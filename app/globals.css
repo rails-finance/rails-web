@@ -1367,8 +1367,11 @@ label[for] {
 .skel-wait {
   animation: fade-in 120ms ease-out 150ms both;
 }
+/* Fill `backwards`, not `both`: a forwards fill keeps the element a stacking
+   context after the fade, trapping the z-index of any menu inside it under
+   later siblings. `.ct-row` follows the same rule. */
 .reveal-in {
-  animation: fade-in 120ms ease-out both;
+  animation: fade-in 120ms ease-out backwards;
 }
 /* The beta strip, dismissed: hidden from first paint by the cookie the
    layout's head script reads (components/shared/beta-strip.tsx). */
@@ -2178,7 +2181,7 @@ html[data-beta-dismissed] [data-beta-strip] {
    viewKey on a facet, sort or page change, so the fade replays; search is left
    out of the key, so typing filters in place. */
 .ct-row {
-  animation: fade-in 120ms ease-out both;
+  animation: fade-in 120ms ease-out backwards;
 }
 @media (prefers-reduced-motion: reduce) {
   .ct-row {

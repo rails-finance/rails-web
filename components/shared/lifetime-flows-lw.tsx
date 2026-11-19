@@ -1272,15 +1272,17 @@ export function LifetimeFlowsLw({
       setMeets((m) => (m.days === touch.length && m.met === met ? m : { days: touch.length, met }));
     }
     const end = grid.start + grid.count * grid.step;
+    const v = view.current;
     c.applyOptions({
       timeScale: {
-        timeVisible: grid.step < DAY_S,
+        // Hours on the axis only for a window under three days: a finer grid
+        // over a longer window labelled a day's midnight "12:00".
+        timeVisible: v.to - v.from < 3 * DAY_S,
         secondsVisible: false,
         fixLeftEdge: grid.start <= bounds.t0,
         fixRightEdge: end >= bounds.t1,
       },
     });
-    const v = view.current;
     c.timeScale().setVisibleLogicalRange({
       from: (v.from - grid.start) / grid.step,
       to: (v.to - grid.start) / grid.step - 1,

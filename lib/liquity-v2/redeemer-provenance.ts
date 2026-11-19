@@ -9,15 +9,20 @@ import type { LiquityV2RedemptionRow } from "@/lib/sources/api/liquity-v2-redeem
 const VIA = "GET /api/liquity-v2/redeemer/:address";
 
 /** One field of a redemption row, from its TroveOperation log. */
-export function redemptionLogProv(what: "bold" | "coll" | "trove" | "block", r: LiquityV2RedemptionRow): Provenance {
+export function redemptionLogProv(
+  what: "bold" | "coll" | "trove" | "block" | "rate",
+  r: LiquityV2RedemptionRow,
+): Provenance {
   const c = r.collateral_type;
   const summary = {
     bold: "BOLD redeemed — the BOLD this redemption took off the Trove's debt: the TroveOperation log's _debtChangeFromOperation, with its sign turned.",
     coll: `${c} paid out of the Trove — the ${c} this redemption took out of the Trove: the TroveOperation log's _collChangeFromOperation, with its sign turned. The redemption fee stays in the Trove and is left out.`,
     trove: `Trove — the _troveId of the ${c} TroveManager's TroveOperation log, with _operation redeemCollateral (6).`,
     block: "Block — the block this TroveOperation was logged in.",
+    rate: "Interest rate — the Trove's annual interest rate at this block, its batch's for a Trove in a batch: the TroveOperation log's _annualInterestRate.",
   }[what];
-  const raw = what === "bold" ? r.bold_raw : what === "coll" ? r.coll_raw : null;
+  const raw =
+    what === "bold" ? r.bold_raw : what === "coll" ? r.coll_raw : what === "rate" ? (r.rate_raw ?? null) : null;
   return {
     kind: "chain",
     pclass: "emitted",
@@ -30,7 +35,17 @@ export function redemptionLogProv(what: "bold" | "coll" | "trove" | "block", r: 
       text: "Confirm in the tx event logs",
     },
     ...(raw
-      ? { scaling: { raw, from: "log" as const, places: 18, why: `${what === "bold" ? "BOLD" : c} has 18 decimals` } }
+      ? {
+          scaling: {
+            raw,
+            from: "log" as const,
+            places: what === "rate" ? 16 : 18,
+            why:
+              what === "rate"
+                ? "the rate is 1e18 for 100%, so 1e16 for 1%"
+                : `${what === "bold" ? "BOLD" : c} has 18 decimals`,
+          },
+        }
       : {}),
     via: VIA,
   };

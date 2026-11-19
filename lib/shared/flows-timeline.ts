@@ -400,6 +400,10 @@ export interface FlowTimeline {
    *  the chart's time axis (lib/shared/flows-pace.ts; Liquity V2's branch
    *  redemptions). */
   activity?: ProtocolActivity;
+  /** The panel draws the price chart with its events row and its tie to the
+   *  timeline, and no bars, value line or totals: the page holds no position
+   *  (a Liquity V2 redeemer). The one-day rule still applies. */
+  chartAlone?: true;
 }
 
 /** Per-timeline words for the scrubber. Every field is optional and defaults
@@ -409,6 +413,9 @@ export interface FlowWords {
   held?: string;
   /** The date label at the last stop ("At the latest block's price"). */
   live?: string;
+  /** The last stop of a closed life, where "Close" would not name it (a
+   *  redeemer's "Last redemption"). */
+  close?: string;
   /** The supplied side's balancing item, for a bar whose dollar axis is a
    *  fixed rate, where everything past what came in is interest. Unset, each
    *  side's balancing item reads "Market move and interest" at every stop:
@@ -539,6 +546,8 @@ export interface FlowModel {
   changesUnavailable: boolean;
   /** The timeline's protocol activity (`FlowTimeline.activity`), or null. */
   activity: ProtocolActivity | null;
+  /** The timeline's `chartAlone`: no position, so no state between events. */
+  chartAlone?: true;
   live: FlowLive;
   /** Held and owed, valued, at the end of each stop before the live one. */
   valued: { collateral: number; debt: number }[];
@@ -1067,6 +1076,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     changes: t.changes ?? [],
     changesUnavailable: t.changesUnavailable === true,
     activity: t.activity ?? null,
+    ...(t.chartAlone ? { chartAlone: true as const } : {}),
     live: t.live,
     valued,
     collateralHigh,
