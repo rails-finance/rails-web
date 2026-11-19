@@ -51,22 +51,6 @@ const vaultCallProv_ = (c: IporFusionCoords, { label, call, what }: { label: str
     via: `${lane(c)} · PlasmaVault.${call} @ the pinned block`,
   }) satisfies Provenance;
 
-const iporRosterCensusProv_ = (
-  c: IporFusionCoords,
-  census: { catalogSize: number; censusBlock: number; factory: string },
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "emitted",
-  source: { block: census.censusBlock },
-  verify: {
-    kind: "recompute",
-    text: `To check: read the FusionInstanceCreated logs of the factory proxy ${census.factory} on ${chainName(c)} up to block ${n(census.censusBlock)}, decoding both of its event signatures, and count the vaults; getFusionFactoryIndex() at that block answers the same count.`,
-  },
-  summary: `Vaults catalogued — ${n(census.catalogSize)}: every vault the IPOR Fusion factory had made on ${chainName(c)} at block ${n(census.censusBlock)}, each named by its creation event. The factory is open to anyone, so a vault on this list is not one IPOR curates. The list is a floor: a vault deployed by hand, or by an earlier factory, emits no such event and is absent, and a vault made since that block joins when the census runs again.`,
-  via: `${lane(c)} · FusionInstanceCreated on the factory proxy, censused to block ${n(census.censusBlock)}`,
-  formula: "count of FusionInstanceCreated logs up to the census block",
-});
-
 const iporEmptyCountProv_ = (c: IporFusionCoords, count: number, total: number): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
@@ -239,7 +223,6 @@ const iporMarketsGapProv_ = (c: IporFusionCoords, f: { total: string; summed: st
   formula: "totalAssets() − (in the vault + rewards manager + Σ totalAssetsInMarket)",
 });
 
-export const iporRosterCensusProv = withServerRead(iporRosterCensusProv_);
 export const iporMarketBalanceProv = withServerRead(iporMarketBalanceProv_);
 export const iporMarketSubstratesProv = withServerRead(iporMarketSubstratesProv_);
 export const iporInVaultProv = withServerRead(iporInVaultProv_);

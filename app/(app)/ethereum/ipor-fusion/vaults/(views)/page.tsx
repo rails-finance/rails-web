@@ -8,8 +8,7 @@
 
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { SubPageHeader } from "@/components/shared/sub-page-header";
-import { iporFusionVaultCardContent } from "@/lib/vaults/card-words";
+import { RailHeader } from "@/components/shared/rail-header";
 import { IporFusionVaultDirectoryView } from "@/components/vaults/ipor-fusion-vault-directory-view";
 import { loadIporFusionVaultDirectory } from "@/lib/sources/chain/ipor-fusion-vault-directory";
 import { iporFusionRoster } from "@/lib/ipor-fusion/vault-roster";
@@ -38,7 +37,11 @@ export default async function IporFusionVaultRosterPage({ searchParams }: { sear
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader protocol={PROTOCOL} title="Vaults" learnMore={iporFusionVaultCardContent()} />
+        {/* The rail alone: no "Vaults" heading (Miles, 19 Nov 2026); the h1 is for screen readers. */}
+        <header className="mb-5" data-skel-section="page-header">
+          <RailHeader session={PROTOCOL.session} venue="subPage" />
+          <h1 className="sr-only">IPOR Fusion vaults</h1>
+        </header>
         <div data-roster-panel>
           <IporFusionVaultDirectoryView
             chainId={CHAIN_ID}
@@ -48,8 +51,6 @@ export default async function IporFusionVaultRosterPage({ searchParams }: { sear
             readBy={serverReadOf(data)}
             chainStale={data.chainStale}
             catalogSize={data.catalogSize}
-            censusBlock={data.censusBlock}
-            factory={data.factory}
           />
         </div>
         <ProvInspectorLayer />
