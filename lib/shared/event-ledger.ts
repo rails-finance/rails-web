@@ -15,9 +15,10 @@
 // Pure, tested offline (scripts/verify/verify-liquity-flows.ts,
 // scripts/verify/verify-lifetime-flows-state.ts).
 
-import { apportionSigned, wholeUsd } from "@/lib/shared/flows-sum";
+import { apportionSigned, listWords, NO_FIGURE, wholeUsd } from "@/lib/shared/flows-sum";
 import {
   assetTokenSumFor,
+  signedShownUsd,
   fmtTokens,
   interestLine,
   type AssetSum,
@@ -25,13 +26,18 @@ import {
   type TokenSum,
 } from "@/lib/shared/flow-focus";
 import {
+  flowLeg,
+  hasParts,
   unitOf,
   type FlowBucket,
+  type FlowLeg,
+  type MarketMove,
   type FlowModel,
   type FlowSegment,
   type FlowSide,
   type FlowUnit,
 } from "@/lib/shared/flows-timeline";
+import { shownPrice, shownUsd } from "@/lib/shared/shown-usd";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 
 /** "5 Jul '25": the day a ledger's rows stand at. */
@@ -59,8 +65,21 @@ export interface LedgerRow {
   seg: FlowSegment | null;
   /** Signed, in units of the printed last decimal, and printed ("−200.00"). */
   tokens: { units: number; text: string } | null;
-  /** Signed whole dollars, and printed ("−$1,151"). */
-  usd: { dollars: number; text: string } | null;
+  /** Signed whole dollars, and printed ("−$1,151"); in a ledger of legs
+   *  with their parts (ui-jobs 743) also `cents`, the sum of its legs' cents
+   *  that the face rounds, and the legs for its receipt. A row with no
+   *  figure prints "—" and names its unpriced assets, or says why
+   *  (`market`). */
+  usd: LedgerUsd | null;
+}
+
+export interface LedgerUsd {
+  dollars: number;
+  text: string;
+  cents?: number;
+  legs?: FlowLeg[];
+  unpriced?: string[];
+  market?: MarketMove;
 }
 
 export interface Ledger {
@@ -72,19 +91,69 @@ export interface Ledger {
   /** What is held or owed: before the event's transaction where it moved
    *  the side, and after. */
   tokens: { before: string | null; after: string; units: number } | null;
-  usd: { before: string | null; after: string; dollars: number } | null;
+  usd: { before: string | null; after: string; dollars: number; cents?: number } | null;
   /** The token's price at the event, where the builder is given it: the
    *  off-par stablecoin rule reads it (lib/shared/usd-display.ts). */
   price?: number | null;
+  /** The amount and price the total multiplies out from, where the ledger
+   *  states one asset at the block's price (a side by asset). */
+  held?: { amount: number; price: number; block: number | null; priceNote?: string };
+  /** Plain lines under the rows: a line with no figure for want of a price,
+   *  or a Market move whose two values stand on different bases. */
+  notes?: string[];
 }
 
-/** A dollar line of the side, as flow-focus prints it. */
+/** A dollar line of the side, as flow-focus prints it; in cents where its
+ *  legs carry their parts (`SumLine`). */
 export interface UsdLine {
   key: string;
   label: string;
   kind: "opening" | "in" | "out" | "rest";
   seg: FlowSegment | null;
   dollars: number;
+  cents?: number;
+  unpriced?: string[];
+  none?: string;
+}
+
+const toCents = (v: number): number => Math.round(v * 100) / 100;
+
+/** A row's dollars from its cents: the face to the dollar, the cents kept. */
+function centsUsd(
+  cents: number,
+  extra: Omit<LedgerUsd, "dollars" | "text" | "cents"> = {},
+  unit?: FlowUnit,
+): LedgerUsd {
+  return { dollars: Math.round(cents), text: signedUsd(cents, unit), cents, ...extra };
+}
+
+/** A row with no figure: "—", its unpriced assets or why. */
+function noFigure(extra: Omit<LedgerUsd, "dollars" | "text" | "cents">): LedgerUsd {
+  return { dollars: 0, text: NO_FIGURE, ...extra };
+}
+
+/** The legs of a line less the event's: one match per event leg. */
+function legsLess(all: FlowLeg[], gone: FlowLeg[]): FlowLeg[] {
+  const left = [...all];
+  for (const g of gone) {
+    const i = left.findIndex(
+      (l) => l.symbol === g.symbol && l.amount === g.amount && l.price === g.price && l.block === g.block,
+    );
+    if (i >= 0) left.splice(i, 1);
+  }
+  return left;
+}
+
+/** The notes a ledger states under its rows for its rows with no figure. */
+function notesFor(rows: LedgerRow[]): string[] | undefined {
+  const notes: string[] = [];
+  for (const r of rows) {
+    if (r.usd?.unpriced?.length && r.role !== "before")
+      notes.push(`${r.label} has no figure: ${listWords(r.usd.unpriced)} has no price at its block.`);
+    if (r.usd?.market && "none" in r.usd.market && !r.usd.market.none.startsWith("No figure"))
+      notes.push(r.usd.market.none);
+  }
+  return notes.length ? [...new Set(notes)] : undefined;
 }
 
 export const signedTokens = (units: number, decimals: number): string =>
@@ -143,24 +212,35 @@ function eventPart(
   key: string,
   symbol?: string,
   accrual = false,
-): { amount: number; usd: number } | null {
+): { amount: number; usd: number; legs: FlowLeg[]; unpriced: string[] } | null {
   let amount = 0;
   let usd = 0;
   let act = false;
+  const legs: FlowLeg[] = [];
+  const unpriced: string[] = [];
   for (const l of ev?.legs ?? []) {
     if (l.bucket !== key || !!l.accrual !== accrual) continue;
     if (symbol != null && l.symbol !== symbol) continue;
     act = true;
     amount += l.amount ?? 0;
-    usd += l.usd ?? 0;
+    if (hasParts(l)) {
+      legs.push({ ...l, ts: ev?.ts });
+      if (l.usd == null) {
+        if (l.symbol && !unpriced.includes(l.symbol)) unpriced.push(l.symbol);
+      } else usd = toCents(usd + l.usd);
+    } else usd += l.usd ?? 0;
   }
-  return act ? { amount, usd } : null;
+  return act ? { amount, usd, legs, unpriced } : null;
 }
 
-const usdTotal = (dollars: number, before: number | null, unit?: FlowUnit) => ({
-  before: before != null && Math.round(before) !== dollars && Math.round(before) !== 0 ? wholeUsd(before, unit) : null,
-  after: wholeUsd(dollars, unit),
-  dollars,
+const usdTotal = (dollars: number, before: number | null, unit?: FlowUnit, cents?: number) => ({
+  before:
+    before != null && Math.round(before) !== Math.round(dollars) && Math.round(before) !== 0
+      ? wholeUsd(before, unit)
+      : null,
+  after: wholeUsd(cents ?? dollars, unit),
+  dollars: cents != null ? Math.round(cents) : dollars,
+  ...(cents != null ? { cents } : {}),
 });
 
 /** A side's ledger in its token: `sum`'s lines, the event's part of each
@@ -175,13 +255,16 @@ export function tokenLedger({
   symbolFilter,
   accrualLabel,
   price,
+  held,
 }: {
   model: FlowModel;
   side: FlowSide;
   /** The event the card states; null for none (no row is split). */
   ev: FocusEvent | null;
   sum: TokenSum;
-  usd: { lines: UsdLine[]; dollars: number; before: number | null } | null;
+  /** The side's dollar lines and total; `cents` where the lines are in
+   *  cents (their legs carry their parts). */
+  usd: { lines: UsdLine[]; dollars: number; before: number | null; cents?: number } | null;
   /** Read only the event's legs in this token (a side by asset). */
   symbolFilter?: string;
   /** Where the family counts the accrual since the last event in the event's
@@ -190,10 +273,13 @@ export function tokenLedger({
   accrualLabel?: (key: string) => string;
   /** The token's price at the event. */
   price?: number | null;
+  /** The amount and price the total multiplies out from, for its receipt. */
+  held?: Ledger["held"];
 }): Ledger {
   const scale = 10 ** sum.decimals;
   const bucketOf = (k: string) => model.buckets.find((b) => b.key === k);
   const usdOf = new Map(usd?.lines.map((l) => [l.key, l]) ?? []);
+  const inCents = usd != null && (usd.cents != null || usd.lines.some((l) => l.cents != null || l.unpriced));
   const rows: LedgerRow[] = [];
   const row = (
     key: string,
@@ -202,7 +288,7 @@ export function tokenLedger({
     role: LedgerRole,
     seg: FlowSegment | null,
     units: number | null,
-    dollars: number | null,
+    dollars: number | LedgerUsd | null,
   ): LedgerRow => ({
     key,
     line,
@@ -210,15 +296,26 @@ export function tokenLedger({
     role,
     seg,
     tokens: units == null ? null : { units, text: signedTokens(units, sum.decimals) },
-    usd: dollars == null ? null : { dollars, text: signedUsd(dollars) },
+    usd: dollars == null ? null : typeof dollars === "number" ? { dollars, text: signedUsd(dollars) } : dollars,
   });
+  /** A whole line's dollars in cents: its legs' sum, or no figure. */
+  const lineCents = (u: UsdLine | undefined): LedgerUsd =>
+    u?.unpriced?.length
+      ? noFigure({ unpriced: u.unpriced, legs: u.seg?.legs })
+      : u?.none != null
+        ? noFigure({ market: u.seg?.market ?? { none: u.none } })
+        : centsUsd(u?.cents ?? 0, {
+            ...(u?.seg?.legs ? { legs: u.seg.legs } : {}),
+            ...(u?.seg?.market ? { market: u.seg.market } : {}),
+          });
   const accrualLines: { key: string; before: string; label: string }[] = [];
   for (const l of sum.lines) {
     const b = bucketOf(l.key);
     const u = usdOf.get(l.key);
     const seg = l.kind === "interest" ? null : b ? bucketSeg(b) : (u?.seg ?? null);
     const words = ledgerWords(b, l.label);
-    const lineUsd = usd ? (u?.dollars ?? 0) : null;
+    const sign = l.kind === "out" ? -1 : 1;
+    const lineUsd: number | LedgerUsd | null = !usd ? null : inCents ? lineCents(u) : (u?.dollars ?? 0);
     let part = l.kind === "interest" ? null : eventPart(ev, l.key, symbolFilter);
     let eventLabel = words.event;
     if (!part && accrualLabel && l.kind !== "interest") {
@@ -226,16 +323,30 @@ export function tokenLedger({
       eventLabel = accrualLabel(l.key);
       if (part) accrualLines.push({ key: l.key, before: words.before, label: eventLabel });
     }
-    const sign = l.kind === "out" ? -1 : 1;
     const evUnits = part ? sign * Math.round(part.amount * scale) : 0;
     if (part && evUnits !== 0) {
       const beforeUnits = l.units - evUnits;
-      let evUsd = lineUsd == null ? null : u ? sign * Math.round(part.usd) : 0;
-      if (beforeUnits !== 0) {
-        rows.push(
-          row(l.key, l.key, words.before, "before", seg, beforeUnits, lineUsd == null ? null : lineUsd - (evUsd ?? 0)),
-        );
-      } else evUsd = lineUsd;
+      let evUsd: number | LedgerUsd | null;
+      let beforeUsd: number | LedgerUsd | null;
+      if (lineUsd == null) evUsd = beforeUsd = null;
+      else if (typeof lineUsd === "number") {
+        evUsd = u ? sign * Math.round(part.usd) : 0;
+        beforeUsd = lineUsd - evUsd;
+      } else {
+        // The event's row is its legs' cents; the earlier row the line less
+        // them, so the rows add to the line in cents. A line with no figure
+        // has no earlier part either.
+        const evCents = toCents(sign * part.usd);
+        evUsd = part.unpriced.length
+          ? noFigure({ unpriced: part.unpriced, legs: part.legs })
+          : centsUsd(evCents, { legs: part.legs });
+        beforeUsd =
+          lineUsd.cents == null
+            ? noFigure({ unpriced: lineUsd.unpriced, legs: legsLess(lineUsd.legs ?? [], part.legs) })
+            : centsUsd(toCents(lineUsd.cents - evCents), { legs: legsLess(lineUsd.legs ?? [], part.legs) });
+      }
+      if (beforeUnits !== 0) rows.push(row(l.key, l.key, words.before, "before", seg, beforeUnits, beforeUsd));
+      else evUsd = lineUsd;
       rows.push(row(`${l.key}#event`, l.key, eventLabel, "event", seg, evUnits, evUsd));
     } else
       rows.push(row(l.key, l.key, words.plain, l.kind === "interest" ? "interest" : "flow", seg, l.units, lineUsd));
@@ -252,7 +363,7 @@ export function tokenLedger({
           u.kind === "rest" ? "market" : u.key === interestLine(side).key ? "interest" : "flow",
           u.kind === "rest" || u.key === interestLine(side).key ? null : b ? bucketSeg(b) : u.seg,
           null,
-          u.dollars,
+          inCents ? lineCents(u) : u.dollars,
         ),
       );
     }
@@ -290,14 +401,17 @@ export function tokenLedger({
       }
     before = recorded !== sum.total.units && recorded !== 0 ? fmtTokens(recorded / scale, sum.decimals) : null;
   }
+  const notes = inCents ? notesFor(rows) : undefined;
   return {
     side,
     symbol: sum.symbol,
     decimals: sum.decimals,
     rows,
     tokens: { before, after: sum.total.amount, units: sum.total.units },
-    usd: usd ? usdTotal(usd.dollars, usd.before) : null,
+    usd: usd ? usdTotal(usd.dollars, usd.before, undefined, inCents ? (usd.cents ?? usd.dollars) : undefined) : null,
     ...(price != null ? { price } : {}),
+    ...(held && usd ? { held } : {}),
+    ...(notes ? { notes } : {}),
   };
 }
 
@@ -310,6 +424,7 @@ export function dollarLedger({
   lines,
   dollars,
   before,
+  cents,
 }: {
   model: FlowModel;
   side: FlowSide;
@@ -317,9 +432,20 @@ export function dollarLedger({
   lines: UsdLine[];
   dollars: number;
   before: number | null;
+  /** The total in cents, where the lines are (`SumLine.cents`). */
+  cents?: number;
 }): Ledger {
+  const unit = unitOf(model, side);
+  const inCents = cents != null || lines.some((l) => l.cents != null || l.unpriced);
   const rows: LedgerRow[] = [];
-  const row = (key: string, line: string, label: string, role: LedgerRole, seg: FlowSegment | null, d: number) =>
+  const row = (
+    key: string,
+    line: string,
+    label: string,
+    role: LedgerRole,
+    seg: FlowSegment | null,
+    d: number | LedgerUsd,
+  ) =>
     rows.push({
       key,
       line,
@@ -327,31 +453,62 @@ export function dollarLedger({
       role,
       seg,
       tokens: null,
-      usd: { dollars: d, text: signedUsd(d, unitOf(model, side)) },
+      usd: typeof d === "number" ? { dollars: d, text: signedUsd(d, unit) } : d,
     });
+  const lineUsd = (l: UsdLine): LedgerUsd =>
+    l.unpriced?.length
+      ? noFigure({ unpriced: l.unpriced, legs: l.seg?.legs })
+      : l.none != null
+        ? noFigure({ market: l.seg?.market ?? { none: l.none } })
+        : centsUsd(
+            l.cents ?? 0,
+            { ...(l.seg?.legs ? { legs: l.seg.legs } : {}), ...(l.seg?.market ? { market: l.seg.market } : {}) },
+            unit,
+          );
   for (const l of lines) {
     const b = model.buckets.find((x) => x.key === l.key);
     const words = ledgerWords(b, l.label);
     if (l.kind === "rest") {
-      row(l.key, l.key, l.label, "market", null, l.dollars);
+      row(l.key, l.key, l.label, "market", null, inCents ? lineUsd(l) : l.dollars);
       continue;
     }
     const interest = l.key === interestLine(side).key;
     const seg = interest ? null : b ? bucketSeg(b) : l.seg;
     const part = interest ? null : eventPart(ev, l.key);
-    const evDollars = part ? (l.kind === "out" ? -1 : 1) * Math.round(part.usd) : 0;
-    if (part && evDollars !== 0) {
-      if (l.dollars !== evDollars) row(l.key, l.key, words.before, "before", seg, l.dollars - evDollars);
-      row(`${l.key}#event`, l.key, words.event, "event", seg, evDollars);
-    } else row(l.key, l.key, interest ? l.label : words.plain, interest ? "interest" : "flow", seg, l.dollars);
+    const sign = l.kind === "out" ? -1 : 1;
+    if (!inCents) {
+      const evDollars = part ? sign * Math.round(part.usd) : 0;
+      if (part && evDollars !== 0) {
+        if (l.dollars !== evDollars) row(l.key, l.key, words.before, "before", seg, l.dollars - evDollars);
+        row(`${l.key}#event`, l.key, words.event, "event", seg, evDollars);
+      } else row(l.key, l.key, interest ? l.label : words.plain, interest ? "interest" : "flow", seg, l.dollars);
+      continue;
+    }
+    const whole = lineUsd(l);
+    const evCents = part ? toCents(sign * part.usd) : 0;
+    const moved = part != null && (part.unpriced.length > 0 || Math.abs(evCents) >= 0.005);
+    if (part && moved) {
+      const evUsd = part.unpriced.length
+        ? noFigure({ unpriced: part.unpriced, legs: part.legs })
+        : centsUsd(evCents, { legs: part.legs }, unit);
+      const rest = legsLess(whole.legs ?? [], part.legs);
+      if (whole.cents == null) {
+        if (rest.length)
+          row(l.key, l.key, words.before, "before", seg, noFigure({ unpriced: whole.unpriced, legs: rest }));
+      } else if (Math.abs(whole.cents - evCents) >= 0.005)
+        row(l.key, l.key, words.before, "before", seg, centsUsd(toCents(whole.cents - evCents), { legs: rest }, unit));
+      row(`${l.key}#event`, l.key, words.event, "event", seg, evUsd);
+    } else row(l.key, l.key, interest ? l.label : words.plain, interest ? "interest" : "flow", seg, whole);
   }
+  const notes = inCents ? notesFor(rows) : undefined;
   return {
     side,
     symbol: null,
     decimals: null,
     rows,
     tokens: null,
-    usd: usdTotal(dollars, before, unitOf(model, side)),
+    usd: usdTotal(dollars, before, unit, inCents ? (cents ?? dollars) : undefined),
+    ...(notes ? { notes } : {}),
   };
 }
 
@@ -374,7 +531,12 @@ export function assetLedgers({
   sum: AssetSum;
   held: number;
   heldBefore: number | null;
-}): { assets: Ledger[]; usd: { before: string | null; after: string; dollars: number } } {
+}): { assets: Ledger[]; usd: { before: string | null; after: string; dollars: number; cents?: number } | null } {
+  // A side whose legs carry their parts sums in cents (ui-jobs 743): each
+  // asset's balance as shown times its price as shown, the side's total
+  // their sum, with no figure where an asset is unpriced.
+  const inCents = Object.values(sum.legs).some((by) => Object.keys(by).length > 0);
+  if (inCents) return assetLedgersInCents({ model, side, ev, sum, heldBefore });
   const total = Math.round(held);
   const values = sum.symbols.map((s) => {
     const b = sum.balances.find((x) => x.symbol === s);
@@ -411,6 +573,102 @@ export function assetLedgers({
   return { assets, usd: usdTotal(total, heldBefore) };
 }
 
+/** An asset's interest row as a leg: its amount as the balance less the
+ *  flows, at the balance read's price. */
+function interestLeg(side: FlowSide, i: AssetSum["interest"][number]): FlowLeg {
+  return flowLeg({
+    bucket: interestLine(side).key,
+    symbol: i.symbol,
+    amount: Math.abs(i.amount),
+    price: i.price,
+    block: i.block ?? null,
+    priceNote: i.priceNote ?? "the price the side's balance read carries",
+  });
+}
+
+function assetLedgersInCents({
+  model,
+  side,
+  ev,
+  sum,
+  heldBefore,
+}: {
+  model: FlowModel;
+  side: FlowSide;
+  ev: FocusEvent | null;
+  sum: AssetSum;
+  heldBefore: number | null;
+}): { assets: Ledger[]; usd: { before: string | null; after: string; dollars: number; cents?: number } | null } {
+  const values = sum.symbols.map((s) => {
+    const b = sum.balances.find((x) => x.symbol === s);
+    if (!b || !(b.amount > 0)) return 0;
+    return b.price == null ? null : shownUsd(b.amount, b.price);
+  });
+  const assets = sum.symbols.map((symbol, i) => {
+    const t = assetTokenSumFor(sum, symbol);
+    const assetCents = values[i];
+    const interest = sum.interest.find((x) => x.symbol === symbol);
+    const bal = sum.balances.find((x) => x.symbol === symbol);
+    let usd: { lines: UsdLine[]; dollars: number; before: number | null; cents: number } | null = null;
+    if (assetCents != null && (!interest || Math.abs(interest.amount) <= 1e-12 || interest.price != null)) {
+      const lines: UsdLine[] = [];
+      for (const l of sum.lines) {
+        if (!l.parts.some((p) => p.symbol === symbol)) continue;
+        const sign = l.kind === "out" ? -1 : 1;
+        const legs =
+          l.kind === "interest" && interest ? [interestLeg(side, interest)] : (sum.legs[l.key]?.[symbol] ?? []);
+        const cents =
+          l.kind === "interest"
+            ? interest?.price != null
+              ? signedShownUsd(interest.amount, interest.price)
+              : 0
+            : toCents(sign * (sum.usd[l.key]?.[symbol] ?? 0));
+        lines.push({
+          key: l.key,
+          label: l.label,
+          kind: l.kind === "interest" ? "in" : l.kind,
+          seg: { key: l.key, label: l.label, fill: "in", width: 0, value: cents, legs },
+          dollars: Math.round(cents),
+          cents,
+        });
+      }
+      const lineSum = toCents(lines.reduce((a, l) => a + (l.cents ?? 0), 0));
+      const rest = toCents(assetCents - lineSum);
+      if (Math.abs(rest) >= 0.005) {
+        const key = `${side}-${symbol}-market`;
+        lines.push({
+          key,
+          label: "Market move",
+          kind: "rest",
+          seg: {
+            key,
+            label: "Market move",
+            fill: "estimate",
+            width: 0,
+            value: rest,
+            market: { cents: rest, held: assetCents, lines: lineSum },
+          },
+          dollars: Math.round(rest),
+          cents: rest,
+        });
+      }
+      usd = { lines, dollars: Math.round(assetCents), before: null, cents: assetCents };
+    }
+    const ledger = tokenLedger({ model, side, ev, sum: t, usd, symbolFilter: symbol, price: bal?.price ?? null });
+    // The held row's receipt: the balance as shown times its price as shown.
+    return bal?.price != null && ledger.usd
+      ? {
+          ...ledger,
+          held: { amount: bal.amount, price: bal.price, block: bal.block ?? null, priceNote: bal.priceNote },
+        }
+      : ledger;
+  });
+  // The side's total: the assets' cents, or no figure where one is unpriced.
+  if (values.some((v) => v == null)) return { assets, usd: null };
+  const cents = toCents((values as number[]).reduce((a, v) => a + v, 0));
+  return { assets, usd: usdTotal(cents, heldBefore, undefined, cents) };
+}
+
 /** A token ledger restated at another price (the card set to today, ui-jobs
  *  283): the flows keep the dollars of their blocks, the total is the tokens
  *  held at `price`, and Market move takes the difference. Null for a ledger
@@ -418,32 +676,60 @@ export function assetLedgers({
 export function ledgerAtPrice(l: Ledger, price: number): Ledger | null {
   if (!l.tokens || !l.usd || l.decimals == null || !(price > 0)) return null;
   const scale = 10 ** l.decimals;
-  const dollars = Math.round((l.tokens.units / scale) * price);
   const moved = l.rows.reduce((a, r) => a + (r.role === "event" ? (r.tokens?.units ?? 0) : 0), 0);
-  const before = l.tokens.before != null ? ((l.tokens.units - moved) / scale) * price : null;
   const rows = l.rows.filter((r) => r.role !== "market");
-  const market = dollars - rows.reduce((a, r) => a + (r.usd?.dollars ?? 0), 0);
-  if (market !== 0) {
-    const key = l.rows.find((r) => r.role === "market")?.key ?? `${l.side}-${l.symbol ?? "usd"}-market`;
-    rows.push({
-      key,
-      line: key,
-      label: "Market move",
-      role: "market",
-      seg: null,
-      tokens: null,
-      usd: { dollars: market, text: signedUsd(market) },
-    });
+  const key = l.rows.find((r) => r.role === "market")?.key ?? `${l.side}-${l.symbol ?? "usd"}-market`;
+  const marketRow = (usd: LedgerUsd): LedgerRow => ({
+    key,
+    line: key,
+    label: "Market move",
+    role: "market",
+    seg: null,
+    tokens: null,
+    usd,
+  });
+  if (l.usd.cents != null) {
+    // In cents (ui-jobs 743): the total is the tokens as shown times today's
+    // price as shown; Market move the difference of it and the rows' cents,
+    // with no figure where a row has none.
+    const amount = l.tokens.units / scale;
+    const cents = shownUsd(amount, price);
+    const before = l.tokens.before != null ? shownUsd((l.tokens.units - moved) / scale, price) : null;
+    const blocked = rows.some((r) => r.usd != null && r.usd.cents == null);
+    const lineSum = toCents(rows.reduce((a, r) => a + (r.usd?.cents ?? 0), 0));
+    const market = toCents(cents - lineSum);
+    if (blocked)
+      rows.push(marketRow(noFigure({ market: { none: "No figure: a line above has no price at its block." } })));
+    else if (Math.abs(market) >= 0.005)
+      rows.push(marketRow(centsUsd(market, { market: { cents: market, held: cents, lines: lineSum } })));
+    return {
+      ...l,
+      rows,
+      usd: usdTotal(cents, before, undefined, cents),
+      price,
+      held: { amount, price: shownPrice(price), block: null },
+    };
   }
+  const dollars = Math.round((l.tokens.units / scale) * price);
+  const before = l.tokens.before != null ? ((l.tokens.units - moved) / scale) * price : null;
+  const market = dollars - rows.reduce((a, r) => a + (r.usd?.dollars ?? 0), 0);
+  if (market !== 0) rows.push(marketRow({ dollars: market, text: signedUsd(market) }));
   return { ...l, rows, usd: usdTotal(dollars, before), price };
 }
 
-/** The rows' sums, for the checks: every column adds to its total. */
+/** The rows' sums, for the checks: every column adds to its total, the
+ *  dollars to the cent where the rows are in cents. A ledger with a row of
+ *  no figure has no dollar sum to check. */
 export function ledgerAdds(l: Ledger): { tokens: boolean; usd: boolean } {
   const tok = l.rows.reduce((a, r) => a + (r.tokens?.units ?? 0), 0);
-  const usd = l.rows.reduce((a, r) => a + (r.usd?.dollars ?? 0), 0);
+  const cents = l.usd?.cents != null;
+  const none = l.rows.some((r) => r.usd != null && r.usd.text === NO_FIGURE);
+  const usd = l.rows.reduce((a, r) => a + (cents ? (r.usd?.cents ?? 0) : (r.usd?.dollars ?? 0)), 0);
   return {
     tokens: l.tokens == null || tok === l.tokens.units,
-    usd: l.usd == null || usd === l.usd.dollars,
+    usd:
+      l.usd == null ||
+      none ||
+      (cents ? Math.round(usd * 100) === Math.round((l.usd.cents as number) * 100) : usd === l.usd.dollars),
   };
 }

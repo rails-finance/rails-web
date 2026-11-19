@@ -558,7 +558,7 @@ function SideSumTable({
   };
   const provFor = (kind: string, seg: FlowSegment) =>
     kind === "rest"
-      ? flowRemainderProv(seg.label, side, when, seg.note)
+      ? flowRemainderProv(seg.label, side, when, seg.note, seg.market)
       : kind === "opening"
         ? flowOpeningProv(seg.label, side)
         : flowSegmentProv(seg, side, when, isLive, daily);

@@ -1559,11 +1559,14 @@ test("the event card's sum by asset: each asset's lines and its interest add to 
         for (const r of l.rows.filter((x) => x.role === "event"))
           assert.ok(r.label.startsWith("This "), `${ev.id}: "${r.label}"`);
       }
-      assert.equal(
-        assets.reduce((a, l) => a + (l.usd?.dollars ?? 0), 0),
-        usd.dollars,
-        `${ev.id} ${side}: the assets' dollars add to the side's`,
-      );
+      // In cents where the legs carry their parts; the side's total has no
+      // figure where an asset is unpriced.
+      if (usd)
+        assert.equal(
+          Math.round(assets.reduce((a, l) => a + (l.usd?.cents ?? l.usd?.dollars ?? 0), 0) * 100),
+          Math.round((usd.cents ?? usd.dollars) * 100),
+          `${ev.id} ${side}: the assets' dollars add to the side's`,
+        );
       assert.ok(
         ledgerAdds(
           dollarLedger({ model: route, side, ev, lines: dollars.lines, dollars: dollars.total.dollars, before: null }),

@@ -12,6 +12,7 @@
 
 import {
   apportionSigned,
+  NO_FIGURE,
   wholeUsd,
   sideSumRows,
   type SideSumRows,
@@ -19,14 +20,21 @@ import {
   type SumSign,
 } from "@/lib/shared/flows-sum";
 import {
+  addCents,
+  bucketLegs,
   DAY_MS,
+  hasParts,
+  rowLegs,
   sideStateFor,
   unitOf,
+  type BucketLegs,
+  type FlowLeg,
   type FlowBucket,
   type FlowModel,
   type FlowSegment,
   type FlowSide,
 } from "@/lib/shared/flows-timeline";
+import { shownUsd } from "@/lib/shared/shown-usd";
 
 /** One event of the page as the flow lines read it: the buckets its legs
  *  fill, each in USD at the price its event carries (null where no price). */
@@ -41,7 +49,7 @@ export interface FocusEvent {
    *  `accrual` leg (a Liquity Trove's interest since its last event) is not
    *  the event's act: its line is highlighted only where it comes to a
    *  dollar. */
-  legs: { bucket: string; usd: number | null; amount?: number; symbol?: string; accrual?: boolean }[];
+  legs: FlowLeg[];
   /** Where the family's replay states it (the Liquity family): each side's
    *  USD just before and once the event's transaction had run, at the
    *  transaction's price, its token move, and the tokens held or owed once
@@ -79,6 +87,10 @@ export interface EventCum {
   legs: FocusEvent["legs"];
   /** Events after this one in the position's history. */
   later: boolean;
+  /** Each line's legs that carry their parts through the transaction (or
+   *  the day's close), for the receipts, and the assets of its unpriced
+   *  ones (`bucketLegs`). */
+  parts: BucketLegs;
 }
 
 /** A leg's figure agrees with the day row's where it is within a dollar, or
@@ -103,19 +115,30 @@ export function eventCum(model: FlowModel, events: FocusEvent[], id: string): Ev
   const keys = model.buckets.map((b) => b.key);
   const sameDay = events.filter((e) => Math.floor(e.ts / 86_400) - startDay === stop);
   const add = (into: Record<string, number>, e: FocusEvent, sign = 1) => {
-    for (const l of e.legs) if (l.usd != null && l.bucket in into) into[l.bucket] += sign * l.usd;
+    for (const l of e.legs)
+      if (l.usd != null && l.bucket in into)
+        into[l.bucket] = hasParts(l) ? addCents(into[l.bucket], sign * l.usd) : into[l.bucket] + sign * l.usd;
   };
   const priced = sameDay.every((e) => e.legs.every((l) => l.usd != null));
   const dayMove: Record<string, number> = Object.fromEntries(keys.map((k) => [k, 0]));
   for (const e of sameDay) add(dayMove, e);
   const exact = priced && keys.every((k) => agrees(dayMove[k], (row.cum[k] ?? 0) - (prev[k] ?? 0)));
   const after: Record<string, number> = Object.fromEntries(keys.map((k) => [k, prev[k] ?? 0]));
+  // The legs behind the totals: every earlier day's, then this day's through
+  // the transaction, or the whole day where the totals are its close.
+  const legs = rowLegs(model, ri - 1);
   if (exact) {
     // Through this event and the rest of its transaction.
     let last = sameDay.findIndex((e) => e.id === id);
     while (ev.tx && last + 1 < sameDay.length && sameDay[last + 1].tx === ev.tx) last++;
-    for (let i = 0; i <= last; i++) add(after, sameDay[i]);
-  } else for (const k of keys) after[k] = row.cum[k] ?? 0;
+    for (let i = 0; i <= last; i++) {
+      add(after, sameDay[i]);
+      for (const l of sameDay[i].legs) legs.push({ ...l, ts: sameDay[i].ts });
+    }
+  } else {
+    for (const k of keys) after[k] = row.cum[k] ?? 0;
+    legs.push(...row.legs);
+  }
   const before = { ...after };
   add(before, ev, -1);
   return {
@@ -126,6 +149,7 @@ export function eventCum(model: FlowModel, events: FocusEvent[], id: string): Ev
     buckets: new Set(ev.legs.filter((l) => !(l.accrual && Math.abs(l.usd ?? 0) < 0.5)).map((l) => l.bucket)),
     legs: ev.legs,
     later: at < events.length - 1 || ri < model.rows.length - 1,
+    parts: bucketLegs(legs),
   };
 }
 
@@ -142,7 +166,7 @@ export function eventSideSum(
   cum: EventCum,
   held: number,
 ): Omit<SideSumRows, "lines"> & { lines: EventSumLine[] } {
-  const st = sideStateFor(model, side, cum.after, held);
+  const st = sideStateFor(model, side, cum.after, held, cum.parts);
   const unit = unitOf(model, side);
   const rows = sideSumRows(st, unit);
   return {
@@ -297,6 +321,10 @@ export interface AssetBalance {
   amount: number;
   before: number;
   price: number | null;
+  /** The block the price stands at, and where it comes from, for the
+   *  receipts (ui-jobs 743). */
+  block?: number | null;
+  priceNote?: string;
 }
 
 export interface AssetSumLine {
@@ -319,14 +347,18 @@ export interface AssetSum {
    *  held at the price of its latest flow); null where an asset with interest
    *  has no price. */
   interestUsd: number | null;
-  /** Each asset's interest in its token, and the price it is valued at. */
-  interest: { symbol: string; amount: number; price: number | null }[];
+  /** Each asset's interest in its token, and the price it is valued at,
+   *  with that price's block and source where the balance read names them. */
+  interest: { symbol: string; amount: number; price: number | null; block?: number | null; priceNote?: string }[];
   /** Running tokens per bucket and asset once the transaction had run, and
    *  less this event's legs; and the running USD per bucket and asset, each
    *  leg at its block's price. */
   after: Record<string, Record<string, number>>;
   before: Record<string, Record<string, number>>;
   usd: Record<string, Record<string, number>>;
+  /** The legs per bucket and asset that carry their parts, for the
+   *  receipts. */
+  legs: Record<string, Record<string, FlowLeg[]>>;
 }
 
 /** The interest line's key and words. */
@@ -367,15 +399,23 @@ export function eventAssetSum(
   const usdBy: Record<string, Record<string, number>> = Object.fromEntries(buckets.map((b) => [b.key, {}]));
   // Each asset's price at its latest flow, for the interest of an asset the
   // side no longer holds (no read at the block prices it).
-  const flowPrice: Record<string, number> = {};
+  const flowPrice: Record<string, { price: number; block?: number | null; priceNote?: string }> = {};
+  const legsBy: Record<string, Record<string, FlowLeg[]>> = Object.fromEntries(buckets.map((b) => [b.key, {}]));
   for (let i = 0; i <= last; i++)
     for (const l of events[i].legs) {
       if (!(l.bucket in after)) continue;
       if (l.amount == null || !l.symbol || l.usd == null) return null;
+      const parts = hasParts(l);
       after[l.bucket][l.symbol] = (after[l.bucket][l.symbol] ?? 0) + l.amount;
       usd[l.bucket] += l.usd;
-      usdBy[l.bucket][l.symbol] = (usdBy[l.bucket][l.symbol] ?? 0) + l.usd;
-      if (l.amount > 0) flowPrice[l.symbol] = l.usd / l.amount;
+      const had = usdBy[l.bucket][l.symbol] ?? 0;
+      usdBy[l.bucket][l.symbol] = parts ? addCents(had, l.usd) : had + l.usd;
+      if (parts) (legsBy[l.bucket][l.symbol] ??= []).push({ ...l, ts: events[i].ts });
+      if (l.amount > 0)
+        flowPrice[l.symbol] =
+          parts && l.price != null
+            ? { price: l.price, block: l.block, priceNote: l.priceNote }
+            : { price: l.usd / l.amount };
     }
   // The page holds every flow: it holds as many events as the history has,
   // or its legs meet the running totals the card states.
@@ -409,16 +449,22 @@ export function eventAssetSum(
     let net = 0;
     for (const b of order) net += (b.dir === "out" ? -1 : 1) * (after[b.key][s] ?? 0);
     const bal = balances.find((x) => x.symbol === s);
-    return { symbol: s, amount: (bal?.amount ?? 0) - net, price: bal?.price ?? flowPrice[s] ?? null };
+    const amount = (bal?.amount ?? 0) - net;
+    // At the balance read's price; an asset no longer held at its latest flow's.
+    if (bal?.price != null) return { symbol: s, amount, price: bal.price, block: bal.block, priceNote: bal.priceNote };
+    const f = flowPrice[s];
+    return f ? { symbol: s, amount, ...f } : { symbol: s, amount, price: null };
   });
   const rel = opts.relDust ?? 0;
   const earned = interest.filter(
     (p) =>
       Math.abs(p.amount) > Math.max(1e-12, rel * Math.abs(balances.find((x) => x.symbol === p.symbol)?.amount ?? 0)),
   );
+  // Each asset's interest as shown times its price as shown, to the cent.
   let interestUsd: number | null = 0;
   for (const p of earned)
-    interestUsd = p.price == null || interestUsd == null ? null : interestUsd + p.amount * p.price;
+    interestUsd =
+      p.price == null || interestUsd == null ? null : addCents(interestUsd, signedShownUsd(p.amount, p.price));
   if (earned.length > 0)
     lines.push({
       ...interestLine(side),
@@ -427,8 +473,13 @@ export function eventAssetSum(
       parts: earned.map(({ symbol, amount }) => ({ symbol, amount })),
       hl: false,
     });
-  return { side, lines, symbols, balances, interestUsd, interest, after, before, usd: usdBy };
+  return { side, lines, symbols, balances, interestUsd, interest, after, before, usd: usdBy, legs: legsBy };
 }
+
+/** A signed amount's shown product: the sign kept, the product of the
+ *  magnitudes as shown. */
+export const signedShownUsd = (amount: number, price: number): number =>
+  (amount < 0 ? -1 : 1) * shownUsd(Math.abs(amount), price);
 
 /** A side by asset that holds one asset, as a sum in that token: the lines
  *  rounded together to its decimals so they add to its balance. Null where
@@ -499,6 +550,7 @@ export function eventSideSumByAsset(
   const rows = eventSideSum(model, sum.side, cum, held);
   const il = sum.lines.find((l) => l.kind === "interest");
   if (!il || sum.interestUsd == null) return rows;
+  const inCents = rows.total.cents != null;
   const dollars = Math.round(sum.interestUsd);
   const flows = rows.lines.filter((l) => l.kind !== "rest");
   const rest = rows.lines.find((l) => l.kind === "rest");
@@ -512,8 +564,11 @@ export function eventSideSumByAsset(
     amount: wholeUsd(dollars, unitOf(model, sum.side)),
     hl: false,
     before: null,
+    ...(inCents ? { cents: sum.interestUsd } : {}),
   };
-  const lines: EventSumLine[] = dollars !== 0 ? [...flows, interest] : [...flows];
+  const shown = inCents ? Math.abs(sum.interestUsd) >= 0.005 : dollars !== 0;
+  const lines: EventSumLine[] = shown ? [...flows, interest] : [...flows];
+  if (inCents) return { ...rows, lines: centsRest(rows, lines, rest, sum.side, model) };
   const restDollars = rows.total.dollars - lines.reduce((a, l) => a + l.dollars, 0);
   const restSeg: FlowSegment = rest?.seg ?? {
     key: `${sum.side}-market`,
@@ -537,6 +592,67 @@ export function eventSideSumByAsset(
   if (lines.length > 0 && lines[0].dollars > 0) lines[0] = { ...lines[0], sign: "" };
   return { ...rows, lines };
 }
+
+/** The balancing item of a sum in cents once the interest has its line: the
+ *  held cents less every line's, or no figure where a line has none. */
+function centsRest(
+  rows: ReturnType<typeof eventSideSum>,
+  lines: EventSumLine[],
+  rest: EventSumLine | undefined,
+  side: FlowSide,
+  model: FlowModel,
+): EventSumLine[] {
+  const held = rows.total.cents ?? rows.total.dollars;
+  const blocked = lines.some((l) => l.cents == null) || rest?.none != null;
+  const seg: FlowSegment = rest?.seg ?? {
+    key: `${side}-market`,
+    label: "Market move",
+    fill: "estimate",
+    width: 0,
+    value: 0,
+  };
+  const out = [...lines];
+  if (blocked) {
+    const none = rest?.none ?? NO_PRICE_REST;
+    out.push({
+      key: seg.key,
+      label: "Market move",
+      kind: "rest",
+      seg: { ...seg, market: { none } },
+      dollars: 0,
+      sign: "",
+      amount: NO_FIGURE,
+      none,
+      hl: false,
+      before: null,
+    });
+  } else {
+    const lineCents = Math.round(lines.reduce((a, l) => a + (l.cents ?? 0), 0) * 100) / 100;
+    const cents = Math.round((held - lineCents) * 100) / 100;
+    if (Math.abs(cents) >= 0.005)
+      out.push({
+        key: seg.key,
+        label: "Market move",
+        kind: "rest",
+        seg: {
+          ...seg,
+          label: "Market move",
+          note: "the change in each asset's price since its flows",
+          market: { cents, held, lines: lineCents },
+        },
+        dollars: Math.round(cents),
+        sign: cents < 0 ? "−" : "+",
+        amount: wholeUsd(cents, unitOf(model, side)),
+        cents,
+        hl: false,
+        before: null,
+      });
+  }
+  if (out.length > 0 && (out[0].cents ?? 0) > 0) out[0] = { ...out[0], sign: "" };
+  return out;
+}
+
+const NO_PRICE_REST = "No figure: a line above has no price at its block.";
 
 // ── The shared state ────────────────────────────────────────────────────────
 

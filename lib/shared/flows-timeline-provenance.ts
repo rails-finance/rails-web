@@ -2,8 +2,138 @@
 // lifetime-flows-scrubber.tsx). Each states what the figure sums and to which
 // date; a segment's tip lists its assets.
 
-import type { Provenance } from "@/components/shared/provenance";
-import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
+import type { Provenance, ProvInput } from "@/components/shared/provenance";
+import type { FlowLeg, FlowSegment, FlowSide, MarketMove } from "@/lib/shared/flows-timeline";
+import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
+import { amountText } from "@/lib/shared/shown-usd";
+import { formatUsdValue } from "@/lib/utils/format";
+
+// ── The rows behind a line (ui-jobs 743) ─────────────────────────────────────
+// A line whose legs carry their parts states every leg: its amount, its price
+// as shown at its block with the price's source, their product to the cent,
+// largest first with those under a cent behind the dust control, and the sum
+// the line draws. A line holding an unpriced leg states no sum.
+
+const blockWords = (b: number | null | undefined) => (b != null ? `block ${b.toLocaleString("en-US")}` : null);
+
+/** "WETH at block 23,456,789", told apart where two legs share one. */
+function legLabels(legs: readonly FlowLeg[]): string[] {
+  const seen = new Map<string, number>();
+  return legs.map((l) => {
+    const at = blockWords(l.block);
+    const base = `${l.symbol ?? "Token"} ${at ? `at ${at}` : "at a block the read does not name"}`;
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    return n > 1 ? `${base} (${n})` : base;
+  });
+}
+
+const signedCents = (v: number): string => `${v < 0 ? "−" : ""}${formatUsdValue(Math.abs(v))}`;
+
+/** A line's receipt from its legs: each amount × price at its block, the
+ *  products summed; or, with an unpriced leg, the legs and no sum. */
+export function legsProv(
+  label: string,
+  when: string,
+  legs: readonly FlowLeg[],
+  unpriced?: readonly string[],
+): Provenance {
+  const labels = legLabels(legs);
+  if (unpriced?.length) {
+    const names = unpriced.length === 1 ? unpriced[0] : `${unpriced.slice(0, -1).join(", ")} and ${unpriced.at(-1)}`;
+    return {
+      kind: "derived",
+      summary: `${label} ${when}. No figure: ${names} has no price at its block, so the line is not summed.`,
+      via: "the position's events · each leg × its price at its block",
+      inputs: legs.flatMap((l, i): ProvInput[] => [
+        {
+          label: `${labels[i]} amount`,
+          value: `${amountText(l.amount ?? 0)} ${l.symbol ?? ""}`.trim(),
+          kind: "chain",
+          pclass: "indexed",
+          note: "the amount its event moved",
+        },
+        l.price == null
+          ? {
+              label: `${labels[i]} price`,
+              value: "no price",
+              kind: "derived",
+              note: "no price stands at this leg's block",
+            }
+          : {
+              label: `${labels[i]} price`,
+              value: formatUsdValue(l.price),
+              kind: "chain-derived",
+              pclass: "oracle",
+              note: l.priceNote,
+            },
+      ]),
+    };
+  }
+  const { prov } = holderUsdReceipt({
+    what: `${label} ${when}`,
+    legs: legs.map((l, i) => ({
+      token: l.symbol ?? "Token",
+      label: labels[i],
+      amount: l.amount ?? 0,
+      amountNote: "the amount its event moved",
+      price: l.price ?? 0,
+      priceNote: l.priceNote ?? "the price at its block",
+      ...(l.face ? { face: true } : {}),
+    })),
+    via: "the position's events · each leg × its price at its block · summed",
+    byValue: true,
+    blocksPerRow: true,
+  });
+  return prov;
+}
+
+/** Market move in cents: what is held or owed to the cent less the lines
+ *  above it, each a sum of shown products; or no figure, and why. */
+export function marketMoveProv(label: string, side: FlowSide, when: string, m: MarketMove): Provenance {
+  const held = side === "collateral" ? "held" : "owed";
+  if ("none" in m) return { kind: "derived", summary: `${label} ${when}. ${m.none}` };
+  return {
+    kind: "chain-derived",
+    summary: `${label} ${when}. What the position has ${held}, its amount times its price as shown, less the lines above it, each the sum of its legs' shown products: the change in the prices since the flows. No funds moved.`,
+    formula: `${held} − Σ lines`,
+    inputs: [
+      {
+        label: held,
+        value: formatUsdValue(m.held),
+        kind: "chain-derived",
+        pclass: "oracle",
+        note: "amount × price as shown, to the cent",
+      },
+      { label: "lines", value: signedCents(m.lines), kind: "derived", note: "the lines above, each to the cent" },
+      { label: "difference", value: signedCents(m.cents), kind: "derived", step: true },
+    ],
+  };
+}
+
+/** What a side holds or owes as one asset's amount times its price, as
+ *  shown, the price at its block. */
+export function heldUsdProv(
+  label: string,
+  when: string,
+  h: { symbol: string; amount: number; price: number; block: number | null; priceNote?: string },
+): Provenance {
+  return holderUsdReceipt({
+    what: `${label} ${when}`,
+    legs: [
+      {
+        token: h.symbol,
+        amount: h.amount,
+        amountNote: "the balance once the event's transaction had run",
+        price: h.price,
+        priceNote:
+          h.priceNote ?? (blockWords(h.block) ? `the price at ${blockWords(h.block)}` : "the latest block's price"),
+      },
+    ],
+    block: h.block,
+    via: "the position's balance × the price at the block",
+  }).prov;
+}
 
 /** `when` is "now" at the live stop, else "the end of 9 Nov 2025". `daily`:
  *  held assets are valued at a daily price series. */
@@ -15,6 +145,9 @@ export function flowSegmentProv(
   daily = false,
 ): Provenance {
   const held = side === "collateral" ? "held" : "owed";
+  if (s.legs && (s.fill === "in" || s.fill === "out"))
+    return legsProv(s.label, isLive ? "now" : `up to ${when}`, s.legs, s.unpriced);
+  if (s.market) return marketMoveProv(s.label, side, isLive ? "now" : `at ${when}`, s.market);
   if (s.fill === "held")
     return isLive
       ? {
@@ -54,7 +187,14 @@ export function flowSegmentProv(
 
 /** The balancing item in a side's sum: what is held or owed at the date less
  *  every flow above it, printed from the printed figures so the lines add. */
-export function flowRemainderProv(label: string, side: FlowSide, when: string, note?: string): Provenance {
+export function flowRemainderProv(
+  label: string,
+  side: FlowSide,
+  when: string,
+  note?: string,
+  market?: MarketMove,
+): Provenance {
+  if (market) return marketMoveProv(label, side, when === "now" ? "now" : `at ${when}`, market);
   const held = side === "collateral" ? "held" : "owed";
   const holds = note ? `It is ${note}` : "It holds price changes and interest together";
   return {

@@ -42,6 +42,7 @@ import { todayUsdProv, useTodayBasisPrice, useTodayBasisPrices } from "@/compone
 import { OFF_PAR_BAND, OffParFigure } from "@/components/shared/usd-figure";
 import { eventPriceText, offPar, todayPriceText, type OffPar } from "@/lib/shared/usd-display";
 import { wholeUsd } from "@/lib/shared/flows-sum";
+import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
 import { eventCum, type EventCum } from "@/lib/shared/flow-focus";
 import { dayCloseNote, ledgerAtPrice, ledgerDayStamp, type Ledger, type LedgerRow } from "@/lib/shared/event-ledger";
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
@@ -51,8 +52,11 @@ import {
   flowRemainderProv,
   flowSegmentProv,
   flowTokenProv,
+  heldUsdProv,
   ledgerAssetUsdProv,
   ledgerPartProv,
+  legsProv,
+  marketMoveProv,
 } from "@/lib/shared/flows-timeline-provenance";
 
 /** Each side's hue, as the bars draw it. */
@@ -618,6 +622,9 @@ function LedgerRows({
   const off = offPar(ledger.price, ledger.symbol);
   const side = ledger.side;
   totalUsdProv = provs?.totalUsd ?? totalUsdProv;
+  // A total in cents states its amount times its price as shown.
+  if (ledger.held && ledger.symbol && ledger === given)
+    totalUsdProv = heldUsdProv(name, at, { symbol: ledger.symbol, ...ledger.held });
   if (ledger !== given && ledger.symbol) {
     totalUsdProv = todayUsdProv(`${name}, ${ledger.symbol} held,`, ledger.symbol);
     totalUsdBeforeProv = todayUsdProv(`${name}, ${ledger.symbol} held before the event,`, ledger.symbol);
@@ -630,6 +637,11 @@ function LedgerRows({
       ? ledgerPartProv(r.label, unit, at, r.role)
       : flowTokenProv(r.label, unit, at, r.role === "interest" ? "interest" : "line"));
   const usdProv = (r: LedgerRow): Provenance => {
+    // A row in cents states its legs, or Market move's two figures
+    // (lib/shared/flows-timeline-provenance.ts, ui-jobs 743).
+    if (r.usd?.market) return marketMoveProv(r.label, side, at, r.usd.market);
+    if (r.usd?.legs && (r.usd.legs.length > 0 || r.usd.unpriced?.length))
+      return legsProv(r.label, at, r.usd.legs, r.usd.unpriced);
     const own = provs?.usd?.(r) ?? usdProvOf?.(r);
     if (own) return own;
     if (r.role === "market")
@@ -771,6 +783,11 @@ function LedgerRows({
           </span>
         )}
       </div>
+      {ledger.notes?.map((n) => (
+        <p key={n} className="col-span-full mt-1 text-sm text-rb-500" data-ledger-note="">
+          {n}
+        </p>
+      ))}
     </div>
   );
 }
@@ -847,7 +864,7 @@ export function AssetLedgers({
   side: FlowSide;
   assets: Ledger[];
   /** The side's total in USD; null where it has none (an asset unpriced). */
-  usd: { before: string | null; after: string; dollars: number } | null;
+  usd: { before: string | null; after: string; dollars: number; cents?: number } | null;
   at: string;
   totalUsdProv: Provenance;
   totalUsdBeforeProv?: Provenance;
@@ -891,6 +908,13 @@ export function AssetLedgers({
     return p != null ? ledgerAtPrice(a, p) : null;
   });
   const allToday = priced.length > 0 && repriced.every((l) => l != null);
+  // A side total in cents states each asset's amount times its price as
+  // shown, and their sum (ui-jobs 743).
+  if (usd?.cents != null && !allToday) {
+    const held = assets.filter((a) => a.usd != null && a.held && a.symbol);
+    if (held.length === assets.filter((a) => a.usd != null).length && held.length > 0)
+      totalUsdProv = sideHeldProv(SIDE_NAME[side], at, held);
+  }
   if (usd && allToday) {
     const dollars = repriced.reduce((t, l) => t + (l?.usd?.dollars ?? 0), 0);
     // Before the event: each asset's tokens less the event's rows.
@@ -980,6 +1004,26 @@ export function AssetLedgers({
       </LedgerGrid>
     </div>
   );
+}
+
+/** A side's total over its assets: each balance times its price, as shown,
+ *  summed. */
+function sideHeldProv(name: string, at: string, assets: Ledger[]): Provenance {
+  const blocks = [...new Set(assets.map((a) => a.held?.block ?? null))];
+  return holderUsdReceipt({
+    what: `${name} at ${at}`,
+    legs: assets.map((a) => ({
+      token: a.symbol as string,
+      amount: a.held!.amount,
+      amountNote: "the balance once the event's transaction had run",
+      price: a.held!.price,
+      priceNote: a.held!.priceNote ?? "the price the balance read carries",
+    })),
+    block: blocks.length === 1 ? blocks[0] : null,
+    blocksPerRow: blocks.length > 1,
+    byValue: true,
+    via: "the side's balances × the prices at the block · summed",
+  }).prov;
 }
 
 /** What a side holds or owes, as the bars' segment, for its receipts. */
