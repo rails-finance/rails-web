@@ -142,10 +142,11 @@ export function IporFusionVaultPage({
               )}
             </span>
           ) : (
-            <>
-              {holderAddress(holders[0])}
-              {holders.length > 1 && <span className="text-xs text-rb-500">+{n(holders.length - 1)}</span>}
-            </>
+            <span className="flex flex-col gap-0.5">
+              {holders.map((h) => (
+                <span key={h.account}>{holderAddress(h)}</span>
+              ))}
+            </span>
           )}
         </span>
       ))}

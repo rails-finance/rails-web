@@ -164,7 +164,7 @@ export function IporFusionMarketsTile({
         "data-market": r.id,
         "data-market-constant": r.constant ?? "",
         "data-market-kind": r.kind,
-        "data-market-covered": uncovered || childUncovered ? "no" : "yes",
+        "data-market-covered": r.kind === "held" ? "held" : uncovered || childUncovered ? "no" : "yes",
         "data-market-balance-raw": r.balance?.raw ?? "",
       },
     });
@@ -183,7 +183,7 @@ export function IporFusionMarketsTile({
         sub:
           gap > ZERO
             ? `totalAssets() ${assetText(y.totalAssets, ad)} less the rows' ${assetText(amount(summed), ad)} at block ${n(data.blockNumber)}`
-            : `the rows' ${assetText(amount(summed), ad)} exceed totalAssets() ${assetText(y.totalAssets, ad)} at block ${n(data.blockNumber)}`,
+            : `the rows' ${assetText(amount(summed), ad)} exceed totalAssets() ${assetText(y.totalAssets, ad)} by ${assetText(gapAmount, ad)} at block ${n(data.blockNumber)}`,
         amount: gapAmount,
         amountProv: iporMarketsGapProv(coords, {
           total: assetText(y.totalAssets, ad),
