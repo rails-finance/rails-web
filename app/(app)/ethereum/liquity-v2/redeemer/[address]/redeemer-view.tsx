@@ -7,7 +7,8 @@
 // collateral narrows to a branch). A wallet has no Lifetime flows panel: it
 // holds no position. Past REDEEMER_FIRST_READ rows the timeline closes on a
 // boundary card, and the cut notice reads the rest on request; the card's
-// sums cover every row.
+// sums cover every row. A row's event page and View in timeline are the
+// Trove's.
 
 import { useEffect, useMemo, useState } from "react";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
@@ -19,7 +20,12 @@ import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { LiquityV2RedeemerCard } from "@/components/protocol/liquity/redeemer-card";
 import { LiquityV2RedemptionCard } from "@/components/protocol/liquity/redeemer-event-card";
 import { LIQUITY_V2_BASE_PATH } from "@/lib/liquity-v2/sp-routes";
-import { REDEEMER_FIRST_READ, redemptionId, redemptionTimelineEvent } from "@/lib/liquity-v2/redeemer-timeline";
+import {
+  REDEEMER_FIRST_READ,
+  redemptionEventHref,
+  redemptionId,
+  redemptionTimelineEvent,
+} from "@/lib/liquity-v2/redeemer-timeline";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import {
   readLiquityV2Redeemer,
@@ -168,6 +174,10 @@ export default function RedeemerView({
         closed={false}
         tl={tl}
         boundary={boundary}
+        eventHref={(id) => {
+          const r = rowById.get(id);
+          return r ? redemptionEventHref(r) : null;
+        }}
         loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
         displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
         emptyLabel="No redemptions recorded for this address"

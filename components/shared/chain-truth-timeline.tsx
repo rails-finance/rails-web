@@ -524,6 +524,10 @@ export interface ChainTruthTimelineProps {
    *  with the shared side column, from the family's contract
    *  (`lib/<family>/explorer.ts`). Unset, the route draws the pinned card. */
   eventPage?: (slot: EventPageSlot) => EventPageContract;
+  /** A row's event page where it lives on another position's page (the
+   *  Liquity V2 redeemer page's rows are Troves' events). Unset, it is this
+   *  page's `/event/<id>`. */
+  eventHref?: (id: string) => string | null;
   /** True once this position is closed/liquidated. Suppresses the pulsing
    *  "live" tip dot — the newest row is no longer a claim about an ongoing
    *  position. Does NOT touch which row IS the tip (numbering, the stale-tip
@@ -769,6 +773,7 @@ function ChainTruthTimelineBody({
   csvExportCeiling,
   persistKeyPrefix,
   eventPage,
+  eventHref,
   closed,
   segments,
   spineKey,
@@ -1824,7 +1829,7 @@ function ChainTruthTimelineBody({
   // `EventCard` reads this href into; it draws no page rows where there is
   // none.
   const shareHrefFor = (id: string) =>
-    `${positionPath}/event/${encodeURIComponent(id)}${subjectQuery ? `?${subjectQuery}` : ""}`;
+    eventHref?.(id) ?? `${positionPath}/event/${encodeURIComponent(id)}${subjectQuery ? `?${subjectQuery}` : ""}`;
 
   /** An `asOneEvent` run row is one card for one transaction, so it takes the
    *  wrappers a single card takes: the day prefix from its place in the flat

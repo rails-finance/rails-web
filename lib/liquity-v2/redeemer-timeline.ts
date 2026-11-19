@@ -9,6 +9,7 @@ import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { units } from "./sp-math";
+import { troveEventHref, troveEventId } from "./redeemer-routes";
 import type { LiquityV2RedemptionRow } from "@/lib/sources/api/liquity-v2-redeemer";
 
 /** Rows the page reads, newest first: the route's ceiling. Past it the
@@ -17,8 +18,12 @@ export const REDEEMER_FIRST_READ = 500;
 
 export const REDEMPTION_LABEL = "Redemption";
 
-/** A row's id: a Trove operation is one log in its transaction. */
-export const redemptionId = (r: LiquityV2RedemptionRow) => `${r.transaction_hash}:${r.log_index}`;
+/** A row's id: its event's id on the Trove's timeline. */
+export const redemptionId = (r: LiquityV2RedemptionRow) => troveEventId(r.transaction_hash, r.log_index);
+
+/** The row's event page on the Trove it hit. */
+export const redemptionEventHref = (r: LiquityV2RedemptionRow) =>
+  troveEventHref(r.collateral_type, r.trove_id, redemptionId(r));
 
 export function redemptionTimelineEvent(r: LiquityV2RedemptionRow, redeemer: string): BaseActivityEvent {
   const branch = LIQUITY_V2_BRANCHES[r.collateral_type.toLowerCase()];

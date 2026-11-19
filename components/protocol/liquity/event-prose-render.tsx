@@ -6,6 +6,7 @@
 // character, and the Copy for LLM build the event page's actions row copies.
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
+import Link from "next/link";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { Prov } from "@/components/shared/provenance";
@@ -17,6 +18,8 @@ import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { liquityEventProse, type EchoKey, type LiquityEventProse, type ProseSentence } from "@/lib/liquity/event-prose";
 import { liquityEventDecimals, liquityEventLedger } from "@/lib/liquity/event-ledgers";
 import { liquityEventMarkdown } from "@/lib/liquity/event-markdown";
+import { liquityV2RedeemerHref } from "@/lib/liquity-v2/redeemer-routes";
+import { useTxTroves } from "@/lib/liquity-v2/tx-troves";
 import {
   collChangeProv,
   debtChangeProv,
@@ -91,6 +94,25 @@ const Bold = ({ children }: { children: ReactNode }) => (
   <strong className="font-semibold text-foreground">{children}</strong>
 );
 
+/** The redemption sentence's "redeemer", linked to the redeemer's page: the
+ *  redemption's sender, as the redeemer note under the grid reads it (the
+ *  same read, cached per transaction). Plain words until it is known. */
+function RedeemerWord({ ctx, txHash, children }: { ctx: LiquityContext; txHash?: string; children: ReactNode }) {
+  const tx = useTxTroves(!ctx.redeemer && txHash ? txHash : "");
+  const redeemer = ctx.redeemer ?? tx?.rows.find((r) => r.operation === "redeemCollateral")?.transaction_from;
+  if (!redeemer) return <span>{children}</span>;
+  return (
+    <Link
+      href={liquityV2RedeemerHref(redeemer)}
+      onClick={(e) => e.stopPropagation()}
+      data-redeemer-link=""
+      className="text-blue-600 dark:text-[var(--text-link)] hover:underline"
+    >
+      {children}
+    </Link>
+  );
+}
+
 /** One sentence: its text, with each figure bolded, echoed into its receipt,
  *  or linked as the generator marks it. */
 export function ProseSentenceText({ s, ctx, coords }: { s: ProseSentence; ctx: LiquityContext; coords: EventCoords }) {
@@ -122,6 +144,12 @@ export function ProseSentenceText({ s, ctx, coords }: { s: ProseSentence; ctx: L
             </a>
           ) : (
             <LinkedAddress key={i} address={seg.address} holderOf={seg.tone === "wallet" ? "liquity-v2" : undefined} />
+          );
+        if (seg.name === "redeemer")
+          return (
+            <RedeemerWord key={i} ctx={ctx} txHash={coords.txHash}>
+              {seg.text}
+            </RedeemerWord>
           );
         if (!seg.emph) return <span key={i}>{seg.text}</span>;
         if (seg.emph === "bold") return <Bold key={i}>{seg.text}</Bold>;

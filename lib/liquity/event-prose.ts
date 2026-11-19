@@ -618,6 +618,7 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
       v.debt_cleared = debtCleared;
       v.coll_taken_usd = collTaken * price;
       v.redemption_result_usd = debtCleared - collTaken * price;
+      v.redeemer = "redeemer";
       sp.say("redeem.what", { debt_cleared: "debt_change", coll_taken: "coll_change" });
       if (price > 0 && !urgentPath) {
         if (num(v.redemption_result_usd) >= 0.5) sp.say("redeem.result");
