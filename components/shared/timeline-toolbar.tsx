@@ -5,15 +5,15 @@
 // Sync to chart, the 30-day projection's switch and Display at its right), then
 // the pill row: one N1.10 pill per axis the history offers (Type, Asset,
 // Version, Address; timeline-filter-bar.tsx), the Date pill where the page has
-// a date axis (`tl.datesAxis`; a timeline its Lifetime flows chart draws tied
-// to has none, `timelineDates` in lib/shared/timeline-dates.ts, and draws the
-// chart's cut as a set pill in its slot), Clear all,
-// and the count at the row's right end. Below sm the pills scroll sideways
-// behind the filter sheet's button and the count takes the line under them.
-// The Date pill opens the navigator panel (the month grid) under
-// the strip. Driven by a useTimelineEvents() state object, so a page wires it
-// in one line. The copy-link control that puts the current VIEW on the
-// clipboard (`tl.viewHref`) is in the position card's Explanation pane — see
+// a date axis (`tl.datesAxis`; a timeline the Lifetime flows chart ties to
+// has none, `timelineDates` in lib/shared/timeline-dates.ts, and draws the
+// chart's cut as a set pill in its slot), Clear all, and the count at the
+// row's right end. Below sm the pills scroll sideways behind the filter
+// sheet's button and the count takes the line under them. The Date pill
+// opens the navigator panel (the month grid) under the strip. Driven by a
+// useTimelineEvents() state object, so a page wires it in one line. The
+// copy-link control that puts the current VIEW on the clipboard
+// (`tl.viewHref`) is in the position card's Explanation pane — see
 // `CopyViewLink` in `provenance-info-tabs.tsx`.
 
 import { RevealTip } from "@/components/shared/reveal-tip";

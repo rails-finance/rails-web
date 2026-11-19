@@ -15,15 +15,24 @@ export type TimelineDates = "chart" | "pill" | "waiting";
 export type FlowsStanding = "waiting" | "settled" | null;
 
 /** The timeline's mode from the store the page wears (null where it wears
- *  none: Sky Savings, an Alchemix V2 position). `hydrated`: the panel has had its
- *  first commit to say. A store whose panel has not said, after hydration, is
- *  a page with no panel, and keeps the pill. */
-export function timelineDates(s: { cursor: unknown; flows: FlowsStanding } | null, hydrated: boolean): TimelineDates {
+ *  none: Sky Savings, an Alchemix V2 position). `hydrated`: the panel has had
+ *  its first commit to say. A store whose panel has not said, after
+ *  hydration, is a page with no panel, and keeps the pill. `waitedOut`: the
+ *  panel has read for longer than `DATES_WAIT_MS`, so the pill stands until a
+ *  tie takes over; no page goes without both the pill and "Sync to chart". */
+export function timelineDates(
+  s: { cursor: unknown; flows: FlowsStanding } | null,
+  hydrated: boolean,
+  waitedOut = false,
+): TimelineDates {
   if (!s) return "pill";
   if (s.cursor != null) return "chart";
-  if (!hydrated || s.flows === "waiting") return "waiting";
+  if ((!hydrated || s.flows === "waiting") && !waitedOut) return "waiting";
   return "pill";
 }
+
+/** How long the timeline holds its Date pill back for a panel still reading. */
+export const DATES_WAIT_MS = 15_000;
 
 /** What a panel writes to the store's `flows` at each step (`useFlowsWaiting`
  *  in components/shared/flow-focus-context.tsx): `waiting` before paint

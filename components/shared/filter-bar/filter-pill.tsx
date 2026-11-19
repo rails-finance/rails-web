@@ -151,7 +151,7 @@ export function FilterPill({
 /** A set pill that is not an axis: the timeline's chart cut, "Timeline to
  *  7 Oct '26 ×" (L2.1, ui-jobs 764), in the set pill's tone, height, radius
  *  and ×, with a glyph at its start. The main button runs `onPress`, the ×
- *  `onRemove`; each carries its own data hooks. */
+ *  `onRemove`; each carries data hooks. */
 export function FilterPillChip({
   icon,
   label,

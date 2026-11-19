@@ -32,6 +32,12 @@ test("the chart's cursor ties: chart, whatever the panel says", () => {
   assert.equal(timelineDates({ cursor, flows: null }, false), "chart");
 });
 
+test("a panel still reading after the wait: the pill, until a cursor ties", () => {
+  assert.equal(timelineDates({ cursor: null, flows: "waiting" }, true, true), "pill");
+  assert.equal(timelineDates({ cursor, flows: "waiting" }, true, true), "chart");
+  assert.equal(timelineDates({ cursor: null, flows: "waiting" }, true, false), "waiting");
+});
+
 test("settled with no cursor, or no panel said after hydration: the pill", () => {
   // A one-day life, the price chart alone, a bars-only scrubber, no panel.
   assert.equal(timelineDates({ cursor: null, flows: "settled" }, true), "pill");

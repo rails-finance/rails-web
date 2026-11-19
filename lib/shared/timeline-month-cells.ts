@@ -2,7 +2,7 @@
 // it must read or refuse (rails-ops ui-jobs 764, decision 0019's two paths). A
 // month is filtered on the page only where the loaded rows hold all of it: a
 // click on a month the rows hold in part would list part of it. Where they do
-// not, the page reads the month from the index as its own segment (`reach`),
+// not, the page reads the month from the index as a segment (`reach`),
 // or the cell refuses the click and says the month is not loaded. Pure, and
 // imports nothing through `@/`, so scripts/test/timeline-month-cells.test.mjs
 // runs it.

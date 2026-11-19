@@ -80,7 +80,13 @@ import {
 } from "@/components/shared/flow-focus-context";
 import { FlowDayMark, utcDay } from "@/components/shared/flow-day-mark";
 import { rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
-import { resetMonthOnTie, tieDropped, timelineDates, type TimelineDates } from "@/lib/shared/timeline-dates";
+import {
+  DATES_WAIT_MS,
+  resetMonthOnTie,
+  tieDropped,
+  timelineDates,
+  type TimelineDates,
+} from "@/lib/shared/timeline-dates";
 import { useHydrated } from "@/hooks/useHydrated";
 import { flowMoment } from "@/lib/shared/flow-moment";
 import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
@@ -539,7 +545,7 @@ export interface ChainTruthTimelineProps {
    *  with no open/closed concept (a vault share-transfer timeline). */
   closed?: boolean;
   /** The SECOND PATH a month click in the Date panel can take, on a page that
-   *  can read a month from the index as its own segment (decision 0019,
+   *  can read a month from the index as a segment (decision 0019,
    *  amendment 2026-09-25). The page owns the segment and its reads; this
    *  component forwards the months to the panel and draws the skeleton while
    *  one is in flight.
@@ -863,18 +869,40 @@ function ChainTruthTimelineBody({
   const tieStore = useFlowsStore();
   const cursorDrawn = useFlowsStoreState((st) => st.cursor != null);
   const flowsStanding = useFlowsStoreState((st) => st.flows);
+  // A panel still reading after DATES_WAIT_MS: the pill stands until a tie
+  // takes over, so the page is never without both it and "Sync to chart".
+  const [waitedOut, setWaitedOut] = useState(false);
+  const holding = tieStore != null && !cursorDrawn && !waitedOut;
+  useEffect(() => {
+    if (!holding) return;
+    const t = setTimeout(() => setWaitedOut(true), DATES_WAIT_MS);
+    return () => clearTimeout(t);
+  }, [holding]);
   const datesBy = timelineDates(
     tieStore ? { cursor: cursorDrawn ? true : null, flows: flowsStanding ?? null } : null,
     hydratedHere,
+    waitedOut,
   );
   const chartTied = datesBy === "chart";
   const { setTimelineDates } = tl;
   useEffect(() => setTimelineDates(datesBy), [setTimelineDates, datesBy]);
   // A tie that drops once it stood (the chart's cursor gone) takes its cut
-  // with it: no cut stands beside a Date pill with no "Sync to chart".
+  // with it, in the store and in the address bar: no cut stands beside a
+  // Date pill with no "Sync to chart".
   const lastDates = useRef<TimelineDates>(datesBy);
   useEffect(() => {
-    if (tieDropped(lastDates.current, datesBy) && tieStore?.get().rewind) tieStore.set({ rewind: null });
+    if (tieDropped(lastDates.current, datesBy)) {
+      if (tieStore?.get().rewind) tieStore.set({ rewind: null });
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has("to") && !url.searchParams.has("from")) {
+          url.searchParams.delete("to");
+          window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+        }
+      } catch {
+        /* non-fatal: the stale param stays in the link */
+      }
+    }
     lastDates.current = datesBy;
   }, [datesBy, tieStore]);
   const toolbarTl = useMemo<TimelineEventsState>(() => {
@@ -1340,7 +1368,8 @@ function ChainTruthTimelineBody({
   // where a filter leaves the cut list empty the filters stay and the empty
   // list says it (Miles, 1 Oct 2026). A tied timeline has no Date pill
   // (`chartTied`): the cut is how it is navigated by day, and the address bar
-  // carries it (`useRewindParam`). Every other keeps Dates and `?from=&to=`.
+  // carries it (`useRewindParam`). Every other keeps the Date pill and
+  // `?from=&to=`.
   const focusStore = useFlowFocus()?.store ?? null;
   useRewindParam(chartTied ? focusStore : null);
   useFollowPreference(chartTied ? focusStore : null);
@@ -1349,7 +1378,7 @@ function ChainTruthTimelineBody({
   /** The month this code asked the page to read, and the cut it read for. */
   const askedMonth = useRef<number | null>(null);
   const askedCut = useRef<number | null>(null);
-  // A month the Date pill's grid read, or is reading, as its own segment goes
+  // A month the Date pill's grid read, or is reading, as a segment goes
   // when the chart ties, since the pill that would clear it goes too; a month
   // the cut asked for stays.
   useEffect(() => {
@@ -1368,6 +1397,7 @@ function ChainTruthTimelineBody({
   }, [chartTied]);
   // The chip's × releases the cut; while the timeline follows the chart it
   // also stops following, which leaves the list whole where the chart stands.
+  const syncRef = useRef<HTMLButtonElement>(null);
   const releaseRewind = useCallback(() => {
     if (!focusStore) return;
     const st = focusStore.get();
@@ -1389,6 +1419,7 @@ function ChainTruthTimelineBody({
   const followToggle =
     focusStore && chartTied ? (
       <SyncChartButton
+        buttonRef={syncRef}
         state={following ? "follow" : synced ? "synced" : "off"}
         onPress={() => {
           const st = focusStore.get();
@@ -2234,7 +2265,12 @@ function ChainTruthTimelineBody({
                     }
                     removeLabel={following ? "Stop following the chart" : `Clear the cut at ${rewind?.word ?? ""}`}
                     onPress={() => rewind && focusStore?.set({ go: focusStore.get().go + 1 })}
-                    onRemove={releaseRewind}
+                    onRemove={() => {
+                      releaseRewind();
+                      // The pill goes with the cut: focus lands on the
+                      // button that makes the next one.
+                      syncRef.current?.focus();
+                    }}
                     data={{ "data-flow-rewind-chip": "", "data-anatomy": "N1.10 L2.1" }}
                     pressData={{ "data-flow-rewind-go": "" }}
                     removeData={{ "data-flow-rewind-release": "" }}
@@ -2547,10 +2583,19 @@ function ChainTruthTimelineBody({
  *  moves ("Follows chart", the chain with a padlock, kept with Display's
  *  preferences as `followChart`); a press then unlocks it. Teal while locked,
  *  the engaged fill while synced; icon-only under 640px. */
-function SyncChartButton({ state, onPress }: { state: "off" | "synced" | "follow"; onPress: () => void }) {
+function SyncChartButton({
+  state,
+  onPress,
+  buttonRef,
+}: {
+  state: "off" | "synced" | "follow";
+  onPress: () => void;
+  buttonRef?: React.Ref<HTMLButtonElement>;
+}) {
   const on = state === "follow";
   return (
     <button
+      ref={buttonRef}
       type="button"
       aria-pressed={on}
       aria-label={on ? "Follows chart" : "Sync to chart"}

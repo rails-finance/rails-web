@@ -143,7 +143,10 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
                 if (r.kind === "folder" && r.folder.firstAt < cutAt) cutAt = r.folder.firstAt;
               if (!Number.isFinite(cutAt)) cutAt = null;
             }
-            setSegment({ monthIdx, asked: ask, events: grouped.events, grouped, cutAt });
+            // A read reset or replaced while it ran (the chart's tie, another
+            // month) lands nowhere.
+            if (segmentRead.current === ac && !ac.signal.aborted)
+              setSegment({ monthIdx, asked: ask, events: grouped.events, grouped, cutAt });
             return;
           }
           apiGroupsSpans.current = false;
@@ -151,7 +154,8 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
         const flat = await reads.current.readFlat(span);
         const kept = trimToNewest(flat.events, preloadCap);
         const cutAt = kept.length < flat.events.length && kept.length > 0 ? kept[0].timestamp : null;
-        setSegment({ monthIdx, asked: ask, events: kept, grouped: null, cutAt });
+        if (segmentRead.current === ac && !ac.signal.aborted)
+          setSegment({ monthIdx, asked: ask, events: kept, grouped: null, cutAt });
       } catch (err) {
         if ((err as { name?: string })?.name === "AbortError") return;
         // The rows the page holds stay; the month stays where it was.
@@ -233,6 +237,7 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
   );
   const resetSegment = useCallback(() => {
     segmentRead.current?.abort();
+    segmentRead.current = null;
     setSegmentLoading(null);
     setSegmentFailed(null);
     setDateRange(null);

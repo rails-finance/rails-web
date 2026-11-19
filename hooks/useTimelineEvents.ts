@@ -408,12 +408,13 @@ function writeViewParams(
   if (view.dateRange) {
     sp.set("from", formatUtcDay(view.dateRange[0]));
     sp.set("to", formatUtcDay(view.dateRange[1]));
-  } else if (sp.has("from") || datesBy === "pill") {
-    // While waiting, a lone `to` is the chart's cut, which a page about to
-    // tie reads once its chart draws (`useRewindParam`).
+  } else if (datesBy === "pill") {
     sp.delete("from");
     sp.delete("to");
   }
+  // While waiting, `from` and `to` stay as the link has them: a range is
+  // applied once the timeline settles on the pill, and a lone `to` is the
+  // chart's cut, which a page about to tie reads once its chart draws.
 }
 
 /** Read the view back out of `sp`. Each axis is `undefined` when its param is
@@ -507,11 +508,22 @@ export function useTimelineEvents(
   // chart ties; `waiting` until ChainTruthTimeline has said.
   const [datesBy, setTimelineDates] = useState<TimelineDates>("waiting");
   const datesAxis = datesBy !== "chart";
+  // A `?from=&to=` range from the address bar waits for the timeline to
+  // settle: applied on `pill`; on `chart` dropped, and `useRewindParam` takes
+  // its `to` as the chart's cut.
+  const datesByRef = useRef<TimelineDates>(datesBy);
+  datesByRef.current = datesBy;
+  const pendingRange = useRef<[number, number] | null>(null);
   useEffect(() => {
     if (datesBy === "chart") {
+      pendingRange.current = null;
       setDateRange(null);
       setHeatmapOpen(false);
       return;
+    }
+    if (datesBy === "pill" && pendingRange.current) {
+      setDateRange(pendingRange.current);
+      pendingRange.current = null;
     }
     try {
       const search = withoutLoneTo(window.location.search, datesBy);
@@ -568,7 +580,11 @@ export function useTimelineEvents(
         if (view.hiddenAssets) setHiddenAssets(view.hiddenAssets);
         if (view.hiddenCounterparties) setHiddenCounterparties(view.hiddenCounterparties);
         if (view.hiddenVersions) setHiddenVersions(view.hiddenVersions);
-        if (view.dateRange) setDateRange(view.dateRange);
+        pendingRange.current = null;
+        if (view.dateRange) {
+          if (datesByRef.current === "pill") setDateRange(view.dateRange);
+          else if (datesByRef.current === "waiting") pendingRange.current = view.dateRange;
+        }
         if (view.sizeRanges) setSizeRanges(view.sizeRanges);
       } catch {
         /* malformed query string — keep the storage-derived state */
