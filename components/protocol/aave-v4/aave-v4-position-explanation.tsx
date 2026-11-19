@@ -402,8 +402,8 @@ export function AaveV4ClosedExplanation({
    *  names today's factors and says so. */
   factorsThen?: ClosedCollateralFactors;
 }) {
-  // A debt peak with no figure (its reserves unpriced) still means debt was carried.
-  const supplyOnly = spoke.peakDebtUsd < 1 && (spoke.peakDebtUnpriced ?? []).length === 0;
+  // Whether the position ever borrowed, in tokens (`debtReserveHistory`).
+  const supplyOnly = spoke.debtReserveHistory.length === 0;
   const cfsNow = useSpokeCollateralFactors(spoke.name);
   const then =
     factorsThen?.status === "ok" ? new Map([...factorsThen.factors].map(([sym, f]) => [sym, f.factor] as const)) : null;

@@ -20,7 +20,7 @@
 import type { FxPositionView } from "@/components/protocol/fx/fx-position-card";
 import { formatUsd } from "@/lib/shared/format-event";
 import { fxAnchorOf, fxPositionCollUsd, fxSeizedUsd } from "@/lib/fx/usd-receipt";
-import { shownUsd } from "@/lib/shared/shown-usd";
+import { centsOf, priceText, shownUsd } from "@/lib/shared/shown-usd";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
@@ -277,7 +277,7 @@ export function FxPositionExplanation({
     if (collUsd) {
       bullets.push(
         <span key="usd">
-          At the oracle&rsquo;s anchor price, {formatUsd(collUsd.price)} per {v.normalizedSymbol}, that collateral is
+          At the oracle&rsquo;s anchor price, {priceText(collUsd.price)} per {v.normalizedSymbol}, that collateral is
           worth{" "}
           <Prov info={collUsd.prov}>
             <H>{formatUsd(collUsd.usd)}</H>
@@ -293,11 +293,21 @@ export function FxPositionExplanation({
       bullets.push(
         <span key="ratio">
           The pool puts the LTV at <H>{(ratio * 100).toFixed(1)}%</H>: the debt as a share of the collateral&rsquo;s
-          value at the anchor price, {formatUsd(anchorAt)} per {v.normalizedSymbol}.
+          value at the anchor price,{" "}
+          {px?.anchor != null ? (
+            <>
+              {priceText(anchorAt)} per {v.normalizedSymbol}.
+            </>
+          ) : (
+            <>
+              {priceText(anchorAt)} per {v.normalizedSymbol}, derived from the pool&rsquo;s figures as debts ÷
+              (collateral × LTV).
+            </>
+          )}
           {px ? (
             <>
               {" "}
-              The pool judges its lines at the oracle&rsquo;s min price, {formatUsd(px.min)}, where the ratio is{" "}
+              The pool judges its lines at the oracle&rsquo;s min price, {priceText(px.min)}, where the ratio is{" "}
               {((debts / (colls * px.min)) * 100).toFixed(1)}%. The ratios on the timeline rows are read at the anchor
               price, so a rebalanced row can show a little under the rebalance line.
             </>
@@ -311,9 +321,9 @@ export function FxPositionExplanation({
           <span key="lines">
             Rebalancing starts at <H>{line(terms.rebalanceRatio)}</H> and liquidation at{" "}
             <H>{line(terms.liquidateRatio)}</H>. With today&rsquo;s collateral and debt the position reaches{" "}
-            {line(terms.rebalanceRatio)} if the min price falls to <H>{formatUsd(p88)}</H>,{" "}
+            {line(terms.rebalanceRatio)} if the min price falls to <H>{priceText(p88)}</H>,{" "}
             {((1 - p88 / px.min) * 100).toFixed(1)}% below now, and {line(terms.liquidateRatio)} at{" "}
-            <H>{formatUsd(p95)}</H>, {((1 - p95 / px.min) * 100).toFixed(1)}% below; funding keeps taking collateral,
+            <H>{priceText(p95)}</H>, {((1 - p95 / px.min) * 100).toFixed(1)}% below; funding keeps taking collateral,
             which moves both prices up slowly. A rebalance takes part of the collateral and leaves the position open; a
             liquidation repays the debt and takes collateral worth it plus the bounty.
           </span>,
@@ -414,23 +424,37 @@ export function FxPositionExplanation({
       pool: v.pool,
       legs: bonus.legs,
     });
-    const paid = Math.round((bonus.collUsd - shownUsd(bonus.debt, 1)) * 100) / 100;
-    const bountyWords = fxBountyWords(
-      {
-        paid,
-        bounty: bonus.bounty,
-        bountyRatio: bonus.bountyRatio,
-        redemptions: who !== "Rebalances",
-      },
-      formatUsd,
-    );
+    // The difference of two shown products, to the cent; none where a
+    // block's price is missing (ui-jobs 743).
+    const paid = seized ? centsOf(seized.usd - shownUsd(bonus.debt, 1)) : null;
+    const bountyWords =
+      paid != null
+        ? fxBountyWords(
+            {
+              paid,
+              bounty: bonus.bounty,
+              bountyRatio: bonus.bountyRatio,
+              redemptions: who !== "Rebalances",
+            },
+            formatUsd,
+          )
+        : null;
     bullets.push(
       <span key="bounty">
         {who} took {formatNumber(bonus.coll)} {v.normalizedSymbol} of collateral for <AmountText value={bonus.debt} />{" "}
-        fxUSD of debt. At the oracle&rsquo;s min price at the block before each, that collateral was worth{" "}
-        {seized ? <Prov info={seized.prov}>{formatUsd(seized.usd)}</Prov> : formatUsd(bonus.collUsd)}:{" "}
-        {formatUsd(Math.abs(paid))} {paid >= 0 ? "more" : "less"} than the debt it cleared, which the pool counts at $1
-        per fxUSD.
+        fxUSD of debt.{" "}
+        {seized && paid != null ? (
+          <>
+            At the oracle&rsquo;s min price at the block before each, that collateral was worth{" "}
+            <Prov info={seized.prov}>{formatUsd(seized.usd)}</Prov>: {formatUsd(Math.abs(paid))}{" "}
+            {paid >= 0 ? "more" : "less"} than the debt it cleared, which the pool counts at $1 per fxUSD.
+          </>
+        ) : (
+          <>
+            The oracle&rsquo;s min price is not read for every block before them, so that collateral has no dollar
+            figure.
+          </>
+        )}
         {bountyWords ? <> {bountyWords.replace(/'/g, "’")}</> : null}
       </span>,
     );

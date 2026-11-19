@@ -515,28 +515,6 @@ export function underlyingProv(
   };
 }
 
-/** A USD figure: the underlying priced through the one general token-price
- *  path. Absent rather than zero where the price could not be had. */
-export function usdProv(symbol: string, pricePerUnit: number, priceSource: string, pricedAt: string): Provenance {
-  return {
-    kind: "offchain",
-    pclass: "offchain",
-    summary: `${symbol} in USD — the amount at the price this asset was quoted at`,
-    formula: "underlying amount × price per unit",
-    via: `${priceSource} · ${pricedAt}`,
-    verify: { kind: "none", text: "An off-chain price, with no on-chain anchor" },
-    inputs: [
-      { label: "price per unit", value: String(pricePerUnit), kind: "offchain", note: priceSource },
-      {
-        label: "priced at",
-        value: pricedAt,
-        kind: "offchain",
-        note: "on a Base market this is the mainnet twin of the same asset",
-      },
-    ],
-  };
-}
-
 /** The shares a self-liquidation used on the debt left after its force repay:
  *  `SelfLiquidated.amount` states both parts, so the earmarked part the same
  *  transaction's `ForceRepay` states is taken off (lib/alchemix/self-liquidation.ts). */
@@ -995,28 +973,5 @@ export function carriedReadingProv(
       },
     ]),
     scaling: { raw, from: "call", places: 18, why: `${symbol} carries 18 decimals` },
-  };
-}
-
-/** A redemption's net, restated in USD at the underlying's price now. */
-export function redemptionNetUsdProv(
-  netUnderlying: number,
-  underlyingSymbol: string,
-  pricePerUnit: number,
-  priceSource: string,
-  pricedAt: string,
-): Provenance {
-  return {
-    kind: "offchain",
-    pclass: "offchain",
-    summary: `Net for this position in USD — the net in ${underlyingSymbol} at ${underlyingSymbol}'s price now`,
-    formula: "net × price per unit",
-    via: `${priceSource} · ${pricedAt}`,
-    verify: { kind: "none", text: "An off-chain price, with no on-chain anchor" },
-    inputs: [
-      { label: "net", value: String(netUnderlying), kind: "chain-derived", note: `in ${underlyingSymbol}` },
-      { label: "price per unit", value: String(pricePerUnit), kind: "offchain", note: priceSource },
-      { label: "priced at", value: pricedAt, kind: "offchain", note: "the price now" },
-    ],
   };
 }

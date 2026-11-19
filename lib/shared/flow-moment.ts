@@ -22,12 +22,14 @@
 import {
   DAY_MS,
   unitOf,
+  type FlowAssetHeld,
   type FlowGrowth,
   type FlowModel,
   type FlowSide,
   type FlowUnit,
 } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
+import { centsOf, faceAmount, shownUsd } from "@/lib/shared/shown-usd";
 
 const DAY_S = 86_400;
 const ONE_YEAR_S = 31_557_600;
@@ -40,17 +42,25 @@ export interface MomentAsset {
   /** What is held or owed at the moment, in tokens: the recorded balance, or
    *  on a side counted at its face, that plus the interest built since. */
   tokens: number;
-  /** Its USD at the day's recorded price; null where none was recorded that
-   *  day, and on a side counted at its face. */
+  /** Its USD at the day's recorded price, the shown product to the cent (the
+   *  chart's figure); null where none was recorded that day, and on a side
+   *  counted at its face. */
   usd: number | null;
   /** The day's recorded price (USD per token), where it states USD. */
   price: number | null;
+  /** The model's row for the asset that day: its price's day and block, for
+   *  the receipts (ui-jobs 743). */
+  row: FlowAssetHeld;
   /** Where the balance was grown by its reserve's index since the event that
    *  recorded it: how, and the interest that adds in tokens and (at the day's
-   *  price, where it states USD) in USD. */
+   *  price, where it states USD) in USD: the asset's shown product less the
+   *  recorded balance's (`heldUsd`), to the cent. */
   grown: FlowGrowth | null;
   interest: number | null;
   interestUsd: number | null;
+  /** The recorded balance at the day's price, the shown product to the cent,
+   *  where the balance grew since; else `usd`. */
+  heldUsd: number | null;
 }
 
 export interface MomentSide {
@@ -127,22 +137,30 @@ export function flowMoment(model: FlowModel, events: FocusEvent[], endTs: number
         const grown = !isFace && h.grown ? h.grown : null;
         const recorded = grown ? grown.recorded : amount;
         const today = !bare && h.priced != null && h.priced.series && h.priced.day === day;
-        const price = !isFace && today ? h.usd / amount : null;
+        const price = !isFace && today ? (h.priced?.price ?? h.usd / amount) : null;
         const interest = grown ? amount - grown.recorded : null;
+        const usd = !isFace && today ? h.usd : null;
+        const heldUsd = usd != null && price != null ? (interest != null ? shownUsd(recorded, price) : usd) : null;
         return {
           symbol: h.symbol,
           recorded,
           // A token axis states the face side's tokens in grains (FlowUnit).
+          // A face side in dollars: the recorded debt × its factor, as its
+          // receipt multiplies them out, to six decimals.
           tokens: isFace
             ? unitOf(model, side)
               ? h.usd / 10 ** (unitOf(model, side) as FlowUnit).scale
-              : h.usd
+              : h.priced?.price != null
+                ? faceAmount(amount, h.priced.price)
+                : h.usd
             : amount,
-          usd: !isFace && today ? h.usd : null,
+          usd,
           price,
+          row: h,
           grown,
           interest,
-          interestUsd: interest != null && price != null ? interest * price : null,
+          interestUsd: interest != null && usd != null && heldUsd != null ? centsOf(usd - heldUsd) : null,
+          heldUsd,
         };
       });
     return {
@@ -157,7 +175,8 @@ export function flowMoment(model: FlowModel, events: FocusEvent[], endTs: number
   if (face.size > 0 && last?.rate != null) {
     const seconds = Math.max(0, close - last.ts);
     const year = model.words.moment?.yearSeconds ?? ONE_YEAR_S;
-    accrual = { rate: last.rate, seconds, factor: 1 + (last.rate / 100) * (seconds / year) };
+    const t = (last.rate / 100) * (seconds / year);
+    accrual = { rate: last.rate, seconds, factor: model.words.moment?.compound ? Math.exp(t) : 1 + t };
     const sum = model.words.moment?.minuteSum;
     if (sum) {
       const past = sum.deadline != null && close > sum.deadline;

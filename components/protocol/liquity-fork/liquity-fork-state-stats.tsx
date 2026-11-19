@@ -436,12 +436,12 @@ export function liquityForkStateStats(
     // The debt's USD at its $1 face, as the cell's ledger counts it.
     ...(Number(ctx.debtAfter) > 0
       ? {
-          usd: { value: Number(ctx.debtAfter), prov: faceUsdProv(debtSymbol, fmt(ctx.debtAfter), "after") },
+          usd: { value: Number(ctx.debtAfter), prov: faceUsdProv(debtSymbol, Number(ctx.debtAfter), "after") },
           ...(Number(ctx.debtBefore) > 0
             ? {
                 usdBefore: {
                   value: Number(ctx.debtBefore),
-                  prov: faceUsdProv(debtSymbol, fmt(ctx.debtBefore), "before"),
+                  prov: faceUsdProv(debtSymbol, Number(ctx.debtBefore), "before"),
                 },
               }
             : {}),

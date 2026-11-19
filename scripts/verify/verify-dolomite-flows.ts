@@ -37,6 +37,8 @@
 //
 //   npx tsx --test scripts/verify/verify-dolomite-flows.ts
 import { test } from "node:test";
+import { centsOfLines } from "./lib/cents-lines";
+import { shownUsd } from "@/lib/shared/shown-usd";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -59,7 +61,7 @@ import {
   type DolomiteFlowRow,
 } from "@/lib/dolomite/flows";
 import { dolomiteLive } from "@/hooks/useDolomiteFlows";
-import { dailyPricesFromAnswer, type DailyAnswer } from "@/lib/api/fetch-daily-prices";
+import { dailyBlocksFromAnswer, dailyPricesFromAnswer, type DailyAnswer } from "@/lib/api/fetch-daily-prices";
 import { buildFlowModel, stateAt, type FlowModel } from "@/lib/shared/flows-timeline";
 import { sideSumRows } from "@/lib/shared/flows-sum";
 import { binInputFromTimeline, binSeries, seriesRouteBinFor } from "@/lib/shared/flows-series";
@@ -89,6 +91,8 @@ const rows = (f: Fixture): DolomiteFlowRow[] => {
   return r;
 };
 const STORE = dailyPricesFromAnswer(J.daily);
+/** The block each store day was read at, as the page reads it (ui-jobs 743). */
+const STORE_BLOCKS = dailyBlocksFromAnswer(J.daily);
 function daily(f: Fixture): Record<string, [number, number][]> {
   const out: Record<string, [number, number][]> = {};
   for (const m of new Set(rows(f).map((r) => r.market))) {
@@ -100,8 +104,16 @@ function daily(f: Fixture): Record<string, [number, number][]> {
 const opts = (f: Fixture, store = true): DolomiteFlowOptions => ({
   now: NOW,
   live: dolomiteLive(f.chain),
-  ...(store ? { dailyPrices: daily(f) } : {}),
+  ...(store ? { dailyPrices: daily(f), dailyBlocks: dailyBlocks(f) } : {}),
 });
+function dailyBlocks(f: Fixture): Record<string, Record<number, number>> {
+  const out: Record<string, Record<number, number>> = {};
+  for (const m of new Set(rows(f).map((r) => r.market))) {
+    const b = STORE_BLOCKS[dolomiteSeriesKey(m)];
+    if (b) out[m] = b;
+  }
+  return out;
+}
 function model(f: Fixture, store = true): FlowModel {
   const t = dolomiteFlowTimeline(rows(f), opts(f, store));
   assert.ok(t, `${f.name}: a timeline`);
@@ -267,11 +279,20 @@ for (const name of NAMES) {
       const st = stateAt(m, stop);
       for (const side of ["collateral", "debt"] as const) {
         const r = sideSumRows(st[side], m.unit);
-        assert.equal(
-          r.lines.reduce((a, l) => a + l.dollars, 0),
-          r.total.dollars,
-          `${name} ${side} at stop ${stop}: lines add`,
-        );
+        // In cents where the legs carry their parts (ui-jobs 743): the lines add
+        // to the cent, each face its cents to the dollar.
+        if (r.total.cents != null)
+          assert.equal(
+            centsOfLines(r.lines, "dolomite"),
+            Math.round(r.total.cents * 100) || 0,
+            `${name} ${side} at stop ${stop}: lines add in cents`,
+          );
+        else
+          assert.equal(
+            r.lines.reduce((a, l) => a + l.dollars, 0),
+            r.total.dollars,
+            `${name} ${side} at stop ${stop}: lines add`,
+          );
         const src = st[side].sources.reduce((a, s) => a + s.value, 0);
         assert.ok(Math.abs(src - st[side].total) < 1e-6 * Math.max(1, st[side].total), `${name} ${side} ${stop}`);
       }
@@ -321,7 +342,12 @@ for (const name of NAMES) {
                 sum: single,
                 usd: (() => {
                   const d = eventSideSumByAsset(m, sum, cum, held);
-                  return { lines: d.lines, dollars: d.total.dollars, before: st.heldBefore[side] };
+                  return {
+                    lines: d.lines,
+                    dollars: d.total.dollars,
+                    before: st.heldBefore[side],
+                    ...(d.total.cents != null ? { cents: d.total.cents } : {}),
+                  };
                 })(),
               }),
             ]
@@ -385,7 +411,13 @@ test("a quiet day takes the store's price; without the store, the last event's",
         const market = rows(f).find((r) => r.symbol === h.symbol)!.market;
         const p = store[market]?.find(([d]) => d === day)?.[1];
         if (p == null || !(h.amount! > 0)) continue;
-        assert.ok(near(h.usd! / h.amount!, p, 1e-9), `${name} ${h.symbol} day ${day}: ${h.usd! / h.amount!} vs ${p}`);
+        // The held figure is its shown product at the store's price, to the cent (ui-jobs 743).
+        assert.equal(h.priced?.price, p, `${name} ${h.symbol} day ${day}: price ${h.priced?.price} vs ${p}`);
+        assert.equal(
+          h.usd,
+          shownUsd(h.amount!, p),
+          `${name} ${h.symbol} day ${day}: ${h.usd} vs ${shownUsd(h.amount!, p)}`,
+        );
         checked++;
       }
     }
@@ -454,9 +486,15 @@ test("a row the route prices at its block (oracle_price) is valued there, the st
   // The panel still adds up at every stop.
   const t = dolomiteFlowTimeline(r, opts(f))!;
   const m = buildFlowModel(t)!;
-  // A row at the day's close names it on its flows; a row at its block does not.
+  // A row at the day's close is the decided basis (ui-jobs 743): it is not
+  // marked, and its legs name the day's close beside the event's block.
   const fe = t.days.flatMap((d) => d.unsure ?? []);
-  assert.ok(fe.some((u) => /priced at the day's close: the price at this block is not stored yet/.test(u.why)));
+  assert.ok(!fe.some((u) => /day's close/.test(u.why)), "a day-close row is not marked");
+  const dayLegs = dolomiteFocusEvents(rp).flatMap((e) => e.legs.filter((l) => /the close of /.test(l.priceNote ?? "")));
+  assert.ok(dayLegs.length > 0, "some rows at the day's close");
+  // The store answers each day's block: the leg names it.
+  for (const l of dayLegs)
+    assert.match(l.priceNote!, /price at block [\d,]+, the close of .+; this event is at block [\d,]+$/);
   const blockOnly = dolomiteFlowTimeline(
     dolomiteFlowRows(
       evs.map((e) => {
@@ -482,10 +520,72 @@ test("a row the route prices at its block (oracle_price) is valued there, the st
     const st = stateAt(m, stop);
     for (const side of ["collateral", "debt"] as const) {
       const s = sideSumRows(st[side], m.unit);
-      assert.equal(
-        s.lines.reduce((a, l) => a + l.dollars, 0),
-        s.total.dollars,
-      );
+      // In cents where the legs carry their parts (ui-jobs 743).
+      if (s.total.cents != null)
+        assert.equal(
+          centsOfLines(s.lines, "dolomite"),
+          Math.round(s.total.cents * 100) || 0,
+          `stop ${stop} ${side}: lines add in cents`,
+        );
+      else
+        assert.equal(
+          s.lines.reduce((a, l) => a + l.dollars, 0),
+          s.total.dollars,
+        );
     }
   }
+});
+
+// The cards' legs carry their parts (ui-jobs 743): each the shown product of
+// its amount and its price, the price named; one read away from its block
+// names both blocks; no price anywhere is unpriced.
+for (const name of NAMES) {
+  test(`${name}: each leg is its shown product, its price named`, () => {
+    const f = fx(name);
+    let legs = 0;
+    for (const fe of dolomiteFocusEvents(dolomiteFlowReplay(rows(f), opts(f))))
+      for (const l of fe.legs) {
+        if (l.price == null) {
+          assert.equal(l.usd, null, `${name}: an unpriced leg has no figure`);
+          continue;
+        }
+        legs++;
+        assert.equal(l.usd, shownUsd(l.amount!, l.price), `${name} ${fe.id}: the shown product`);
+        assert.ok(l.priceNote && /block [\d,]+/.test(l.priceNote), `${name} ${fe.id}: ${l.priceNote}`);
+        if (l.block == null || l.priceNote.includes("this "))
+          assert.match(l.priceNote, /this (event|row) is at block [\d,]+$/);
+      }
+    assert.ok(legs > 0);
+  });
+}
+
+// A past row with no stored price near it takes the latest read's price: on
+// another basis, under "Not complete:", and out of the daily series (ui-jobs 743).
+test("a past row at the latest read's price is not complete and stays out of the series", () => {
+  const f = fx("open-liquidated");
+  const o = { ...opts(f), dailyPrices: {} };
+  const bare = dolomiteFlowRows(
+    eventsOf(f).map(
+      (e) => ({ ...e, context: { ...e.context, data: { ...dataOf(e), oraclePrice: undefined } } }) as BaseActivityEvent,
+    ),
+    f.owner,
+  )!;
+  const live = Object.fromEntries(
+    [...new Set(bare.map((r) => r.market))].map((m) => [
+      m,
+      { price: 1234.5, balance: 0, supplyIndex: null, borrowIndex: null, supplyApr: null, borrowApr: null },
+    ]),
+  );
+  const rp = dolomiteFlowReplay(bare, { ...o, live } as typeof o);
+  const latest = rp.replayed.filter((r) => r.basis === "latest");
+  assert.ok(latest.length > 0, "some past rows at the latest read");
+  const t = dolomiteFlowTimeline(bare, { ...o, live } as typeof o)!;
+  assert.ok(
+    t.days.flatMap((d) => d.unsure ?? []).some((u) => /latest read's price/.test(u.why)),
+    "under Not complete",
+  );
+  for (const l of dolomiteFocusEvents(rp)
+    .flatMap((e) => e.legs)
+    .filter((l) => l.basis))
+    assert.equal(l.basis, "the latest read's price");
 });

@@ -101,6 +101,7 @@ export function skyFlowTimeline(
     },
     dailyPrices: { [SUSDS.address]: dailyPrices },
     todayPrices: asOf.chi ? { [SUSDS.address]: rayNumber(asOf.chi) * usdcNow } : undefined,
+    todayBlock: asOf.block,
     ...(share
       ? {
           shareLine: {

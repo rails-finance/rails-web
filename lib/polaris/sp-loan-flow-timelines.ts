@@ -71,7 +71,7 @@ function focusEvents(events: FlowEvent[], buckets: FlowBucket[], G: Grains): Foc
   const sideOf = new Map(buckets.map((b) => [b.key, b.side]));
   return events.map((e) => {
     const move = { collateral: 0, debt: 0 };
-    for (const l of e.legs) move[sideOf.get(l.bucket)!] += (out.has(l.bucket) ? -1 : 1) * l.usd;
+    for (const l of e.legs) move[sideOf.get(l.bucket)!] += (out.has(l.bucket) ? -1 : 1) * (l.usd ?? 0);
     const side = (k: "collateral" | "debt") => {
       const bal = e.balances.find((b) => b.side === k)!;
       const after = bal.amount * G[k];
@@ -87,7 +87,7 @@ function focusEvents(events: FlowEvent[], buckets: FlowBucket[], G: Grains): Foc
       id: e.id,
       ts: e.ts,
       ...(e.tx ? { tx: e.tx } : {}),
-      legs: e.legs.map((l) => ({ ...l, amount: l.usd / G[sideOf.get(l.bucket)!] })),
+      legs: e.legs.map((l) => ({ ...l, amount: (l.usd ?? 0) / G[sideOf.get(l.bucket)!] })),
       sides: { collateral: side("collateral"), debt: side("debt") },
     };
   });
@@ -570,7 +570,7 @@ function loanFocusEvents(events: FlowEvent[], buckets: FlowBucket[], floors: num
   return events.map((e, i) => {
     const per = { collateral: floors[i] * G, debt: G };
     const move = { collateral: 0, debt: 0 };
-    for (const l of e.legs) move[sideOf.get(l.bucket)!] += (out.has(l.bucket) ? -1 : 1) * l.usd;
+    for (const l of e.legs) move[sideOf.get(l.bucket)!] += (out.has(l.bucket) ? -1 : 1) * (l.usd ?? 0);
     const side = (k: "collateral" | "debt") => {
       const bal = e.balances.find((b) => b.side === k)!;
       const after = bal.amount * per[k];
@@ -586,7 +586,7 @@ function loanFocusEvents(events: FlowEvent[], buckets: FlowBucket[], floors: num
       id: e.id,
       ts: e.ts,
       ...(e.tx ? { tx: e.tx } : {}),
-      legs: e.legs.map((l) => ({ ...l, amount: l.usd / per[sideOf.get(l.bucket)!] })),
+      legs: e.legs.map((l) => ({ ...l, amount: (l.usd ?? 0) / per[sideOf.get(l.bucket)!] })),
       sides: { collateral: side("collateral"), debt: side("debt") },
     };
   });

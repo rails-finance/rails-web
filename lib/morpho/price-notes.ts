@@ -7,7 +7,7 @@
 // same way.
 
 const blockText = (block: number | null | undefined): string =>
-  block != null ? `at block ${block.toLocaleString("en-US")}` : "at the latest read, which states no block";
+  block != null ? `at block ${block.toLocaleString("en-US")}` : "at the latest read, which names no block";
 
 /** A loan token's price from an AaveOracle. */
 export const morphoAaveOraclePriceNote = (oracle: string, symbol: string, block: number | null | undefined): string =>

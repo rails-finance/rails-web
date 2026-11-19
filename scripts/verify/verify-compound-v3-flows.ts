@@ -45,6 +45,8 @@
 //
 //   npx tsx --test scripts/verify/verify-compound-v3-flows.ts
 import { test } from "node:test";
+import { centsOfLines } from "./lib/cents-lines";
+import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -101,8 +103,19 @@ function served(f: Fixture): BaseActivityEvent[] {
 }
 function rows(f: Fixture): CompoundFlowEvent[] {
   const m = marketFor(f);
-  const prices = new Map(Object.entries(f.prices).map(([b, p]) => [Number(b), p]));
+  const prices = new Map(Object.entries(archivePrices(f)).map(([b, p]) => [Number(b), p]));
   return compoundFlowEvents(served(f), m.baseToken, m.baseDecimals, prices);
+}
+/** The archive route's answer per block. The fixture recorded it before an
+ *  ETH-quoted Comet's price was composed from its two factors as shown
+ *  (ui-jobs 743); the route now answers what the stored raw reads give
+ *  through the same composition, so an ETH-quoted market's blocks take that,
+ *  checked against the recording to the composition's rounding. */
+function archivePrices(f: Fixture): Record<string, Record<string, number>> {
+  if (marketFor(f).quoteUnit !== "ETH") return f.prices;
+  const out: Record<string, Record<string, number>> = {};
+  for (const b of Object.keys(f.prices)) out[b] = storedCometPrices(STORED.v3[f.name].blocks[b], assetsOf(f)) ?? {};
+  return out;
 }
 function opts(f: Fixture): CompoundFlowOptions {
   const m = marketFor(f);
@@ -280,11 +293,19 @@ for (const name of NAMES) {
       const st = stateAt(m, stop);
       for (const side of ["collateral", "debt"] as const) {
         const r = sideSumRows(st[side]);
-        assert.equal(
-          r.lines.reduce((a, l) => a + l.dollars, 0),
-          r.total.dollars,
-          `${name} ${side} at stop ${stop}: lines add`,
-        );
+        // In cents where the legs carry their parts (ui-jobs 743).
+        if (r.total.cents != null && !r.lines.some((l) => l.cents == null))
+          assert.equal(
+            centsOfLines(r.lines, "compound-v3"),
+            Math.round(r.total.cents * 100) || 0,
+            `${name} ${side} at stop ${stop}: lines add in cents`,
+          );
+        else if (r.total.cents == null)
+          assert.equal(
+            r.lines.reduce((a, l) => a + l.dollars, 0),
+            r.total.dollars,
+            `${name} ${side} at stop ${stop}: lines add`,
+          );
         const src = st[side].sources.reduce((a, s) => a + s.value, 0);
         assert.ok(Math.abs(src - st[side].total) < 1e-6 * Math.max(1, st[side].total), `${name} ${side} ${stop}`);
       }
@@ -309,17 +330,28 @@ for (const name of NAMES) {
       for (const side of ["collateral", "debt"] as const) {
         const sb = compoundSideBalances(rp, fe.id, side)!;
         if (sb.balances.length === 0) continue;
-        const usd = eventSideSum(m, side, cum, sb.held);
-        assert.equal(
-          usd.lines.reduce((a, l) => a + l.dollars, 0),
-          usd.total.dollars,
-          `${name} ${fe.id} ${side}: lines add`,
-        );
+        // A held asset with no price leaves the side with no figure (ui-jobs 743).
+        if (sb.held == null) continue;
+        const held = sb.held;
+        const usd = eventSideSum(m, side, cum, held);
+        // In cents where the legs carry their parts: the lines add to the cent.
+        if (usd.total.cents != null)
+          assert.equal(
+            centsOfLines(usd.lines, "compound-v3"),
+            Math.round(usd.total.cents * 100) || 0,
+            `${name} ${fe.id} ${side}: lines add in cents`,
+          );
+        else
+          assert.equal(
+            usd.lines.reduce((a, l) => a + l.dollars, 0),
+            usd.total.dollars,
+            `${name} ${fe.id} ${side}: lines add`,
+          );
         const bySum = eventAssetSum(m, focus, side, cum, fe.id, sb.balances);
         assert.ok(bySum, `${name} ${fe.id} ${side}: a sum by asset`);
         // Each asset's interest past its flows is the rounding at most.
         for (const i of bySum.interest)
-          assert.ok(Math.abs(i.amount) <= 1e-5 * Math.max(1, sb.held), `${name} ${fe.id}: ${i.symbol} ${i.amount}`);
+          assert.ok(Math.abs(i.amount) <= 1e-5 * Math.max(1, held), `${name} ${fe.id}: ${i.symbol} ${i.amount}`);
         const single = assetTokenSum(bySum);
         if (single) {
           const scale = 10 ** single.decimals;
@@ -332,13 +364,18 @@ for (const name of NAMES) {
             single.total.units,
             `${name} ${fe.id} ${side}: token lines add`,
           );
-          const dollars = eventSideSumByAsset(m, bySum, cum, sb.held);
+          const dollars = eventSideSumByAsset(m, bySum, cum, held);
           const l = tokenLedger({
             model: m,
             side,
             ev: fe,
             sum: single,
-            usd: { lines: dollars.lines, dollars: dollars.total.dollars, before: sb.heldBefore },
+            usd: {
+              lines: dollars.lines,
+              dollars: dollars.total.dollars,
+              before: sb.heldBefore,
+              ...(dollars.total.cents != null ? { cents: dollars.total.cents } : {}),
+            },
           });
           const adds = ledgerAdds(l);
           assert.ok(adds.tokens && adds.usd, `${name} ${fe.id} ${side}: the ledger adds`);
@@ -437,7 +474,14 @@ for (const name of NAMES) {
     for (const [b, archive] of Object.entries(f.prices)) {
       const s = stored.blocks[b];
       assert.ok(s, `${name} ${b}: stored`);
-      assert.deepEqual(storedCometPrices(s, assetsOf(f)), archive, `${name} ${b}`);
+      const got = storedCometPrices(s, assetsOf(f));
+      if (marketFor(f).quoteUnit === "ETH") {
+        // Composed from its two factors as shown. The tolerance covers only
+        // the 6 dp rounding of those two factors, against a recording made
+        // from their unrounded product.
+        for (const [t, p] of Object.entries(archive))
+          assert.ok(Math.abs((got?.[t] ?? 0) - p) <= 1e-5 * p, `${name} ${b} ${t}: ${got?.[t]} vs ${p}`);
+      } else assert.deepEqual(got, archive, `${name} ${b}`);
     }
   });
 
@@ -452,7 +496,9 @@ for (const name of NAMES) {
     const missing = new Set(blocks.filter((_, i) => i % 2 === 1));
     const mixed = new Map<number, Record<string, number>>();
     for (const b of blocks) {
-      const r = missing.has(b) ? f.prices[String(b)] : storedCometPrices(STORED.v3[name].blocks[String(b)], assets);
+      const r = missing.has(b)
+        ? archivePrices(f)[String(b)]
+        : storedCometPrices(STORED.v3[name].blocks[String(b)], assets);
       if (r) mixed.set(b, r);
     }
     const fromStore = compoundFlowTimeline(compoundFlowEvents(served(f), m.baseToken, m.baseDecimals, mixed), opts(f));
@@ -487,4 +533,61 @@ test("the daily store prices a quiet day; an event's day keeps the row's price",
   assert.equal(at(stored, "base-supply", quiet), 0.5, "the base too");
   assert.ok(stored.words?.linePrices?.includes("end of the day"), "the words name the day's price");
   assert.ok(!carried.words?.linePrices?.includes("end of the day"), "and only with the store");
+});
+
+// The cards' legs carry their parts (ui-jobs 743): each the shown product of
+// its amount and its price, the price named at its block; a price from the
+// nearest read names both blocks; the legs rebuild their line to the cent.
+for (const name of NAMES) {
+  test(`${name}: each leg is its shown product, its price named at its block`, () => {
+    const f = fx(name);
+    const rp = compoundFlowReplay(rows(f), opts(f));
+    let legs = 0;
+    let absorbs = 0;
+    for (const fe of compoundFocusEvents(rp))
+      for (const l of fe.legs) {
+        if (l.stated) {
+          // An absorb's collateral: the log's usdValue, to the cent.
+          const r = rp.replayed.find((x) => x.ev.id === fe.id)!;
+          assert.equal(l.usd, centsOf(r.ev.usdValue!), `${name} ${fe.id}: the log's usdValue`);
+          assert.match(l.priceNote!, /^usdValue in the AbsorbCollateral log, block [\d,]+$/);
+          absorbs++;
+          continue;
+        }
+        if (l.price == null) {
+          assert.equal(l.usd, null, `${name}: an unpriced leg has no figure`);
+          continue;
+        }
+        legs++;
+        assert.equal(l.usd, shownUsd(l.amount!, l.price), `${name} ${fe.id}: the shown product`);
+        assert.match(l.priceNote!, /block [\d,]+/, `${name} ${fe.id}: the block named`);
+        if (l.priceNote!.includes("nearest read"))
+          assert.match(l.priceNote!, /price at block [\d,]+, the nearest read; this event is at block [\d,]+$/);
+      }
+    assert.ok(legs > 0);
+    if (name.includes("absorbed")) assert.ok(absorbs > 0, `${name}: an absorb's leg states its usdValue`);
+  });
+}
+
+// A side holding a token no read priced states no dollars: that side is NaN
+// (printed "—"), never a $0, and the priced side keeps its figures (ui-jobs 743).
+test("a side holding an unpriced token has no dollars; the other side keeps its own", () => {
+  const f = fx("usdc-repaid");
+  const coll = rows(f).find((r) => !r.isBase)!.token;
+  const unpriced = rows(f).map((r) => ({
+    ...r,
+    prices: r.prices ? Object.fromEntries(Object.entries(r.prices).filter(([t]) => t !== coll)) : null,
+  }));
+  const rp = compoundFlowReplay(unpriced, opts(f));
+  const held = compoundFocusEvents(rp).filter((fe) => {
+    const r = rp.replayed.find((x) => x.ev.id === fe.id)!;
+    return (r.coll.get(coll) ?? 0) > 1e-9;
+  });
+  assert.ok(held.length > 0);
+  for (const fe of held) {
+    const c = fe.sides!.collateral;
+    // Before or once the transaction had run, the unpriced token is held.
+    assert.ok(Number.isNaN(c.after) || Number.isNaN(c.before), `${fe.id}: the collateral has no dollars`);
+    assert.ok(Number.isFinite(fe.sides!.debt.after), `${fe.id}: the debt keeps its figure`);
+  }
 });

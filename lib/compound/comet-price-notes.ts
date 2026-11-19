@@ -10,6 +10,38 @@ const at = (block: number | null | undefined) => (block != null ? ` at block ${b
 export const cometPriceNote = (comet: string, block?: number | null): string =>
   `${comet}'s getPrice, in dollars${at(block)}`;
 
+/** A Lifetime flows leg's price (ui-jobs 743): the Comet's getPrice (an
+ *  ETH-quoted Comet's composed with WETH/USD at the same block) at the
+ *  leg's block; a liquidation's AbsorbCollateral usdValue over its amount;
+ *  or the nearest read's, both blocks named. */
+export function cometFlowPriceNote(o: {
+  comet: string;
+  priceBlock: number;
+  eventBlock: number;
+  /** An ETH-quoted Comet's two factors, each shown in the note. */
+  factor?: { price: number; ethUsd: number } | null;
+}): string {
+  const read = o.factor
+    ? cometComposedPriceNote({
+        comet: o.comet,
+        ethPrice: o.factor.price,
+        ethUsd: o.factor.ethUsd,
+        wethFrom: "the Comet's WETH feed at the same block",
+      })
+    : `${o.comet}'s getPrice, in dollars`;
+  return o.priceBlock === o.eventBlock
+    ? `${read}${at(o.eventBlock)}`
+    : `${read}, price at block ${o.priceBlock.toLocaleString("en-US")}, the nearest read; this event is at block ${o.eventBlock.toLocaleString("en-US")}`;
+}
+
+/** Where a side has no dollar figure: the assets with no price at the block. */
+export const cometNoDollarLine = (assets: readonly string[]): string =>
+  `no dollar figure: ${assets.length > 1 ? `${assets.slice(0, -1).join(", ")} and ${assets[assets.length - 1]} have` : `${assets[0] ?? "an asset"} has`} no price at this block`;
+
+/** An absorb's collateral leg: the dollars its AbsorbCollateral log states. */
+export const cometAbsorbValueNote = (block: number): string =>
+  `usdValue in the AbsorbCollateral log, block ${block.toLocaleString("en-US")}`;
+
 /** The ETH-quoted Comet's composed price: its getPrice in ETH times WETH in
  *  dollars, each as shown. `wethFrom` says where the WETH leg was read. */
 export function cometComposedPriceNote(o: {

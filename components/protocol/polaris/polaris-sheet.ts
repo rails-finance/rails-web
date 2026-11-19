@@ -49,6 +49,8 @@ import { formatExact, formatNumber } from "@/lib/utils/format";
 import { formatPeth } from "@/lib/polaris/figure-format";
 import { priceText, shownUsd } from "@/lib/shared/shown-usd";
 import { polarisSheetUsd, shownPricesOf } from "@/lib/polaris/sheet-usd";
+import { centsParts } from "@/lib/shared/sheet-usd-rows";
+import { NO_FIGURE, noPriceWords } from "@/lib/shared/flows-sum";
 
 const W = POLARIS_WORDS;
 
@@ -91,7 +93,7 @@ function unitPriceOf(ctx: PolarisContext): UnitPrice | null {
     usd: pa.xauUsd,
     input: {
       label: `${stable} in USD`,
-      value: sheetUsd(pa.xauUsd),
+      value: priceText(pa.xauUsd),
       kind: "chain",
       pclass: "oracle",
       note: "the XAU/USD medianiser at this block; the feed counts a GOLDp as one ounce of gold",
@@ -139,7 +141,7 @@ export function polarisSheet(
     const pr = at === "this" ? prices : prevPrices;
     const block = at === "this" ? coords.blockNumber : prevBlock;
     const r = polarisSheetUsd(pr, what, token, n, block, stable);
-    return r ? { text: sheetUsd(n < 0 ? -r.usd : r.usd), info: r.prov } : undefined;
+    return r ? { text: sheetUsd(n < 0 ? -r.usd : r.usd), info: r.prov, cents: n < 0 ? -r.usd : r.usd } : undefined;
   };
   // The previous event's prices, where the page hands it down and it read the feed.
   const prevUnit = prev ? unitPriceOf(prev) : null;
@@ -163,7 +165,22 @@ export function polarisSheet(
   ): SheetRow | null => {
     const now = token === "coll" ? pethUsd : (prices?.debt ?? null);
     const then = token === "coll" ? prevPethUsd : (prevPrices?.debt ?? null);
-    if (now == null || then == null || held <= 0) return null;
+    if (held <= 0) return null;
+    // Held with a price missing at either event: "—", so a group's sum is
+    // blocked (ui-jobs 743).
+    if (now == null || then == null)
+      return {
+        key: "market",
+        label: SHEET_WORDS.market,
+        usd: {
+          text: NO_FIGURE,
+          info: {
+            kind: "derived",
+            summary: `Market move on the ${what} since the last event. No dollar figure: ${noPriceWords([token === "coll" ? "pETH" : stable])}.`,
+          },
+        },
+        tip,
+      };
     // The difference of the two shown products.
     const mv = shownUsd(held, now) - shownUsd(held, then);
     if (Math.abs(mv) < 0.005) return null;
@@ -171,7 +188,7 @@ export function polarisSheet(
       key: "market",
       label: SHEET_WORDS.market,
       usd: {
-        text: sheetUsd(mv, true),
+        ...centsParts(mv, true),
         info: {
           kind: "chain-derived",
           pclass: "oracle",
@@ -345,7 +362,7 @@ export function polarisSheet(
     assets: isLiq ? liqSplit("coll") : undefined,
     total:
       collAfter === 0
-        ? { text: "$0", info: ledgerFieldProv("newColl", coords, ctx.raw?.newColl) }
+        ? { text: "$0", cents: 0, info: ledgerFieldProv("newColl", coords, ctx.raw?.newColl) }
         : (rowUsd("The collateral after this event", "coll", collAfter) ?? { none: W.sheet_no_price }),
     totalAmount: {
       text: formatPeth(collAfter),
@@ -472,7 +489,7 @@ export function polarisSheet(
     assets: isLiq ? liqSplit("debt") : undefined,
     total:
       debtAfter === 0
-        ? { text: "$0", info: ledgerFieldProv("newDebt", coords, ctx.raw?.newDebt) }
+        ? { text: "$0", cents: 0, info: ledgerFieldProv("newDebt", coords, ctx.raw?.newDebt) }
         : (rowUsd("The debt after this event", "debt", debtAfter) ?? { none: W.sheet_no_price }),
     totalAmount: {
       text: formatNumber(debtAfter),

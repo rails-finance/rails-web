@@ -5,7 +5,8 @@
 // (components/shared/event-cells.tsx). The figures are the generator's
 // (lib/liquity/event-prose.ts `liquityL2`); the receipts are built here.
 
-import { amountText, priceText } from "@/lib/shared/holder-usd-receipt";
+import { liquityV2PriceNote } from "@/lib/liquity-v2/price-notes";
+import { amountText, priceText, shownUsd } from "@/lib/shared/holder-usd-receipt";
 import { collSheetUsd } from "@/lib/liquity/sheet-usd";
 import { formatUsdValue } from "@/lib/utils/format";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
@@ -47,6 +48,8 @@ import { SHEET_WORDS, sheetUsd, type EventSheet, type SheetRow, type SheetStat }
 import { changeText } from "@/components/shared/change-swap-value";
 import { redeemerEventHref } from "@/lib/liquity-v2/redeemer-routes";
 import { useTxTroves } from "@/lib/liquity-v2/tx-troves";
+import { centsParts, faceParts } from "@/lib/shared/sheet-usd-rows";
+import { NO_FIGURE, noPriceWords } from "@/lib/shared/flows-sum";
 
 const tmContractOf = (addr?: string) => ({ name: "TroveManager", address: addr });
 
@@ -153,6 +156,12 @@ export function useLiquityCells({
   // price — and the USD / ratio derived from it — is chain-derived. (On the
   // live-chain source lane collPrice is 0, so these
   // gate out rather than assert an unpriced figure.)
+  // Named by its source and this event's block (ui-jobs 743); an event with
+  // no block names none and is not complete.
+  const priceNote =
+    blockNumber != null
+      ? `${liquityV2PriceNote(collSym)}, at block ${blockNumber.toLocaleString("en-US")}`
+      : `Not complete: ${liquityV2PriceNote(collSym)}, at a block this read does not name`;
   const priceInput =
     collPrice > 0
       ? [
@@ -161,7 +170,7 @@ export function useLiquityCells({
             value: formatUsd(collPrice),
             kind: "chain-derived" as const,
             pclass: "oracle" as const,
-            note: "on-chain oracle @ event block",
+            note: priceNote,
           },
         ]
       : [];
@@ -380,7 +389,7 @@ export function useLiquityCells({
     collPrice > 0
       ? {
           kind: "chain-derived",
-          summary: `Collateral value (after) in USD. The collateral after this event times Liquity's price for ${collSym} at this block, as the rows show them, to the cent, shown to the dollar.`,
+          summary: `Collateral value (after) in USD. The collateral after this event times Liquity's price for ${collSym} at this block, as the rows show them.`,
           formula: "collateral × price",
           inputs: [
             {
@@ -390,6 +399,7 @@ export function useLiquityCells({
               note: "after",
             },
             ...priceInput.map((p) => ({ ...p, value: priceText(collPrice) })),
+            { ...productRow(l2.coll.after, collPrice), label: "collateral × price" },
           ],
         }
       : undefined;
@@ -397,7 +407,7 @@ export function useLiquityCells({
     collPrice > 0
       ? {
           kind: "chain-derived",
-          summary: `Collateral value (before) in USD. The collateral before this event times Liquity's price for ${collSym} at this block, as the rows show them, to the cent, shown to the dollar.`,
+          summary: `Collateral value (before) in USD. The collateral before this event times Liquity's price for ${collSym} at this block, as the rows show them.`,
           formula: "collateral × price",
           inputs: [
             {
@@ -411,6 +421,7 @@ export function useLiquityCells({
               value: priceText(l2.coll.beforePrice),
               note: l2.coll.beforePrice !== collPrice ? "the price the liquidation used" : p.note,
             })),
+            { ...productRow(l2.coll.before, l2.coll.beforePrice), label: "collateral × price" },
           ],
         }
       : undefined;
@@ -673,15 +684,9 @@ export function useLiquityCells({
       ? {
           before:
             debtShowBefore && !accrualMove ? (
-              <P info={faceUsdProv(debtSym, toLocaleStringHelper(beforeDebt), "before", boldLine)}>
-                {formatUsd(beforeDebt)}
-              </P>
+              <P info={faceUsdProv(debtSym, beforeDebt, "before", boldLine)}>{formatUsd(beforeDebt)}</P>
             ) : null,
-          after: (
-            <P info={faceUsdProv(debtSym, toLocaleStringHelper(debtAfter), "after", boldLine)}>
-              {formatUsd(debtAfter)}
-            </P>
-          ),
+          after: <P info={faceUsdProv(debtSym, debtAfter, "after", boldLine)}>{formatUsd(debtAfter)}</P>,
           price: `At its $1 face, $1 per ${debtSym}`,
         }
       : undefined,
@@ -839,6 +844,11 @@ export function useLiquityCells({
   const redistUsd = sheetUsdOf.redistribution;
   const eventUsd = sheetUsdOf.event;
   const marketUsd = sheetUsdOf.market;
+  // A collateral figure with no price at this block: "—", naming the asset.
+  const collNoFigure = (what: string) => ({
+    text: NO_FIGURE,
+    info: { kind: "derived" as const, summary: `${what}. No dollar figure: ${noPriceWords([collSym])}.` },
+  });
   const collRows: SheetRow[] = [];
   if (Math.abs(opColl) >= DUST_COLL)
     collRows.push({
@@ -856,16 +866,17 @@ export function useLiquityCells({
       usd:
         priceNow > 0
           ? {
-              text: sheetUsd(eventUsd),
+              ...centsParts(eventUsd),
               info: eventMoveUsdProv(
                 collSym,
                 afterCollInUsd,
                 beforeCollAtEventUsd,
                 redistUsd,
+                eventUsd,
                 Boolean(isLiquidation && liquidation),
               ),
             }
-          : undefined,
+          : collNoFigure("The collateral this event moved, in USD"),
       tip: TIP.collEvent,
     });
   if (Math.abs(redistColl) >= DUST_COLL)
@@ -873,7 +884,10 @@ export function useLiquityCells({
       key: "redistribution",
       label: L2_WORDS.sheet_redistribution,
       amount: { text: formatColl(redistColl), symbol: collSym, info: collDeltaProv },
-      usd: priceNow > 0 ? { text: sheetUsd(redistUsd), info: usdMoveProv(collSym, redistColl, priceNow) } : undefined,
+      usd:
+        priceNow > 0
+          ? { ...centsParts(redistUsd), info: usdMoveProv(collSym, redistColl, priceNow, priceNote) }
+          : collNoFigure("The redistribution's collateral, in USD"),
       tip: TIP.collRedist,
     });
   const collCarry: EventSheet["sides"][number]["carry"] = [];
@@ -885,20 +899,31 @@ export function useLiquityCells({
       usd:
         lastUsd != null && prevPrice
           ? {
-              text: sheetUsd(lastUsd),
+              ...centsParts(lastUsd),
               info: atPriceProv(collSym, beforeColl, prevPrice, "the previous event"),
             }
           : undefined,
       tip: TIP.collLast,
     });
-    // The same price at both events moves nothing: the row is left out.
+    // The same price at both events moves nothing: the row is left out. A
+    // price missing at either event draws "—", so a group's sum is blocked.
     if (lastUsd != null && priceNow > 0 && marketUsd !== 0)
       collCarry.push({
         key: "market",
         label: SHEET_WORDS.market,
         usd: {
-          text: sheetUsd(marketUsd, true),
-          info: marketMoveProv(collSym, beforeCollAtEventUsd, lastUsd),
+          ...centsParts(marketUsd, true),
+          info: marketMoveProv(collSym, beforeCollAtEventUsd, lastUsd, marketUsd),
+        },
+        tip: TIP.collMarket,
+      });
+    else if (lastUsd == null || !(priceNow > 0))
+      collCarry.push({
+        key: "market",
+        label: SHEET_WORDS.market,
+        usd: {
+          text: NO_FIGURE,
+          info: { kind: "derived", summary: `Market move. No dollar figure: ${noPriceWords([collSym])}.` },
         },
         tip: TIP.collMarket,
       });
@@ -913,12 +938,25 @@ export function useLiquityCells({
             key: "before",
             label: SHEET_WORDS.before,
             amount: { text: formatColl(beforeColl), symbol: collSym, info: collBeforeProv },
-            usd: beforeCollAtEventUsd > 0 ? { text: sheetUsd(beforeCollAtEventUsd), info: usdBeforeProv } : undefined,
+            usd:
+              beforeCollAtEventUsd > 0
+                ? { ...centsParts(beforeCollAtEventUsd), info: usdBeforeProv }
+                : beforeColl > 0
+                  ? collNoFigure("The collateral just before this event, in USD")
+                  : undefined,
             tip: TIP.collBefore,
           }
         : undefined,
     rows: collRows,
-    total: { text: afterCollInUsd > 0 ? sheetUsd(afterCollInUsd) : "$0", info: usdAfterProv ?? collAfterProv },
+    // Collateral held with no price at this block: "—", never "$0".
+    total:
+      collAfter > 0 && !(collPrice > 0)
+        ? collNoFigure("Collateral after this event, in USD")
+        : {
+            text: afterCollInUsd > 0 ? sheetUsd(afterCollInUsd) : "$0",
+            cents: afterCollInUsd,
+            info: usdAfterProv ?? collAfterProv,
+          },
     totalAmount: { text: formatColl(collAfter), symbol: collSym, info: collAfterProv },
     totalTip: TIP.collTotal,
   };
@@ -965,7 +1003,7 @@ export function useLiquityCells({
             : debtMoveProv,
         value: sheetDebtCp?.value,
       },
-      usd: { text: sheetUsd(opDebt), info: debtMoveProv },
+      usd: { ...faceParts(opDebt), info: debtMoveProv },
       tip: TIP.debtEvent,
     });
   if (upfrontFee >= DUST_DEBT)
@@ -973,10 +1011,7 @@ export function useLiquityCells({
       key: "upfront-fee",
       label: L2_WORDS.sheet_upfront_fee,
       amount: { text: toLocaleStringHelper(upfrontFee), symbol: debtSym, info: feeP?.info, value: feeP?.value },
-      usd: {
-        text: sheetUsd(upfrontFee),
-        info: faceUsdProv(debtSym, toLocaleStringHelper(upfrontFee), "after", boldLine),
-      },
+      usd: { ...faceParts(upfrontFee), info: faceUsdProv(debtSym, upfrontFee, "after", boldLine) },
       tip: TIP.debtUpfront,
     });
   if (Math.abs(redistDebt) >= DUST_DEBT)
@@ -984,7 +1019,7 @@ export function useLiquityCells({
       key: "redistribution",
       label: L2_WORDS.sheet_redistribution,
       amount: { text: debtFig(redistDebt), symbol: debtSym, info: debtMoveProv },
-      usd: { text: sheetUsd(redistDebt), info: debtMoveProv },
+      usd: { ...faceParts(redistDebt), info: debtMoveProv },
       tip: TIP.debtRedist,
     });
   const debtCarry: EventSheet["sides"][number]["carry"] = [];
@@ -993,17 +1028,14 @@ export function useLiquityCells({
       key: "last",
       label: SHEET_WORDS.last,
       amount: { text: toLocaleStringHelper(beforeDebt), symbol: debtSym, info: debtBeforeProv },
-      usd: {
-        text: sheetUsd(beforeDebt),
-        info: faceUsdProv(debtSym, toLocaleStringHelper(beforeDebt), "before", boldLine),
-      },
+      usd: { ...faceParts(beforeDebt), info: faceUsdProv(debtSym, beforeDebt, "before", boldLine) },
       tip: TIP.debtLast,
     });
     if (accrualTotal >= DUST_DEBT)
       debtCarry.push({
         key: "interest",
         label: SHEET_WORDS.interest,
-        usd: { text: sheetUsd(accrualTotal), info: accrualProv },
+        usd: { ...faceParts(accrualTotal), info: accrualProv },
         tip: TIP.debtInterest,
         sub: [
           {
@@ -1016,7 +1048,7 @@ export function useLiquityCells({
               info: accrualProv,
             },
             usd: {
-              text: sheetUsd(accrual.batched && accrual.split ? accrual.interest : accrualTotal),
+              ...faceParts(accrual.batched && accrual.split ? accrual.interest : accrualTotal),
               info: accrualProv,
             },
             tip: TIP.debtInterestAsset,
@@ -1027,7 +1059,7 @@ export function useLiquityCells({
                   key: "fee",
                   label: L2_WORDS.sheet_fee,
                   amount: { text: fmtAccrued(accrual.fee), symbol: debtSym, info: accrualProv },
-                  usd: { text: sheetUsd(accrual.fee), info: accrualProv },
+                  usd: { ...faceParts(accrual.fee), info: accrualProv },
                   tip: TIP.debtFee,
                 },
               ]
@@ -1045,14 +1077,15 @@ export function useLiquityCells({
             key: "before",
             label: SHEET_WORDS.before,
             amount: { text: toLocaleStringHelper(debtBeforeEvent), symbol: debtSym, info: debtBeforeEventProv },
-            usd: { text: sheetUsd(debtBeforeEvent), info: debtBeforeEventProv },
+            usd: { ...faceParts(debtBeforeEvent), info: debtBeforeEventProv },
             tip: TIP.debtBefore,
           }
         : undefined,
     rows: debtRows,
     total: {
-      text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0",
-      info: faceUsdProv(debtSym, toLocaleStringHelper(debtAfter), "after", boldLine),
+      text: debtAfter > 0 ? faceParts(debtAfter).text : "$0",
+      cents: faceParts(debtAfter).cents,
+      info: faceUsdProv(debtSym, debtAfter, "after", boldLine),
     },
     totalAmount: { text: toLocaleStringHelper(debtAfter), symbol: debtSym, info: debtAfterProv },
     totalTip: TIP.debtTotal,
@@ -1223,11 +1256,24 @@ export function useLiquityCells({
   return { cells, sheet };
 }
 
+/** An amount × price row: the product of the two as shown, to the cent, and
+ *  the face the sheet prints it as (ui-jobs 743). */
+function productRow(amount: number, price: number) {
+  const cents = shownUsd(Math.abs(amount), price);
+  return {
+    label: "amount × price",
+    value: formatUsdValue(cents),
+    kind: "derived" as const,
+    step: true as const,
+    note: `to the cent, shown as ${sheetUsd(cents)}`,
+  };
+}
+
 /** A token amount's dollars at a price, as the rows show them, to the cent. */
-function usdMoveProv(sym: string, amount: number, price: number): Provenance {
+function usdMoveProv(sym: string, amount: number, price: number, priceNote: string): Provenance {
   return {
     kind: "chain-derived",
-    summary: `${sym} this event moved, in US dollars. The amount times Liquity's price for ${sym} at this block, as the rows show them, to the cent, shown to the dollar.`,
+    summary: `${sym} this event moved, in US dollars. The amount times Liquity's price for ${sym} at this block, as the rows show them.`,
     formula: "amount × price",
     inputs: [
       { label: "amount", value: `${amountText(amount)} ${sym}`, kind: "chain" },
@@ -1236,27 +1282,43 @@ function usdMoveProv(sym: string, amount: number, price: number): Provenance {
         value: priceText(price),
         kind: "chain-derived",
         pclass: "oracle",
-        note: "on-chain oracle @ event block",
+        note: priceNote,
       },
+      productRow(amount, price),
     ],
   };
 }
 
 /** The event's own row on the sheet: what takes the balance before to the
  *  balance after, in dollars, less any redistribution. */
-function eventMoveUsdProv(sym: string, total: number, before: number, redist: number, liquidation = false): Provenance {
+function eventMoveUsdProv(
+  sym: string,
+  total: number,
+  before: number,
+  redist: number,
+  moved: number,
+  liquidation = false,
+): Provenance {
+  const formula = redist !== 0 ? "total − before − redistribution" : "total − before";
   return {
     kind: "derived",
     summary: liquidation
-      ? `${sym} this liquidation moved, in US dollars. The balance after at Liquity's price for ${sym} at this block, less the balance before and any redistribution at the price the liquidation used, to the cent, shown to the dollar.`
-      : `${sym} this event moved, in US dollars. The balance after less the balance before and any redistribution, each at Liquity's price for ${sym} at this block, to the cent, shown to the dollar.`,
-    formula: redist !== 0 ? "total − before − redistribution" : "total − before",
+      ? `${sym} this liquidation moved, in US dollars. The balance after at Liquity's price for ${sym} at this block, less the balance before and any redistribution at the price the liquidation used.`
+      : `${sym} this event moved, in US dollars. The balance after less the balance before and any redistribution, each at Liquity's price for ${sym} at this block.`,
+    formula,
     inputs: [
       { label: "total", value: formatUsdValue(total), kind: "derived", step: true },
       { label: "before", value: formatUsdValue(before), kind: "derived", step: true },
       ...(redist !== 0
         ? [{ label: "redistribution", value: formatUsdValue(redist), kind: "derived" as const, step: true as const }]
         : []),
+      {
+        label: formula,
+        value: `${moved < 0 ? "−" : ""}${formatUsdValue(Math.abs(moved))}`,
+        kind: "derived",
+        step: true,
+        note: `to the cent, shown as ${sheetUsd(moved)}`,
+      },
     ],
   };
 }
@@ -1265,11 +1327,12 @@ function eventMoveUsdProv(sym: string, total: number, before: number, redist: nu
 function atPriceProv(sym: string, amount: number, price: number, when: string): Provenance {
   return {
     kind: "chain-derived",
-    summary: `${sym} held after ${when}, in US dollars. The amount times Liquity's price for ${sym} then, as the rows show them, to the cent, shown to the dollar.`,
+    summary: `${sym} held after ${when}, in US dollars. The amount times Liquity's price for ${sym} then, as the rows show them.`,
     formula: "collateral × price then",
     inputs: [
       { label: "collateral", value: `${amountText(amount)} ${sym}`, kind: "chain" },
       { label: `price at ${when}`, value: priceText(price), kind: "chain-derived", pclass: "oracle" },
+      productRow(amount, price),
     ],
   };
 }
@@ -1277,14 +1340,21 @@ function atPriceProv(sym: string, amount: number, price: number, when: string): 
 /** The collateral's move in dollars from the previous event's price to this
  *  event's: the balance before at this event's price less the same balance at
  *  the previous event's (the sheet's Before − Last). */
-function marketMoveProv(sym: string, before: number, last: number): Provenance {
+function marketMoveProv(sym: string, before: number, last: number, moved: number): Provenance {
   return {
     kind: "derived",
-    summary: `Market move. The change in Liquity's price for ${sym} from the previous event to this one, on the ${sym} the Trove held between them, to the cent, shown to the dollar. No ${sym} moved.`,
+    summary: `Market move. The change in Liquity's price for ${sym} from the previous event to this one, on the ${sym} the Trove held between them. No ${sym} moved.`,
     formula: "before − last",
     inputs: [
       { label: "before", value: formatUsdValue(before), kind: "derived", step: true },
       { label: "last", value: formatUsdValue(last), kind: "derived", step: true },
+      {
+        label: "before − last",
+        value: `${moved < 0 ? "−" : ""}${formatUsdValue(Math.abs(moved))}`,
+        kind: "derived",
+        step: true,
+        note: `to the cent, shown as ${sheetUsd(moved, true)}`,
+      },
     ],
   };
 }

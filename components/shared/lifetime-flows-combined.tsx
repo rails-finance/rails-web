@@ -79,7 +79,7 @@ import {
   type FlowsLwLink,
 } from "@/components/shared/lifetime-flows-lw-axis";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
-import type { FlowBinSeries } from "@/lib/shared/flows-series";
+import { flowLinePoints, type FlowBinSeries } from "@/lib/shared/flows-series";
 import { CHANGES_UNAVAILABLE_NOTE } from "@/lib/shared/change-log-read";
 import { changesByDay, changeWords, type FlowChange } from "@/lib/shared/flows-changes";
 import { ChangeValues } from "@/components/shared/protocol-change-row";
@@ -844,7 +844,15 @@ export function CombinedFlows({
         <SectionHelp content={barsHelp} name="the bars" anatomy="F16" extra={flowsKey} />
       </div>
     ),
-    ...(hasDebt ? { debt: <div className="mb-1.5 mt-4">{bareHeadline("debt")}</div> } : {}),
+    ...(hasDebt
+      ? {
+          debt: (
+            <div className="mb-1.5 mt-4" data-flow-headline-row="debt">
+              {bareHeadline("debt")}
+            </div>
+          ),
+        }
+      : {}),
   };
   // The protocol's changes inside the life, a marker a day (ruling 10).
   const changeDays = useMemo(() => changesByDay(model.changes, startDay, today), [model.changes, startDay, today]);
@@ -1144,18 +1152,11 @@ function Steady({ children }: { children: ReactNode }) {
   );
 }
 
-type Point = { to: number; collateral: number | null; debt: number | null };
-
-/** The flows line's points, the last at the live figures, and its axis
- *  labels: compact ("$4M", "$250k"), a token axis (Morpho) without the
- *  symbol. */
+/** The flows line's points (`flowLinePoints`: a break on each day an asset
+ *  held there has no price), and its axis labels: compact ("$4M", "$250k"),
+ *  a token axis (Morpho) without the symbol. */
 export function flowLineScale(model: FlowModel, series: FlowBinSeries | null) {
-  const points: Point[] = (series?.points ?? []).map(([, to, collateral, debt]) => ({ to, collateral, debt }));
-  const tail = points[points.length - 1];
-  if (tail) {
-    tail.collateral = model.live.collateralUsd;
-    tail.debt = model.live.debtUsd;
-  }
+  const points = flowLinePoints(model, series);
   const axisLabel = (t: number) =>
     model.unit ? formatFlowToken(t, model.unit, false) : formatFlowUsd(t).replace(/\.0(?=[KMB])/, "");
   return { points, axisLabel };

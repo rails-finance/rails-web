@@ -36,6 +36,7 @@ import {
   useFlowUnit,
 } from "@/components/shared/lifetime-flows-tip";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
+import { NO_FIGURE } from "@/lib/shared/flows-sum";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
@@ -54,6 +55,7 @@ import {
   type FlowSide,
   type FlowSideState,
   type FlowUnit,
+  shownNow,
 } from "@/lib/shared/flows-timeline";
 import { OldPriceLabel, OldPriceTip } from "@/components/shared/flow-old-price";
 import { RevealTip } from "@/components/shared/reveal-tip";
@@ -286,9 +288,19 @@ export type FlowsTotalsData = {
 export function flowsTotals(model: FlowModel, since: string | null): FlowsTotalsData {
   const t = throughput(model);
   const hasDebt = model.buckets.some((b) => b.side === "debt");
+  // A side whose inflows hold an unpriced leg draws no figure (ui-jobs 743).
+  const gaps = model.rows.at(-1)?.unpriced ?? {};
+  const gapIn = (side: FlowSide) =>
+    model.buckets.some((b) => b.side === side && b.dir === "in" && (gaps[b.key]?.length ?? 0) > 0);
   return {
-    deposited: formatFlowUsd(t.deposited, unitOf(model, "collateral")),
-    borrowed: hasDebt && t.borrowed > 0.5 ? formatFlowUsd(t.borrowed, unitOf(model, "debt")) : null,
+    deposited: gapIn("collateral") ? NO_FIGURE : formatFlowUsd(t.deposited, unitOf(model, "collateral")),
+    borrowed: !hasDebt
+      ? null
+      : gapIn("debt")
+        ? NO_FIGURE
+        : t.borrowed > 0.5
+          ? formatFlowUsd(t.borrowed, unitOf(model, "debt"))
+          : null,
     txs: t.txs,
     unit: t.unit,
     turnover: t.turnover,
@@ -394,9 +406,13 @@ export function Headline({
   const tokens = assets.held.filter((h) => h.side === side && (h.amount ?? 0) > 0).map((h) => h.symbol);
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <Prov info={flowSegmentProv(st.bar[0], side, when, isLive, model.daily)}>
+      <Prov
+        info={flowSegmentProv(st.bar[0], side, when, isLive, model.daily, unitOf(model, side), (u) =>
+          formatFlowUsd(u, unitOf(model, side)),
+        )}
+      >
         <span className="text-xl font-semibold tabular-nums text-foreground">
-          {formatFlowUsd(st.now, unitOf(model, side))}
+          {formatFlowUsd(shownNow(st), unitOf(model, side))}
         </span>
       </Prov>
       {partial && partial.length > 0 && (
@@ -510,7 +526,7 @@ export function Rescaled({
             <div className={`relative ${heads ? "h-8" : "h-10 sm:h-11"}`}>
               <div
                 role="img"
-                aria-label={`${word}: ${spokenUsd(st.now, u)}.`}
+                aria-label={`${word}: ${spokenUsd(shownNow(st), u)}.`}
                 className="absolute inset-0 overflow-hidden rounded-md bg-sunken"
               >
                 {axis.ticks.slice(1).map((t) => (
@@ -533,8 +549,8 @@ export function Rescaled({
                 className={`absolute inset-0 block cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${!tip && open?.side === side ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
                 aria-label={
                   tip
-                    ? `${st.bar[0].label}: ${spokenUsd(st.now, u)}`
-                    : `${word}: ${spokenUsd(st.now, u)}. Open how its flows add up.`
+                    ? `${st.bar[0].label}: ${spokenUsd(shownNow(st), u)}`
+                    : `${word}: ${spokenUsd(shownNow(st), u)}. Open how its flows add up.`
                 }
                 aria-expanded={open?.side === side}
                 aria-haspopup="dialog"
@@ -543,7 +559,7 @@ export function Rescaled({
               />
               {open?.side === side && (
                 <FlowPanelShell
-                  label={`${word}: ${spokenUsd(st.now, u)}`}
+                  label={`${word}: ${spokenUsd(shownNow(st), u)}`}
                   anchor={() => document.querySelector<HTMLElement>(`[data-flow-seg="${side}-busy"]`)}
                   onClose={() => setOpen(null)}
                   focusOnOpen={open.keyboard}

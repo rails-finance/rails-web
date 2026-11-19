@@ -37,7 +37,7 @@ import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import type { StoredHeadRead } from "@/lib/shared/server-head-read";
 import { COMPOUND_DEPLOYMENT, type CometDeployment, type CometMarket } from "@/lib/compound/asset-catalog";
-import { cometUsdOf } from "@/lib/compound/at-block-prices";
+import { cometEthFactorOf, cometUsdOf, type CometFactor } from "@/lib/compound/at-block-prices";
 import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const COMET_ABI = parseAbi([
@@ -523,7 +523,7 @@ export async function cometPricesAtBlock(
   market: CometMarket,
   assets: string[],
   block: number,
-): Promise<Record<string, number>> {
+): Promise<{ prices: Record<string, number>; factors: Record<string, CometFactor> }> {
   const client = chainClient(deployment.chainId);
   const comet = market.comet as `0x${string}`;
   const base = market.baseToken.toLowerCase();
@@ -550,7 +550,7 @@ export async function cometPricesAtBlock(
     if (typeof feed === "string" && feed.toLowerCase() !== ZERO_ADDR)
       named.push({ token: i === 0 ? base : coll[i - 1], feed: feed as `0x${string}` });
   });
-  if (named.length === 0) return {};
+  if (named.length === 0) return { prices: {}, factors: {} };
   const res = (await client.multicall({
     allowFailure: true,
     blockNumber: at,
@@ -561,15 +561,18 @@ export async function cometPricesAtBlock(
   let quote: bigint | null = null;
   if (market.quoteUnit === "ETH") {
     const eth = (await cometEthUsdAtBlocks(deployment, [block])).get(block);
-    if (eth == null || eth <= BigInt(0)) return {};
+    if (eth == null || eth <= BigInt(0)) return { prices: {}, factors: {} };
     quote = eth;
   }
   // The conversion the stored prices take too (lib/compound/at-block-prices.ts).
   const out: Record<string, number> = {};
+  const factors: Record<string, CometFactor> = {};
   res.forEach((r, i) => {
     if (r.status !== "success" || r.result == null) return;
     const usd = cometUsdOf(r.result as bigint, quote);
     if (usd > 0) out[named[i].token] = usd;
+    const f = cometEthFactorOf(r.result as bigint, quote);
+    if (usd > 0 && f) factors[named[i].token] = f;
   });
-  return out;
+  return { prices: out, factors };
 }

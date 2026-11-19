@@ -397,7 +397,10 @@ function head(c: Ctx, overview: boolean): ProductHead {
         label: "Funding rate",
         tip: fxFundingTip(p.fundingRatioAnnual),
         value: (
-          <Prov info={stamp(c, fundingRateProv(label, p.address))} value={formatExact(p.fundingRatioAnnual * 100)}>
+          <Prov
+            info={stamp(c, fundingRateProv(label, p.address, p.configuration))}
+            value={formatExact(p.fundingRatioAnnual * 100)}
+          >
             {pctOf(p.fundingRatioAnnual, 2)}
           </Prov>
         ),
@@ -436,7 +439,10 @@ function head(c: Ctx, overview: boolean): ProductHead {
           </Prov>
         )}
         <Prov
-          info={stamp(c, p.redeemPaused ? pausedProv("redeem", label, p.address) : redeemGateProv(label, p.address))}
+          info={stamp(
+            c,
+            p.redeemPaused ? pausedProv("redeem", label, p.address) : redeemGateProv(label, p.configuration),
+          )}
         >
           <span data-fx-redemption="">{redemptionWords(p)}</span>
         </Prov>
@@ -831,7 +837,7 @@ function Funding({ c }: { c: Ctx }) {
         </Stat>
         <Stat label="Default fees" note="a router can set its own">
           <Prov
-            info={stamp(c, defaultFeesProv(label, p.address))}
+            info={stamp(c, defaultFeesProv(p.configuration))}
             value={`${formatExact(p.defaultFees.borrow * 100)} / ${formatExact(p.defaultFees.repay * 100)}`}
           >
             {[

@@ -64,8 +64,9 @@ import {
 import { CTokenMembershipLine } from "@/components/shared/ctoken-membership-line";
 import { compoundV2LiquidationValues } from "@/lib/compound-v2/liquidation-values";
 import { buildCompoundV2LiqForensics, oracleNote } from "@/lib/compound-v2/liquidation-forensics";
-import { formatExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatExact, formatNumber } from "@/lib/utils/format";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { priceText } from "@/lib/shared/shown-usd";
 
 export interface CompoundV2CellsInput {
   ctx: CompoundV2Context;
@@ -239,13 +240,12 @@ export function useCompoundV2Cells({ ctx, txHash, blockNumber, wallet, eventId, 
   const usdLegs = forensics != null && values?.numeraire === "USD";
   const priceAt = useCTokenPriceAt(blockNumber, ctx.market);
   const prices: EventPriceChip[] = usdLegs
-    ? pillPriceChips(forensics.pricePills, "Compound", formatUsdValue)
+    ? pillPriceChips(forensics.pricePills, "Compound", priceText)
     : priceAt != null && ctx.eventType !== "liquidation"
       ? [
           {
             symbol: ctx.marketSymbol,
             usd: priceAt,
-            display: formatUsdValue(priceAt),
             info: priceAtBlockProv(ctx.marketSymbol, coords),
             title: `${ctx.marketSymbol} price at this event: Compound's ${oracleNote(blockNumber)}`,
           },

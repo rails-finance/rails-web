@@ -36,6 +36,7 @@
 // today's at the live read; each row's price is a mark at its block.
 //
 //   npx tsx --test scripts/verify/verify-lifetime-flows-state.ts
+import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
 import { createFlowFocusStore, rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -74,6 +75,7 @@ import {
   daysFromEvents,
   dayStart,
   formatFlowUsd,
+  livePriced,
   longDay,
   nextEventDay,
   prevEventDay,
@@ -86,6 +88,7 @@ import {
   windowModel,
 } from "@/lib/shared/flows-timeline";
 import { formatDate } from "@/lib/date";
+import { heldDayProv } from "@/lib/shared/flows-timeline-provenance";
 import {
   flowPriceSeries,
   formatPrice,
@@ -197,8 +200,21 @@ test("the live stop states the ledger's figures", () => {
   const s = stateAt(model, model.liveStop);
   const c = tower.collateral;
   const d = tower.debt;
-  assert.ok(near(s.collateral.now, usdSum(c.current)));
-  assert.ok(near(s.debt.now, usdSum(d.current) + (d.interest?.usd ?? 0)));
+  // The live figures are the lines' shown products, to the cent (ui-jobs
+  // 743): the same assets as the ledger's lines, within what showing each
+  // amount and price rounds away.
+  const shown = (ls: typeof c.current) => ls.reduce((t, l) => centsOf(t + shownUsd(l.amount, l.price!.usd)), 0);
+  assert.ok(c.current.every((l) => l.price != null) && d.current.every((l) => l.price != null), "each line priced");
+  assert.equal(s.collateral.now, shown(c.current));
+  assert.ok(near(s.collateral.now, usdSum(c.current), 0.01 * c.current.length + 1e-6 * usdSum(c.current)));
+  // The debt: each asset's rows (its line with the interest joined) at its
+  // price, as shown, summed by cents.
+  const debtRows = model.liveHeld.filter((r) => r.side === "debt" && (r.amount ?? 0) > 0);
+  assert.ok(debtRows.length > 0 && debtRows.every((r) => r.priced?.price != null), "each debt row priced");
+  assert.equal(
+    s.debt.now,
+    debtRows.reduce((t, r) => centsOf(t + shownUsd(r.amount as number, r.priced!.price as number)), 0),
+  );
   assert.ok(near(seg(s.collateral, "deposited"), c.lifetimeInflow));
   assert.ok(near(seg(s.collateral, "received"), usdSum(c.received)));
   // One balancing item at every stop: at the live stop it is the ledger's
@@ -1559,11 +1575,14 @@ test("the event card's sum by asset: each asset's lines and its interest add to 
         for (const r of l.rows.filter((x) => x.role === "event"))
           assert.ok(r.label.startsWith("This "), `${ev.id}: "${r.label}"`);
       }
-      assert.equal(
-        assets.reduce((a, l) => a + (l.usd?.dollars ?? 0), 0),
-        usd.dollars,
-        `${ev.id} ${side}: the assets' dollars add to the side's`,
-      );
+      // In cents where the legs carry their parts; the side's total has no
+      // figure where an asset is unpriced.
+      if (usd)
+        assert.equal(
+          Math.round(assets.reduce((a, l) => a + (l.usd?.cents ?? l.usd?.dollars ?? 0), 0) * 100),
+          Math.round((usd.cents ?? usd.dollars) * 100),
+          `${ev.id} ${side}: the assets' dollars add to the side's`,
+        );
       assert.ok(
         ledgerAdds(
           dollarLedger({ model: route, side, ev, lines: dollars.lines, dollars: dollars.total.dollars, before: null }),
@@ -1821,9 +1840,9 @@ test("indexes: between events the card, the bars and the line state recorded × 
       // The line's day point is the bars' figure that day.
       const p = line.points.find((x) => x[0] === day);
       const v = m.valued[stop];
-      if (p && p[2] != null)
-        assert.ok(near(p[2], v.collateral, 1e-6 * Math.max(1, v.collateral)), `${name}: collateral line at ${day}`);
-      if (p && p[3] != null) assert.ok(near(p[3], v.debt, 1e-6 * Math.max(1, v.debt)), `${name}: debt line at ${day}`);
+      // Both in cents (ui-jobs 743): the point is the bars' figure to the cent.
+      if (p && p[2] != null) assert.equal(p[2], v.collateral, `${name}: collateral line at ${day}`);
+      if (p && p[3] != null) assert.equal(p[3], v.debt, `${name}: debt line at ${day}`);
       // The state card states the model's tokens and their interest.
       if (m.eventDays.includes(stop)) continue;
       const mo: FlowMoment | null = flowMoment(m, [], (day + 1) * 86_400 - 1);
@@ -1835,7 +1854,12 @@ test("indexes: between events the card, the bars and the line state recorded × 
           if (h.grown) {
             assert.equal(a.recorded, h.grown.recorded);
             assert.ok(near(a.interest ?? -1, (h.amount ?? 0) - h.grown.recorded, 1e-15 * (h.amount ?? 1)));
-            if (a.price != null) assert.ok(near(a.interestUsd ?? -1, (a.interest ?? 0) * a.price, 1e-9));
+            // In cents (ui-jobs 743): the asset is its shown product, the
+            // interest that less the recorded balance's.
+            if (a.price != null) {
+              assert.equal(a.usd, shownUsd(a.tokens, a.price), `${name}: ${a.symbol} to the cent on ${day}`);
+              assert.equal(a.interestUsd, centsOf((a.usd ?? 0) - shownUsd(a.recorded, a.price)));
+            }
           } else assert.equal(a.interest, null);
         }
     }
@@ -1951,7 +1975,12 @@ test("incomplete stretches: a figure without its price or read is dashed and nam
   // A leg priced off its block marks the bars from its day, not the day's held figure.
   assert.deepEqual(unsureAt(m, 2, "collateral").flows, []);
   assert.deepEqual(unsureAt(m, 3, "collateral"), { held: [], flows: [why.legs] });
-  assert.deepEqual(partialAt(m, m.liveStop, "collateral"), [why.legs]);
+  // The live stop holds WETH with no live price: its last stop's price,
+  // carried and not complete (ui-jobs 743).
+  assert.deepEqual(partialAt(m, m.liveStop, "collateral"), [
+    "WETH at an earlier price: the live read has no price for it.",
+    why.legs,
+  ]);
   // An unread balance stands until the next day with events.
   for (const st of [6, 7, 8]) assert.deepEqual(unsureAt(m, st, "debt").held, [why.unread], `stop ${st}`);
   assert.deepEqual(unsureAt(m, 9, "debt").held, []);
@@ -1963,8 +1992,10 @@ test("incomplete stretches: a figure without its price or read is dashed and nam
     /^WETH is valued at its price of \d+ \w+ '\d\d: no daily price is stored/,
   );
   assert.equal(unsureAt(m, 4, "collateral").held.length, 1);
-  // The live stop is the live read's: only the flows' reasons.
-  assert.deepEqual(unsureAt(m, m.liveStop, "collateral").held, []);
+  // The live stop: the carried price's reason, then the flows'.
+  assert.deepEqual(unsureAt(m, m.liveStop, "collateral").held, [
+    "WETH at an earlier price: the live read has no price for it.",
+  ]);
   // A window keeps each reason, those before it from its opening.
   const w = windowModel(m, 5);
   assert.deepEqual(unsureAt(w, 0, "collateral").flows, [why.legs]);
@@ -3230,4 +3261,28 @@ test("LlamaLend's band and health: each read's user_prices and health held to th
   assert.deepEqual(open.band!.points.at(-1), [110, 1_900, 1_700, null]);
   assert.deepEqual(open.health!.points.at(-1), [110, 0.05, null]);
   assert.equal(open.band!.end, "today");
+});
+
+test("the live and past held receipts' via names what it sums, as the receipt prints it", () => {
+  // components/shared/provenance.tsx viaNode: the leading custody segment
+  // drops whenever more than one stands.
+  const printed = (via?: string) => {
+    const parts = via ? via.split(" · ") : [];
+    return (parts.length > 1 ? parts.slice(1) : parts).join(" · ");
+  };
+  const row = (priced: FlowAssetHeld["priced"]): FlowAssetHeld => ({
+    side: "collateral",
+    symbol: "WETH",
+    amount: 2,
+    usd: 3000,
+    priced,
+  });
+  const live = heldDayProv("Still deposited", "now", [
+    row(livePriced(1500, 23_000_000, 1_763_500_000, { source: "the oracle's price now" })),
+  ]);
+  const past = heldDayProv("Still deposited", "the end of 9 Nov 2025", [
+    row({ day: 20_401, series: true, price: 1500, block: 23_000_000 }),
+  ]);
+  assert.equal(printed(live.via), "each asset's balance × its price now · summed");
+  assert.equal(printed(past.via), "each asset's balance × its price that day · summed");
 });

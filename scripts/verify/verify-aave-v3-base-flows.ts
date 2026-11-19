@@ -46,6 +46,9 @@
 //
 //   npx tsx --test scripts/verify/verify-aave-v3-base-flows.ts
 import { test } from "node:test";
+import { centsOfLines } from "./lib/cents-lines";
+import { NO_FIGURE } from "@/lib/shared/flows-sum";
+import { shownUsd } from "@/lib/shared/shown-usd";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -276,11 +279,26 @@ for (const name of NAMES) {
       const st = stateAt(m, stop);
       for (const side of ["collateral", "debt"] as const) {
         const r = sideSumRows(st[side], m.unit);
-        assert.equal(
-          r.lines.reduce((a, l) => a + l.dollars, 0),
-          r.total.dollars,
-          `${name} ${side} at stop ${stop}: lines add`,
-        );
+        // In cents (ui-jobs 743): the lines add to the total to the cent, each
+        // face its cents to the dollar; a side with a line of no figure states
+        // no sum to add.
+        if (r.lines.some((l) => l.amount === NO_FIGURE)) {
+          assert.ok(
+            r.lines.some((l) => l.unpriced?.length),
+            `${name} ${side} at stop ${stop}: an unpriced line`,
+          );
+        } else if (r.total.cents != null)
+          assert.equal(
+            centsOfLines(r.lines, "aave-v3-base"),
+            Math.round(r.total.cents * 100) || 0,
+            `${name} ${side} at stop ${stop}: lines add in cents`,
+          );
+        else
+          assert.equal(
+            r.lines.reduce((a, l) => a + l.dollars, 0),
+            r.total.dollars,
+            `${name} ${side} at stop ${stop}: lines add`,
+          );
         const src = st[side].sources.reduce((a, s) => a + s.value, 0);
         assert.ok(Math.abs(src - st[side].total) < 1e-6 * Math.max(1, st[side].total), `${name} ${side} ${stop}`);
       }
@@ -293,17 +311,25 @@ for (const name of NAMES) {
     const f = fx(name);
     const m = model(f);
     const rp = replay(f);
-    const focus = aaveBaseFocusEvents(rp);
+    const focus = aaveBaseFocusEvents(rp, opts(f).brand);
     // The balances once each transaction had run, as the Pool states them at
     // its block: the reserves its rows touched as recorded.
     const held = new Map<string, { side: FlowSide; symbol: string; amount: number }>();
     let sums = 0;
+    let unpricedSkipped = 0;
     for (let i = 0; i < focus.length; i++) {
       const r = rp.replayed[i];
       for (const b of r.after) held.set(`${b.side}:${b.asset}`, { side: b.side, symbol: b.symbol, amount: b.amount });
       const lastOfTx = i === focus.length - 1 || rp.replayed[i + 1].tx !== r.tx;
       if (!lastOfTx) continue;
       const cum = eventCum(m, focus, focus[i].id);
+      // A leg with no price at its block (ui-jobs 743) leaves the day's totals
+      // and every sum through it with no figure.
+      const unpricedSoFar = focus.slice(0, i + 1).some((e) => e.legs.some((l) => l.usd == null));
+      if (unpricedSoFar) {
+        unpricedSkipped++;
+        continue;
+      }
       assert.ok(cum?.exact, `${name} ${focus[i].id}: the legs add to the day row's move`);
       for (const side of ["collateral", "debt"] as const) {
         const bySym = new Map<string, AssetBalance>();
@@ -331,7 +357,7 @@ for (const name of NAMES) {
         }
       }
     }
-    assert.ok(sums > 0);
+    assert.ok(sums > 0 || unpricedSkipped > 0);
   });
 }
 
@@ -369,7 +395,13 @@ test("a quiet day takes the store's price; without the store, the last event's",
       for (const h of m.heldAt[stop]) {
         const p = store[assetOf.get(h.symbol) ?? ""]?.find(([d]) => d === day)?.[1];
         if (p == null || !(h.amount! > 0)) continue;
-        assert.ok(near(h.usd! / h.amount!, p, 1e-9), `${name} ${h.symbol} day ${day}: ${h.usd! / h.amount!} vs ${p}`);
+        // The held figure is its shown product at the store's price, to the cent (ui-jobs 743).
+        assert.equal(h.priced?.price, p, `${name} ${h.symbol} day ${day}: price ${h.priced?.price} vs ${p}`);
+        assert.equal(
+          h.usd,
+          shownUsd(h.amount!, p),
+          `${name} ${h.symbol} day ${day}: ${h.usd} vs ${shownUsd(h.amount!, p)}`,
+        );
         checked++;
       }
     }
@@ -460,7 +492,9 @@ for (const [name, answer] of Object.entries(ROUTE.answers)) {
     const fromPage = aaveBaseFlowTimeline(rp, o)!;
     const fromRoute = aaveBaseTimelineFromSummary(answer, o)!;
     assert.equal(answer.totalEvents, f.events.length, "every event");
-    assert.deepEqual(asJson(fromRoute), asJson(fromPage), `${name}: the timeline`);
+    // The route's rows carry no legs until rails-server serves them (ui-jobs 743).
+    const noLegs = (t: typeof fromPage) => ({ ...t, days: t.days.map(({ legs: _legs, ...d }) => d) });
+    assert.deepEqual(asJson(noLegs(fromRoute)), asJson(noLegs(fromPage)), `${name}: the timeline`);
     const a = buildFlowModel(fromPage)!;
     const b = buildFlowModel(fromRoute)!;
     assert.equal(b.liveStop, a.liveStop);
@@ -468,7 +502,7 @@ for (const [name, answer] of Object.entries(ROUTE.answers)) {
       assert.deepEqual(asJson(stateAt(b, stop)), asJson(stateAt(a, stop)), `${name} at stop ${stop}`);
     assert.deepEqual(asJson(aaveBaseWrittenOff(answer, o)), asJson(rp.writtenOff), `${name}: written off`);
     // The newest events' legs, as the cards read them.
-    assert.deepEqual(answer.events, asJson(aaveBaseFocusEvents(rp).slice(-answer.events.length)));
+    assert.deepEqual(answer.events, asJson(aaveBaseFocusEvents(rp, o.brand).slice(-answer.events.length)));
     assert.equal(answer.facts.liquidations, rp.replayed.filter((r) => eventType(r.ev) === "liquidation").length);
     assert.equal(answer.facts.treasuryFees, rp.replayed.filter((r) => r.treasuryFee).length);
   });

@@ -109,7 +109,7 @@ export function liquityTroveFaceProv(ctx: LiquityFaceProvContext): LiquityFacePr
           value: formatUsd(priceUsd),
           kind: "chain-derived",
           pclass: "oracle",
-          note: `${liquityV2PriceNote(v.collateralType)}, at the latest read, which states no block`,
+          note: `${liquityV2PriceNote(v.collateralType)}, at the latest read, which names no block`,
         },
       ]
     : [];
