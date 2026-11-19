@@ -46,3 +46,23 @@ test("a mantissa that rounds out of its range moves up a power", async () => {
   // 43.7199 × 10^18 is 43.72 × 10^18.
   assert.deepEqual(engineeringParts(at18("43719900000000000000"), 18), { mantissa: "43.72", exponent: 18 });
 });
+
+test("below 0.0001 the ratio reads as a mantissa and a negative power of ten (ui-jobs 765)", async () => {
+  const { perShareScientific, scientificText } = await import("../../lib/liquity-v2/sbold-per-share.ts");
+  const p = perShareScientific("4536142689132635456", "43719935839791186313206357993620281274", 18, 18);
+  assert.deepEqual(p, { mantissa: "1.038", exponent: -19 });
+  assert.equal(scientificText(p.mantissa, p.exponent), "1.038 × 10⁻¹⁹");
+  // Trailing zeros come back to four digits: 0.00001 is 1.000 × 10⁻⁵.
+  assert.deepEqual(perShareScientific("1", "100000", 18, 18), { mantissa: "1.000", exponent: -5 });
+  // Half-up on the fifth digit: 0.000012345 is 1.235 × 10⁻⁵.
+  assert.deepEqual(perShareScientific("12345", "1000000000", 18, 18), { mantissa: "1.235", exponent: -5 });
+  // At or above 0.0001 the plain decimal stands, a carry into 0.0001 included.
+  assert.equal(perShareScientific("99995", "1000000000", 18, 18), null);
+  assert.equal(perShareScientific("1050000000000000000", "1000000000000000000", 18, 18), null);
+  assert.equal(perShareScientific("5", "0", 18, 18), null);
+});
+
+test("a positive power reads in the same superscript style", async () => {
+  const { scientificText } = await import("../../lib/liquity-v2/sbold-per-share.ts");
+  assert.equal(scientificText("43.72", 18), "43.72 × 10¹⁸");
+});

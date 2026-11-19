@@ -66,3 +66,38 @@ export function engineeringParts(
   }
   return { mantissa: lead < 4 ? `${digits.slice(0, lead)}.${digits.slice(lead)}` : digits, exponent };
 }
+
+/** perShareText's figure below 0.0001 as a mantissa of four significant
+ *  digits and a negative power of ten ("1.038", -19), the same half-up
+ *  rounding (ui-jobs 765); null at or above 0.0001, or over a zero supply. */
+export function perShareScientific(
+  assetsRaw: string,
+  supplyRaw: string,
+  assetDecimals: number,
+  shareDecimals: number,
+): { mantissa: string; exponent: number } | null {
+  const text = perShareText(assetsRaw, supplyRaw, assetDecimals, shareDecimals);
+  const m = text == null ? null : /^0\.(0{4,})(\d+)$/.exec(text);
+  if (m == null) return null;
+  const digits = m[2].padEnd(4, "0");
+  return { mantissa: `${digits[0]}.${digits.slice(1)}`, exponent: -(m[1].length + 1) };
+}
+
+const SUPERSCRIPT: Record<string, string> = {
+  "-": "⁻",
+  "0": "⁰",
+  "1": "¹",
+  "2": "²",
+  "3": "³",
+  "4": "⁴",
+  "5": "⁵",
+  "6": "⁶",
+  "7": "⁷",
+  "8": "⁸",
+  "9": "⁹",
+};
+
+/** "1.038 × 10⁻¹⁹": the page's one exponent style, in superscript
+ *  characters, so copied text and a screen reader keep it (ui-jobs 765). */
+export const scientificText = (mantissa: string, exponent: number): string =>
+  `${mantissa} × 10${String(exponent).replace(/[-\d]/g, (c) => SUPERSCRIPT[c])}`;

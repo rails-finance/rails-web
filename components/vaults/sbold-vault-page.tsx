@@ -31,7 +31,7 @@ import { vaultVenueShareProv } from "@/lib/vaults/card-provenance";
 import { vaultAssetsExports, vaultPointsCsv, type VaultExportModel } from "@/lib/vaults/card-export";
 import { SHARES_ISSUED_TIP, sboldVaultAssetsContent, sboldVaultCardContent } from "@/lib/vaults/card-words";
 import { SBOLD_ASSET, SBOLD_CREATED_BLOCK, SBOLD_DEPOSITS_HREF, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
-import { engineeringParts, perShareText } from "@/lib/liquity-v2/sbold-per-share";
+import { engineeringParts, perShareScientific, perShareText, scientificText } from "@/lib/liquity-v2/sbold-per-share";
 import { liquityV2DepositHref } from "@/lib/liquity-v2/sp-routes";
 import {
   sboldAssetProv,
@@ -71,7 +71,8 @@ const fraction = (part: RawAmount | null, total: RawAmount | null): number | nul
     : null;
 
 /** A share count: the full figure up to twelve integer digits, else
- *  "43.72 × 10¹⁸" with the full raw integer in its title. */
+ *  "43.72 × 10¹⁸" (scientificText, the page's one exponent style) with the
+ *  full raw integer in its title. */
 function SharesFace({ raw, decimals }: { raw: string; decimals: number }) {
   const e = engineeringParts(raw, decimals);
   const exact = formatUnitsExact(raw, decimals);
@@ -79,7 +80,7 @@ function SharesFace({ raw, decimals }: { raw: string; decimals: number }) {
     return <span data-figure-value="">{shareText({ raw, value: Number(raw) / 10 ** decimals }, decimals)}</span>;
   return (
     <span data-figure-value="" data-prov-exact={exact} title={`${exact} shares (raw ${raw})`}>
-      {e.mantissa} × 10<sup>{e.exponent}</sup>
+      {scientificText(e.mantissa, e.exponent)}
     </span>
   );
 }
@@ -96,7 +97,7 @@ const pointText = (key: SboldSeriesKey, raw: string): string =>
       : (() => {
           const e = engineeringParts(raw, 18);
           return e
-            ? `${e.mantissa} × 10^${e.exponent} shares`
+            ? `${scientificText(e.mantissa, e.exponent)} shares`
             : `${shareText({ raw, value: Number(raw) / 1e18 }, 18)} shares`;
         })();
 
@@ -253,6 +254,11 @@ export function SboldVaultPage({
     y.totalAssets && y.totalSupply && y.shareDecimals != null
       ? perShareText(y.totalAssets.raw, y.totalSupply.raw, ad, y.shareDecimals)
       : null;
+  // Below 0.0001 the stat reads "1.038 × 10⁻¹⁹"; the receipt keeps the decimal (ui-jobs 765).
+  const perShareSci =
+    y.totalAssets && y.totalSupply && y.shareDecimals != null
+      ? perShareScientific(y.totalAssets.raw, y.totalSupply.raw, ad, y.shareDecimals)
+      : null;
 
   const stats: PositionPanelRow[] = [
     {
@@ -281,8 +287,9 @@ export function SboldVaultPage({
         "per-share",
         undefined,
         perShare != null && y.totalAssets && y.totalSupply && y.shareDecimals != null ? (
-          <span className="break-all" data-figure-value="">
+          <span className={perShareSci ? undefined : "break-all"} data-figure-value="">
             <Prov
+              value={perShare}
               info={sboldPerShareProv(coords, {
                 assets: assetText(y.totalAssets, ad),
                 supply: shareText(y.totalSupply, y.shareDecimals),
@@ -291,7 +298,7 @@ export function SboldVaultPage({
                 ratio: perShare,
               })}
             >
-              {perShare}
+              {perShareSci ? scientificText(perShareSci.mantissa, perShareSci.exponent) : perShare}
             </Prov>
           </span>
         ) : (
