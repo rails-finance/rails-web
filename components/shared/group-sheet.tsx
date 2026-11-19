@@ -114,9 +114,9 @@ function summedRows(rows: SheetRow[], label: string, n: number): SheetRow[] | nu
     let amount = 0;
     let places = 0;
     let usd = 0;
-    let usdKnown = true;
-    // In cents where every member's figure carries its rows' cents (ui-jobs 743).
-    const allCents = rs.every((r) => r.usd?.cents != null);
+    // The members' cents (ui-jobs 743): a member whose figure carries none
+    // leaves the group's row with no dollars, never a sum of faces.
+    const usdKnown = rs.every((r) => r.usd?.cents != null);
     for (const r of rs) {
       if (r.amount) {
         // The receipt's exact figure where it reads, so the sum does not
@@ -127,9 +127,7 @@ function summedRows(rows: SheetRow[], label: string, n: number): SheetRow[] | nu
         amount += exact != null ? Math.sign(shown) * Math.abs(exact) : shown;
         places = Math.max(places, placesOf(r.amount.text as string));
       }
-      const u = r.usd ? (allCents ? (r.usd.cents as number) : parseSheetNumber(r.usd.text)) : null;
-      if (u == null) usdKnown = false;
-      else usd = allCents ? centsOf(usd + u) : usd + u;
+      if (usdKnown) usd = centsOf(usd + (r.usd!.cents as number));
     }
     const amountText = `${amount < 0 ? "−" : ""}${Math.abs(amount).toLocaleString("en-US", {
       minimumFractionDigits: places,
@@ -141,9 +139,7 @@ function summedRows(rows: SheetRow[], label: string, n: number): SheetRow[] | nu
       amount: rs[0].amount
         ? { text: amountText, symbol: symbol || undefined, address: rs[0].amount.address, info: sumProv(label, n) }
         : undefined,
-      usd: usdKnown
-        ? { text: sheetUsd(usd), info: sumProv(`${label} in USD`, n), ...(allCents ? { cents: usd } : {}) }
-        : undefined,
+      usd: usdKnown ? { text: sheetUsd(usd), info: sumProv(`${label} in USD`, n), cents: usd } : undefined,
     });
   }
   return out;
@@ -163,12 +159,13 @@ function sumFigure(
   if (!usd && new Set(present.map((f) => (f as SheetRow["amount"])?.symbol ?? "")).size > 1) return undefined;
   let total = 0;
   let places = 0;
-  // In cents where every member's dollar figure carries its rows' cents.
-  const allCents = usd && present.every((f) => f!.cents != null);
+  // Dollars sum the members' cents; a member whose figure carries none
+  // leaves the group with no dollar figure, never a sum of faces.
+  if (usd && present.some((f) => f!.cents == null)) return undefined;
   for (const f of present) {
-    const v = allCents ? (f!.cents as number) : parseSheetNumber(f!.text);
+    const v = usd ? (f!.cents as number) : parseSheetNumber(f!.text);
     if (v == null) return null;
-    total = allCents ? centsOf(total + v) : total + v;
+    total = usd ? centsOf(total + v) : total + v;
     places = Math.max(places, placesOf(f!.text as string));
   }
   const first = present[0] as SheetRow["amount"];
@@ -183,7 +180,7 @@ function sumFigure(
     symbol: first?.symbol,
     address: first?.address,
     info: sumProv(what, n),
-    ...(allCents ? { cents: total } : {}),
+    ...(usd ? { cents: total } : {}),
   };
 }
 

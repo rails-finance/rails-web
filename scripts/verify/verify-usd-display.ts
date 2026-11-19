@@ -152,3 +152,39 @@ test("a ledger at today's price states the before where the event moved it", () 
   assert.equal(t.usd?.before, "$20,000");
   assert.equal(t.usd?.after, "$30,000");
 });
+
+// A group's sheet sums its members' cents (ui-jobs 743): the summed row is the
+// cents of its members' rows, never their faces; a member with no cents leaves
+// the group's row with no dollars.
+test("a group's dollar row is the sum of its members' cents", async () => {
+  const { mergeGroupSheet } = await import("@/components/shared/group-sheet");
+  const side = (cents: number | undefined, text: string) => ({
+    side: "collateral" as const,
+    icons: ["WETH"],
+    carry: [],
+    rows: [
+      {
+        key: "event",
+        label: "Supply",
+        amount: { text: "1", symbol: "WETH", value: "1" },
+        usd: { text, ...(cents != null ? { cents } : {}) },
+      },
+    ],
+    total: { text: "$0" },
+  });
+  const card = (id: string, cents: number | undefined, text: string) => ({
+    id,
+    timestamp: 0,
+    sheet: { sides: [side(cents, text)], panels: [] },
+  });
+  // Two faces of $2 whose cents are $1.49 and $1.49: the group states $2.98, not $4.
+  const g = mergeGroupSheet([card("a", 1.49, "$1.49"), card("b", 1.49, "$1.49")] as never, "Supply")!;
+  const row = g.sides[0].rows.find((r) => r.usd)!;
+  assert.equal(row.usd!.cents, 2.98);
+  assert.equal(row.usd!.text, "$2.98");
+  const big = mergeGroupSheet([card("a", 12.49, "$12"), card("b", 12.49, "$12")] as never, "Supply")!;
+  assert.equal(big.sides[0].rows.find((r) => r.usd)!.usd!.cents, 24.98);
+  // A member with no cents: no dollars on the group's row.
+  const mixed = mergeGroupSheet([card("a", 1.49, "$1.49"), card("b", undefined, "$1.49")] as never, "Supply")!;
+  assert.ok(!mixed.sides[0].rows.some((r) => r.key.startsWith("group") && r.usd));
+});

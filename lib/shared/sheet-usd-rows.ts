@@ -34,6 +34,8 @@ export interface PricedAmount {
   price: number | null;
   block?: number | null;
   priceNote?: string;
+  /** A $1 face the protocol defines (crvUSD), not a read. */
+  face?: boolean;
 }
 
 /** A dollar cell: its text, its receipt, and its cents (null: no figure). */
@@ -83,6 +85,7 @@ export function amountsUsd(
       price: x.price as number,
       priceNote:
         x.priceNote ?? (x.block != null ? `the price at block ${x.block.toLocaleString("en-US")}` : "the price"),
+      ...(x.face ? { face: true } : {}),
     })),
     blocksPerRow: true,
     byValue: live.length > 1,

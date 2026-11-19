@@ -441,3 +441,91 @@ test("a unit model's past-day Held and Owed receipts stay in the underlying toke
   for (const name of NAMES) read += assertUnitReceipts(buildFlowModel(timeline(fx(name)))!, name);
   assert.ok(read > 0, "receipts read");
 });
+
+// No dollar stands on an off-chain price (ui-jobs 743): the sheet's collateral
+// side and the card's Deposit headline state no "$"; alUSD's debt rows keep
+// their $1 face, to the cent.
+test("the sheet and the card draw no dollars but alUSD's debt at its $1 face", async () => {
+  const { alchemixSheet } = await import("@/components/protocol/alchemix/alchemix-event-sheet");
+  const { depositedHead } = await import("@/components/protocol/alchemix/alchemix-position-card");
+  const leg = {
+    actionLabel: "Deposit",
+    txHash: "0xabc",
+    blockNumber: 101,
+    context: { data: { eventType: "deposit", raw: { amount: "1500000000000000000" } } },
+  } as unknown as AlchemistEvent;
+  const sheetFor = (syntheticSymbol: string) =>
+    alchemixSheet({
+      legs: [leg],
+      state: {
+        status: "stated",
+        blockNumber: 101,
+        collateralRaw: "2500000000000000000",
+        debtRaw: "1234567890123456789",
+        earmarkedRaw: "100000000000000000",
+        sharePriceRaw: "1002345",
+        positionEventsInBlock: 1,
+      } as never,
+      before: {
+        blockNumber: 100,
+        collateralRaw: "1000000000000000000",
+        debtRaw: "1200000000000000000",
+        earmarkedRaw: null,
+        sharePriceRaw: "1001000",
+      },
+      mytSymbol: "mvUSDC",
+      syntheticSymbol,
+      // A dollar price in hand, as the page once passed one: it must not be used.
+      unit: {
+        symbol: "USDC",
+        decimals: 6,
+        usd: { pricePerUnit: 1.0001, priceSource: "lane", pricedAt: "0x0" },
+      } as never,
+      ratios: null,
+      coords: { chainId: 1, blockNumber: 101 } as never,
+    })!;
+  for (const sym of ["alUSD", "alETH"]) {
+    const sheet = sheetFor(sym);
+    assert.ok(sheet, `${sym}: a sheet`);
+    const [coll, debt] = sheet.sides;
+    // Every printed figure, without its receipts.
+    const texts = (x: unknown): string[] =>
+      x == null || typeof x !== "object"
+        ? typeof x === "string"
+          ? [x]
+          : []
+        : Object.entries(x as Record<string, unknown>).flatMap(([k, v]) =>
+            k === "info" || k === "tip" ? [] : texts(v),
+          );
+    assert.ok(
+      !texts(coll).some((t) => t.includes("$")),
+      `${sym} collateral: ${texts(coll).filter((t) => t.includes("$"))}`,
+    );
+    const debtDollars = texts(debt).filter((t) => t.includes("$"));
+    if (sym === "alUSD") {
+      assert.ok(debtDollars.length > 0, "alUSD's debt at its $1 face");
+      assert.ok(debt.total && "cents" in debt.total && debt.total.cents === 1.23, "1.234568 alUSD at $1, to the cent");
+    } else assert.deepEqual(debtDollars, [], "alETH draws no dollars");
+  }
+  // The card's headline: the underlying and the shares, no dollar line.
+  const head = depositedHead(
+    {
+      unit: "myt-shares",
+      raw: "2500000000000000000",
+      formatted: 2.5,
+      mytSymbol: "mvUSDC",
+      underlying: {
+        symbol: "USDC",
+        decimals: 6,
+        address: "0x0",
+        raw: "2505862",
+        formatted: 2.505862,
+        sharePriceAsOfBlock: 101,
+        sharePriceRaw: "1002345",
+      },
+      usd: { usd: 2.51, pricePerUnit: 1.0001, priceSource: "lane", pricedAt: "0x0" },
+    } as never,
+    "mvUSDC",
+  );
+  assert.equal((head as { usd?: unknown }).usd, undefined, "no dollar line on the card");
+});

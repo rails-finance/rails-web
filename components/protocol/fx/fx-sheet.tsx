@@ -143,7 +143,7 @@ const collUsdAt = (
 
 /** A sheet cell from a receipt, signed where the amount is. */
 const usdCell = (r: { prov: Provenance; usd: number } | null | undefined, sign = 1) =>
-  r ? { text: sheetUsd(sign < 0 ? -r.usd : r.usd), info: r.prov } : undefined;
+  r ? { text: sheetUsd(sign < 0 ? -r.usd : r.usd), info: r.prov, cents: sign < 0 ? -r.usd : r.usd } : undefined;
 
 /** The collateral the previous event left, as its row read it. */
 const prevCollProv = (sym: string, amount: number, coords: FxCoords): Provenance => ({

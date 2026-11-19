@@ -87,7 +87,6 @@ import {
   alchemixAmountFigure,
   alchemixChip,
   alchemixStatus,
-  collateralUsdText,
   depositedHead,
   formatSharePrice,
 } from "@/components/protocol/alchemix/alchemix-position-card";
@@ -136,7 +135,6 @@ import {
   redemptionNetTotalProv,
   sharePriceProv,
   underlyingProv,
-  usdProv,
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
 import type { AlchemixDeployment } from "@/lib/alchemix/lines";
@@ -401,12 +399,10 @@ export function AlchemistPositionView({
   // is the underlying the readings name; with none named, nothing is valued.
   const underlyingUnit = useMemo<AlchemixUnderlyingUnit | null>(() => {
     const u = live?.collateral.underlying ?? position.figures.collateral?.underlying ?? null;
-    const usd = live?.collateral.usd ?? position.figures.collateral?.usd ?? null;
     return u?.symbol
       ? {
           symbol: u.symbol,
           decimals: u.decimals,
-          usd: usd ? { pricePerUnit: usd.pricePerUnit, priceSource: usd.priceSource, pricedAt: usd.pricedAt } : null,
         }
       : null;
   }, [live, position.figures.collateral]);
@@ -663,9 +659,6 @@ export function AlchemistPositionView({
         )}
       </>
     ) : null;
-  // Whether the collateral column states the dollar figure (collateralUsdText).
-  const usdOnCard =
-    live != null && collateralUsdText(live.collateral.underlying ?? null, live.collateral.usd ?? null) != null;
   const v2Names =
     v2History && v2History.links.length > 0 ? (
       <>
@@ -708,7 +701,6 @@ export function AlchemistPositionView({
           ? explorerUrl(chainId as ChainId, "address", live.collateral.mytAddress)
           : null,
         debtFromEvents,
-        usdOnCard,
         // The fee now, for what clearing the earmarked debt would take.
         feeBps: protocolFeeNow(chainId, lineKey)?.bps ?? null,
         lineLiquidations: live.health?.lineLiquidations
@@ -744,14 +736,6 @@ export function AlchemistPositionView({
               live.collateral.underlying.sharePriceRaw,
               live.collateral.underlying.sharePriceAsOfBlock,
               coords,
-            )
-          : undefined,
-        usd: live.collateral.usd
-          ? usdProv(
-              live.collateral.underlying?.symbol ?? "the asset underneath",
-              live.collateral.usd.pricePerUnit,
-              live.collateral.usd.priceSource,
-              live.collateral.usd.pricedAt,
             )
           : undefined,
       }

@@ -139,7 +139,7 @@ export function polarisSheet(
     const pr = at === "this" ? prices : prevPrices;
     const block = at === "this" ? coords.blockNumber : prevBlock;
     const r = polarisSheetUsd(pr, what, token, n, block, stable);
-    return r ? { text: sheetUsd(n < 0 ? -r.usd : r.usd), info: r.prov } : undefined;
+    return r ? { text: sheetUsd(n < 0 ? -r.usd : r.usd), info: r.prov, cents: n < 0 ? -r.usd : r.usd } : undefined;
   };
   // The previous event's prices, where the page hands it down and it read the feed.
   const prevUnit = prev ? unitPriceOf(prev) : null;

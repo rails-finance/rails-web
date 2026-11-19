@@ -53,6 +53,7 @@ import {
 } from "@/lib/alchemix/readings-before";
 import { SELF_LIQUIDATION_LABEL } from "./alchemix-event-header";
 import { ltvExact, ltvOfCollateralization, ltvPct, ltvPrint } from "@/lib/alchemix/ltv";
+import { shownUsd } from "@/lib/shared/shown-usd";
 
 const WORDS = {
   ltv: "LTV",
@@ -95,8 +96,8 @@ const TIPS = {
     "The debt just before this event: debt moves only at the position's events and the market's redemptions, each an event on this timeline, so it is the reading at the previous event.",
   earmarked:
     "Earmarked debt: the part of the debt set aside to be repaid by the market's redemptions, read from the Alchemist at this block; a redemption pays it down.",
-  coll_total: (under: string, usd: boolean) =>
-    `The vault shares held after this event, and their worth in ${under} at the share price read at this block${usd ? `, then at ${under}'s price now` : ""}.`,
+  coll_total: (under: string) =>
+    `The vault shares held after this event, and their worth in ${under} at the share price read at this block.`,
   debt_total: (sym: string, face: boolean) =>
     `The debt after this event, read from the Alchemist at this block${face ? `, at the ${sym}'s $1 face` : ""}.`,
   ltv: (under: string) =>
@@ -134,44 +135,6 @@ const faceProv = (what: string, sym: string, amount: string): Provenance => ({
   summary: `${what}, in US dollars. The ${sym} at its $1 face.`,
   formula: `${sym} × $1`,
   inputs: [{ label: "amount", value: `${amount} ${sym}`, kind: "chain" }],
-});
-
-/** Shares valued in the underlying at a reading's share price, then at the
- *  underlying's price now. */
-const nowUsdProv = (
-  what: string,
-  shares: string,
-  mytSymbol: string,
-  sharePrice: number,
-  atBlock: number,
-  unit: AlchemixUnderlyingUnit,
-): Provenance => ({
-  kind: "offchain",
-  pclass: "offchain",
-  summary: `${what}, in US dollars. The ${mytSymbol} valued in ${unit.symbol} at the share price read at block ${atBlock}, then at ${unit.symbol}'s price now, the one dollar price the page holds.`,
-  formula: "shares × share price × price now",
-  via: unit.usd ? `${unit.usd.priceSource} · ${unit.usd.pricedAt}` : undefined,
-  verify: { kind: "none", text: "An off-chain price, with no on-chain anchor" },
-  inputs: [
-    { label: "shares", value: `${shares} ${mytSymbol}`, kind: "chain" },
-    {
-      label: "share price",
-      value: `${sharePrice} ${unit.symbol}`,
-      kind: "chain",
-      note: `convertToAssets(1e18) at block ${atBlock}`,
-    },
-    ...(unit.usd
-      ? [
-          {
-            label: "price per unit",
-            value: String(unit.usd.pricePerUnit),
-            kind: "offchain" as const,
-            note: unit.usd.priceSource,
-          },
-          { label: "priced at", value: unit.usd.pricedAt, kind: "offchain" as const, note: "the price now" },
-        ]
-      : []),
-  ],
 });
 
 /** The vault's yield on the shares held between two readings. */
@@ -305,28 +268,20 @@ export function alchemixSheet({
   const dec = unit?.decimals ?? null;
   const spOf = (raw: string | null | undefined) => (raw != null && dec != null ? Number(raw) / 10 ** dec : null);
   const sp = spOf(state.sharePriceRaw);
-  // A dollar line's synthetic stands at its $1 face, and the underlying's price
-  // now puts the shares' worth in dollars; another line states its units.
+  // A dollar line's synthetic stands at its $1 face, its debt in dollars to
+  // the cent; the collateral states its worth in the underlying (no on-chain
+  // dollar price is read for it, ui-jobs 743).
   const face = /^alusd/i.test(sym);
-  const usdNow = face && unit?.usd ? unit.usd.pricePerUnit : null;
   const isRedemption = legs.some((l) => l.context.data.eventType === "redemption");
   const reading = (label: string, symbol: string, raw: string) =>
     stateAtBlockFromReadingProv(label, symbol, raw, atBlock, state.positionEventsInBlock, coords, DECIMALS);
   const spNote =
     sp != null ? `1 ${mytSymbol} = ${sp.toLocaleString("en-US", { maximumFractionDigits: 6 })} ${under}` : undefined;
-  const sharesUsd = (what: string, sharesRaw: bigint, price: number | null, block: number) => {
-    if (price == null || usdNow == null || !unit) return undefined;
-    // Signed: a move that took shares reads "−$…".
-    const v = (sharesRaw < ZERO ? -1 : 1) * units(abs(sharesRaw)) * price * usdNow;
-    return {
-      text: sheetUsd(v),
-      info: nowUsdProv(what, formatUnitsExact(abs(sharesRaw).toString(), DECIMALS), mytSymbol, price, block, unit),
-    };
+  const faceUsd = (what: string, raw: bigint) => {
+    if (!face) return undefined;
+    const cents = shownUsd(units(raw), 1);
+    return { text: sheetUsd(cents), info: faceProv(what, sym, formatUnitsExact(raw.toString(), DECIMALS)), cents };
   };
-  const faceUsd = (what: string, raw: bigint) =>
-    face
-      ? { text: sheetUsd(units(raw)), info: faceProv(what, sym, formatUnitsExact(raw.toString(), DECIMALS)) }
-      : undefined;
 
   // ── The event's rows ──
   const collRows: SheetRow[] = [];
@@ -346,7 +301,6 @@ export function alchemixSheet({
           info: readingChangeProv("Collateral", mytSymbol, before.blockNumber, atBlock, coords),
           value: signedExact(dColl),
         },
-        usd: sharesUsd("The vault shares this event moved", dColl, sp, atBlock),
         tip: beyond ? TIPS.block(state.positionEventsInBlock) : isRedemption ? TIPS.coll_redemption : TIPS.coll_event,
       });
     if (abs(dDebt) > ONE_WEI)
@@ -392,7 +346,6 @@ export function alchemixSheet({
             info: emittedAmountProv("amount", mytSymbol, raw, legCoords),
             value: signedExact(signed),
           },
-          usd: sharesUsd("The vault shares the log states", signed, sp, atBlock),
           tip: TIPS.coll_log,
         });
       } else if (ctx.eventType === "mint" || ctx.eventType === "burn") {
@@ -438,7 +391,6 @@ export function alchemixSheet({
         info: stateAtBlockFromReadingProv("Collateral", mytSymbol, before.collateralRaw, before.blockNumber, 0, coords),
         value: prevShares,
       },
-      usd: sharesUsd("Collateral at the previous event", prevColl, spThen, before.blockNumber),
       tip: TIPS.last_coll,
     });
     const earned = spThen != null && sp != null && prevColl > ZERO ? units(prevColl) * (sp - spThen) : null;
@@ -459,20 +411,6 @@ export function alchemixSheet({
             coords,
           ),
         },
-        usd:
-          usdNow != null
-            ? {
-                text: sheetUsd(earned * usdNow),
-                info: {
-                  kind: "offchain",
-                  pclass: "offchain",
-                  summary: `The yield since the previous event, in US dollars. The yield in ${unit.symbol} at ${unit.symbol}'s price now, the one dollar price the page holds.`,
-                  formula: "yield × price now",
-                  via: unit.usd ? `${unit.usd.priceSource} · ${unit.usd.pricedAt}` : undefined,
-                  verify: { kind: "none", text: "An off-chain price, with no on-chain anchor" },
-                },
-              }
-            : undefined,
         tip: TIPS.yield(unit.symbol),
       });
     }
@@ -486,7 +424,6 @@ export function alchemixSheet({
         info: stateAtBlockFromReadingProv("Collateral", mytSymbol, before.collateralRaw, before.blockNumber, 0, coords),
         value: prevShares,
       },
-      usd: sharesUsd("Collateral before this event", prevColl, sp, atBlock),
       tip: TIPS.before_coll,
     };
     const prevDebtExact = formatUnitsExact(prevDebt.toString(), DECIMALS);
@@ -522,32 +459,29 @@ export function alchemixSheet({
   // ── Totals ──
   const collTotal: SheetSide["total"] =
     collAfter === ZERO
-      ? face
-        ? { text: "$0", info: reading("Collateral", mytSymbol, state.collateralRaw) }
-        : SHEET_NO_USD
+      ? SHEET_NO_USD
       : sp == null
         ? { none: WORDS.no_price }
-        : usdNow != null && unit
-          ? (sharesUsd("Collateral after this event", collAfter, sp, atBlock) as { text: string; info: Provenance })
-          : {
-              text: `${fmtPositionAmount(units(collAfter) * sp)} ${under}`,
-              info: readingCollateralValueProv(
-                state.collateralRaw,
-                state.sharePriceRaw!,
-                atBlock,
-                dec!,
-                mytSymbol,
-                under,
-                coords,
-              ),
-            };
+        : {
+            text: `${fmtPositionAmount(units(collAfter) * sp)} ${under}`,
+            info: readingCollateralValueProv(
+              state.collateralRaw,
+              state.sharePriceRaw!,
+              atBlock,
+              dec!,
+              mytSymbol,
+              under,
+              coords,
+            ),
+          };
   const debtTotal: SheetSide["total"] = !face
     ? SHEET_NO_USD
     : debtAfter === ZERO
       ? { text: "$0", info: reading("Debt", sym, state.debtRaw) }
       : {
-          text: sheetUsd(units(debtAfter)),
+          text: sheetUsd(shownUsd(units(debtAfter), 1)),
           info: faceProv("Debt after this event", sym, formatUnitsExact(state.debtRaw, DECIMALS)),
+          cents: shownUsd(units(debtAfter), 1),
         };
 
   // Earmarked: part of the debt, stated at this block alone (decisions/0032).
@@ -584,7 +518,7 @@ export function alchemixSheet({
         info: reading("Collateral", mytSymbol, state.collateralRaw),
         value: formatUnitsExact(state.collateralRaw, DECIMALS),
       },
-      totalTip: TIPS.coll_total(under, usdNow != null),
+      totalTip: TIPS.coll_total(under),
     },
     {
       side: "debt",

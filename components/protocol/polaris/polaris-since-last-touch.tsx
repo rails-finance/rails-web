@@ -427,7 +427,9 @@ function polarisLiveSheet(
   const usd = (what: string, token: "coll" | "debt", n: number) => {
     if ((token === "coll" ? prices?.coll : prices?.debt) == null) return undefined;
     const r = polarisSheetUsd(prices, what, token, n, head, stable);
-    return r ? { text: sheetUsd(n < 0 ? -r.usd : r.usd), info: r.prov } : { text: sheetUsd(0) };
+    return r
+      ? { text: sheetUsd(n < 0 ? -r.usd : r.usd), info: r.prov, cents: n < 0 ? -r.usd : r.usd }
+      : { text: sheetUsd(0), cents: 0 };
   };
   /** A view call on the cdpManager at the head block, as a receipt. */
   const view = (summary: string, fn: string, value: number, unit: string): Provenance => ({

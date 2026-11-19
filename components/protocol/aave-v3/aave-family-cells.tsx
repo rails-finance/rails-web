@@ -665,9 +665,8 @@ export function priceChips(pills: AtBlockPricePill[]): EventPriceChip[] {
     symbol: p.symbol,
     address: p.address,
     usd: p.priceUsd,
+    // The price as the receipts show it (EventPriceRow's default, ui-jobs 743).
     info: p.priceProv,
-    value: p.display ?? undefined,
-    display: p.display != null ? `$${p.display}` : undefined,
     title: `${p.symbol} at the ${p.note ?? "oracle at block"}`,
   }));
 }

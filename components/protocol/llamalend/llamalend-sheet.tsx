@@ -21,7 +21,6 @@ import { changeText } from "@/components/shared/change-swap-value";
 import {
   SHEET_NO_USD,
   SHEET_WORDS,
-  sheetUsd,
   type EventSheet,
   type SheetRow,
   type SheetSide,
@@ -50,6 +49,8 @@ import {
 } from "@/lib/llamalend/event-provenance";
 import { formatDayMonth } from "@/lib/date";
 import { formatExactDecimal, formatNumber } from "@/lib/utils/format";
+import { amountsUsd, cellOf, type PricedAmount } from "@/lib/shared/sheet-usd-rows";
+import { priceText } from "@/lib/shared/shown-usd";
 
 const UNREAD = "Not read on this page";
 
@@ -121,25 +122,6 @@ const healthPts = (a: number) =>
   `${(a * 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pts`;
 const DUST = 1e-12;
 
-/** An amount valued at the AMM's oracle price at this block (crvUSD markets). */
-function valuedProv(what: string, parts: { label: string; value: string }[], coords: LlamalendCoords): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "oracle",
-    summary: `${what}, in US dollars. The collateral at the market's AMM oracle price (price_oracle, crvUSD per collateral) at block ${coords.blockNumber ?? "?"}, plus any crvUSD at its $1 face.`,
-    formula: "collateral × oracle price + crvUSD",
-    via: "GET /api/chain/llamalend/event-state · AMM.price_oracle() at this block",
-    inputs: parts.map((p) => ({ label: p.label, value: p.value, kind: "chain" as const, pclass: "state" as const })),
-  };
-}
-
-/** A borrowed-token figure (crvUSD) at its $1 face. */
-const faceProv = (sym: string, what: string): Provenance => ({
-  kind: "derived",
-  summary: `${what} in US dollars. The ${sym} amount at its $1 face.`,
-  formula: "amount × $1",
-});
-
 /** A figure in a market whose borrowed token is not crvUSD: stated in it. */
 const inBorrowedProv = (what: string, b: string, parts: { label: string; value: string }[]): Provenance => ({
   kind: "chain-derived",
@@ -196,11 +178,28 @@ export function llamalendSheet({
     info,
     value,
   });
-  // The collateral's price, as the sheet's other families print one.
-  const priceNote =
-    usdMarket && p != null
-      ? `$${p.toLocaleString("en-US", p >= 1 ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumSignificantDigits: 4 })}`
-      : undefined;
+  // The collateral's price, as the receipts show it.
+  const priceNote = usdMarket && p != null ? priceText(p) : undefined;
+  // Each dollar cell is its rows' cents, shown to the dollar (ui-jobs 743):
+  // the collateral at the AMM's price_oracle at this block, crvUSD at its $1
+  // face.
+  const VIA = "the Controller and AMM reads around the event · the collateral × price_oracle, crvUSD at $1";
+  const collAt = (amount: number): PricedAmount => ({
+    symbol: c,
+    amount,
+    price: p ?? null,
+    block,
+    priceNote: `the market's AMM price_oracle (crvUSD per ${c}) at block ${block.toLocaleString("en-US")}`,
+  });
+  const crv = (amount: number): PricedAmount => ({
+    symbol: b,
+    amount,
+    price: 1,
+    face: true,
+    priceNote: `1 ${b} is counted as $1`,
+  });
+  const usdOf = (what: string, xs: PricedAmount[]) =>
+    amountsUsd(`${what}, in USD`, xs, { amountNote: "as the Controller states it", via: VIA });
 
   // ── Collateral ──
   const collRows: SheetRow[] = [];
@@ -226,20 +225,7 @@ export function llamalendSheet({
           : stateChangeProv(`${c} collateral`, coords),
         `${collMove < 0 ? "−" : "+"}${formatExactDecimal(String(Math.abs(collMove)))}`,
       ),
-      usd:
-        usdMarket && p != null
-          ? {
-              text: sheetUsd(collMove * p),
-              info: valuedProv(
-                `The ${c} this transaction moved`,
-                [
-                  { label: "amount", value: `${formatExactDecimal(String(Math.abs(collMove)))} ${c}` },
-                  { label: `${c} price`, value: `${p} ${b}` },
-                ],
-                coords,
-              ),
-            }
-          : undefined,
+      usd: usdMarket && p != null ? cellOf(usdOf(`The ${c} this transaction moved`, [collAt(collMove)])) : undefined,
       tip: TIPS.collEvent(c),
     });
   }
@@ -257,9 +243,7 @@ export function llamalendSheet({
           : stateChangeProv(`${b} converted`, coords),
         `${convMove < 0 ? "−" : "+"}${formatExactDecimal(String(Math.abs(convMove)))}`,
       ),
-      usd: usdMarket
-        ? { text: sheetUsd(convMove), info: faceProv(b, `The converted ${b} this transaction moved`) }
-        : undefined,
+      usd: usdMarket ? cellOf(usdOf(`The converted ${b} this transaction moved`, [crv(convMove)])) : undefined,
       tip: TIPS.convEvent(b),
     });
   }
@@ -320,10 +304,7 @@ export function llamalendSheet({
           collBeforeValue == null
             ? undefined
             : usdMarket
-              ? {
-                  text: sheetUsd(collBeforeValue),
-                  info: valuedProv("The collateral just before this transaction", beforeParts, coords),
-                }
+              ? cellOf(usdOf("The collateral just before this transaction", [collAt(collBefore), crv(convBefore)]))
               : convBefore > 0
                 ? {
                     text: `${fmtPrice(collBeforeValue)} ${b}`,
@@ -350,10 +331,7 @@ export function llamalendSheet({
       collValue == null
         ? { none: WORDS.noPrice }
         : usdMarket
-          ? {
-              text: collValue > 0 ? sheetUsd(collValue) : "$0",
-              info: valuedProv("The collateral after this transaction", afterParts, coords),
-            }
+          ? cellOf(usdOf("The collateral after this transaction", [collAt(collAfter), crv(convAfter)]))
           : {
               text: `${fmtPrice(collValue)} ${b}`,
               info: inBorrowedProv("The collateral after this transaction", b, afterParts),
@@ -391,7 +369,7 @@ export function llamalendSheet({
         debtDeltaProv(b, ctx.eventType, coords, ctx.raw?.debtDelta),
         `${debtMove < 0 ? "−" : "+"}${formatExactDecimal(String(Math.abs(debtMove)))}`,
       ),
-      usd: usdMarket ? { text: sheetUsd(debtMove), info: faceProv(b, `The ${b} this transaction moved`) } : undefined,
+      usd: usdMarket ? cellOf(usdOf(`The ${b} this transaction moved`, [crv(debtMove)])) : undefined,
       tip: TIPS.debtEvent(b),
     });
   const debtBeforeProv = stateAtBlockProv(
@@ -422,7 +400,7 @@ export function llamalendSheet({
         },
         formatExactDecimal(String(lastDebt.amount)),
       ),
-      usd: usdMarket ? { text: sheetUsd(lastDebt.amount), info: faceProv(b, "The debt at the last event") } : undefined,
+      usd: usdMarket ? cellOf(usdOf("The debt at the last event", [crv(lastDebt.amount)])) : undefined,
       tip: TIPS.debtLast(b),
     });
     const interest = debtBefore - lastDebt.amount;
@@ -440,9 +418,7 @@ export function llamalendSheet({
           },
           formatExactDecimal(String(interest)),
         ),
-        usd: usdMarket
-          ? { text: sheetUsd(interest), info: faceProv(b, "The interest since the last event") }
-          : undefined,
+        usd: usdMarket ? cellOf(usdOf("The interest since the last event", [crv(interest)])) : undefined,
         tip: TIPS.debtInterest(b),
       });
   }
@@ -455,14 +431,12 @@ export function llamalendSheet({
           key: "before",
           label: SHEET_WORDS.before,
           amount: borAmt(formatNumber(debtBefore), debtBeforeProv, formatExactDecimal(String(debtBefore))),
-          usd: usdMarket
-            ? { text: sheetUsd(debtBefore), info: faceProv(b, "The debt just before this transaction") }
-            : undefined,
+          usd: usdMarket ? cellOf(usdOf("The debt just before this transaction", [crv(debtBefore)])) : undefined,
           tip: TIPS.debtBefore(b),
         }
       : undefined,
     rows: debtRows,
-    total: usdMarket ? { text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0", info: debtAfterProv } : SHEET_NO_USD,
+    total: usdMarket ? cellOf(usdOf("The debt after this transaction", [crv(debtAfter)])) : SHEET_NO_USD,
     totalAmount: borAmt(formatNumber(debtAfter), debtAfterProv, formatExactDecimal(String(debtAfter))),
     totalTip: TIPS.debtTotal(b),
   };

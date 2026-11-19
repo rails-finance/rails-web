@@ -39,6 +39,7 @@ import { parseAbi } from "viem";
 import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { scaleRaw } from "@/lib/sources/chain/erc20-meta";
 import { resolveLlamalendMarketState, type LlamalendMarketStateMap } from "@/lib/sources/chain/llamalend-markets";
+import { shownUsd } from "@/lib/shared/shown-usd";
 import {
   marketPairLabel,
   LLAMALEND_ADDRESSES,
@@ -316,7 +317,7 @@ export async function buildLlamalendPositionRows(
       // ~$1: crvUSD debt IS the USD figure; collateral through the AMM's own
       // oracle. Null on the non-crvUSD-borrowed markets — their own token is
       // the unit, and no dollar is asserted.
-      collateralUsd: isCrvusd && priceOracle != null && collateral != null ? collateral * priceOracle : null,
+      collateralUsd: isCrvusd && priceOracle != null && collateral != null ? shownUsd(collateral, priceOracle) : null,
       debtUsd: isCrvusd ? debt : null,
       eventCount: r.eventCount,
       txCount: r.txCount,

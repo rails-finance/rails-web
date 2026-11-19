@@ -94,7 +94,7 @@ const faceUsd = (sym: string, what: string, amount: number) =>
 
 /** A sheet cell from a receipt: its figure, signed where the amount is. */
 const usdCell = (r: { prov: Provenance; usd: number } | null, sign = 1) =>
-  r ? { text: sheetUsd(sign < 0 ? -r.usd : r.usd), info: r.prov } : undefined;
+  r ? { text: sheetUsd(sign < 0 ? -r.usd : r.usd), info: r.prov, cents: sign < 0 ? -r.usd : r.usd } : undefined;
 
 /** A figure's change over this event: the figure after less the figure before. */
 function changeProv(what: string, formula: string): Provenance {
