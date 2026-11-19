@@ -1,10 +1,10 @@
 // How Morpho's vault layer is built on one chain — /base/morpho/vaults/info and
 // /ethereum/morpho/vaults/info (rails-ops ui-jobs 486).
 // ----------------------------------------------------------------------------
-// Reached from the roster above it. These paragraphs were the listing's "How
-// this listing is built" drawer: a panel that was always mounted and merely
-// hidden, because what it says is true of the section whether or not anyone
-// opens it. That is a page, so it is one.
+// The rail's (i). The first paragraphs are the roster's words, its census
+// count with its receipt, and the vault's "?" concepts, which left the roster's
+// head (ui-jobs 771: the roster opens on its read stamp alone). The rest were
+// the positions listing's "How this listing is built" drawer.
 //
 // THE THREE-BLOCKS PARAGRAPH NAMES NO FINALIZED BLOCK. This page reads no
 // position and no overlay, so a number here would be a different request's
@@ -19,16 +19,22 @@
 //
 // SERVER-ONLY.
 
+import Link from "next/link";
 import { VaultsInfoPage } from "@/components/vaults/vaults-info-page";
+import { Prov } from "@/components/shared/provenance";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { UnpricedSentence } from "@/components/vaults/unpriced-sentence";
 import { loadMetaMorphoCensus } from "@/components/vaults/metamorpho-roster-page";
 import { protocolForPathname } from "@/lib/shared/protocols";
-import { metaMorphoVaultRosterHref } from "@/lib/vaults/routes";
-import type { MetaMorphoChainId } from "@/lib/metamorpho/vault-roster";
+import { metaMorphoVaultRosterHref, metaMorphoVaultsListingHref } from "@/lib/vaults/routes";
+import { loadMetaMorphoVaultRoster, type MetaMorphoChainId } from "@/lib/metamorpho/vault-roster";
+import { vaultDirectoryCensusProv } from "@/lib/morpho-base/vault-provenance";
+import { FOOT_LINK, INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
 const MORPHO_VAULT_V2_DOCS = "https://docs.morpho.org/learn/concepts/vault-v2/";
+const MORPHO_VAULT_DOCS = "https://docs.morpho.org/curate/concepts/roles/#morpho-vaults-v1-roles";
 
 /** The chain's own facts in the paragraphs. */
 const WORDS: Record<MetaMorphoChainId, { window: string; finalized: string }> = {
@@ -44,13 +50,61 @@ const WORDS: Record<MetaMorphoChainId, { window: string; finalized: string }> = 
 };
 
 export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoChainId }) {
-  const census = await loadMetaMorphoCensus(chainId);
+  const [census, roster] = await Promise.all([loadMetaMorphoCensus(chainId), loadMetaMorphoVaultRoster(chainId)]);
+  const chain = chainId === 1 ? "Ethereum" : "Base";
   const neverHeld = census.filter((c) => c.participants === 0).length;
   const unproven = census.filter((c) => !c.sumMatches);
   const words = WORDS[chainId];
 
   return (
     <VaultsInfoPage chainId={chainId} protocol={protocolForPathname(metaMorphoVaultRosterHref(chainId))!}>
+      <p data-intro-vault>
+        A MetaMorpho vault pools one asset and lends it across the Morpho Blue markets its curator chooses. A holder
+        owns shares, and a share buys back more of the asset as those markets pay interest. The curator sets which
+        markets the vault may lend to and each one&rsquo;s cap; the owner can replace the curator and sets the fee. A
+        vault&rsquo;s total assets add each market&rsquo;s interest up to the block read, while Morpho Blue books
+        interest only when a market is touched, so the sum the vault has allocated trails it. On a V1.1 vault, lost
+        assets are assets no market holds after a loss, and the share price is not lowered for them.
+      </p>
+      <p data-intro-roster data-figure="directory-census">
+        The roster is{" "}
+        <Prov
+          info={vaultDirectoryCensusProv(
+            { chainId },
+            { catalogSize: roster.vaults.length, censusBlock: roster.censusBlock },
+          )}
+        >
+          the {n(roster.vaults.length)} vaults the two MetaMorpho factories had made on {chain} at block{" "}
+          {n(roster.censusBlock)}
+        </Prov>
+        , each found from the creation event its factory emits. The list is a floor: a vault deployed without a factory
+        emits no creation event, a vault created since the census block joins when the census runs again, and the Vault
+        V2 family is outside it. Names are read live, because a V1.1 owner can rename a vault. Every figure on the
+        roster is a call answered at the block its read stamp names, re-read at most every five minutes.
+      </p>
+      <p data-intro-figures>
+        Amounts are in each vault&rsquo;s asset and nothing is priced in USD, so two assets are never ordered or added
+        together. Yield is Rails&rsquo;s figure: the share price&rsquo;s growth over 30 days, annualised simply, net of
+        the fees the vault takes inside the share; rewards paid outside the share, such as MORPHO, are not in it. An
+        empty vault answered zero to <code>totalAssets()</code>; a vault with no holder has never minted a share.
+        {census.length > 0 && (
+          <>
+            {" "}
+            Holders counts every address holding a share at the census&rsquo;s block: a floor, since an address is often
+            a wrapper. The positions listing names{" "}
+            <Link href={metaMorphoVaultsListingHref(chainId)} className={INLINE_LINK} prefetch={false}>
+              every holder
+            </Link>
+            ; the paragraphs below say how it is built.
+          </>
+        )}
+      </p>
+      <p data-intro-docs>
+        <a href={MORPHO_VAULT_DOCS} target="_blank" rel="noopener" className={`font-medium ${FOOT_LINK}`}>
+          Morpho&rsquo;s documentation
+        </a>{" "}
+        explains the Vaults V1 roles in Morpho&rsquo;s terms.
+      </p>
       <p data-intro-membership>
         Membership comes from the census and only from the census: every address named either side of any{" "}
         <code>Transfer</code> a vault has ever emitted, swept from that vault&rsquo;s creation block rather than from a
@@ -108,6 +162,7 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
         assembled from what visitors typed would be a public record of who looked at what. What an address holds right
         now, census member or not, is a different question, and nothing here answers it.
       </p>
+      <ProvInspectorLayer />
     </VaultsInfoPage>
   );
 }

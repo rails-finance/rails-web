@@ -71,14 +71,7 @@ export function IporFusionVaultDirectoryView({
           emptyCountProv={(count) => iporEmptyCountProv(coords, count, catalogSize)}
           // Miles, 19 Nov 2026: the roster carries its read stamp and nothing
           // else above the rows; what the list is lives on the about page.
-          head={{
-            censusFigure: "roster-census",
-            census: null,
-            listingHref: null,
-            drawer: null,
-            infoHref: null,
-            indexHref: null,
-          }}
+          head={{ drawer: null }}
         />
       </ProvSection>
       <CompareBar />

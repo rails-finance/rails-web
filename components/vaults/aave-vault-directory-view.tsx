@@ -8,34 +8,25 @@
 // narrowing to one asset still sees which rows are a slashable stake and which
 // are wrapped supply. Compare ticks as on /vaults (E2, E3).
 // The family's own mechanic reads (deposit cap, wrapped aToken, cooldown and
-// slashing) are on the vault's page; the mechanics in words are in the intro
-// drawer, with Aave's own pages.
+// slashing) are on the vault's page; the mechanics in words, the catalogue count
+// and Aave's pages are on the vaults info page, since the roster opens on its
+// read stamp alone (ui-jobs 771).
 //
 // THE DENOMINATOR is complete at its block: two enumerator calls answer their
 // whole family in one read, and sGHO is one address Aave's book names.
 
-import type { ReactNode } from "react";
 import type { ServerRead } from "@/lib/shared/server-head-read";
-import { Prov } from "@/components/shared/provenance";
 import { ProvSection } from "@/components/shared/section-menu";
-import { isoSeconds, RosterBlock } from "@/components/vaults/roster-read-stamp";
-import { ROSTER_SCOPE, RosterMenu, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
+import { ROSTER_SCOPE, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { CompareBar } from "@/components/vaults/compare-selection";
-import { AaveFirstPartySources } from "@/components/vaults/aave-first-party-sources";
 import { AAVE_FAMILY_LABEL } from "@/components/vaults/aave-vault-format";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { ethereumVaultHref, ethereumVaultRosterHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
+import { ethereumVaultHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
 import { AAVE_VAULT_FAMILY_ORDER, type AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
-import {
-  aaveVaultCatalogueProv,
-  aaveVaultEmptyCountProv,
-  type AaveVaultCoords,
-} from "@/lib/aave-vaults/vault-provenance";
+import { aaveVaultEmptyCountProv, type AaveVaultCoords } from "@/lib/aave-vaults/vault-provenance";
 import type { VaultSummary } from "@/lib/vaults/summary";
 import type { VaultYield } from "@/lib/vaults/yield";
 import { aaveRowReceipts } from "@/lib/vaults/row-receipts";
-
-const n = (v: number) => v.toLocaleString("en-US");
 
 const FACETS: VaultRosterFacet[] = [
   {
@@ -54,8 +45,7 @@ export function AaveVaultDirectoryView({
   blockNumber,
   readBy,
   chainStale,
-  counts,
-  censusBlock,
+  catalogSize,
 }: {
   /** The query string the page was served with (the roster's preset and sort). */
   initialSearch?: string;
@@ -65,23 +55,11 @@ export function AaveVaultDirectoryView({
   /** rails-server's read of `blockNumber`, when it answered every read. */
   readBy?: ServerRead | null;
   chainStale: boolean;
-  /** What the enumerators answered at the block. */
-  counts: { catalogSize: number; stataCount: number; stakeCount: number };
-  /** The position census's block; null where the census did not answer. */
-  censusBlock: number | null;
+  /** How many vaults the enumerators answered at the block (the empty count's receipt). */
+  catalogSize: number;
 }) {
   const coords: AaveVaultCoords = { blockNumber: blockNumber || undefined, readBy };
 
-  const readBlock = (
-    <RosterBlock
-      read={{
-        label: "Aave on Ethereum",
-        block: blockNumber,
-        at: readBy?.blockTime ?? isoSeconds(vaults[0]?.readAt.timestamp),
-      }}
-      chainId={MAINNET_CHAIN_ID}
-    />
-  );
   return (
     <>
       <ProvSection scope={ROSTER_SCOPE} as="div">
@@ -100,71 +78,11 @@ export function AaveVaultDirectoryView({
           holdersHrefOf={(v) => ethereumVaultsListingHref({ vault: v.address })}
           receiptsOf={(v) => aaveRowReceipts(coords, v)}
           hooksOf={(v) => ({ "data-family": v.family })}
-          emptyCountProv={(count) => aaveVaultEmptyCountProv(coords, count, counts.catalogSize)}
-          head={{
-            censusFigure: "directory-catalogue",
-            census: (
-              <>
-                <Prov info={aaveVaultCatalogueProv(coords, counts)}>
-                  Aave&rsquo;s contracts name {n(counts.catalogSize)} vaults at this block
-                </Prov>
-                {censusBlock != null
-                  ? `; Holders counts every address holding a share at census block ${n(censusBlock)}.`
-                  : "."}
-              </>
-            ),
-            listingHref: ethereumVaultsListingHref(),
-            infoHref: `${ethereumVaultRosterHref()}/info`,
-            menu: (
-              <RosterMenu
-                listingHref={ethereumVaultsListingHref()}
-                infoHref={`${ethereumVaultRosterHref()}/info`}
-                docs={{
-                  title: "Aave's documentation",
-                  subtitle: "aave.com: Savings GHO",
-                  href: "https://aave.com/docs/ecosystem/gho/sgho",
-                }}
-              />
-            ),
-            drawer: <AaveRosterDrawer counts={counts} block={readBlock} />,
-          }}
+          emptyCountProv={(count) => aaveVaultEmptyCountProv(coords, count, catalogSize)}
+          head={{ drawer: null }}
         />
       </ProvSection>
       <CompareBar />
-    </>
-  );
-}
-
-/** The listing intro drawer (standards/explanation-copy-charter.md §8a). */
-function AaveRosterDrawer({ counts, block }: { counts: { stataCount: number; stakeCount: number }; block: ReactNode }) {
-  return (
-    <>
-      <h3 className="text-[13px] font-semibold text-foreground">What Aave&rsquo;s vaults are</h3>
-      <p>
-        Three families of ERC-4626 vault that Aave deploys. Savings GHO is one vault over GHO: a holder&rsquo;s shares
-        grow with a stored yield index, and withdrawals are clamped to the GHO the contract holds. A static aToken wraps
-        exactly one Aave V3 aToken, so its shares are a non-rebasing claim on a supply position and its share price is
-        the reserve&rsquo;s accrued index. An Umbrella stake token is staked against one reserve&rsquo;s deficit:
-        Umbrella can slash it, taking part of the stake to cover the deficit, which lowers every holder&rsquo;s share
-        price at once, and redemption runs through a cooldown and a window after it.
-      </p>
-      <h3 className="text-[13px] font-semibold text-foreground">What this page is</h3>
-      <p>
-        One row is one vault: savings GHO, the {n(counts.stataCount)} static aTokens <code>getStataTokens()</code>{" "}
-        returns and the {n(counts.stakeCount)} stake tokens <code>getStkTokens()</code> returns, every one read at{" "}
-        {block}. Both calls answer their whole family, so the list is complete at that block. Outside it: Aave&rsquo;s
-        deployments on other chains, the legacy static-aToken factory, and any ERC-4626 Aave has not published. The
-        census that counts Holders runs on its own block.
-      </p>
-      <h3 className="text-[13px] font-semibold text-foreground">What the figures leave out</h3>
-      <p>
-        Amounts are in each vault&rsquo;s own asset and nothing is priced in USD. Three of the four stake tokens hold a
-        static aToken, so their amounts are in that wrapper&rsquo;s units. A static aToken holding nothing still answers
-        a share price well above one: the reserve&rsquo;s index. Yield is Rails&rsquo;s figure: the share price&rsquo;s
-        growth over 30 days, annualised simply; Umbrella&rsquo;s rewards are paid outside the share and are not in it.
-        The deposit cap, the wrapped aToken and the cooldown are on each vault&rsquo;s page.
-      </p>
-      <AaveFirstPartySources />
     </>
   );
 }

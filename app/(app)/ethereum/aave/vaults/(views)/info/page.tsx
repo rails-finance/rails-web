@@ -1,11 +1,15 @@
 // focus: the explorer's explainer; the shell's gate stands over the explorer
 // How Aave's vault layer on Ethereum is built — /ethereum/aave/vaults/info.
 // ----------------------------------------------------------------------------
-// The (i) in the section rail. These paragraphs were the listing's "How this
-// listing is built" drawer: a panel that was always mounted and merely hidden,
-// because what it says is true of the section whether or not anyone opens it.
-// That is a page, so it is one — the same words, at a path a reader can link
-// to, with the listing's face left carrying only the two figures it read.
+// The (i) in the section rail. The first paragraphs are the roster's words and
+// its catalogue count, which left the roster's head (ui-jobs 771: the roster
+// opens on its read stamp alone), and Aave's pages; the rest were the
+// listing's "How this listing is built" drawer.
+//
+// THE CATALOGUE COUNT IS A CHAIN READ: what Aave's enumerators answer at a
+// block. The page asks the roster's loader, which caches a good read for five
+// minutes and never caches a failure; a failed read states the count as not
+// read and the prose stands.
 //
 // THE CENSUS HEADER IS FETCHED HERE, without the live overlay: three of the
 // paragraphs are about the census itself — which vaults nobody has ever held,
@@ -14,7 +18,16 @@
 // leaves those three unstated rather than stated emptily; the rest of the page
 // is about the section's rules and stands either way.
 
+import Link from "next/link";
 import { VaultsInfoPage } from "@/components/vaults/vaults-info-page";
+import { AaveFirstPartySources } from "@/components/vaults/aave-first-party-sources";
+import { Prov } from "@/components/shared/provenance";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { loadAaveEthereumVaultDirectory } from "@/lib/sources/chain/aave-ethereum-vault-directory";
+import { aaveVaultCatalogueProv } from "@/lib/aave-vaults/vault-provenance";
+import { serverReadOf } from "@/lib/shared/server-head-read";
+import { ethereumVaultsListingHref } from "@/lib/vaults/routes";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { UnpricedSentence } from "@/components/vaults/unpriced-sentence";
 import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
 import { ssrHop } from "@/lib/shared/listing-ssr";
@@ -52,12 +65,60 @@ async function loadCensus(): Promise<VaultCensusRow[]> {
 }
 
 export default async function EthereumVaultsInfoPage() {
-  const census = await loadCensus();
+  const [census, data] = await Promise.all([loadCensus(), loadAaveEthereumVaultDirectory()]);
+  const coords = { blockNumber: data.blockNumber || undefined, readBy: serverReadOf(data) };
+  const censusBlock = census.length > 0 ? Math.max(...census.map((c) => c.censusBlock)) : null;
   const empty = census.filter((c) => c.participants === 0);
   const unproven = census.filter((c) => !c.sumMatches);
 
   return (
     <VaultsInfoPage chainId={MAINNET_CHAIN_ID} protocol={protocolForHref("/ethereum/aave")!}>
+      <p data-intro-vault>
+        Three families of ERC-4626 vault that Aave deploys. Savings GHO is one vault over GHO: a holder&rsquo;s shares
+        grow with a stored yield index, and withdrawals are clamped to the GHO the contract holds. A static aToken wraps
+        exactly one Aave V3 aToken, so its shares are a non-rebasing claim on a supply position and its share price is
+        the reserve&rsquo;s accrued index. An Umbrella stake token is staked against one reserve&rsquo;s deficit:
+        Umbrella can slash it, taking part of the stake to cover the deficit, which lowers every holder&rsquo;s share
+        price at once, and redemption runs through a cooldown and a window after it.
+      </p>
+      <p data-intro-roster>
+        {data.chainStale ? (
+          <>
+            One row on the roster is one vault: savings GHO, the static aTokens <code>getStataTokens()</code> returns
+            and the stake tokens <code>getStkTokens()</code> returns. Aave&rsquo;s contracts were not read just now, so
+            the count is not stated.
+          </>
+        ) : (
+          <>
+            One row on the roster is one vault.{" "}
+            <Prov info={aaveVaultCatalogueProv(coords, data)}>
+              Aave&rsquo;s contracts name {n(data.catalogSize)} vaults at block {n(data.blockNumber)}
+            </Prov>
+            : savings GHO, the {n(data.stataCount)} static aTokens <code>getStataTokens()</code> returns and the{" "}
+            {n(data.stakeCount)} stake tokens <code>getStkTokens()</code> returns.
+          </>
+        )}{" "}
+        Both calls answer their whole family, so the list is complete at its block. Outside it: Aave&rsquo;s deployments
+        on other chains, the legacy static-aToken factory, and any ERC-4626 Aave has not published. Every figure on the
+        roster is a call answered at the block its read stamp names, re-read at most every five minutes.
+      </p>
+      <p data-intro-figures>
+        Amounts are in each vault&rsquo;s asset and nothing is priced in USD. Three of the four stake tokens hold a
+        static aToken, so their amounts are in that wrapper&rsquo;s units. A static aToken holding nothing still answers
+        a share price well above one: the reserve&rsquo;s index. Yield is Rails&rsquo;s figure: the share price&rsquo;s
+        growth over 30 days, annualised simply; Umbrella&rsquo;s rewards are paid outside the share and are not in it.
+        The deposit cap, the wrapped aToken and the cooldown are on each vault&rsquo;s page.
+        {censusBlock != null && (
+          <>
+            {" "}
+            Holders counts every address holding a share at census block {n(censusBlock)}. The positions listing names{" "}
+            <Link href={ethereumVaultsListingHref()} className={INLINE_LINK} prefetch={false}>
+              every holder
+            </Link>
+            ; the paragraphs below say how it is built.
+          </>
+        )}
+      </p>
       <p data-intro-membership>
         Membership comes from the census and only from the census: every address named either side of any{" "}
         <code>Transfer</code> a vault has ever emitted, swept whole, and proven complete by Σ <code>balanceOf</code>{" "}
@@ -130,6 +191,8 @@ export default async function EthereumVaultsInfoPage() {
         has no row here: the listing answers no rows for it and records nothing about the search, because a set
         assembled from what visitors typed would be a public record of who looked at what.
       </p>
+      <AaveFirstPartySources />
+      <ProvInspectorLayer />
     </VaultsInfoPage>
   );
 }

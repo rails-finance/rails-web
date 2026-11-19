@@ -204,15 +204,7 @@ export function VaultIndexView({
             receiptsOf={receiptsOf}
             hooksOf={hooksOf}
             leadOf={(v) => LEAD_IDS[vaultIndexRosterKeyOf(v)] ?? null}
-            head={{
-              census: null,
-              censusFigure: "index-census",
-              listingHref: null,
-              infoHref: null,
-              indexHref: null,
-              readAt,
-              drawer,
-            }}
+            head={{ readAt, drawer }}
           />
         </div>
       </ProvSection>

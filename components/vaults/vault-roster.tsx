@@ -38,7 +38,6 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { isoSeconds, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import { InfoDisclosureTrigger } from "@/components/shared/info-disclosure";
-import { SectionMenu, type SectionMenuLink } from "@/components/shared/section-menu";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
@@ -48,8 +47,7 @@ import { VaultIndexTable, useVaultIndexSort } from "@/components/vaults/vault-in
 import type { ChainId } from "@/lib/shared/chains";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
-import { FOOT_LINK, INLINE_LINK, PAGE_LINK } from "@/lib/shared/ui-grammar";
-import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
+import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { vaultRosterShownProv } from "@/lib/vaults/roster-provenance";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
@@ -74,69 +72,20 @@ export interface VaultRosterFacet {
 
 type Filters = Record<string, string[]>;
 
-/** What the roster states above its rows: at most the read-at line and one
- *  census sentence (survey §6, "Words, by surface"); the rest is in the drawer. */
+/** What the roster states above its rows: the read stamp, and on the index
+ *  its (i) drawer. A family roster opens on its read stamp alone (ui-jobs 771):
+ *  its words and counts are on its vaults info page, which the rail's (i)
+ *  reaches. */
 export interface VaultRosterHead {
-  /** The one sentence on what the list is, with its receipts; null draws none. */
-  census: ReactNode;
-  /** `data-figure` on the census sentence, which the roster verifiers read. */
-  censusFigure: string;
-  /** The positions listing, linked after the sentence; null where there is none. */
-  listingHref: string | null;
   /** The intro drawer's body (standards/explanation-copy-charter.md §8a);
-   *  null draws no (i) and no drawer, where the about page carries it all. */
+   *  null draws no (i) and no drawer. */
   drawer: ReactNode;
-  /** The vault layer's about page; null where there is none. */
-  infoHref: string | null;
   /** In place of the one "Read at block N" line: the index's line per roster. */
   readAt?: ReactNode;
-  /** The cross-protocol index, linked after the sentence; null on the index. */
-  indexHref?: string | null;
-  /** The roster's ⋮ at the right of the read-stamp row (`RosterMenu`): its
-   *  pages. Absent on the index. */
-  menu?: ReactNode;
 }
 
 /** The roster's name (`data-prov-scope`). */
 export const ROSTER_SCOPE = "vault-roster";
-
-/** The family roster's ⋮: every holder, the index and the about page on
- *  Rails, the protocol's docs. */
-export function RosterMenu({
-  listingHref,
-  infoHref,
-  docs,
-}: {
-  listingHref: string | null;
-  infoHref: string | null;
-  docs?: { title: string; subtitle: string; href: string };
-}) {
-  const links: SectionMenuLink[] = [
-    ...(listingHref
-      ? [
-          {
-            item: "every-holder",
-            title: "Every holder",
-            subtitle: "The positions in these vaults",
-            href: listingHref,
-            internal: true,
-          },
-        ]
-      : []),
-    {
-      item: "vault-index",
-      title: "All vaults",
-      subtitle: "Every protocol's vaults on one table",
-      href: VAULT_INDEX_HREF,
-      internal: true,
-    },
-    ...(infoHref
-      ? [{ item: "info", title: "How this is built", subtitle: "About these vaults", href: infoHref, internal: true }]
-      : []),
-    ...(docs ? [{ item: "docs", ...docs }] : []),
-  ];
-  return <SectionMenu scope={ROSTER_SCOPE} title="Vaults" links={links} />;
-}
 
 const rawOf = (v: VaultSummary) => BigInt(v.totalAssets?.raw ?? "0");
 
@@ -428,7 +377,6 @@ export function VaultRoster({
 
   // On the index every roster has its own block, so a count says "at its block".
   const atBlock = blockNumber > 0 ? "at this block" : "at its roster’s block";
-  const indexHref = head.indexHref === undefined ? VAULT_INDEX_HREF : head.indexHref;
 
   const intro = (
     <section className="mb-5" data-skel-section={`${skel}-denominator`}>
@@ -443,10 +391,7 @@ export function VaultRoster({
             ariaControls="vault-roster-intro"
           />
           {/* The stamp stands at the right (ui-jobs 730). */}
-          <span className="ml-auto flex items-center gap-1">
-            {head.readAt}
-            {head.menu}
-          </span>
+          <span className="ml-auto flex items-center gap-1">{head.readAt}</span>
         </div>
       ) : (
         !chainStale && (
@@ -475,7 +420,6 @@ export function VaultRoster({
                   },
                 ]}
               />
-              {head.menu}
             </span>
           </div>
         )
@@ -488,40 +432,7 @@ export function VaultRoster({
           className="mt-2 max-w-3xl space-y-2 rounded-xl bg-raised px-3 py-3 text-[12px] leading-relaxed text-rb-500"
         >
           {head.drawer}
-          {head.infoHref && (
-            <p>
-              <Link href={head.infoHref} className={`text-xs font-semibold ${FOOT_LINK}`} prefetch={false}>
-                How this is built
-              </Link>
-            </p>
-          )}
         </div>
-      )}
-      {head.census != null && (
-        <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure={head.censusFigure}>
-          {head.census}
-          {head.listingHref && (
-            <>
-              {" "}
-              <Link href={head.listingHref} className={INLINE_LINK} prefetch={false} data-link="every-holder">
-                Every holder
-              </Link>
-            </>
-          )}
-          {head.listingHref && indexHref && (
-            <span aria-hidden="true" className="px-1.5">
-              ·
-            </span>
-          )}
-          {indexHref && (
-            <>
-              {!head.listingHref && " "}
-              <Link href={indexHref} className={INLINE_LINK} prefetch={false} data-link="vault-index">
-                All vaults
-              </Link>
-            </>
-          )}
-        </p>
       )}
     </section>
   );

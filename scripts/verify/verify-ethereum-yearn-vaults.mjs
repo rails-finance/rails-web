@@ -330,7 +330,6 @@ await page.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 12
 // they are different facts: the catalogue's CENSUS block ("the 247 vaults the
 // five V3 factories had deployed … at block N") and the block this READING was
 // taken at. The sentence anchored on is the one that names the CALL.
-const rosterText = (await page.locator("[data-roster-panel]").innerText()).replace(/\s+/g, " ");
 // 2026-10-20 (ui-jobs 407, V1): the roster's read-at line moved into the
 // panel ("Read at 52,854,244"), and the empty group's sentence that named
 // the call went to the intro drawer, so the line is what is read.
@@ -340,33 +339,34 @@ const rosterText = (await page.locator("[data-roster-panel]").innerText()).repla
 // `data-roster-read-block`), and the block is printed in the "about these
 // vaults" panel, linked; the panel's BlockRef is what is read (textContent: the
 // panel is closed at rest), held against the attribute and the stamp.
+// ui-jobs 771: the roster opens on its read stamp alone, with no panel; the
+// stamp's block is what is read, held against the line's attribute.
 const statedBlock = Number(
-  (
-    (await page.locator("[data-roster-panel] [data-intro-drawer] [data-block-ref]").first().textContent()) ?? ""
-  ).replace(/[^\d]/g, "") || NaN,
+  (await page.locator("[data-roster-read-block]").first().getAttribute("data-roster-read-block")) ?? NaN,
 );
 const headerBlockAttr = (await page.locator("[data-directory-block]").count())
   ? Number(await page.locator("[data-directory-block]").first().getAttribute("data-directory-block"))
   : null;
 check(
-  "0b the roster states the block it read at, in its header attribute and in its own prose, and the two agree",
-  Number.isInteger(statedBlock) &&
-    statedBlock > 0 &&
-    headerBlockAttr === statedBlock &&
-    Number(await page.locator("[data-roster-read-block]").first().getAttribute("data-roster-read-block")) ===
-      statedBlock,
-  `prose block ${statedBlock}, header attribute ${headerBlockAttr}`,
+  "0b the roster states the block it read at, in its header attribute and in its read stamp, and the two agree",
+  Number.isInteger(statedBlock) && statedBlock > 0 && headerBlockAttr === statedBlock,
+  `stamp block ${statedBlock}, header attribute ${headerBlockAttr}`,
 );
 const blockNumber = BigInt(statedBlock);
 // The web reuses a served roster for up to an hour, and the box can write a
 // newer run inside it, so the census block the page names may trail the one
 // this script read; it must still be a served block (after the bake's, no later
 // than the box's latest) and behind the reading.
+// ui-jobs 771: the census count and block are on the vaults info page.
+const infoText = (await (await fetch(`${BASE}/ethereum/yearn/vaults/info`)).text())
+  .replace(/<!--.*?-->/g, "")
+  .replace(/<[^>]+>/g, "")
+  .replace(/\s+/g, " ");
 const statedCensus = Number(
-  (rosterText.match(/factories had deployed on Ethereum at block ([\d,]+)/) ?? [])[1]?.replace(/,/g, "") ?? NaN,
+  (infoText.match(/factories deployed, [\d,]+ of them at block ([\d,]+)/) ?? [])[1]?.replace(/,/g, "") ?? NaN,
 );
 check(
-  "0c the roster names the census block it draws its membership from, and it is behind the reading",
+  "0c the info page names the census block it draws its membership from, and it is behind the reading",
   ROSTER.source === "served"
     ? statedCensus > BAKED_BLOCK && statedCensus <= CENSUS_BLOCK && statedCensus <= statedBlock
     : statedCensus === CENSUS_BLOCK && CENSUS_BLOCK <= statedBlock,
