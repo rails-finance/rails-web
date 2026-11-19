@@ -339,3 +339,135 @@ test("the lifetime figures wait for the oracle read, and say so while pending an
   assert.match(lifetimeFiguresState("answered", ["XAUt"]).line, /XAUt has no on-chain price/);
   assert.deepEqual(lifetimeFiguresState("answered", []), { draw: true });
 });
+
+// ── ui-jobs 743, Aave V4 follow-up ──
+const { reserveLifetime, lifetimeSideBarUsd } = await import(ROOT + "lib/aave-v4/lifetime-totals.ts");
+const { buildAaveV4SpokeCards } = await import(ROOT + "lib/aave-v4/spoke-cards.ts");
+const { spokeToMarkdown } = await import(ROOT + "lib/aave-v4/spoke-to-markdown.ts");
+const { priceKeyFor } = await import(ROOT + "lib/aave/prices.ts");
+
+const stats = (o) => ({
+  symbol: "WETH",
+  supplied: 0,
+  withdrawn: 0,
+  borrowed: 0,
+  repaid: 0,
+  liquidatedDebt: 0,
+  liquidatedCollateral: 0,
+  withdrawnUsd: 0,
+  repaidUsd: 0,
+  liquidatedDebtUsd: 0,
+  liquidatedCollateralUsd: 0,
+  ...o,
+});
+
+test("interest is priced only while all of it is held, at the latest block's price, to the cent", () => {
+  // Supplied 2, nothing left, the spoke now reports 2.0123456: all the interest is held.
+  const held = reserveLifetime(stats({ supplied: 2, currentSupplied: 2.0123456 }), 3000.987654).supply;
+  assert.equal(held.interestUsd, shownUsd(0.0123456, 3000.987654));
+  assert.equal(held.heldUsd, shownUsd(2.0123456, 3000.987654));
+  assert.equal(held.inflowUsd, Math.round((held.heldUsd - held.interestUsd) * 100) / 100);
+  // Once anything has left, the interest has no price at its own block: no
+  // interest figure and no Supplied figure apart from it; the gross stands.
+  const left = reserveLifetime(
+    stats({ supplied: 3, withdrawn: 1, withdrawnUsd: shownUsd(1, 2900), currentSupplied: 2.01 }),
+    3000,
+  ).supply;
+  assert.equal(left.interestUsd, null);
+  assert.equal(left.inflowUsd, null);
+  assert.equal(left.grossUsd, Math.round((shownUsd(2.01, 3000) + shownUsd(1, 2900)) * 100) / 100);
+});
+
+test("a side bar draws no height from a partial: an unpriced asset or outflow leaves it without a figure", () => {
+  assert.equal(lifetimeSideBarUsd([100.12, 50.01], []), 150.13);
+  assert.equal(lifetimeSideBarUsd([100.12, 50.01], ["XAUt"]), null);
+  assert.equal(lifetimeSideBarUsd([100.12, null], []), null);
+});
+
+test("an unpriced holding of any real size stops the lifetime figures and the peak", () => {
+  const r = calculateAaveEconomics(
+    [
+      ev(1, "supply", "WETH", 1, { usd: 3000, source: "iaave-oracle", block: 1001 }),
+      // 0.00005 tokens: under the old 0.0001 floor, which passed it over.
+      ev(2, "supply", "XAUt", 0.00005, null),
+    ],
+    undefined,
+    undefined,
+  );
+  const t = computeAaveLifetimeTotals(r.reserves, { "0x0": 1 });
+  assert.ok(t.noFigure.includes("XAUt"));
+  const alone = calculateAaveEconomics([ev(1, "supply", "XAUt", 0.00005, null)], undefined, undefined);
+  assert.equal(alone.peakSupply, undefined);
+  assert.deepEqual(alone.peakSupplyUnpriced, ["XAUt"]);
+});
+
+test("gas is stated in ETH, and not at all where an event has none recorded", () => {
+  const gas = (e, eth) => ({ ...e, gas: { gasCostEth: eth, gasCostUsd: 99 } });
+  const all = calculateAaveEconomics(
+    [gas(ev(1, "supply", "WETH", 1, null), 0.0012), gas(ev(2, "withdraw", "WETH", 1, null), 0.0008)],
+    undefined,
+    undefined,
+  );
+  assert.ok(Math.abs(all.totalGasCostEth - 0.002) < 1e-12);
+  assert.equal("totalGasCostUsd" in all, false);
+  const some = calculateAaveEconomics(
+    [gas(ev(1, "supply", "WETH", 1, null), 0.0012), ev(2, "withdraw", "WETH", 1, null)],
+    undefined,
+    undefined,
+  );
+  assert.equal(some.totalGasCostEth, null);
+});
+
+test("the markdown export writes no figure while the read is pending, once it has failed, or with an unpriced asset", () => {
+  const events = [
+    ev(1, "supply", "WETH", 2, { usd: 3000, source: "iaave-oracle", block: 1001 }),
+    ev(2, "borrow", "USDC", 1000, { usd: 1, source: "iaave-oracle", block: 1002 }),
+  ];
+  const weth = priceKeyFor("WETH");
+  const usdc = priceKeyFor("USDC");
+  const prices = { [weth]: 3100.5, [usdc]: 0.9999 };
+  const base = buildAaveV4SpokeCards(events, undefined, prices)[0];
+  const md = (card, p = prices) =>
+    spokeToMarkdown({
+      spokeName: "Main",
+      wallet: "0xabc",
+      card,
+      reserves: [],
+      prices: p,
+      events,
+      generatedAt: new Date(0),
+    });
+  const answered = {
+    prices: {
+      [weth]: { usd: 3100.5, source: "iaave-oracle", symbol: "WETH" },
+      [usdc]: { usd: 0.9999, source: "iaave-oracle", symbol: "USDC" },
+    },
+    blockNumber: 2000,
+    blockTimestamp: 1,
+  };
+  const card = { ...base, weightedCollateralUsd: 5000, borrowingPowerUsd: 3000 };
+
+  const pending = md({ ...card, oracleRead: null });
+  assert.match(pending, /\*\*Collateral:\*\* price read pending supplied/);
+  assert.match(pending, /\*\*Debt:\*\* price read pending/);
+  assert.doesNotMatch(pending, /counts at the collateral factor|Borrowing power remaining/);
+
+  const failed = md({ ...card, oracleRead: { prices: {}, blockNumber: null, blockTimestamp: null, failed: true } });
+  assert.match(failed, /no dollar figure: the price read did not answer/);
+  assert.doesNotMatch(failed, /counts at the collateral factor|Borrowing power remaining/);
+
+  const unpriced = md({
+    ...card,
+    oracleRead: answered,
+    unpricedHoldings: [{ symbol: "XAUt", side: "supply", collateralEnabled: true }],
+  });
+  assert.match(unpriced, /XAUt/);
+  assert.doesNotMatch(unpriced, /counts at the collateral factor|Borrowing power remaining/);
+
+  const drawn = md({ ...card, oracleRead: answered });
+  assert.match(drawn, /counts at the collateral factor/);
+  assert.match(drawn, /Borrowing power remaining/);
+  // The peaks are the card's: its receipt's figure, the shown products summed.
+  assert.match(drawn, /\*\*Peak supply:\*\* \$6,000/);
+  assert.match(md({ ...card, peakSupply: undefined, peakSupplyUnpriced: ["XAUt"] }), /\*\*Peak supply:\*\* .*XAUt/);
+});

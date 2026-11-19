@@ -101,8 +101,10 @@ export interface ReserveStats {
 
 export interface AaveEconomicsResult {
   reserves: ReserveStats[];
-  totalGasCostEth: number;
-  totalGasCostUsd: number;
+  /** The events' gas in ETH, on chain; null where any event has none
+   *  recorded (no partial totals, ui-jobs 743). Stated in ETH only: no
+   *  per-event dollar price of gas has a receipt. */
+  totalGasCostEth: number | null;
   eventCount: number;
   /** Distinct non-liquidation transaction count (COUNT DISTINCT txHash over
    *  owner-driven events). The Liquity-faithful "transactions" metric the card
@@ -566,8 +568,7 @@ export function calculateAaveEconomics(
   }
 
   const reserveMap = new Map<string, ReserveStats>();
-  let totalGasCostEth = 0;
-  let totalGasCostUsd = 0;
+  let totalGasCostEth: number | null = 0;
 
   const runningDebt = new Map<string, number>();
   const runningSupply = new Map<string, number>();
@@ -609,18 +610,13 @@ export function calculateAaveEconomics(
       reservePriceBlock.set(symbol, ctx.price?.block ?? event.blockNumber);
     }
     // Price for the moved asset AT THIS event, used to value lifetime outflows
-    // at price-at-the-time. Prefer this event's historic price, else the
-    // reserve's most-recent historic price. NO current-price fallback — per the
-    // chain-state omission rule a historic figure must not be back-filled with a
-    // live-market guess; an unpriceable event contributes 0 (omitted).
-    // Only this event's own on-chain price: an earlier event's stands at
+    // at price-at-the-time. Only this event's own on-chain price: an earlier event's stands at
     // another block, and an outflow with none here has no figure (ui-jobs 743).
     const priceNow = movedPrice ?? 0;
 
-    if (event.gas) {
-      totalGasCostEth += event.gas.gasCostEth || 0;
-      totalGasCostUsd += event.gas.gasCostUsd || 0;
-    }
+    const gasEth = event.gas?.gasCostEth;
+    totalGasCostEth =
+      totalGasCostEth == null || gasEth == null || !Number.isFinite(gasEth) ? null : totalGasCostEth + gasEth;
 
     let stats = reserveMap.get(symbol);
     if (!stats) {
@@ -857,7 +853,6 @@ export function calculateAaveEconomics(
   return {
     reserves: [...reserveMap.values()],
     totalGasCostEth,
-    totalGasCostUsd,
     eventCount: aaveEvents.length,
     txCount: txSet.size,
     firstTimestamp: sorted[0].timestamp,

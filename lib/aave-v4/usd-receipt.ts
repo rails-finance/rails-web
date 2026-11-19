@@ -152,3 +152,15 @@ export function aaveV4FlowReceipt(
     via: "the position's events · each outflow × the on-chain price stored for its block · summed",
   });
 }
+
+/** A peak as the card draws it: the receipt's figure, or no figure and the
+ *  reserves no instant could be priced without; null where the side never
+ *  held anything (ui-jobs 743). */
+export function aaveV4PeakState(
+  what: string,
+  peak: Parameters<typeof aaveV4PeakReceipt>[1] | undefined,
+  unpriced: readonly string[] | undefined,
+): AaveV4UsdResult | null {
+  if (peak) return aaveV4PeakReceipt(what, peak);
+  return unpriced && unpriced.length > 0 ? { prov: null, usd: null, missing: [...unpriced] } : null;
+}
