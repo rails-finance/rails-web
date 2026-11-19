@@ -113,7 +113,7 @@ const sboldYieldProv_ = (
     kind: "recompute",
     text: `To check: ask any Ethereum archive node${atBlock(c)} for getDepositorYieldGainWithPending(${SBOLD_VAULT}) on each of the three Stability Pools, and add them.`,
   },
-  summary: `BOLD yield pending — the BOLD yield each Stability Pool's getDepositorYieldGainWithPending(sBOLD) answers${atBlock(c)}, the interest not yet minted included, summed over the three pools: ${r.sumRaw} raw BOLD. The vault's totalAssets() counts it with each pool's deposit (SpLogic._getBoldAssetsSP in the vault's verified source).`,
+  summary: `BOLD yield pending — the BOLD yield each Stability Pool's getDepositorYieldGainWithPending(sBOLD) answers${atBlock(c)}, the interest not yet minted included, summed over the three pools: ${r.sumRaw} raw BOLD.`,
   contract: vaultContract,
   via: `${LANE} · Σ StabilityPool.getDepositorYieldGainWithPending(sBOLD) @ the pinned block`,
   formula: "WETH pool + wstETH pool + rETH pool",
