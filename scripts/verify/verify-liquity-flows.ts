@@ -45,6 +45,8 @@ import {
   LQ,
   liquityFlowTimeline,
   liquityFocusEvents,
+  liquityPriceNote,
+  type LiquityReplayed,
   liquityForkFlowEvents,
   liquityV2FlowEvents,
   replayLiquity,
@@ -903,8 +905,39 @@ test("V2 WETH, redeemed: each leg is its shown product, its price named", () => 
         continue;
       }
       coll++;
-      assert.match(l.priceNote!, /the branch PriceFeed's price(, price)? at block [\d,]+/);
-      if (l.priceNote!.includes("nearest read")) assert.match(l.priceNote!, /this event is at block [\d,]+$/);
+      assert.match(
+        l.priceNote!,
+        /(the branch PriceFeed's price, block [\d,]+$|priced event's price, at block [\d,]+; this event is at block [\d,]+$)/,
+      );
     }
   assert.ok(coll > 0);
+});
+
+// Each price named by its source and block (ui-jobs 743).
+test("a Trove's price note names its source, its block and, where borrowed, both blocks by direction", () => {
+  const ev = (extra: Partial<LiquityFlowEvent>) => ({ block: 20_000_000, ...extra }) as unknown as LiquityFlowEvent;
+  const row = (r: Partial<LiquityReplayed>) =>
+    ({ price: 3000, borrowedPrice: false, priceBlock: 20_000_000, legs: [], ...r }) as LiquityReplayed;
+  // Liquity V1, its own PriceFeed.
+  assert.equal(liquityPriceNote(row({ ev: ev({}) }), "v1"), "Liquity's PriceFeed lastGoodPrice, block 20,000,000");
+  // Liquity V1 on a day with no read of its own: Liquity V2's WETH close.
+  assert.equal(
+    liquityPriceNote(row({ ev: ev({ priceFrom: { source: "v2-weth-day", day: 20_000, block: 21_000_000 } }) }), "v1"),
+    "Liquity V2's WETH PriceFeed, the close of 4 Oct 2024 at block 21,000,000; this event is at block 20,000,000",
+  );
+  // A fork's branch PriceFeed, and the _price in its Redemption log.
+  assert.equal(liquityPriceNote(row({ ev: ev({}) }), "v2"), "the branch PriceFeed's price, block 20,000,000");
+  assert.equal(
+    liquityPriceNote(row({ ev: ev({ priceFrom: { source: "redemption-log" } }) }), "v2"),
+    "_price in the Redemption log, block 20,000,000",
+  );
+  // Borrowed: the last priced event's, or (before the first) the next one's.
+  assert.equal(
+    liquityPriceNote(row({ ev: ev({}), borrowedPrice: true, priceBlock: 19_999_000, priceDirection: "last" }), "v2"),
+    "the last priced event's price, at block 19,999,000; this event is at block 20,000,000",
+  );
+  assert.equal(
+    liquityPriceNote(row({ ev: ev({}), borrowedPrice: true, priceBlock: 20_001_000, priceDirection: "next" }), "v2"),
+    "the next priced event's price, at block 20,001,000; this event is at block 20,000,000",
+  );
 });
