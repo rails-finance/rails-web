@@ -53,7 +53,8 @@ import type { AaveV4Event } from "@/lib/aave-v4/event-prose";
 import { AaveV4SpokeCardSelector } from "@/components/protocol/aave-v4/aave-v4-spoke-card";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { aaveV4EconomicsContent } from "@/lib/shared/learn-more-content";
-import { computeAaveLifetimeTotals, lifetimeFiguresState } from "@/lib/aave-v4/lifetime-totals";
+import { shownUsd } from "@/lib/shared/shown-usd";
+import { computeAaveLifetimeTotals, lifetimeFiguresState, SETTLED_INTEREST_NOTE } from "@/lib/aave-v4/lifetime-totals";
 // Lazy chunk: the tower chart (below the fold, ~700 lines of legend/anatomy)
 // loads off the initial bundle. A mount-time prefetch (below) has it cached
 // well before the data fetch resolves and it first renders.
@@ -761,7 +762,7 @@ function AaveV4SpokePageInner({
             oraclePrices={oraclePrices}
             priceRead={!oracleRead ? "pending" : oracleRead.failed ? "failed" : "answered"}
             gasEth={activeGroup.result.totalGasCostEth}
-            gasUsd={activeGroup.result.totalGasCostUsd}
+            priceBlock={oracleRead?.blockNumber ?? null}
             historyComplete={olderCount === 0}
             onFlowTimeline={setFocusTimeline}
             events={positionEvents}
@@ -829,7 +830,7 @@ function AaveV4SpokeTowerBlock({
   oraclePrices,
   priceRead,
   gasEth,
-  gasUsd,
+  priceBlock,
   historyComplete,
   onFlowTimeline,
   events,
@@ -856,8 +857,10 @@ function AaveV4SpokeTowerBlock({
   /** Whether the oracle read has answered: before it does, or once it has
    *  failed, the lifetime figures are not drawn. */
   priceRead: "pending" | "failed" | "answered";
-  gasEth: number;
-  gasUsd: number;
+  /** Null where any event has no gas recorded. */
+  gasEth: number | null;
+  /** The block the oracle read stands at. */
+  priceBlock: number | null;
   /** False when the page holds a window of the timeline (lib/aave-v4/lifetime-totals.ts). */
   historyComplete: boolean;
 }) {
@@ -915,15 +918,17 @@ function AaveV4SpokeTowerBlock({
     if (coll.length === 0 || debt.length === 0) return null;
     const list = (rs: typeof reserves, amt: (r: (typeof reserves)[number]) => number) =>
       rs.map((r) => `${fmtTokenAmount(amt(r))} ${aaveV4DisplaySymbol(r.symbol)}`).join(" and ");
-    const atTimeUsd = totals.liquidatedDebtUsd - totals.liquidatedCollUsd;
+    // Each the difference of cent figures, every leg a shown product.
+    const cents = (v: number) => Math.round(v * 100) / 100;
+    const atTimeUsd = cents(totals.liquidatedDebtUsd - totals.liquidatedCollUsd);
     let todayUsd: number | null = 0;
     for (const r of coll) {
       const p = resolvePrice(r.symbol, prices);
-      todayUsd = p == null || todayUsd == null ? null : todayUsd - r.liquidatedCollateral * p;
+      todayUsd = p == null || todayUsd == null ? null : cents(todayUsd - shownUsd(r.liquidatedCollateral, p));
     }
     for (const r of debt) {
       const p = resolvePrice(r.symbol, prices);
-      todayUsd = p == null || todayUsd == null ? null : todayUsd + r.liquidatedDebt * p;
+      todayUsd = p == null || todayUsd == null ? null : cents(todayUsd + shownUsd(r.liquidatedDebt, p));
     }
     return {
       seized: list(coll, (r) => r.liquidatedCollateral),
@@ -1067,6 +1072,7 @@ function AaveV4SpokeTowerBlock({
                 onToggleHideSurplus={() => setHideSurplus((v) => !v)}
                 title={!scrubbed ? title : undefined}
                 historyComplete={historyComplete}
+                priceBlock={priceBlock}
               />
             </div>
 
@@ -1094,9 +1100,18 @@ function AaveV4SpokeTowerBlock({
                     <div className="flex items-start gap-2 leading-relaxed">
                       <span className="select-none text-rb-500">•</span>
                       <span>
-                        {fig(totals.depositedUsd)} of collateral supplied over the position&apos;s life
-                        {totals.supplyInterestUsd > 0.01 && (
-                          <> and {fig(totals.supplyInterestUsd)} earned in interest</>
+                        {totals.depositedUsd != null && totals.supplyInterestUsd != null ? (
+                          <>
+                            {fig(totals.depositedUsd)} of collateral supplied over the position&apos;s life
+                            {totals.supplyInterestUsd > 0.01 && (
+                              <> and {fig(totals.supplyInterestUsd)} earned in interest</>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {fig(totals.suppliedGrossUsd)} supplied and earned in interest over the position&apos;s
+                            life, not drawn apart because {SETTLED_INTEREST_NOTE}
+                          </>
                         )}
                         {totals.withdrawnUsd > 0.01 && <>, then {fig(totals.withdrawnUsd)} withdrawn</>}
                         {totals.liquidatedCollUsd > 0.01 && (
@@ -1113,9 +1128,18 @@ function AaveV4SpokeTowerBlock({
                     <div className="flex items-start gap-2 leading-relaxed">
                       <span className="select-none text-rb-500">•</span>
                       <span>
-                        {fig(totals.borrowedUsd)} borrowed over the position&apos;s life
-                        {totals.debtInterestUsd > 0.01 && (
-                          <> and {fig(totals.debtInterestUsd)} of interest accrued on it</>
+                        {totals.borrowedUsd != null && totals.debtInterestUsd != null ? (
+                          <>
+                            {fig(totals.borrowedUsd)} borrowed over the position&apos;s life
+                            {totals.debtInterestUsd > 0.01 && (
+                              <> and {fig(totals.debtInterestUsd)} of interest accrued on it</>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {fig(totals.borrowedGrossUsd)} borrowed and accrued in interest over the position&apos;s
+                            life, not drawn apart because {SETTLED_INTEREST_NOTE}
+                          </>
                         )}
                         {totals.repaidUsd > 0.01 && <>, then {fig(totals.repaidUsd)} repaid</>}
                         {totals.liquidatedDebtUsd > 0.01 && (
@@ -1143,12 +1167,16 @@ function AaveV4SpokeTowerBlock({
                       </span>
                     </div>
                   )}
-                  {gasEth > 0 && (
+                  {gasEth !== 0 && (
                     <div className="flex items-start gap-2 leading-relaxed">
                       <span className="select-none text-rb-500">•</span>
                       <span>
-                        A total of {gasEth.toFixed(4)} ETH (${gasUsd.toFixed(2)}) has been spent on gas fees across
-                        these transactions. Each event&apos;s own gas is in its footnote below.
+                        {gasEth == null ? (
+                          <>Not every event has its gas recorded, so no total is drawn.</>
+                        ) : (
+                          <>A total of {gasEth.toFixed(6)} ETH has been spent on gas fees across these transactions.</>
+                        )}{" "}
+                        Each event&apos;s own gas is in its footnote below.
                       </span>
                     </div>
                   )}
@@ -1165,7 +1193,7 @@ function AaveV4SpokeTowerBlock({
                       ) : undefined
                     }
                     content={aaveV4EconomicsContent({
-                      supplyInterest: totals.supplyInterestUsd > 0.01,
+                      supplyInterest: (totals.supplyInterestUsd ?? 0) > 0.01,
                       liquidations: totals.liquidatedCollUsd > 0.01 || totals.liquidatedDebtUsd > 0.01,
                     })}
                   />

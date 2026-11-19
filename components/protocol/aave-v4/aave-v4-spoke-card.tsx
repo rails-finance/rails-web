@@ -67,7 +67,7 @@ import {
   YEARLY_COST_PROV,
 } from "@/lib/aave-v4/position-provenance";
 import { partialSumProv } from "@/lib/aave-v4/unpriced";
-import { aaveV4PeakReceipt, type AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
+import { aaveV4PeakState, type AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
 import { aaveV4SpokeSideUsd } from "@/lib/aave-v4/spoke-usd";
 import type { AaveV4Peak } from "@/lib/aave-v4/spoke-cards";
 import { aaveV4NoFigureLine, AAVE_V4_PEAK_WHAT } from "@/lib/aave-v4/price-notes";
@@ -137,20 +137,19 @@ function oneAssetHead(
   };
 }
 
-/** A peak's receipt from its rows; the plain receipt where the walk kept none. */
-const peakInfo = (peak: AaveV4Peak | undefined, what: string, plain: Provenance): Provenance =>
-  (peak ? aaveV4PeakReceipt(what, peak)?.prov : null) ?? plain;
-
-/** A peak's figure, or where no instant could be priced, the reserves it lacks a price for. */
+/** A peak's figure from its receipt, or where no instant could be priced,
+ *  the reserves it lacks a price for (aaveV4PeakState, which the markdown
+ *  export reads too); $0 on the plain receipt where the side held nothing. */
 function peakValue(
-  usd: number,
   peak: AaveV4Peak | undefined,
   unpriced: string[] | undefined,
   what: string,
   plain: Provenance,
 ): ReactNode {
-  if (!peak && unpriced && unpriced.length > 0) return <NoPriceLine r={{ missing: unpriced }} />;
-  return <PeakUsd usd={usd} info={peakInfo(peak, what, plain)} />;
+  const state = aaveV4PeakState(what, peak, unpriced);
+  if (state == null) return <PeakUsd usd={0} info={plain} />;
+  if (state.prov == null) return <NoPriceLine r={state} />;
+  return <PeakUsd usd={state.usd} info={state.prov} />;
 }
 
 /** A closed card's peak, muted as a historic figure. */
@@ -389,13 +388,7 @@ export function useAaveV4SpokeCardSlots({
       {
         id: "peak-collateral",
         label: supplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
-        value: peakValue(
-          spoke.peakSupplyUsd,
-          spoke.peakSupply,
-          spoke.peakSupplyUnpriced,
-          AAVE_V4_PEAK_WHAT.supply,
-          PEAK_COLL_PROV,
-        ),
+        value: peakValue(spoke.peakSupply, spoke.peakSupplyUnpriced, AAVE_V4_PEAK_WHAT.supply, PEAK_COLL_PROV),
       },
       ...(supplyOnly
         ? []
@@ -403,13 +396,7 @@ export function useAaveV4SpokeCardSlots({
             {
               id: "peak-debt",
               label: CARD_VOCAB.peakDebt,
-              value: peakValue(
-                spoke.peakDebtUsd,
-                spoke.peakDebt,
-                spoke.peakDebtUnpriced,
-                AAVE_V4_PEAK_WHAT.debt,
-                PEAK_DEBT_PROV,
-              ),
+              value: peakValue(spoke.peakDebt, spoke.peakDebtUnpriced, AAVE_V4_PEAK_WHAT.debt, PEAK_DEBT_PROV),
             },
           ]),
     ];

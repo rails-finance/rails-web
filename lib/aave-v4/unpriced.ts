@@ -17,9 +17,11 @@ import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 /** What the USD column shows beside a balance with no price behind it. */
 export const NO_PRICE_HINT = "no on-chain price";
 
-/** The dust floor for a holding no USD floor can judge, because the asset has
- *  no price. Matches the token epsilon the position calculation uses. */
-export const UNPRICED_DUST_TOKENS = 0.0001;
+/** Below this many tokens an unpriced balance is the arithmetic residue of
+ *  adding event amounts as floats, not a holding. An unpriced holding of any
+ *  real size stops every figure it belongs to (ui-jobs 743): at 0.0001 tokens
+ *  the old floor passed over about $10 of WBTC. */
+export const UNPRICED_DUST_TOKENS = 1e-12;
 
 /** Whether the live price map has answered at all. An empty map means the page
  *  is still fetching it, which is a loading state and not a missing source, so
