@@ -518,7 +518,7 @@ words:
   live_note_touch: |-
     A position's stated collateral and debt change only at a touch, so the figures at the feed are what its last touch wrote plus what is pending, and the breakdown is the whole of what moved its equity at the feed since then. The next touch writes the pending legs into the stated figures.
   live_legs: |-
-    The protocol's legs, pending until the next touch:
+    The rows below show the protocol's legs, pending until the next touch.
   live_change: |-
     Change in equity at the feed
   tip_live_coll_stated: |-
@@ -563,13 +563,13 @@ position_words:
     History
   # ── Leads ──
   lead_holds: |-
-    This position holds {coll} pETH of collateral and owes {debt} {stable}:
+    This position holds {coll} pETH of collateral and owes {debt} {stable}.
   lead_settles: |-
-    This position holds {coll} pETH of collateral and owes nothing at this block; its pending legs clear the recorded debt:
+    This position holds {coll} pETH of collateral and owes nothing at this block; its pending legs clear the recorded debt.
   lead_owed: |-
-    This position holds {coll} pETH of collateral and is owed {owed} {stable}, which its next touch mints to the holder:
+    This position holds {coll} pETH of collateral and is owed {owed} {stable}, which its next touch mints to the holder.
   lead_no_debt: |-
-    This position holds {coll} pETH of collateral and has no debt:
+    This position holds {coll} pETH of collateral and has no debt.
   lead_closed: |-
     This position is closed and holds nothing now.
   lead_liquidated: |-

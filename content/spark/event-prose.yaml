@@ -403,11 +403,11 @@ position_words:
     The account was not read from the Pool. Reload to try again.
   # ── An open account ──
   lead_debt: |-
-    The account borrows against its supplied collateral, held at a {hf} health factor:
+    The account borrows against its supplied collateral, held at a {hf} health factor.
   lead_debt_unread: |-
-    The account borrows against its supplied collateral:
+    The account borrows against its supplied collateral.
   lead_no_debt: |-
-    The account supplies collateral only and owes nothing, so none of it can be liquidated:
+    The account supplies collateral only and owes nothing, so none of it can be liquidated.
   coll: |-
     The collateral is worth {coll_usd}, held in {coll_syms}.
   coll_many: |-
@@ -440,17 +440,17 @@ position_words:
     {lead}{external} {were} executed by an address other than the owner's.
   # ── A closed or liquidated account ──
   closed_lead_transfers: |-
-    This account's record has no Pool transaction: its balances arrived and left as spToken transfers:
+    This account's record has no Pool transaction: its balances arrived and left as spToken transfers.
   closed_lead_transfer_out: |-
-    This account's record ended with its supplied balance moving to another account as an spToken transfer:
+    This account's record ended with its supplied balance moving to another account as an spToken transfer.
   closed_lead_seized: |-
-    A liquidation took the last of this account's collateral to cover its debt:
+    A liquidation took the last of this account's collateral to cover its debt.
   closed_lead_liquidated: |-
-    This account closed with its debt repaid and its balances withdrawn, after at least one liquidation:
+    This account closed with its debt repaid and its balances withdrawn, after at least one liquidation.
   closed_lead_borrowed: |-
-    This account closed with its debt repaid and its collateral withdrawn:
+    This account closed with its debt repaid and its collateral withdrawn.
   closed_lead_supplied: |-
-    This account closed with its supplied balances withdrawn and nothing ever borrowed:
+    This account closed with its supplied balances withdrawn and nothing ever borrowed.
   peaks_both: |-
     At its height it held {peak_supply} supplied and owed {peak_debt}.
   peaks_supply: |-

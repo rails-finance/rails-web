@@ -912,15 +912,15 @@ trove_words:
   heading_history: |-
     History
   liq_lead: |-
-    Trove {id} was liquidated when its LTV rose above the Max LTV ({max_ltv} for {coll_type}):
+    Trove {id} was liquidated when its LTV rose above the Max LTV ({max_ltv} for {coll_type}).
   liq_lifecycle: |-
     Trove was active for {duration} before liquidation from {range}
   liq_nft: |-
     The {nft} representing trove {id} was held by {owner} at the time of liquidation
   closed_lead_redeemed: |-
-    This trove closed after redemptions cleared its debt, and the owner took back the collateral left and the 0.0375 ETH liquidation reserve:
+    This trove closed after redemptions cleared its debt, and the owner took back the collateral left and the 0.0375 ETH liquidation reserve.
   closed_lead_repaid: |-
-    This trove closed with its debt repaid in full, and the owner took back all the collateral and the 0.0375 ETH liquidation reserve:
+    This trove closed with its debt repaid in full, and the owner took back all the collateral and the 0.0375 ETH liquidation reserve.
   closed_peak_debt: |-
     This trove reached a maximum debt of {debt} during its lifetime
   closed_peak_coll: |-
@@ -928,7 +928,7 @@ trove_words:
   closed_lifecycle: |-
     Trove was active for {duration} from {range}
   open_lead: |-
-    This trove holds {coll} of collateral against {debt} of debt:
+    This trove holds {coll} of collateral against {debt} of debt.
   debt_breakdown: |-
     The debt includes {interest} of interest accrued since the last event
   debt_breakdown_shutdown: |-

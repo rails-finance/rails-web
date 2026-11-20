@@ -395,9 +395,9 @@ position_words:
     History
   # ── An open Trove ──
   lead_debt: |-
-    The Trove holds {coll} ETH of collateral against {debt} LUSD of debt:
+    The Trove holds {coll} ETH of collateral against {debt} LUSD of debt.
   lead_no_debt: |-
-    The Trove holds {coll} ETH of collateral and owes nothing:
+    The Trove holds {coll} ETH of collateral and owes nothing.
   coll_worth: |-
     That collateral is worth {coll_usd} at Liquity's price feed now.
   debt_parts: |-
@@ -420,30 +420,30 @@ position_words:
     The system is in Recovery Mode: its total collateral ratio is {tcr}, below {ccr}.
   # ── A life the index still has open and the chain has closed ──
   superseded_owner: |-
-    The chain shows this Trove closed by its owner:
+    The chain shows this Trove closed by its owner.
   superseded_redeemed: |-
-    The chain shows this Trove fully redeemed:
+    The chain shows this Trove fully redeemed.
   superseded_liquidated: |-
-    The chain shows this Trove liquidated:
+    The chain shows this Trove liquidated.
   superseded_none: |-
-    The chain has no record of this Trove at the current head:
+    The chain has no record of this Trove at the current head.
   superseded_lag: |-
     The history here ends before that event, so the figures show the Trove as last recorded.
   superseded_joins: |-
     The closing event joins the timeline once it is recorded.
   # ── A closed or liquidated life ──
   closed_lead_liquidated: |-
-    This Trove life ended in liquidation on {ended}:
+    This Trove life ended in liquidation on {ended}.
   closed_lead_liquidated_undated: |-
-    This Trove life ended in liquidation:
+    This Trove life ended in liquidation.
   closed_lead_redeemed: |-
-    This Trove life ended fully redeemed on {ended}:
+    This Trove life ended fully redeemed on {ended}.
   closed_lead_redeemed_undated: |-
-    This Trove life ended fully redeemed:
+    This Trove life ended fully redeemed.
   closed_lead_owner: |-
-    The owner closed this Trove life on {ended}:
+    The owner closed this Trove life on {ended}.
   closed_lead_owner_undated: |-
-    The owner closed this Trove life:
+    The owner closed this Trove life.
   redemptions_took: |-
     Redemptions took {eth_taken} ETH over this life.
   redemption_took: |-

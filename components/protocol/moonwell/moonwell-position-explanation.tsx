@@ -1,7 +1,7 @@
 "use client";
 
 // The Moonwell position card's explanation (zone Z1), on Ethereum and on Base:
-// a colon-terminated lead, then bullets under Holdings, Risk, Rate and History
+// a lead ending in a period, then bullets under Holdings, Risk, Rate and History
 // when two of them hold two or more bullets (rails-ops
 // standards/prose-limits-and-zones.md 3.3). The words are
 // content/moonwell/event-prose.yaml's `position_words`; this file chooses which
@@ -162,8 +162,8 @@ export function MoonwellPositionExplanation({
 
   if (bullets.length === 0) return null;
 
-  // Subject-first status lead: a one-sentence verdict, colon-terminated, the
-  // lead-in to the bullets. Keyed on the resulting state.
+  // Subject-first status lead: a one-sentence verdict ending in a period; the
+  // bullets give its figures. Keyed on the resulting state.
   const lead = hasDebt
     ? chain.shortfallUsd > 0
       ? positionNodes("lead_shortfall")

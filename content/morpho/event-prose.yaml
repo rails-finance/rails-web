@@ -340,9 +340,9 @@ position_words:
     History
   # ── An open position ──
   lead_debt: |-
-    This position owes {debt} {loan_symbol} against {coll} {coll_symbol} of collateral:
+    This position owes {debt} {loan_symbol} against {coll} {coll_symbol} of collateral.
   lead_collateral: |-
-    This position holds {coll} {coll_symbol} of collateral with nothing borrowed against it:
+    This position holds {coll} {coll_symbol} of collateral with nothing borrowed against it.
   coll_worth: |-
     That collateral is worth about {coll_value} {loan_symbol} at the market's oracle.
   no_debt: |-
@@ -373,13 +373,13 @@ position_words:
     {lead}{external} {external_word} run by another account, most of them through {name}.
   # ── A closed or liquidated position ──
   closed_lead_emptied: |-
-    This position was emptied by liquidation:
+    This position was emptied by liquidation.
   closed_lead_liquidated: |-
-    This position closed with liquidations in its record, its debt cleared and its collateral withdrawn:
+    This position closed with liquidations in its record, its debt cleared and its collateral withdrawn.
   closed_lead_repaid: |-
-    This position ran its course and closed, its debt repaid and its collateral withdrawn:
+    This position ran its course and closed, its debt repaid and its collateral withdrawn.
   closed_lead_no_debt: |-
-    This position ran its course and closed, its collateral withdrawn with nothing ever borrowed:
+    This position ran its course and closed, its collateral withdrawn with nothing ever borrowed.
   peaks_both: |-
     At its height it held {peak_coll} {coll_symbol} and owed {peak_debt} {loan_symbol}, though not at the same time.
   peaks_both_principal: |-

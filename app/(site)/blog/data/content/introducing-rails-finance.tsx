@@ -101,7 +101,7 @@ export default function IntroducingRailsFinance() {
       <h2>What you can do now</h2>
       <p>
         Currently in beta, Rails currently supports <a href="http://liquity.org">Liquity V2</a> across all collateral
-        types (WETH, wstETH, rETH). You can:
+        types (WETH, wstETH, rETH). The list below says what you can do.
       </p>
       <ul>
         <li>Browse active Troves to see protocol mechanics in action</li>

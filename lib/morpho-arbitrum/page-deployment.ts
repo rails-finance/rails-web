@@ -39,7 +39,7 @@ export const MORPHO_ARBITRUM_PAGE: MorphoPageDeployment = {
       `All ${n} markets were asked and none holds anything for this address, and the singleton has emitted no event naming it between its first block and now.`,
     emptyNowTitle: "This wallet holds nothing on Morpho Blue Arbitrum right now.",
     notWholeWallet:
-      "This wallet’s history is not yet confirmed against the chain, so the position cards and the lifetime economics wait for it. Each position’s page shows the history read so far, and the line under its timeline says how far the check has reached:",
+      "This wallet’s history is not yet confirmed against the chain, so the position cards and the lifetime economics wait for it. Each position’s page shows the history read so far, and the line under its timeline says how far the check has reached. The links below open each position.",
     unswept: (which) =>
       `${which} the wallet holds something in had no event naming it in the history read, which should not happen — a holding cannot arrive without one.`,
     wholeCount:

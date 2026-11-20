@@ -80,12 +80,12 @@ export function PwnPositionExplanation({
   const coll = assetText(v.collateral);
 
   // Subject-first status lead (charter §4): the loan's present state in one
-  // sentence, ≤2 figures, colon-terminated into the bullets.
+  // sentence, ≤2 figures, ending in a period, ahead of the bullets.
   const lead: React.ReactNode =
     v.status === "open" && pastDue ? (
       <>
         This loan has defaulted and no one has claimed it yet: its deadline passed unpaid, and the escrowed{" "}
-        <H>{coll}</H> is the lender&rsquo;s to claim at any time:
+        <H>{coll}</H> is the lender&rsquo;s to claim at any time.
       </>
     ) : v.status === "open" ? (
       hasRepay ? (
@@ -94,16 +94,16 @@ export function PwnPositionExplanation({
           <H>
             <AmountText value={cost!.total} /> {creditSym}
           </H>
-          :
+          .
         </>
       ) : accruing ? (
         <>
           This loan is running: <H>{coll}</H> sits in the loan contract&rsquo;s escrow while interest accrues at{" "}
-          {aprText(v.accruingInterestApr!)} on the principal:
+          {aprText(v.accruingInterestApr!)} on the principal.
         </>
       ) : (
         <>
-          This loan is running: <H>{coll}</H> sits in the loan contract&rsquo;s escrow until the borrower repays:
+          This loan is running: <H>{coll}</H> sits in the loan contract&rsquo;s escrow until the borrower repays.
         </>
       )
     ) : v.status === "repaid" ? (
@@ -113,7 +113,7 @@ export function PwnPositionExplanation({
           <H>
             <AmountText value={cost!.total} /> {creditSym}
           </H>{" "}
-          and the escrow released <H>{coll}</H> back:
+          and the escrow released <H>{coll}</H> back.
         </>
       ) : accruing && cost ? (
         <>
@@ -121,16 +121,16 @@ export function PwnPositionExplanation({
           <H>
             <AmountText value={cost.total} /> {creditSym}
           </H>
-          , principal and accrued interest, and the escrow released <H>{coll}</H> back:
+          , principal and accrued interest, and the escrow released <H>{coll}</H> back.
         </>
       ) : (
         <>
-          This loan settled by repayment: the borrower repaid in full and the escrow released <H>{coll}</H> back:
+          This loan settled by repayment: the borrower repaid in full and the escrow released <H>{coll}</H> back.
         </>
       )
     ) : (
       <>
-        This loan settled by default: its deadline passed unpaid and the lender claimed the escrowed <H>{coll}</H>:
+        This loan settled by default: its deadline passed unpaid and the lender claimed the escrowed <H>{coll}</H>.
       </>
     );
 

@@ -24,7 +24,10 @@ export default function WhenFrontendsFailWhatHappensInACrisis() {
         <figcaption>First report of the issue on Discord at 3.24 AM.</figcaption>
       </figure>
 
-      <p>You have meaningful exposure on the protocol. Your mind jumps straight to the questions that matter:</p>
+      <p>
+        You have meaningful exposure on the protocol. Your mind jumps straight to the questions that matter. The list
+        below gives them.
+      </p>
 
       <ul>
         <li>Has an attacker already drained my position?</li>

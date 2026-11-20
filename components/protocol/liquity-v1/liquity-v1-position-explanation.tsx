@@ -1,6 +1,6 @@
 "use client";
 
-// The Liquity V1 position card's explanation (zone Z1): a colon-terminated
+// The Liquity V1 position card's explanation (zone Z1): a lead ending in a period
 // lead, then bullets under Holdings, Risk and History when two of them hold
 // two or more bullets (rails-ops standards/prose-limits-and-zones.md 3.3;
 // Liquity V1 has no rate). The words are content/liquity-v1/event-prose.yaml's
