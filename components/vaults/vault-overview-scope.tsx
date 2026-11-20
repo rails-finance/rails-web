@@ -35,13 +35,15 @@ export function VaultOverviewScope({ cards, className }: { cards: OverviewCardSc
     (r) => r.chainId,
   );
   const kept = new Set(scoped.rows.map((r) => `${r.ci}:${r.ri}`));
+  // The cards with a row left; the count on the list is theirs.
+  const shown = cards
+    .map((c, ci) => ({ c, rows: c.rows.filter((_, ri) => kept.has(`${ci}:${ri}`)) }))
+    .filter((x) => x.rows.length > 0);
   return (
     <>
       <ScopeNote scoped={scoped} noun={["roster", "rosters"]} className="mt-4" />
-      <div className={className} data-vault-overview-cards={scoped.rows.length} {...scoped.listProps}>
-        {cards.map((c, ci) => {
-          const rows = c.rows.filter((_, ri) => kept.has(`${ci}:${ri}`));
-          if (rows.length === 0) return null;
+      <div className={className} data-vault-overview-cards={shown.length} {...scoped.listProps}>
+        {shown.map(({ c, rows }) => {
           return (
             <article key={c.key} className={c.className} {...c.attrs}>
               {c.head}

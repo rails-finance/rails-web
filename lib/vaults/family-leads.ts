@@ -19,7 +19,11 @@ export const metaMorphoLead = (chainId: number) => metaMorphoLeadOn([chainId]);
 export const metaMorphoLeadOn = (chainIds: readonly number[]) => {
   const names = chainIds.map((c) => CHAIN[c] ?? String(c));
   const on = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
-  return `The MetaMorpho ${names.length > 1 ? "rosters list" : "roster lists"} every vault the two MetaMorpho factories made on ${on}, with each vault’s totals and share price.`;
+  // Each chain has its own pair of factories, so the form over several chains
+  // names no number.
+  return names.length > 1
+    ? `The MetaMorpho rosters list every vault the MetaMorpho factories made on ${on}, with each vault’s totals and share price.`
+    : `The MetaMorpho roster lists every vault the two MetaMorpho factories made on ${on}, with each vault’s totals and share price.`;
 };
 
 export const AAVE_VAULTS_LEAD =

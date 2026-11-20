@@ -11,7 +11,10 @@ test("one chain reads as the info page's sentence", () => {
 });
 
 test("the family card names every chain, in order", () => {
-  assert.match(metaMorphoLeadOn([8453, 1]), /^The MetaMorpho rosters list every vault .+ made on Base and Ethereum, /);
+  assert.match(
+    metaMorphoLeadOn([8453, 1]),
+    /^The MetaMorpho rosters list every vault the MetaMorpho factories made on Base and Ethereum, /,
+  );
   assert.match(metaMorphoLeadOn([8453, 1, 42161]), / made on Base, Ethereum and Arbitrum, /);
 });
 

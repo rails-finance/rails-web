@@ -31,8 +31,8 @@
 //      roster's read stamp at that block
 //   3  each card's lead is the first sentence of its family's info page (sBOLD:
 //      the line under its page's header)
-//   4  each row is the link to its roster, which answers 200, named for family
-//      and chain; the chain an icon named for a screen reader, no name shown
+//   4  each row is the link to its roster, which answers 200, named for family,
+//      chain and count ("Morpho on Base: 516 vaults. Open the roster"); the chain an icon named for a screen reader, no name shown
 //   5  no roster links the overview: each opens on its read stamp alone (ui-jobs 771)
 //   6  the counts carry receipts and the page offers the inspector (ui-jobs 571)
 //   7  /vaults/about is gone (404); Products, Fronts and Compare light their menu entry
@@ -341,7 +341,9 @@ for (const k of KEYS) {
   // MetaMorpho's card names every chain it holds; its info page names one.
   const chain = CHAIN[k.split(":")[1]];
   const lead = k.startsWith("morpho:")
-    ? c.lead.replace("rosters list", "roster lists").replace(/ made on [^,]+,/, ` made on ${chain},`)
+    ? c.lead
+        .replace("rosters list every vault the MetaMorpho", "roster lists every vault the two MetaMorpho")
+        .replace(/ made on [^,]+,/, ` made on ${chain},`)
     : c.lead;
   check(
     `3  ${k}: the card's lead is ${ROSTER[k].lead}'s sentence${k.startsWith("morpho:") ? " over its chains" : ""}`,
@@ -354,13 +356,15 @@ for (const k of KEYS) {
     `${c.href} ${rosterPages[k].status}`,
   );
   check(
-    `4b ${k}: the link is named for its family and chain`,
-    /^Open the .+ on (Base|Ethereum|Arbitrum) (roster|pools page|vault)$/.test(c.name ?? ""),
+    `4b ${k}: the link is named for its family, chain and count, the row's count`,
+    /^.+ on (Base|Ethereum|Arbitrum): ([\d,]+ [A-Za-z ]*vaults?|count not read)\. Open the (roster|pools page|vault)$/.test(
+      c.name ?? "",
+    ) && (c.name ?? "").includes(`: ${Number(c.count).toLocaleString("en-US")} vault`),
     c.name ?? "no name",
   );
   check(
     `4c ${k}: the row's chain is an icon, its name in the label alone`,
-    c.chainShown === "" && c.chainName === chain && (c.name ?? "").includes(` on ${chain} `),
+    c.chainShown === "" && c.chainName === chain && (c.name ?? "").includes(` on ${chain}: `),
     `shown "${c.chainShown}", label ${c.chainName}`,
   );
 }

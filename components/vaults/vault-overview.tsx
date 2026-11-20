@@ -118,7 +118,8 @@ function RosterRow({ roster, cut }: { roster: VaultIndexRoster; cut: AssetCut | 
   return (
     <Link
       href={rosterHrefWithAsset(protocol, chainId, cut?.param)}
-      aria-label={`Open the ${label} on ${chainName(chainId)} ${opens}`}
+      // The name carries the count, which the label hides from a screen reader.
+      aria-label={`${label} on ${chainName(chainId)}: ${counted ? `${n(count)} ${noun}` : "count not read"}. Open the ${opens}`}
       className="-mx-2 flex min-h-11 items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition-colors duration-150 hover:bg-[var(--surface-row-hover)] focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none dark:hover:bg-rb-800"
       prefetch={false}
       data-overview-roster=""
@@ -176,8 +177,8 @@ export async function VaultOverviewCards({ asset }: { asset?: string }) {
   const families = [...new Set(shown.map((r) => r.protocol))];
   const cards = families.map((protocol) => {
     const rows = shown.filter((r) => r.protocol === protocol);
-    // The lead names every listed chain of the family, as its card can hold them.
-    const chains = listed.filter((r) => r.protocol === protocol).map((r) => r.chainId);
+    // The lead names the chains of the rows the card shows.
+    const chains = rows.map((r) => r.chainId);
     return {
       key: protocol,
       className: `${CARD} flex flex-col`,
