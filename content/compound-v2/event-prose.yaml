@@ -295,13 +295,13 @@ position_words:
     History
   # ── An open account ──
   lead_liquidatable: |-
-    This position is liquidatable now: its borrowing has outgrown what its collateral covers:
+    This position is liquidatable now: its borrowing has outgrown what its collateral covers.
   lead_borrowing: |-
-    This position borrows against its Compound V2 collateral and is currently healthy:
+    This position borrows against its Compound V2 collateral and is currently healthy.
   lead_debt_free: |-
-    This position supplies collateral and is debt-free, so its collateral is safe from liquidation:
+    This position supplies collateral and is debt-free, so its collateral is safe from liquidation.
   lead_supply_only: |-
-    This position only supplies; nothing is entered as collateral, so it backs no borrowing:
+    This position only supplies; nothing is entered as collateral, so it backs no borrowing.
   worth_both: |-
     At Compound's oracle prices, the supplied markets are worth {supplied_usd} and the borrowed markets {borrowed_usd}.
   worth_supplied: |-
@@ -356,9 +356,9 @@ position_words:
     The work is spread across {actors} addresses, the most active running {top_count} of them.
   # ── A closed or liquidated account ──
   closed_lead: |-
-    This account ran its course and closed; nothing remains supplied or borrowed:
+    This account ran its course and closed; nothing remains supplied or borrowed.
   closed_lead_liquidated: |-
-    This account closed with a liquidation in its record; nothing remains supplied or borrowed:
+    This account closed with a liquidation in its record; nothing remains supplied or borrowed.
   peak_supplied: |-
     At its height it supplied as much as {peak_supplies}.
   peak_owed: |-

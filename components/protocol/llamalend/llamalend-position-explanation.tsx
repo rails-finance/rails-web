@@ -278,7 +278,7 @@ export function LlamalendPositionExplanation({
     );
   }
 
-  // Subject-first, one sentence, two figures, colon-terminated (charter §4);
+  // Subject-first, one sentence, two figures, ending in a period (charter §4);
   // the verdict rides the lead when the position is in soft-liquidation.
   const lead = (
     <>
@@ -296,7 +296,7 @@ export function LlamalendPositionExplanation({
         : chain.inSoftLiq
           ? ", and is in soft-liquidation right now"
           : ""}
-      :
+      .
     </>
   );
 
@@ -439,10 +439,10 @@ function ClosedExplanation({
     view.status === "liquidated" && liqs.length > 0 ? (
       <>
         This position was liquidated {liqs.length === 1 ? "once" : liqs.length === 2 ? "twice" : `${liqs.length} times`}
-        {firstPartial ? "; the first took part of the loan, and the last cleared what was left" : ""}:
+        {firstPartial ? "; the first took part of the loan, and the last cleared what was left" : ""}.
       </>
     ) : (
-      <>This position is closed: its debt is 0 and it holds no collateral:</>
+      <>This position is closed: its debt is 0 and it holds no collateral.</>
     );
   return <ProseExplainer paragraph={lead} items={bullets} />;
 }

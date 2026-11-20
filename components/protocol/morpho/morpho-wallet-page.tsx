@@ -250,7 +250,7 @@ export function MorphoWalletView({
                 {unswept.length > 0 && (
                   <p className="text-sm text-rb-500">
                     {w.unswept(unswept.length === 1 ? "One market" : `${unswept.length} markets`)}
-                    {unswept.length === 1 ? " It is" : " They are"} shown from the live read alone:
+                    {unswept.length === 1 ? " It is" : " They are"} shown from the live read alone, in the rows below.
                   </p>
                 )}
                 {unswept.length > 0 && data && (

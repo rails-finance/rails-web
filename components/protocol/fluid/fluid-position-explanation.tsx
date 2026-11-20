@@ -63,15 +63,15 @@ function FluidClosedPositionExplanation({
   const lead = v.fullyLiquidated ? (
     <>
       This {pairText} position was emptied by liquidation. The vault&rsquo;s engine swept it to nothing, and nothing
-      remains on either side:
+      remains on either side.
     </>
   ) : v.wasLiquidated ? (
     <>
       This {pairText} position ran its course and closed, the remaining collateral withdrawn and the debt repaid, with
-      liquidations in its record:
+      liquidations in its record.
     </>
   ) : (
-    <>This {pairText} position ran its course and closed. The collateral withdrawn and the debt repaid:</>
+    <>This {pairText} position ran its course and closed. The collateral withdrawn and the debt repaid.</>
   );
 
   const list: React.ReactNode[] = [];
@@ -272,12 +272,12 @@ export function FluidPositionExplanation({
     status.push(
       clause(
         <>
-          This position holds {liveFig("supply")} of collateral and owes {liveFig("borrow")}:
+          This position holds {liveFig("supply")} of collateral and owes {liveFig("borrow")}.
         </>,
       ),
     );
   } else if (live) {
-    status.push(clause(<>This position holds {liveFig("supply")} of collateral and owes nothing:</>));
+    status.push(clause(<>This position holds {liveFig("supply")} of collateral and owes nothing.</>));
   } else if (view) {
     // No live read yet — narrate the lane the verdict came from, never a lane
     // the verdict did not come from.
@@ -285,14 +285,14 @@ export function FluidPositionExplanation({
       clause(
         <>
           This position holds {restFig("supply")} of collateral
-          {restHolds(restDebt) ? <> and owes {restFig("borrow")}</> : null}:
+          {restHolds(restDebt) ? <> and owes {restFig("borrow")}</> : null}.
         </>,
       ),
     );
   }
 
   // The lead paragraph is the status verdict alone — one subject-first
-  // sentence, colon-terminated (charter §4); everything else is an independent
+  // sentence, ending in a period (charter §4); everything else is an independent
   // fact and renders as a bullet under it.
   const paragraph = composeParagraph(positionClauses({ status }));
 

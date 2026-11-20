@@ -1,6 +1,6 @@
 "use client";
 
-// The Compound V2 position card's explanation (zone Z1): a colon-terminated
+// The Compound V2 position card's explanation (zone Z1): a lead ending in a period
 // lead, then bullets under Holdings, Risk, Rate and History when two of them
 // hold two or more bullets (rails-ops standards/prose-limits-and-zones.md 3.3).
 // The words are content/compound-v2/event-prose.yaml's `position_words`; this

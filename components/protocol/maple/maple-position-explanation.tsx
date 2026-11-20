@@ -198,7 +198,7 @@ export function MaplePositionExplanation({
     const closedLead = (
       <>
         This position is closed: the wallet holds no pool shares and nothing waits in the withdrawal queue
-        {peaks.length > 0 ? <>. Its history below is the full record of how it grew and wound down:</> : <>:</>}
+        {peaks.length > 0 ? <>. Its history below is the full record of how it grew and wound down.</> : <>.</>}
       </>
     );
     return <ProseExplainer paragraph={closedLead} items={closedBullets.filter(Boolean)} />;
@@ -212,13 +212,13 @@ export function MaplePositionExplanation({
   const fullyQueued = live.every((p) => p.shares <= 0 && p.escrowedShares > 0);
   const bullets: React.ReactNode[] = [];
 
-  // ── the status lead (charter §4): subject-first, ≤2 figures, colon ────────
+  // ── the status lead (charter §4): subject-first, ≤2 figures, ending in a period ────────
   const lead: React.ReactNode = multi ? (
-    <>This position lends across {live.length} Maple pools, each claim priced at its own pool&rsquo;s exit rate:</>
+    <>This position lends across {live.length} Maple pools, each claim priced at its own pool&rsquo;s exit rate.</>
   ) : fullyQueued ? (
     <>
       This position is winding down its {one.assetSymbol} lending. Every share sits in the pool&rsquo;s withdrawal
-      queue:
+      queue.
     </>
   ) : one.currentValue != null ? (
     <>
@@ -230,7 +230,7 @@ export function MaplePositionExplanation({
       <H>
         <AmountText value={one.currentValue} format="number" /> {one.assetSymbol}
       </H>
-      :
+      .
     </>
   ) : (
     <>
@@ -242,7 +242,7 @@ export function MaplePositionExplanation({
       <H>
         <AmountText value={one.depositedPrincipal} format="number" /> {one.assetSymbol}
       </H>{" "}
-      of net deposits recorded:
+      of net deposits recorded.
     </>
   );
 

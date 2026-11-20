@@ -409,7 +409,7 @@ function FocusLinkIntro({
   const body = (
     <div className="flex flex-col gap-3" data-focus-intro-body="">
       <p className="text-sm leading-relaxed text-rb-600 dark:text-rb-300">
-        Focus mode limits Rails to the assets and chains you choose. This link sets:
+        Focus mode limits Rails to the assets and chains you choose. The box below shows what this link sets.
       </p>
       <div className="rounded-lg border border-rb-200 px-3 py-2 dark:border-rb-800" data-focus-intro-view="">
         {name && (

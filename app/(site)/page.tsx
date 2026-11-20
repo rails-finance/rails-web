@@ -146,8 +146,8 @@ export default async function Home() {
               the page shows anything. */}
             <p className="body-text max-w-3xl">
               Each Rails explorer covers one DeFi protocol, from lending markets and vaults to savings and exchanges.
-              Look up an address to see its positions, what they hold and every transaction behind them. Here is the
-              path the data travels:
+              Look up an address to see its positions, what they hold and every transaction behind them. The diagram
+              below shows the path the data travels.
             </p>
 
             {/* The capability list became a transit-style rail: the four

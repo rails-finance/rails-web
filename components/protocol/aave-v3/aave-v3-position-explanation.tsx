@@ -1,7 +1,7 @@
 "use client";
 
 // The Aave V3 position card's explanation (zone Z1), on Aave V3 Ethereum,
-// Aave V3 Base and Seamless: a colon-terminated lead, then bullets under
+// Aave V3 Base and Seamless: a lead ending in a period, then bullets under
 // Holdings, Risk, Rate and History when two of them hold two or more bullets
 // (rails-ops standards/prose-limits-and-zones.md 3.3). The words are
 // content/aave-v3/event-prose.yaml's `position_words`; this file chooses which

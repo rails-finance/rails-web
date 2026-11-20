@@ -35,7 +35,7 @@ export const MORPHO_BASE_PAGE: MorphoPageDeployment = {
       `All ${n} markets were asked and none holds anything for this address, and the singleton has emitted no event naming it between its first block and now.`,
     emptyNowTitle: "This wallet holds nothing on Morpho Blue Base right now.",
     notWholeWallet:
-      "The sweep could not read every block of this wallet’s history, so the position cards and the lifetime economics are withheld — a principal or an “all time” over a partial history would be a figure this page cannot stand behind. Each position’s page shows the history that was read and says where it stopped:",
+      "The sweep could not read every block of this wallet’s history, so the position cards and the lifetime economics are withheld — a principal or an “all time” over a partial history would be a figure this page cannot stand behind. Each position’s page shows the history that was read and says where it stopped. The links below open each position.",
     unswept: (which) =>
       `${which} the wallet holds something in had no event naming it in the sweep, which should not happen — a holding cannot arrive without one.`,
     wholeCount:

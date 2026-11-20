@@ -1,6 +1,6 @@
 "use client";
 
-// The SparkLend position card's explanation (zone Z1): a colon-terminated lead,
+// The SparkLend position card's explanation (zone Z1): a lead ending in a period,
 // then bullets under Holdings, Risk, Rate and History when two of them hold two
 // or more bullets (rails-ops standards/prose-limits-and-zones.md 3.3). The words
 // are content/spark/event-prose.yaml's `position_words`; this file chooses which
@@ -108,7 +108,7 @@ export function SparkPositionExplanation({
   // Empty position — nothing supplied and nothing borrowed. Nothing to narrate.
   if (supplySyms.length === 0 && !hasDebt) return null;
 
-  // Status lead — the one-sentence verdict, subject-first, colon-terminated:
+  // Status lead — the one-sentence verdict, subject-first, ending in a period:
   // the lead-in to the bullets. The health factor is a figure the card shows.
   const lead = !hasDebt
     ? positionNodes("lead_no_debt")

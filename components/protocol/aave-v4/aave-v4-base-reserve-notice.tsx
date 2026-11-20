@@ -90,7 +90,7 @@ export function AaveV4BaseReserveNotice({ reserves }: { reserves: AaveV4SpokeCha
     <div className="mt-4 text-xs text-rb-500 space-y-1.5 max-w-prose">
       {rows.length > 0 && (
         <>
-          <p>Prices this position is valued at, from the spoke&rsquo;s oracle:</p>
+          <p>The list below shows the prices this position is valued at, from the spoke&rsquo;s oracle.</p>
           <ul className="list-disc pl-4 space-y-0.5">{rows}</ul>
         </>
       )}
