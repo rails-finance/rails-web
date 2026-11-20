@@ -1,6 +1,6 @@
 "use client";
 
-// The Morpho position card's explanation (zone Z1): a colon-terminated lead,
+// The Morpho position card's explanation (zone Z1): a lead ending in a period,
 // then bullets under Holdings, Risk, Rate and History when two of them hold
 // two or more bullets (rails-ops standards/prose-limits-and-zones.md 3.3). The
 // words are content/morpho/event-prose.yaml's `position_words`; this file
@@ -106,7 +106,7 @@ export function MorphoPositionExplanation({
   const loan = chain.loanSymbol;
   const coll = chain.collateralSymbol;
 
-  // The status lead: subject-first, one sentence, colon-terminated.
+  // The status lead: subject-first, one sentence, ending in a period.
   let lead: ReactNode = null;
   if (hasDebt) {
     lead = positionNodes("lead_debt", {

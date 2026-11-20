@@ -401,13 +401,13 @@ position_words:
     History
   # ── An open account ──
   lead_hf: |-
-    This account borrows against its collateral at a {hf} health factor:
+    This account borrows against its collateral at a {hf} health factor.
   lead_debt: |-
-    This account borrows against its collateral:
+    This account borrows against its collateral.
   lead_no_debt: |-
-    This account supplies collateral and borrows nothing, so none of it can be liquidated:
+    This account supplies collateral and borrows nothing, so none of it can be liquidated.
   lead_unread: |-
-    This account borrows {debt_assets} against {coll_assets}:
+    This account borrows {debt_assets} against {coll_assets}.
   unread: |-
     The health factor waits for the Pool's read at the current block, which has not answered.
   worth: |-
@@ -442,17 +442,17 @@ position_words:
     {external} of the {total} events were sent by {actor} on the owner's behalf.
   # ── A closed or liquidated account ──
   closed_lead_transfers: |-
-    This account's balances arrived and left as aToken transfers, with no Pool transaction by the owner:
+    This account's balances arrived and left as aToken transfers, with no Pool transaction by the owner.
   closed_lead_transfer_out: |-
-    This account ended on {closed} when its supply moved to another account:
+    This account ended on {closed} when its supply moved to another account.
   closed_lead_seized: |-
-    Liquidation emptied this account on {closed}:
+    Liquidation emptied this account on {closed}.
   closed_lead_after_liq: |-
-    The owner closed this account on {closed}, after liquidation:
+    The owner closed this account on {closed}, after liquidation.
   closed_lead_repaid: |-
-    The owner closed this account on {closed}, with its debt repaid:
+    The owner closed this account on {closed}, with its debt repaid.
   closed_lead_supply: |-
-    The owner closed this account on {closed}, with nothing ever borrowed:
+    The owner closed this account on {closed}, with nothing ever borrowed.
   peaks_both: |-
     At its height it held {peak_supply} supplied and owed {peak_borrow}.
   peaks_supply: |-

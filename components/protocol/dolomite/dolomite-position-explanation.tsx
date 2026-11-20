@@ -62,12 +62,12 @@ export function DolomitePositionExplanation({
   const req = chain.requiredCollateralization;
   const dropPct = c != null && req > 0 && c > req ? Math.round((1 - req / c) * 100) : null;
 
-  // Status lead — subject-first, one sentence, colon-terminated: the lead-in
-  // to the bullets (charter §4).
+  // Status lead — subject-first, one sentence, ending in a period
+  // (charter §4); the bullets give its figures.
   const lead: React.ReactNode = hasDebt ? (
-    <>The account borrows against its own collateral inside a single cross-margined account number:</>
+    <>The account borrows against its own collateral inside a single cross-margined account number.</>
   ) : supplied.length > 0 ? (
-    <>The account is lending only. Every balance is positive, so nothing in it can be liquidated:</>
+    <>The account is lending only. Every balance is positive, so nothing in it can be liquidated.</>
   ) : null;
 
   const bullets: React.ReactNode[] = [];
@@ -306,9 +306,9 @@ export function DolomiteClosedPositionExplanation({ v }: { v: DolomitePositionVi
   const inTokens = [...v.peakSupplies, ...v.peakBorrows].every((r) => r.tokens);
 
   const lead = liquidated ? (
-    <>This account closed with liquidation in its record, and nothing remains supplied or borrowed:</>
+    <>This account closed with liquidation in its record, and nothing remains supplied or borrowed.</>
   ) : (
-    <>This account ran its course and closed, and nothing remains supplied or borrowed:</>
+    <>This account ran its course and closed, and nothing remains supplied or borrowed.</>
   );
 
   const list: React.ReactNode[] = [];

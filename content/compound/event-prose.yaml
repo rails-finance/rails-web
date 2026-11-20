@@ -353,11 +353,11 @@ position_words:
     History
   # ── An open position ──
   lead_borrow: |-
-    This account borrows {borrowed} against collateral in {collateral_syms}:
+    This account borrows {borrowed} against collateral in {collateral_syms}.
   lead_lend: |-
-    This account supplies {lent} to the {base_symbol} market, earning {supply_apr} Supply APR:
+    This account supplies {lent} to the {base_symbol} market, earning {supply_apr} Supply APR.
   lead_collateral: |-
-    This account holds collateral in {collateral_syms} with nothing borrowed against it:
+    This account holds collateral in {collateral_syms} with nothing borrowed against it.
   worth_both: |-
     At the market's price feeds, the collateral is worth {collateral_usd} and the borrow balance {debt_usd}.
   worth_collateral: |-
@@ -404,13 +404,13 @@ position_words:
     The work is spread across {actors} addresses, the most active running {top_count} of them.
   # ── A closed or absorbed position ──
   closed_lead: |-
-    This {market} account is closed; nothing is supplied, borrowed or posted now:
+    This {market} account is closed; nothing is supplied, borrowed or posted now.
   closed_lead_dust: |-
-    This {market} account is closed; nothing is borrowed now:
+    This {market} account is closed; nothing is borrowed now.
   closed_lead_absorbed: |-
-    This {market} account is closed, with a liquidation in its record; nothing is supplied, borrowed or posted now:
+    This {market} account is closed, with a liquidation in its record; nothing is supplied, borrowed or posted now.
   closed_lead_absorbed_dust: |-
-    This {market} account is closed, with a liquidation in its record; nothing is borrowed now:
+    This {market} account is closed, with a liquidation in its record; nothing is borrowed now.
   dust_left: |-
     All that is left is dust worth under a cent: {dust}.
   peak_held: |-

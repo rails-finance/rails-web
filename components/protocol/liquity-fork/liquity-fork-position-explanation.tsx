@@ -86,11 +86,11 @@ export function LiquityForkClosedExplanation({
 
   const lead = liquidated ? (
     <>
-      This Trove life <H>ended in liquidation</H>. No balances remain on it:
+      This Trove life <H>ended in liquidation</H>. No balances remain on it.
     </>
   ) : (
     <>
-      This Trove life <H>was closed by its owner</H>. No balances remain on it:
+      This Trove life <H>was closed by its owner</H>. No balances remain on it.
     </>
   );
 
@@ -222,7 +222,7 @@ export function LiquityForkPositionExplanation({
       : null;
 
   // The status lead — composition, subject-first, one sentence, two figures,
-  // colon-terminated (charter §4); the live-vs-recorded caveat (the entire
+  // ending in a period (charter §4); the live-vs-recorded caveat (the entire
   // figures carry pending gains and interest, so a reader comparing them to a
   // last-emitted number needs the warning) rides as the first bullet.
   const shut = shutdown;
@@ -240,7 +240,7 @@ export function LiquityForkPositionExplanation({
       <H>
         <AmountText value={chain.entireDebt} /> {debtSymbol}
       </H>{" "}
-      of debt:
+      of debt.
     </>
   ) : (
     <>
@@ -248,7 +248,7 @@ export function LiquityForkPositionExplanation({
       <H>
         <AmountText value={chain.entireColl} /> {chain.symbol}
       </H>{" "}
-      and carries no debt:
+      and carries no debt.
     </>
   );
 
