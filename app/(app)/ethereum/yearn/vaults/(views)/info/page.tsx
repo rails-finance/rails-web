@@ -28,6 +28,7 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { loadYearnVaultRoster } from "@/lib/yearn/vault-roster";
 import { YEARN_VAULTS_LEAD } from "@/lib/vaults/family-leads";
+import { YEARN_DOCS } from "@/lib/vaults/family-docs";
 
 export const dynamic = "force-dynamic";
 
@@ -43,8 +44,6 @@ const n = (v: number) => v.toLocaleString("en-US");
 /** A small count in words, the way prose says it. Kept derived from the
  *  catalogue rather than written into the sentence, so a sixth release moves
  *  this page when the census picks it up. */
-const YEARN_DOCS = "https://docs.yearn.fi/getting-started/intro";
-
 const WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
 const word = (v: number) => WORDS[v] ?? n(v);
 

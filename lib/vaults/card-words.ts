@@ -4,12 +4,13 @@
 // page view.
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { MORPHO_VAULT_V1_ROLES_DOCS } from "./family-docs";
 
 // The cards describe MetaMorpho (Vaults V1) vaults: the docs' V1 sections,
 // not /learn/concepts/vault/, which answers with the Vault V2 page (ui-jobs 628).
 const MORPHO_VAULT_DOCS = {
   label: "docs.morpho.org: Vaults V1 roles",
-  url: "https://docs.morpho.org/curate/concepts/roles/#morpho-vaults-v1-roles",
+  url: MORPHO_VAULT_V1_ROLES_DOCS,
 };
 const MORPHO_VAULT_QUEUE_DOCS = {
   label: "docs.morpho.org: Vaults V1 liquidity",

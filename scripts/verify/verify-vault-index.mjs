@@ -35,7 +35,10 @@
 //      table and the cards; each row states the six facts; each count equals
 //      the overview card's (Aave's three families summing to its card), at the
 //      card's block, in a receipt; a "Not read" head is muted; steward roles
-//      use the lexicon's words; no USD figure and no curator brand
+//      use the lexicon's words; no USD figure and no curator brand; every
+//      row links its roster (name, count, pointers), its info page and docs,
+//      each internal link answers 200, no link goes to a protocol's app, and
+//      one link name never names two places
 
 import { chromium } from "playwright";
 import fs from "node:fs";
@@ -415,6 +418,55 @@ for (const k of KEYS.filter((k) => !k.startsWith("sbold:"))) {
     "9g no USD figure, no curator brand",
     !/\$\s?\d|USD\b/.test(text) &&
       !/\b(Gauntlet|Steakhouse|Re7|MEV Capital|Block Analitica|Hyperithm|Keyrock)\b/.test(text),
+  );
+  // The links (Miles, 20 Nov 2026): roster, count, pointers, About, Docs.
+  const links = await p.locator('[data-product-layout="table"] [data-product-link]').evaluateAll((els) =>
+    els.map((a) => ({
+      kind: a.getAttribute("data-product-link"),
+      href: a.getAttribute("href"),
+      name: a.getAttribute("aria-label") || a.textContent.trim(),
+      row: a.closest("[data-product-row]")?.getAttribute("data-product-row"),
+    })),
+  );
+  const kinds = (f) => new Set(links.filter((l) => l.row === f).map((l) => l.kind));
+  check(
+    "9h every row links its roster by name and count, and its info page and docs where it has them",
+    rows.every((r) => kinds(r.family).has("family") && kinds(r.family).has("count")) &&
+      rows
+        .filter((r) => r.family !== "sbold")
+        .every((r) => kinds(r.family).has("about") && kinds(r.family).has("docs")),
+    rows.map((r) => `${r.family}: ${[...kinds(r.family)].join("/")}`).join("; "),
+  );
+  const pointerRows = rows.filter((r) => links.some((l) => l.row === r.family && l.kind === "pointer"));
+  check(
+    "9i each pointer links the row's roster",
+    pointerRows.length > 0 &&
+      links
+        .filter((l) => l.kind === "pointer")
+        .every((l) => links.some((x) => x.row === l.row && x.kind === "family" && x.href === l.href)),
+    `${pointerRows.length} rows with pointers`,
+  );
+  const internal = [...new Set(links.filter((l) => l.href.startsWith("/")).map((l) => l.href))];
+  const statuses = await Promise.all(internal.map(async (h) => [h, (await get(h)).status]));
+  check(
+    "9j each internal link answers 200",
+    statuses.every(([, st]) => st === 200),
+    statuses.map(([h, st]) => `${h} ${st}`).join(", "),
+  );
+  const DOCS_HOSTS = new Set(["docs.morpho.org", "aave.com", "docs.yearn.fi", "docs.maple.finance", "ipor.io"]);
+  const external = links.filter((l) => !l.href.startsWith("/")).map((l) => new URL(l.href).hostname);
+  check(
+    "9k every external link is a docs page, none a protocol's app",
+    external.length > 0 && external.every((h) => DOCS_HOSTS.has(h) && !h.startsWith("app.")),
+    [...new Set(external)].join(", "),
+  );
+  const byName = new Map();
+  for (const l of links) byName.set(l.name, new Set([...(byName.get(l.name) ?? []), l.href]));
+  const clash = [...byName].filter(([, hrefs]) => hrefs.size > 1);
+  check(
+    "9l one link name never names two places",
+    clash.length === 0,
+    clash.map(([n, h]) => `${n}: ${[...h].join(" | ")}`).join("; "),
   );
   await p.close();
 }

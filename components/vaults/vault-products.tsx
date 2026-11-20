@@ -7,7 +7,14 @@
 // The words are lib/vaults/products-words.ts. The one figure is each count,
 // read from the vault index (cached five minutes, shared with /vaults) and
 // stated in its roster's receipt with its read stamp.
+//
+// Links (Miles, 20 Nov 2026): the family's name, its count and each pointer
+// to "each vault's page" open the family's roster (Maple's pools page,
+// sBOLD's vault page), where the reader picks a vault; each row also links
+// the family's vaults info page and the docs that page cites. No link goes to
+// a protocol's app. Every href comes from the route helpers.
 
+import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   DataTable,
@@ -20,21 +27,27 @@ import { IndexNotice } from "@/components/shared/index-notice";
 import { Prov } from "@/components/shared/provenance";
 import { ProvSection } from "@/components/shared/section-menu";
 import { RosterReadStamp } from "@/components/vaults/roster-read-stamp";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { VAULT_FAMILIES, type VaultFamily } from "@/lib/vaults/families";
 import { loadVaultIndex } from "@/lib/vaults/index-read";
 import {
   chainName,
   VAULT_INDEX_LISTED,
   VAULT_INDEX_PROTOCOL_LABEL,
+  vaultIndexInfoHref,
   vaultIndexProtocol,
+  vaultIndexRosterHref,
   vaultIndexRosterKey,
   type VaultIndexProtocol,
 } from "@/lib/vaults/index-rosters";
 import {
+  PRODUCT_DOCS,
   PRODUCT_FAMILY_WORDS,
+  PRODUCT_LINKS,
   PRODUCTS_PAGE,
   vaultCountText,
   type ProductCell,
+  type ProductLine,
   type ProductRole,
 } from "@/lib/vaults/products-words";
 import { rosterCountProv, rosterFamilyCountProv, type RosterRead } from "@/lib/vaults/roster-provenance";
@@ -76,7 +89,15 @@ interface ProductCount {
   count: number | null;
   /** Where the roster carries several families (Aave's): its whole count. */
   rosterTotal: number | null;
+  /** The roster (Maple's pools page, sBOLD's vault page) and its link's name. */
+  href: string;
+  rosterName: string;
+  /** The family's vaults info page; null for sBOLD. */
+  infoHref: string | null;
 }
+
+/** What a roster link opens. */
+const NOUN: Partial<Record<VaultIndexProtocol, string>> = { maple: "pools page", sbold: "vault page" };
 
 interface ProductRow {
   family: VaultFamily;
@@ -110,6 +131,15 @@ async function readProducts(): Promise<{ rows: ProductRow[]; indexDown: boolean 
           chainId: l.chainId,
           protocol,
           read,
+          href: vaultIndexRosterHref(protocol, l.chainId),
+          rosterName: PRODUCT_LINKS.roster(
+            VAULT_FAMILIES[family].label,
+            VAULT_INDEX_PROTOCOL_LABEL[protocol],
+            chainName(l.chainId),
+            NOUN[protocol] ?? "roster",
+            shared,
+          ),
+          infoHref: vaultIndexInfoHref(protocol, l.chainId),
           rosterTotal: counted && shared ? r.count : null,
           count: counted
             ? vaults.filter((v) => v.family === family && v.chainId === l.chainId && vaultIndexProtocol(v) === protocol)
@@ -122,21 +152,54 @@ async function readProducts(): Promise<{ rows: ProductRow[]; indexDown: boolean 
   return { rows, indexDown };
 }
 
-function Cell({ cell, hook }: { cell: ProductCell; hook: string }) {
+/** "Open the roster", one per chain where the family has several, each named
+ *  for its family and chain. */
+function RosterLinks({ counts }: { counts: ProductCount[] }) {
+  const named = counts.length > 1;
+  return (
+    <>
+      {counts.map((c, i) => (
+        <span key={c.chainId}>
+          {i > 0 && " · "}
+          <Link
+            href={c.href}
+            aria-label={PRODUCT_LINKS.open(c.rosterName)}
+            className={INLINE_LINK}
+            prefetch={false}
+            data-product-link="pointer"
+          >
+            {named ? chainName(c.chainId) : PRODUCT_LINKS.open(NOUN[c.protocol] ?? "roster")}
+          </Link>
+        </span>
+      ))}
+    </>
+  );
+}
+
+function Line({ line, counts }: { line: ProductLine; counts: ProductCount[] }) {
+  if (typeof line === "string") return <span className={`mt-0.5 block ${MUTED}`}>{line}</span>;
+  return (
+    <span className={`mt-0.5 block ${MUTED}`} data-product-pointer="">
+      {line.pointer} <RosterLinks counts={counts} />
+    </span>
+  );
+}
+
+const lineKey = (l: ProductLine) => (typeof l === "string" ? l : l.pointer);
+
+function Cell({ cell, hook, counts }: { cell: ProductCell; hook: string; counts: ProductCount[] }) {
   return (
     <span className="block" data-product-cell={hook} data-product-read={cell.read ? "read" : "not-read"}>
       <span className={`block ${cell.read ? "font-medium text-foreground" : "text-rb-500"}`}>{cell.head}</span>
       {cell.lines.map((l) => (
-        <span key={l} className={`mt-0.5 block ${MUTED}`}>
-          {l}
-        </span>
+        <Line key={lineKey(l)} line={l} counts={counts} />
       ))}
     </span>
   );
 }
 
-function Stewards({ stewards }: { stewards: ProductRole[] | ProductCell }) {
-  if (!Array.isArray(stewards)) return <Cell cell={stewards} hook="stewards" />;
+function Stewards({ stewards, counts }: { stewards: ProductRole[] | ProductCell; counts: ProductCount[] }) {
+  if (!Array.isArray(stewards)) return <Cell cell={stewards} hook="stewards" counts={counts} />;
   return (
     <span className="flex flex-col gap-1.5" data-product-cell="stewards" data-product-read="read">
       {stewards.map((s) => (
@@ -169,21 +232,29 @@ function Counts({ counts, familyLabel }: { counts: ProductCount[]; familyLabel: 
           ) : (
             <span className="block text-foreground">
               {named ? `${chainName(c.chainId)}: ` : ""}
-              <Prov
-                info={
-                  c.rosterTotal != null
-                    ? rosterFamilyCountProv(
-                        c.read,
-                        VAULT_INDEX_PROTOCOL_LABEL[c.protocol],
-                        familyLabel,
-                        c.count,
-                        c.rosterTotal,
-                      )
-                    : rosterCountProv(c.read, c.count)
-                }
+              <Link
+                href={c.href}
+                aria-label={`${vaultCountText(c.count)}, ${c.rosterName}`}
+                className={INLINE_LINK}
+                prefetch={false}
+                data-product-link="count"
               >
-                {vaultCountText(c.count)}
-              </Prov>
+                <Prov
+                  info={
+                    c.rosterTotal != null
+                      ? rosterFamilyCountProv(
+                          c.read,
+                          VAULT_INDEX_PROTOCOL_LABEL[c.protocol],
+                          familyLabel,
+                          c.count,
+                          c.rosterTotal,
+                        )
+                      : rosterCountProv(c.read, c.count)
+                  }
+                >
+                  {vaultCountText(c.count)}
+                </Prov>
+              </Link>
             </span>
           )}
           <span className="block text-[11px] text-rb-500">
@@ -195,13 +266,86 @@ function Counts({ counts, familyLabel }: { counts: ProductCount[]; familyLabel: 
   );
 }
 
-function Family({ family }: { family: VaultFamily }) {
-  const f = VAULT_FAMILIES[family];
+/** The family's name, linking its roster (one link per chain where it has
+ *  several); its kind; then About and Docs. */
+function Family({ row, part = "all" }: { row: ProductRow; part?: "all" | "name" | "links" }) {
+  const f = VAULT_FAMILIES[row.family];
+  const docs = PRODUCT_DOCS[row.family];
+  const one = row.counts.length === 1 ? row.counts[0] : null;
+  const infos = row.counts.filter((c) => c.infoHref != null);
+  const name = part !== "links";
   return (
     <>
-      <span className="block font-semibold text-foreground">{f.label}</span>
+      {name && (
+        <span className="block font-semibold text-foreground">
+          {one ? (
+            <Link
+              href={one.href}
+              aria-label={one.rosterName}
+              className={INLINE_LINK}
+              prefetch={false}
+              data-product-link="family"
+            >
+              {f.label}
+            </Link>
+          ) : (
+            f.label
+          )}
+        </span>
+      )}
+      {name && !one && (
+        <span className="block text-sm">
+          {row.counts.map((c, i) => (
+            <span key={c.chainId}>
+              {i > 0 && " · "}
+              <Link
+                href={c.href}
+                aria-label={c.rosterName}
+                className={INLINE_LINK}
+                prefetch={false}
+                data-product-link="family"
+              >
+                {chainName(c.chainId)}
+              </Link>
+            </span>
+          ))}
+        </span>
+      )}
       {/* The kind, where it says more than the family's name. */}
-      {f.kind !== f.label && f.kind !== f.singular && <span className={`mt-0.5 block ${MUTED}`}>{f.kind}</span>}
+      {name && f.kind !== f.label && f.kind !== f.singular && <span className={`mt-0.5 block ${MUTED}`}>{f.kind}</span>}
+      {part !== "name" && (infos.length > 0 || docs) && (
+        <span className={`mt-1.5 block ${MUTED}`}>
+          {infos.map((c, i) => (
+            <span key={c.chainId}>
+              {i > 0 && " · "}
+              <Link
+                href={c.infoHref!}
+                aria-label={PRODUCT_LINKS.aboutName(f.label, chainName(c.chainId))}
+                className={INLINE_LINK}
+                prefetch={false}
+                data-product-link="about"
+              >
+                {infos.length > 1 ? `${PRODUCT_LINKS.about} (${chainName(c.chainId)})` : PRODUCT_LINKS.about}
+              </Link>
+            </span>
+          ))}
+          {docs && (
+            <>
+              {infos.length > 0 && " · "}
+              <a
+                href={docs.href}
+                target="_blank"
+                rel="noopener"
+                aria-label={docs.label}
+                className="link-external"
+                data-product-link="docs"
+              >
+                {PRODUCT_LINKS.docs}
+              </a>
+            </>
+          )}
+        </span>
+      )}
     </>
   );
 }
@@ -210,12 +354,12 @@ function Family({ family }: { family: VaultFamily }) {
 function facts(row: ProductRow): [string, ReactNode][] {
   const w = PRODUCT_FAMILY_WORDS[row.family];
   return [
-    [C.withdrawals, <Cell key="w" cell={w.withdrawals} hook="withdrawals" />],
-    [C.stewards, <Stewards key="s" stewards={w.stewards} />],
-    [C.timelock, <Cell key="t" cell={w.timelock} hook="timelock" />],
-    [C.fees, <Cell key="f" cell={w.fees} hook="fees" />],
+    [C.withdrawals, <Cell key="w" cell={w.withdrawals} hook="withdrawals" counts={row.counts} />],
+    [C.stewards, <Stewards key="s" stewards={w.stewards} counts={row.counts} />],
+    [C.timelock, <Cell key="t" cell={w.timelock} hook="timelock" counts={row.counts} />],
+    [C.fees, <Cell key="f" cell={w.fees} hook="fees" counts={row.counts} />],
     [C.vaults, <Counts key="v" counts={row.counts} familyLabel={VAULT_FAMILIES[row.family].label} />],
-    [C.withdrawable, <Cell key="l" cell={w.withdrawable} hook="withdrawable" />],
+    [C.withdrawable, <Cell key="l" cell={w.withdrawable} hook="withdrawable" counts={row.counts} />],
   ];
 }
 
@@ -240,7 +384,7 @@ function ProductsTable({ rows }: { rows: ProductRow[] }) {
         {rows.map((r) => (
           <tr key={r.family} className="align-top" data-anatomy="E7.1" data-product-row={r.family}>
             <DataTableCell rowHeader>
-              <Family family={r.family} />
+              <Family row={r} />
             </DataTableCell>
             {facts(r).map(([label, body]) => (
               <DataTableCell key={label}>{body}</DataTableCell>
@@ -264,8 +408,9 @@ function ProductCards({ rows }: { rows: ProductRow[] }) {
           data-product-row={r.family}
         >
           <h2 className="text-base">
-            <Family family={r.family} />
+            <Family row={r} part="name" />
           </h2>
+          <Family row={r} part="links" />
           <dl className="mt-2">
             {facts(r).map(([label, body]) => (
               <div key={label} className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-3 py-1.5">

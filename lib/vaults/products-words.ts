@@ -9,11 +9,14 @@
 // the page-only sentences: the pointers to where a vault's or pool's page
 // states a figure (`perVault`, `aaveGovLengths`, `aaveAdminPointer`,
 // `sboldPaused`, Maple's two), and what Rails does not read (`kindsUnread`,
-// `iporWaitsUnread`). "Not read yet." is the vault comparison's word.
+// `iporWaitsUnread`). A pointer is drawn with a link to the family's roster
+// (or Maple's pools page, sBOLD's vault page), where the reader picks a vault. "Not read yet." is the vault comparison's word.
 //
 // Pure: no React, imports from pure word modules only.
 
 import type { VaultFamily } from "./families";
+import { AAVE_FIRST_PARTY_SOURCES } from "../aave-vaults/first-party-sources";
+import { IPOR_FUSION_DOCS, MAPLE_LENDER_DOCS, MORPHO_VAULT_V1_ROLES_DOCS, YEARN_DOCS } from "./family-docs";
 import {
   IPOR_FEES_TEXT,
   MORPHO_QUEUE_ORDER,
@@ -56,7 +59,7 @@ import {
 export const PRODUCTS_TITLE = "Vault products";
 
 export const PRODUCTS_PAGE = {
-  lead: "How each vault family Rails reads works: how a deposit is redeemed, who can change the vault, what waits, what it charges, and where a vault's withdrawable figure is stated.",
+  lead: "The rows below show, for each vault family Rails reads, how a deposit is redeemed, who can change the vault, what waits, what it charges, and where a vault's withdrawable figure is stated.",
   caption: "Vault families Rails reads",
   columns: {
     family: "Family",
@@ -72,11 +75,44 @@ export const PRODUCTS_PAGE = {
   countNotRead: "Count not read",
 };
 
+/** A line under a cell's head: a sentence, or a pointer to where each
+ *  vault's page states the figure, drawn with a link to the family's roster. */
+export type ProductLine = string | { pointer: string };
+
+/** The page's link words. Each link's accessible name names its family and chain. */
+export const PRODUCT_LINKS = {
+  /** "MetaMorpho on Base roster", "Savings GHO on the Aave on Ethereum roster". */
+  roster: (family: string, protocol: string, chain: string, noun: string, shared: boolean) =>
+    shared ? `${family} on the ${protocol} on ${chain} ${noun}` : `${family} on ${chain} ${noun}`,
+  open: (noun: string) => `Open the ${noun}`,
+  about: "About",
+  aboutName: (family: string, chain: string) => `About the ${family} vaults on ${chain}`,
+  docs: "Docs",
+};
+
+/** Aave's docs page for one family, from the info page's first-party sources. */
+const aaveDocs = (label: string) => {
+  const src = AAVE_FIRST_PARTY_SOURCES.find((x) => x.label === label);
+  return src ? { label: `Aave's docs on ${label}`, href: src.url } : null;
+};
+
+/** The protocol docs each family's info page cites; sBOLD has no info page. */
+export const PRODUCT_DOCS: Record<VaultFamily, { label: string; href: string } | null> = {
+  metamorpho: { label: "Morpho's docs on Vaults V1 roles", href: MORPHO_VAULT_V1_ROLES_DOCS },
+  sgho: aaveDocs("Savings GHO"),
+  stata: aaveDocs("Static aTokens"),
+  "umbrella-stake": aaveDocs("Umbrella"),
+  "yearn-v3": { label: "Yearn's documentation", href: YEARN_DOCS },
+  "maple-pool": MAPLE_LENDER_DOCS,
+  sbold: null,
+  "ipor-fusion": { label: IPOR_FUSION_DOCS.title, href: IPOR_FUSION_DOCS.href },
+};
+
 /** One cell: a short head, then the sentences under it. `read` false draws
  *  the head muted: Rails has not read it. */
 export interface ProductCell {
   head: string;
-  lines: string[];
+  lines: ProductLine[];
   read: boolean;
 }
 
@@ -98,17 +134,20 @@ export interface ProductFamilyWords {
 /** "a holder starts…" → "A holder starts…": the modals' texts open lower-case. */
 const sentence = (s: string) => `${s[0].toUpperCase()}${s.slice(1)}`;
 
-const cell = (head: string, ...lines: string[]): ProductCell => ({ head, lines, read: true });
-const unread = (...lines: string[]): ProductCell => ({ head: PRODUCTS_PAGE.notRead, lines, read: false });
+const cell = (head: string, ...lines: ProductLine[]): ProductCell => ({ head, lines, read: true });
+const unread = (...lines: ProductLine[]): ProductCell => ({ head: PRODUCTS_PAGE.notRead, lines, read: false });
+const pointer = (text: string): ProductLine => ({ pointer: text });
 
 /** The page-only sentences (the header names them). */
-const perVault = (what: string) => `Each vault's page states ${what}.`;
-const aaveGovLengths = "Each vault's page states the vote's and the wait's lengths.";
+const perVault = (what: string) => pointer(`Each vault's page states ${what}.`);
+const aaveGovLengths = pointer("Each vault's page states the vote's and the wait's lengths.");
 const aaveAdminPointer = (subject: string) =>
-  `Each vault's page states whether Aave governance holds ${subject}'s admin role, and the vote's and the wait's lengths.`;
+  pointer(
+    `Each vault's page states whether Aave governance holds ${subject}'s admin role, and the vote's and the wait's lengths.`,
+  );
 const kindsUnread = "Rails does not read which kinds it charges.";
 const iporWaitsUnread = "Rails does not read the access manager's waits on each role.";
-const sboldPaused = "The vault's page states paused() where it answers true.";
+const sboldPaused = pointer("The vault's page states paused() where it answers true.");
 
 export const PRODUCT_FAMILY_WORDS: Record<VaultFamily, ProductFamilyWords> = {
   metamorpho: {
@@ -169,14 +208,14 @@ export const PRODUCT_FAMILY_WORDS: Record<VaultFamily, ProductFamilyWords> = {
     timelock: cell(
       "Maple's timelock",
       `${MAPLE_UPGRADES_WAIT}. ${mapleSecurityAdminText()}`,
-      "Each pool's page states the wait.",
+      pointer("Each pool's page states the wait."),
       MAPLE_VERSIONS_GAP,
     ),
     fees: unread(),
     withdrawable: cell(
       "Stated per pool",
       `Liquid now: ${MAPLE_LIQUID_TEXT}`,
-      "The pools page states it for each pool.",
+      pointer("The pools page states it for each pool."),
     ),
   },
   sbold: {
