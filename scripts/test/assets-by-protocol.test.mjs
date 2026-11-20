@@ -51,7 +51,7 @@ const USDC = card(
   ],
 );
 const WETH = card("WETH", [[1, "0xc02a"]], [chip("morpho", 1)]);
-const AAVE = { id: "aave-v3", label: "Aave V3", href: "/ethereum/aave-v3" };
+const AAVE = { id: "aave-v3", label: "Aave V3", href: "/ethereum/aave-v3", noun: "Positions" };
 
 test("an explorer's Assets page and its page for a token", () => {
   assert.equal(protocolAssetsHref("/ethereum/aave-v3"), "/ethereum/aave-v3/assets");
@@ -78,18 +78,55 @@ test("Also used in: the same chain only, each opening the other explorer's page 
 });
 
 test("what the asset is in the protocol", () => {
-  assert.deepEqual(assetMarkets(AAVE, chip("aave-v3", 1), "USDC", "0xA0B8"), [
+  assert.deepEqual(assetMarkets(AAVE, chip("aave-v3", 1), "0xA0B8"), [
     { label: "Reserve", href: "/ethereum/aave-v3/markets/0xa0b8" },
   ]);
-  const liquity = { id: "liquity", label: "Liquity V2", href: "/ethereum/liquity-v2" };
+  const liquity = { id: "liquity", label: "Liquity V2", href: "/ethereum/liquity-v2", noun: "Troves" };
   const coll = chip("liquity", 1, { link: "filtered", href: "/ethereum/liquity-v2?collateralTypes=WETH" });
   assert.deepEqual(
-    assetMarkets(liquity, coll, "WETH", "0xc02a").map((m) => m.href),
-    ["/ethereum/liquity-v2/branches", "/ethereum/liquity-v2?collateralTypes=WETH"],
+    assetMarkets(liquity, coll, "0xc02a").map((m) => [m.label, m.href]),
+    [
+      ["Branch", "/ethereum/liquity-v2/branches"],
+      ["Troves", "/ethereum/liquity-v2?collateralTypes=WETH"],
+    ],
   );
   const uses = [{ label: "Stability Pools", href: "/ethereum/liquity-v2/stability-pool" }];
-  assert.deepEqual(assetMarkets(liquity, chip("liquity", 1, { uses }), "BOLD", "0x6440"), uses);
-  assert.deepEqual(assetMarkets({ id: "x", label: "X", href: "/x" }, chip("x", 1), "T", "0x1"), []);
+  assert.deepEqual(assetMarkets(liquity, chip("liquity", 1, { uses }), "0x6440"), uses);
+  const x = { id: "x", label: "X", href: "/ethereum/x", noun: "Accounts" };
+  assert.deepEqual(assetMarkets(x, chip("x", 1), "0x1"), []);
+  // A chip's page names itself; a filtered listing takes the positions' noun.
+  assert.deepEqual(assetMarkets(x, chip("x", 1, { link: "page", href: "/ethereum/x/markets/0x1" }), "0x1"), [
+    { label: "Markets", href: "/ethereum/x/markets/0x1" },
+  ]);
+  assert.deepEqual(assetMarkets(x, chip("x", 1, { link: "filtered", href: "/ethereum/x?market=usdc" }), "0x1"), [
+    { label: "Accounts", href: "/ethereum/x?market=usdc" },
+  ]);
+  // Compound V2 and Moonwell take their market pages from the server.
+  const pages = [
+    { label: "cWBTC market", href: "/ethereum/x/markets/0xc11b" },
+    { label: "cWBTC2 market", href: "/ethereum/x/markets/0xccf4" },
+  ];
+  assert.deepEqual(
+    assetMarkets({ ...x, id: "compound-v2" }, chip("compound-v2", 1, { link: "filtered" }), "0x2260", pages),
+    pages,
+  );
+  // Maple and f(x) name a pool.
+  assert.deepEqual(
+    assetMarkets(
+      { ...x, id: "maple" },
+      chip("maple", 1, { link: "filtered", href: "/ethereum/maple?pool=USDC" }),
+      "0x1",
+    ),
+    [{ label: "Pool", href: "/ethereum/maple?pool=USDC" }],
+  );
+  // Aave V3 on Ethereum: a reserve page per market the token is in.
+  assert.deepEqual(assetMarkets(AAVE, chip("aave-v3", 1, { markets: ["core", "prime"] }), "0xA0B8"), [
+    { label: "Core reserve", href: "/ethereum/aave-v3/markets/0xa0b8" },
+    { label: "Prime reserve", href: "/ethereum/aave-v3/markets/0xa0b8?market=prime" },
+  ]);
+  assert.deepEqual(assetMarkets(AAVE, chip("aave-v3", 1, { markets: ["prime"] }), "0xA0B8"), [
+    { label: "Prime reserve", href: "/ethereum/aave-v3/markets/0xa0b8?market=prime" },
+  ]);
 });
 
 test("the canonical page is the first explorer by the roster's order on that chain", () => {

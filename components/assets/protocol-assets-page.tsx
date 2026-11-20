@@ -43,9 +43,10 @@ import {
 import type { ChipUse } from "@/lib/shared/asset-uses";
 import { CHAINS, MAINNET_CHAIN_ID, type ChainMeta } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
-import { PROTOCOLS, type ProtocolEntry } from "@/lib/shared/protocols";
+import { PROTOCOLS, positionNounPlural, type ProtocolEntry } from "@/lib/shared/protocols";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { comptrollerMarketLinks } from "@/lib/comptroller/market-pages";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -64,14 +65,25 @@ const hrefOf = (id: string) => {
   const p = PROTOCOLS.find((x) => x.id === id);
   return p?.subPages.some((s) => s.segment === ASSETS_SEGMENT) ? p.href : null;
 };
-const explorerOf = (e: ProtocolEntry): AssetsExplorer => ({ id: e.id, label: e.label, href: e.href });
+const explorerOf = (e: ProtocolEntry): AssetsExplorer => ({
+  id: e.id,
+  label: e.label,
+  href: e.href,
+  noun: positionNounPlural(e.session),
+});
 
 async function read() {
   return fetchAssetExplorerServer(await readerIpFromHeaders()).catch(() => null);
 }
 
 const linesFor = (cards: readonly AssetCard[], e: ProtocolEntry): ProtocolAssetLine[] =>
-  protocolAssetLines(cards, explorerOf(e), (c) => cardLines(c, CHAIN_ORDER), hrefOf);
+  protocolAssetLines(
+    cards,
+    explorerOf(e),
+    (c) => cardLines(c, CHAIN_ORDER),
+    hrefOf,
+    (chip, token) => comptrollerMarketLinks(e.id, e.href, token, chip.href),
+  );
 
 // ── /<chain>/<slug>/assets ──────────────────────────────────────────────────
 

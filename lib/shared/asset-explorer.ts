@@ -47,6 +47,9 @@ export interface AssetChip {
    *  debt" and "Stability Pools" on Liquity V2, a Pendle market's PT
    *  (lib/shared/asset-uses.ts). */
   uses?: ChipUse[];
+  /** On Aave V3 on Ethereum: the markets the token is a reserve of ("core",
+   *  "prime", "etherfi"), each a reserve page (ui-jobs 786). */
+  markets?: string[];
 }
 
 export interface CardChain {

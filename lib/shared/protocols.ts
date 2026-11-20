@@ -241,7 +241,10 @@ const SPECS: ProtocolSpec[] = [
     type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Aave V3's Base deployment, a separate Pool with its own reserves and risk parameters: every wallet's account read whole from the contracts",
-    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Market overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Aave V3 on Arbitrum One, position-first (rails-ops
@@ -311,6 +314,7 @@ const SPECS: ProtocolSpec[] = [
     subPages: [
       { segment: "markets", label: "Spokes", tab: "Spokes" },
       { segment: "hubs", label: "Hubs", tab: "Hubs" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },
   {
@@ -500,7 +504,10 @@ const SPECS: ProtocolSpec[] = [
     type: "cdp",
     tags: ["CDP"],
     desc: "A Liquity V2 fork minting USDaf across seven collateral branches: each Trove's collateral and debt read from events",
-    subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
+    subPages: [
+      { segment: "branches", label: "Branches", tab: "Branches" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "compound-v2",
@@ -512,7 +519,10 @@ const SPECS: ProtocolSpec[] = [
     type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "The original cToken markets over six years: every account's supplies, borrows and liquidations, with the markets read live at /compound-v2/markets",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "compound",
@@ -524,7 +534,10 @@ const SPECS: ProtocolSpec[] = [
     type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Compound V3 markets replayed from events: each account's signed base principal and every collateral asset traceable",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Compound V3's Base deployment — five Comets of its own, none of them the
@@ -541,7 +554,10 @@ const SPECS: ProtocolSpec[] = [
     type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Compound V3's Base deployment: five Comets read live, and a wallet's standing in every one of them found by asking each market",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Compound V3 on Arbitrum One, position-first (rails-ops
@@ -614,7 +630,10 @@ const SPECS: ProtocolSpec[] = [
     type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Dolomite margin accounts, one per owner and account number: balances and debts from the contract's events, each account's liquidation line read live",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "basedollar",
@@ -626,7 +645,10 @@ const SPECS: ProtocolSpec[] = [
     type: "cdp",
     tags: ["CDP"],
     desc: "A Liquity V2 fork on Base minting BD across five collateral branches, captured from Base: each Trove's collateral and debt read from events",
-    subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
+    subPages: [
+      { segment: "branches", label: "Branches", tab: "Branches" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "ebisu",
@@ -640,7 +662,10 @@ const SPECS: ProtocolSpec[] = [
     // The shutdown's date is the catalog's record (lib/ebisu/asset-catalog.ts,
     // EBISU_SHUTDOWN; ui-jobs 608, 612).
     desc: "A Liquity V2 fork that minted ebUSD across five collateral branches, shut down on 20 Aug 2026: each Trove's collateral and debt read from events",
-    subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
+    subPages: [
+      { segment: "branches", label: "Branches", tab: "Branches" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Euler V2 on Base and Arbitrum (rails-ops reference/read-on-visit-candidates-572.md,
@@ -722,7 +747,10 @@ const SPECS: ProtocolSpec[] = [
     type: "cdp",
     tags: ["Borrow", "CDP"],
     desc: "Oracle-free ZCHF loans, each a separate contract whose owner declares the liquidation price, which anyone can challenge by auction, all in native units",
-    subPages: [{ segment: "system", label: "System overview", tab: "System" }],
+    subPages: [
+      { segment: "system", label: "System overview", tab: "System" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "fx",
@@ -734,7 +762,10 @@ const SPECS: ProtocolSpec[] = [
     type: "cdp",
     tags: ["Leverage", "CDP"],
     desc: "f(x) positions on wstETH and WBTC: every event from the chain, current state from the pools, and shared funding costs split per position",
-    subPages: [{ segment: "pools", label: "Pools overview", tab: "Pools" }],
+    subPages: [
+      { segment: "pools", label: "Pools overview", tab: "Pools" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Lido on Ethereum (rails-ops ui-jobs 570): a front door taking a wallet
@@ -767,7 +798,10 @@ const SPECS: ProtocolSpec[] = [
     type: "cdp",
     tags: ["Borrow"],
     desc: "The original interest-free Trove: ETH collateral and exact LUSD debt emitted per event",
-    subPages: [{ segment: "system", label: "System overview", tab: "System" }],
+    subPages: [
+      { segment: "system", label: "System overview", tab: "System" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "liquity",
@@ -795,7 +829,10 @@ const SPECS: ProtocolSpec[] = [
     type: "lending",
     tags: ["Borrow"],
     desc: "Curve's LlamaLend markets, where liquidation happens gradually across a price band: each loan's soft-liquidation state read live and cross-checked",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "makerdao",
@@ -807,7 +844,10 @@ const SPECS: ProtocolSpec[] = [
     type: "cdp",
     tags: ["CDP"],
     desc: "MakerDAO vaults and LockStake urns read from the chain, every value traceable",
-    subPages: [{ segment: "system", label: "System overview", tab: "System" }],
+    subPages: [
+      { segment: "system", label: "System overview", tab: "System" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "maple",
@@ -819,7 +859,10 @@ const SPECS: ProtocolSpec[] = [
     type: "lending",
     tags: ["Lend", "RWA"],
     desc: "Maple's institutional credit pools from the lender's side: share balances, the withdrawal queue, and what is liquid now against what is lent out",
-    subPages: [{ segment: "pools", label: "Pools overview", tab: "Pools" }],
+    subPages: [
+      { segment: "pools", label: "Pools overview", tab: "Pools" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "moonwell",
@@ -831,7 +874,10 @@ const SPECS: ProtocolSpec[] = [
     type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "A Compound v2 fork newly on Ethereum: exact mToken balances replayed from events, debt from emitted balances",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Moonwell's Base deployment — the protocol's real home, and a separate
@@ -848,7 +894,10 @@ const SPECS: ProtocolSpec[] = [
     type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Moonwell's Base deployment: twenty-one markets under one Comptroller, every account's standing read from the contracts",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "morpho",
@@ -865,6 +914,7 @@ const SPECS: ProtocolSpec[] = [
     subPages: [
       { segment: "markets", label: "Markets overview", tab: "Markets" },
       { segment: "vaults", label: "Vaults overview", tab: "Vaults", holderListing: true },
+      { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },
   {
@@ -889,6 +939,7 @@ const SPECS: ProtocolSpec[] = [
     subPages: [
       { segment: "markets", label: "Markets overview", tab: "Markets" },
       { segment: "vaults", label: "Vaults overview", tab: "Vaults", holderListing: true },
+      { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },
   {
@@ -995,7 +1046,10 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Fixed yield", "Yield trading"],
     desc: "A wallet's principal, yield and liquidity tokens in each Pendle market, valued at Pendle's oracle and read at one block",
     positionListing: false,
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // The first testnet explorer. A Sepolia figure is a test figure, and the
@@ -1041,7 +1095,10 @@ const SPECS: ProtocolSpec[] = [
     type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "An Aave V3 fork on Base, frozen since April 2025: every position read whole from the contracts, and none of them can grow",
-    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Market overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Sky Savings (sUSDS on Ethereum). Sky rebranded MakerDAO, and a saver is
@@ -1092,7 +1149,10 @@ const SPECS: ProtocolSpec[] = [
     type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "SparkLend, an Aave V3 fork, replayed from events: each reserve's principal traceable and valued at the Pool's oracle",
-    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Market overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Uniswap V3 and V4 on Ethereum (rails-ops ui-jobs 556): two versions,
@@ -1233,7 +1293,10 @@ const SPECS: ProtocolSpec[] = [
     // (rails-ops decision 0027 call 2), so the rail's first tab is this
     // sub-page and `/ethereum/yearn` opens on it.
     positionListing: false,
-    subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
+    subPages: [
+      { segment: "vaults", label: "Vaults overview", tab: "Vaults" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // The second vault-native roster subject, in the Yearn shape (rails-ops

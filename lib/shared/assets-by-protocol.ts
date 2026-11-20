@@ -20,7 +20,19 @@ export interface AssetsExplorer {
   id: string;
   label: string;
   href: string;
+  /** Its positions' name, plural: "Positions", "Troves", "Accounts". */
+  noun: string;
 }
+
+/** The Aave family's explorers with a reserve page at `markets/<underlying>`
+ *  (M3) on one market; Aave V3 on Ethereum names its markets on the chip. */
+const RESERVE_PAGES = new Set(["aave-v3-base", "spark", "seamless"]);
+/** The Liquity family: a collateral is a branch. */
+const BRANCHES = new Set(["liquity", "asymmetry", "ebisu", "basedollar"]);
+/** The explorers whose filtered listing is a pool's (decision 0065: their term). */
+const POOLS = new Set(["maple", "fx"]);
+/** Aave V3 on Ethereum's markets, as its `?market=` names them. */
+const AAVE_V3_MARKET: Record<string, string> = { core: "Core", prime: "Prime", etherfi: "EtherFi" };
 
 /** One asset the explorer uses on its chain. */
 export interface ProtocolAssetLine {
@@ -32,21 +44,41 @@ export interface ProtocolAssetLine {
   also: AssetChip[];
 }
 
+/** "/markets" or "/markets/0x…" under the explorer: "Markets". */
+const pageWord = (e: AssetsExplorer, href: string): string => {
+  const seg = href.slice(e.href.length).split(/[/?#]/)[1] ?? "";
+  return seg ? seg[0].toUpperCase() + seg.slice(1).replace(/-/g, " ") : e.label;
+};
+
 /** What the asset is in the protocol, as links (ui-jobs 786): the uses the
- *  explorer's list names (BOLD's trove debt and Stability Pools), else Aave
- *  V3's reserve page, Liquity V2's branch, else the chip's market page or its
- *  listing filtered to the asset. */
-export function assetMarkets(e: AssetsExplorer, chip: AssetChip, symbol: string, token: string): ChipUse[] {
+ *  explorer's list names (a debt token's Trove debt and Stability Pools, a
+ *  Pendle market); else its reserve pages on the Aave family (Aave V3 on
+ *  Ethereum one per market, "Prime reserve"), its market pages on Compound V2
+ *  and Moonwell (`marketPages`, by the server from their catalogs), its branch
+ *  on the Liquity family; then the chip's page named by its route ("Markets",
+ *  "Vaults") or the listing filtered to it, named "Pool" on Maple and f(x) and
+ *  by the positions' noun elsewhere. */
+export function assetMarkets(
+  e: AssetsExplorer,
+  chip: AssetChip,
+  token: string,
+  marketPages: ChipUse[] | null = null,
+): ChipUse[] {
   if (chip.uses?.length) return chip.uses;
-  if (e.id === "aave-v3") return [{ label: "Reserve", href: `${e.href}/markets/${token.toLowerCase()}` }];
-  if (e.id === "liquity")
-    return [
-      { label: "Branch", href: `${e.href}/branches` },
-      { label: "Troves", href: chip.href },
-    ];
-  if (chip.link === "page") return [{ label: "Market", href: chip.href }];
-  if (chip.link === "filtered") return [{ label: `Positions with ${symbol}`, href: chip.href }];
-  return [];
+  const t = token.toLowerCase();
+  if (e.id === "aave-v3") {
+    const markets = chip.markets?.length ? chip.markets : ["core"];
+    return markets.map((m) => ({
+      label: markets.length === 1 && m === "core" ? "Reserve" : `${AAVE_V3_MARKET[m] ?? m} reserve`,
+      href: `${e.href}/markets/${t}${m === "core" ? "" : `?market=${m}`}`,
+    }));
+  }
+  if (RESERVE_PAGES.has(e.id)) return [{ label: "Reserve", href: `${e.href}/markets/${t}` }];
+  if (marketPages?.length) return marketPages;
+  const out: ChipUse[] = BRANCHES.has(e.id) ? [{ label: "Branch", href: `${e.href}/branches` }] : [];
+  if (chip.link === "page") out.push({ label: pageWord(e, chip.href), href: chip.href });
+  if (chip.link === "filtered") out.push({ label: POOLS.has(e.id) ? "Pool" : e.noun, href: chip.href });
+  return out;
 }
 
 /** A chip as these pages link it: an explorer's page for the token, where
@@ -67,6 +99,7 @@ export function protocolAssetLines(
   e: AssetsExplorer,
   linesOf: (c: AssetCard) => CardLine[],
   hrefOf: (explorer: string) => string | null,
+  marketPagesOf: (chip: AssetChip, token: string) => ChipUse[] | null = () => null,
 ): ProtocolAssetLine[] {
   const out: ProtocolAssetLine[] = [];
   for (const card of cards) {
@@ -77,7 +110,7 @@ export function protocolAssetLines(
     out.push({
       card,
       line: { ...line, href: protocolAssetsHref(e.href, line.token) },
-      markets: assetMarkets(e, chip, card.symbol, line.token),
+      markets: assetMarkets(e, chip, line.token, marketPagesOf(chip, line.token)),
       also: line.chips.filter((ch) => ch.explorer !== e.id).map((ch) => chipToProtocolPage(ch, line.token, hrefOf)),
     });
   }
