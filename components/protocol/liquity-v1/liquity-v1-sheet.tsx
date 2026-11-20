@@ -49,6 +49,7 @@ import {
   liquityV1EthUsdCell,
 } from "@/lib/liquity-v1/event-provenance";
 import {
+  COLLATERAL_ADDRESS,
   COLLATERAL_SYMBOL,
   DEBT_SYMBOL,
   LIQUITY_V1_ADDRESSES,
@@ -172,6 +173,7 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
   const collSide: SheetSide = {
     side: "collateral",
     icons: [COLLATERAL_SYMBOL],
+    iconAddresses: { [COLLATERAL_SYMBOL]: COLLATERAL_ADDRESS },
     carry: [],
     before:
       !isOpen && collRows.length > 0

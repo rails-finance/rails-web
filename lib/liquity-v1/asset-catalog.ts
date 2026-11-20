@@ -6,6 +6,8 @@
 // LUSD — so this file holds only the protocol's own addresses (used as the
 // `contract` on every provenance entry) plus the two fixed asset descriptors.
 
+import { NATIVE } from "@/lib/shared/asset-roster";
+
 export const LIQUITY_V1_ADDRESSES = {
   /** TroveManager — emits TroveUpdated on liquidation / redemption paths. */
   TROVE_MANAGER: "0xa39739ef8b0231dbfa0dcda07d7e29faabcf4bb2",
@@ -48,9 +50,9 @@ export const LIQUITY_V1_CCR = 1.5;
 
 /** Collateral is always native ETH; debt is always LUSD — both 18 decimals. */
 export const COLLATERAL_SYMBOL = "ETH";
-/** Native ETH's sentinel (the asset roster's NATIVE): passed with the
+/** Native ETH's sentinel (the asset roster's NATIVE). Passed with the
  *  collateral's icon, it draws the plain ETH mark and opens native ETH's asset
- *  page (Miles, 20 Nov 2026: plain ETH everywhere in Liquity V1). */
-export const COLLATERAL_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+ *  page. */
+export const COLLATERAL_ADDRESS = NATIVE;
 export const DEBT_SYMBOL = "LUSD";
 export const ASSET_DECIMALS = 18;
