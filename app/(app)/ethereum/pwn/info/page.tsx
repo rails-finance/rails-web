@@ -140,6 +140,7 @@ export default function InfoPage() {
       views={[
         {
           heading: "Listing",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>The listing shows one card for each loan, with its collateral, principal, amount owed and status.</li>
@@ -153,6 +154,7 @@ export default function InfoPage() {
         },
         {
           heading: "Loan page",
+          section: "positions",
           body: (
             <p>
               The loan page shows the terms agreed at the start, the deadline, and a timeline of every event, including
@@ -162,6 +164,7 @@ export default function InfoPage() {
         },
         {
           heading: "Loan book",
+          section: "book",
           body: (
             <p>
               The loan book lists the loans still in escrow (those that are Running, or Defaulted and not yet claimed),

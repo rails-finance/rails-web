@@ -108,6 +108,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "Listing",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>Each row is one Trove, with its collateral, its BD debt and the interest rate its borrower chose.</li>
@@ -127,6 +128,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Trove page",
+    section: "positions",
     body: (
       <p>
         The Trove page shows one Trove&apos;s collateral and debt, and a timeline lists each event on that Trove, newest
@@ -136,6 +138,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Branches page",
+    section: "branches",
     body: (
       <p>
         The branches page shows one card for each of the five branches, with its price, its size and the range of

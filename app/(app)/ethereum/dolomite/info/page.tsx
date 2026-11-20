@@ -82,6 +82,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "Listing",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>Each row is one account, which is an owner address and an account number.</li>
@@ -92,6 +93,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Account page",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>
@@ -104,15 +106,16 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Markets page",
+    section: "markets",
     body: (
       <p>
-        The markets page lists every market with its minimum collateralization, price, supplied and borrowed amounts,
-        borrow rate and supply rate. It also shows the spread (the liquidation penalty for that market) and utilization
-        (the share of supplied tokens that is lent out). A market&apos;s premiums show under the figures they raise.{" "}
+        The{" "}
         <Link href="/ethereum/dolomite/markets" className={INLINE_LINK}>
-          Open the markets page to see them all
-        </Link>
-        .
+          markets page
+        </Link>{" "}
+        lists every market with its minimum collateralization, price, supplied and borrowed amounts, borrow rate and
+        supply rate. It also shows the spread (the liquidation penalty for that market) and utilization (the share of
+        supplied tokens that is lent out). A market&apos;s premiums show under the figures they raise.
       </p>
     ),
   },

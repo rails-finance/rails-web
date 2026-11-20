@@ -7,7 +7,7 @@ import Link from "next/link";
 import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
-import { MAPLE_POOLS_LEAD } from "@/lib/vaults/family-leads";
+import { MAPLE_POOLS_SHOWS } from "@/lib/vaults/family-leads";
 import { MAPLE_LENDER_DOCS } from "@/lib/vaults/family-docs";
 
 export const metadata = infoMetadata("maple");
@@ -74,6 +74,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "Listing",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>Each row is one wallet&apos;s stake in one pool.</li>
@@ -85,6 +86,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Wallet page",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>The top card shows the wallet&apos;s shares, what they pay out now and the interest they have earned.</li>
@@ -95,13 +97,14 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Pools page",
+    section: "pools",
     body: (
       <p>
-        {MAPLE_POOLS_LEAD}{" "}
+        The{" "}
         <Link href="/ethereum/maple/pools" className={INLINE_LINK}>
-          Open the pools page
+          pools page
         </Link>{" "}
-        to see them.
+        {MAPLE_POOLS_SHOWS}
       </p>
     ),
   },

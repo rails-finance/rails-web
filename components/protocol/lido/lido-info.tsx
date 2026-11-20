@@ -79,6 +79,7 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "A wallet's stake",
+    section: "intro",
     body: (
       <>
         <p>
@@ -104,6 +105,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Lido now",
+    section: "intro",
     body: (
       <p>
         The front door states the ether Lido accounts for, all shares, the share rate and its change over 30 days, and

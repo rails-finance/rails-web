@@ -28,6 +28,7 @@ const ROUTE = MORPHO_OPTIMISM.route;
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "A wallet's positions",
+    section: "intro",
     body: (
       <>
         <p>
@@ -46,6 +47,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Position page",
+    section: "intro",
     body: (
       <p>
         The position page shows the collateral, the debt or the supply, each in dollars where Optimism has a price for
@@ -56,6 +58,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Markets",
+    section: "markets",
     body: (
       <p>
         The{" "}

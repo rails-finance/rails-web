@@ -123,6 +123,7 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "A wallet's positions",
+    section: "intro",
     body: (
       <>
         <p>
@@ -142,6 +143,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Position page",
+    section: "intro",
     body: (
       <p>
         The position page shows the two tokens the position holds now and their worth in the quote token, with its range

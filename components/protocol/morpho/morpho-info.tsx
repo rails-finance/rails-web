@@ -120,6 +120,7 @@ const FIGURES_IN_LOAN_TOKEN =
 function marketsView(href: string, body: ReactNode): InfoView {
   return {
     heading: "Markets",
+    section: "markets",
     body: (
       <p>
         The{" "}
@@ -218,6 +219,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
         views={[
           {
             heading: "Listing",
+            section: "positions",
             body: (
               <p>
                 Each card shows one position: the wallet, its market, its collateral, what it borrowed and its status.
@@ -229,6 +231,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
           marketsView("/ethereum/morpho/markets", LOAN_TOKEN_ROWS),
           {
             heading: "Vaults",
+            section: "vaults",
             body: (
               <ul className={UL}>
                 <li>
@@ -307,6 +310,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
         views={[
           {
             heading: "Listing",
+            section: "positions",
             body: (
               <>
                 <p>
@@ -327,6 +331,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
           marketsView("/base/morpho/markets", LOAN_TOKEN_ROWS),
           {
             heading: "Vaults",
+            section: "vaults",
             body: (
               <ul className={UL}>
                 <li>
@@ -408,6 +413,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
       views={[
         {
           heading: "Listing",
+          section: "positions",
           body: (
             <p>
               The listing holds the positions Rails has read, which come from each day&apos;s most active wallets since

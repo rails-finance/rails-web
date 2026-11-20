@@ -175,6 +175,7 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
       views={[
         {
           heading: "Listing",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>
@@ -206,6 +207,7 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
         },
         {
           heading: "Position page",
+          section: "positions",
           body: (
             <p>
               The card shows the loan&apos;s figures, read from the chain. The timeline lists each of its events,
@@ -215,6 +217,7 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
         },
         {
           heading: "Markets page",
+          section: "markets",
           body: (
             <p>
               This page shows how many redemptions each market has had. A redemption changes every open loan of the

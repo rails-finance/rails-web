@@ -124,10 +124,12 @@ export default function PendleInfoPage() {
       views={[
         {
           heading: "Markets",
+          section: "markets",
           body: "Every market the routers have named, with how many are active and how many have matured, the active markets first. A market's page shows its liquidity, implied APY, PT price, maturity, YT and LP prices, SY exchange rate, pool and latest router events.",
         },
         {
           heading: "Wallet and position pages",
+          section: "intro",
           body: "A wallet's page lists one card per market. A position's page shows its value, Effective Fixed APY against the implied APY now, its maturity, its lifetime flows by leg and its router events.",
         },
       ]}

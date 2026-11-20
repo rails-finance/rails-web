@@ -94,6 +94,7 @@ export function MoonwellInfoPage({ deployment }: { deployment: MoonwellInfoDeplo
       views={[
         {
           heading: "Listing",
+          section: "positions",
           body: (
             <>
               <ul className={UL}>
@@ -113,6 +114,7 @@ export function MoonwellInfoPage({ deployment }: { deployment: MoonwellInfoDeplo
         },
         {
           heading: "Position page",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>
@@ -125,17 +127,18 @@ export function MoonwellInfoPage({ deployment }: { deployment: MoonwellInfoDeplo
         },
         {
           heading: "Markets view",
+          section: "markets",
           body: (
             <>
               <p>
-                The markets view shows each market with what it holds, what is borrowed and available, and its supply
-                and borrow rates. Each market opens a page with its rate curve and parameters. A supply cap is the most
-                the market accepts in deposits and a borrow cap is the most that can be borrowed, and at a cap new
-                supply or new borrowing is refused.{" "}
+                The{" "}
                 <Link href={`${route}/markets`} className={INLINE_LINK}>
-                  Use the markets link
+                  markets page
                 </Link>{" "}
-                to open it.
+                shows each market with what it holds, what is borrowed and available, and its supply and borrow rates.
+                Each market opens a page with its rate curve and parameters. A supply cap is the most the market accepts
+                in deposits and a borrow cap is the most that can be borrowed, and at a cap new supply or new borrowing
+                is refused.
               </p>
               {base && <MoonwellBorrowFrozenNote className="mt-2" />}
             </>

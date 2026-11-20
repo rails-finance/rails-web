@@ -32,8 +32,11 @@ export const AAVE_VAULTS_LEAD =
 export const YEARN_VAULTS_LEAD =
   "The Yearn V3 roster lists every vault the V3 factories deployed on Ethereum, endorsed or not, with each vault’s totals and share price.";
 
-export const MAPLE_POOLS_LEAD =
-  "The pools page shows each pool's cash available to pay exits, its fixed-term and open-term loans, and its exit rate.";
+/** What the Maple pools page shows, after its name: the About page links the name. */
+export const MAPLE_POOLS_SHOWS =
+  "shows each pool's cash available to pay exits, its fixed-term and open-term loans, and its exit rate.";
+
+export const MAPLE_POOLS_LEAD = `The pools page ${MAPLE_POOLS_SHOWS}`;
 
 export const SBOLD_LEAD =
   "sBOLD is one ERC-4626 vault over BOLD that deposits it into Liquity V2’s three Stability Pools.";

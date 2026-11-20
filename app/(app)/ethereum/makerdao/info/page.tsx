@@ -120,6 +120,7 @@ export default function InfoPage() {
       views={[
         {
           heading: "Listing",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>
@@ -132,6 +133,7 @@ export default function InfoPage() {
         },
         {
           heading: "Vat balance sheet",
+          section: "system",
           body: (
             <p>
               This page shows the Vat&apos;s debt and collateral, split by collateral type.{" "}
@@ -144,6 +146,7 @@ export default function InfoPage() {
         },
         {
           heading: "Vault page",
+          section: "positions",
           body: (
             <>
               <p>
@@ -170,6 +173,7 @@ export default function InfoPage() {
         },
         {
           heading: "LockStake urn page",
+          section: "positions",
           body: (
             <>
               <p>
@@ -196,6 +200,7 @@ export default function InfoPage() {
         },
         {
           heading: "Sky Savings",
+          section: "intro",
           body: (
             <p>
               <Link href="/ethereum/sky-savings" className={INLINE_LINK}>
