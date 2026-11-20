@@ -1,16 +1,15 @@
-// lib/vaults/compare.ts: the selection, the column sort and the holder
-// donut's slices (rails-ops ui-jobs 553, door 3).
+// lib/vaults/compare.ts: the selection, the Differences rule and the holder
+// donut's slices (rails-ops ui-jobs 553 door 3, 779).
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
   compareHref,
+  differs,
   donutSlices,
-  mixedAssets,
   parseCompareParam,
+  pickedKeys,
   ringPath,
-  sortColumns,
-  toggleCompare,
 } from "../../lib/vaults/compare.ts";
 
 const A = (n) => `1:0x${String(n).padStart(40, "0")}`;
@@ -23,53 +22,17 @@ test("?v= parses to at most four keys, once each, lowercased", () => {
   assert.equal(compareHref([A(1), A(2)]), `/vaults/compare?v=${A(1)},${A(2)}`);
 });
 
-test("a fifth tick is refused; a held tick is removed", () => {
-  let keys = [];
-  for (const n of [1, 2, 3, 4]) keys = toggleCompare(keys, A(n)).keys;
-  assert.equal(keys.length, 4);
-  const fifth = toggleCompare(keys, A(5));
-  assert.equal(fifth.refused, true);
-  assert.deepEqual(fifth.keys, keys);
-  const off = toggleCompare(keys, A(2));
-  assert.equal(off.refused, false);
-  assert.deepEqual(off.keys, [A(1), A(3), A(4)]);
+test("the picker's slots: filled ones in order, once each, at most four", () => {
+  assert.deepEqual(pickedKeys([A(2), null, A(1), A(2)]), [A(2), A(1)]);
+  assert.deepEqual(pickedKeys([A(1), A(2), A(3), A(4), A(5)]), [A(1), A(2), A(3), A(4)]);
+  assert.deepEqual(pickedKeys([null, null]), []);
 });
 
-const col = (id, f) => ({
-  id,
-  figures: { asset: "USDC", held: null, yearly30: null, range: null, withdrawable: null, ...f },
-});
-
-test("each sort orders columns by its figure, none last, ties by size", () => {
-  const cols = [
-    col("a", { held: 10, yearly30: 0.05, range: 0.01, withdrawable: 0.4 }),
-    col("b", { held: 30, yearly30: null, range: null, withdrawable: null }),
-    col("c", { held: 20, yearly30: 0.08, range: 0.002, withdrawable: 1 }),
-    col("d", { held: 5, yearly30: 0.05, range: null, withdrawable: 0.4 }),
-  ];
-  const ids = (s) => sortColumns(cols, s).map((c) => c.id);
-  assert.deepEqual(ids("size"), ["b", "c", "a", "d"]);
-  assert.deepEqual(ids("yield"), ["c", "a", "d", "b"]);
-  assert.deepEqual(ids("range"), ["c", "a", "b", "d"]);
-  assert.deepEqual(ids("withdrawable"), ["c", "a", "d", "b"]);
-  assert.deepEqual(
-    cols.map((c) => c.id),
-    ["a", "b", "c", "d"],
-  );
-});
-
-test("size compares within one asset: assets first, A to Z", () => {
-  const cols = [
-    col("x", { asset: "USDT", held: 100 }),
-    col("y", { asset: "USDC", held: 1 }),
-    col("z", { asset: "USDC", held: 2 }),
-  ];
-  assert.deepEqual(
-    sortColumns(cols, "size").map((c) => c.id),
-    ["z", "y", "x"],
-  );
-  assert.equal(mixedAssets(cols), true);
-  assert.equal(mixedAssets(cols.slice(1)), false);
+test("a fact differs where any column prints another value, an absent one included", () => {
+  assert.equal(differs(["USDC", "USDC", "USDC"]), false);
+  assert.equal(differs(["USDC", "USDT"]), true);
+  assert.equal(differs(["10%", null]), true);
+  assert.equal(differs([null, null]), false);
 });
 
 test("donut: largest first, the rest one slice, turns end at one", () => {

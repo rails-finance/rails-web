@@ -14,8 +14,11 @@
 //   Who holds it: the census's six largest live holders and its live count
 //     (Maple has no census).
 //
-// No figure here is scored; the page sorts by the figures it states. Like the
-// index, the page carries no receipts: each vault's page keeps them.
+// No figure here is scored or ranked; the columns stand in the order the
+// reader picked them (ui-jobs 779). Every figure carries its receipt: the
+// roster row's at the index's block (lib/vaults/row-receipts.ts), the
+// readout lines' at the family loader's block (lib/vaults/health-provenance.ts)
+// and the Fees line's (lib/vaults/compare-provenance.ts).
 //
 // SERVER-ONLY: the loaders read the chain and the bearer token.
 
@@ -35,15 +38,27 @@ import { VAULT_SHAPE_FACET_LABEL, isVaultPositionShape } from "@/lib/aave-vaults
 import type { MetaMorphoChainId } from "@/lib/metamorpho/vault-roster";
 import { VAULT_FAMILIES } from "@/lib/vaults/families";
 import { loadVaultIndex } from "@/lib/vaults/index-read";
-import { chainName, vaultIndexHref } from "@/lib/vaults/index-rosters";
+import {
+  chainName,
+  vaultIndexHref,
+  vaultIndexKey,
+  vaultIndexRosterKey,
+  vaultIndexRosterKeyOf,
+} from "@/lib/vaults/index-rosters";
+import { vaultIndexRowReceipts } from "@/lib/vaults/row-receipts";
+import type { VaultRowReceipts } from "@/components/vaults/vault-heads";
+import type { Provenance } from "@/components/shared/provenance";
+import type { VaultYield } from "@/lib/vaults/yield";
+import { healthLineProv, type HealthReceiptVault } from "@/lib/vaults/health-provenance";
+import { metaMorphoFeeProv, noFeeProv, yearnFeeProv, yearnNoAccountantProv } from "@/lib/vaults/compare-provenance";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
-import { vaultHealth, shareOf, type HealthInput } from "@/lib/vaults/health";
+import { vaultHealth, shareOf, type HealthInput, type HealthKey } from "@/lib/vaults/health";
 import { healthLines, shortHex, type HealthLine } from "@/lib/vaults/health-words";
-import { assetScaleAbsentTip } from "@/lib/vaults/asset-scale-words";
+import { assetScaleAbsentTip, assetScaleReceiptNote } from "@/lib/vaults/asset-scale-words";
 import { loadVaultHealthSeries } from "@/lib/vaults/health-read";
 import { illiquidSentence } from "@/lib/vaults/illiquid";
 import { tooSmallToMeasure } from "@/lib/vaults/yield";
-import { compareKey, isCompareKey, DONUT_HOLDERS, type CompareFigures } from "@/lib/vaults/compare";
+import { compareKey, isCompareKey, DONUT_HOLDERS } from "@/lib/vaults/compare";
 import {
   EXPOSURE_SHOWN,
   EXPOSURE_WORDS as X,
@@ -52,6 +67,8 @@ import {
   type CompareCell,
   type ExposureRow,
 } from "@/lib/vaults/compare-words";
+
+const HEALTH_KEYS: readonly HealthKey[] = ["size", "yield", "withdrawals", "losses", "steward"];
 
 export type CompareExposure = { kind: "rows"; rows: ExposureRow[]; more: number } | { kind: "cell"; cell: CompareCell };
 
@@ -79,9 +96,16 @@ export interface CompareColumn {
   readAt: string | null;
   lines: HealthLine[];
   fees: CompareCell;
+  /** The Fees line's receipt; null where nothing was read. */
+  feeProv: Provenance | null;
   exposure: CompareExposure;
   holders: CompareHolders;
-  figures: CompareFigures;
+  /** The roster row's receipts for Total assets and Share price, at the index's block. */
+  receipts: VaultRowReceipts;
+  /** The daily store's yield figure, as the roster row reads it. */
+  yieldFigure: VaultYield | null;
+  /** Each readout line's receipt, at the family loader's block. */
+  lineProvs: Partial<Record<HealthKey, Provenance>>;
 }
 
 export interface CompareRead {
@@ -98,6 +122,9 @@ const WORDS = {
 const held = (v: VaultSummary) => (v.totalAssets?.value ?? 0) - (v.lostAssets?.value ?? 0);
 
 const WAD = 1e18;
+
+/** The vault a Fees receipt names. */
+const feeVault = (v: VaultSummary) => ({ address: v.address, name: vaultDisplayName(v) ?? v.address });
 const BPS = 10_000;
 
 // ── The family reads ───────────────────────────────────────────────────────
@@ -109,6 +136,7 @@ interface FamilyRead {
   readAt: string | null;
   health: Pick<HealthInput, "exit" | "paused" | "shutdown" | "caught" | "lostAssets" | "steward">;
   fees: CompareCell;
+  feeProv: Provenance | null;
   exposure: CompareExposure;
 }
 
@@ -116,6 +144,7 @@ const UNANSWERED: Omit<FamilyRead, "health"> = {
   block: null,
   readAt: null,
   fees: FEE_WORDS.unanswered,
+  feeProv: null,
   exposure: { kind: "cell", cell: { headline: null, sentence: X.unanswered, read: false } },
 };
 
@@ -164,7 +193,7 @@ async function metaMorpho(v: VaultSummary): Promise<FamilyRead> {
       functionName: "fee",
       blockNumber: BigInt(d.blockNumber),
     })
-    .then((raw) => Number(raw) / WAD)
+    .then((raw) => ({ raw: raw.toString(), fee: Number(raw) / WAD }))
     .catch(() => null);
   const l = d.liquidity;
   return {
@@ -178,7 +207,8 @@ async function metaMorpho(v: VaultSummary): Promise<FamilyRead> {
         ? { role: "curator", address: d.vault.curator, block: d.blockNumber }
         : { role: "owner", address: d.vault.owner, block: d.blockNumber },
     },
-    fees: fee == null ? FEE_WORDS.unanswered : FEE_WORDS.metamorpho(fee),
+    fees: fee == null ? FEE_WORDS.unanswered : FEE_WORDS.metamorpho(fee.fee),
+    feeProv: fee == null ? null : metaMorphoFeeProv(feeVault(v), d.blockNumber, fee.raw, fee.fee),
     exposure:
       d.legs.length === 0
         ? { kind: "cell", cell: { headline: null, sentence: X.none, read: true } }
@@ -201,6 +231,7 @@ async function yearn(v: VaultSummary): Promise<FamilyRead> {
   if (d.chainStale) return fromSummary(v);
   const { totalIdle, totalAssets, accountant } = d.vault;
   let fees: CompareCell = FEE_WORDS.yearnNoAccountant;
+  let feeProv: Provenance | null = yearnNoAccountantProv(feeVault(v), d.blockNumber);
   if (accountant) {
     const config = await vaultHeadClient(1)
       .readContract({
@@ -213,6 +244,9 @@ async function yearn(v: VaultSummary): Promise<FamilyRead> {
       .catch(() => null);
     // An accountant of another kind answers nothing here: its fees are not read.
     fees = config ? FEE_WORDS.yearn(config.performanceFee / BPS, config.managementFee / BPS) : FEE_WORDS.notRead;
+    feeProv = config
+      ? yearnFeeProv(feeVault(v), accountant, d.blockNumber, config.performanceFee, config.managementFee)
+      : null;
   }
   const total = totalAssets?.raw;
   const outside =
@@ -246,6 +280,7 @@ async function yearn(v: VaultSummary): Promise<FamilyRead> {
       steward: d.vault.roleManager ? { role: "roleManager", address: d.vault.roleManager, block: d.blockNumber } : null,
     },
     fees,
+    feeProv,
     exposure:
       rows.length === 0
         ? { kind: "cell", cell: { headline: null, sentence: X.unanswered, read: false } }
@@ -263,6 +298,7 @@ async function aave(v: VaultSummary): Promise<FamilyRead> {
       readAt: new Date().toISOString(),
       health: { exit: null, paused: d.sgho?.paused === true, steward: null },
       fees: FEE_WORDS.notRead,
+      feeProv: null,
       exposure: { kind: "cell", cell: { ...X.sgho, read: true } },
     };
   if (v.family === "umbrella-stake") {
@@ -278,6 +314,7 @@ async function aave(v: VaultSummary): Promise<FamilyRead> {
         steward: u?.owner ? { role: "umbrellaOwner", address: u.owner, block } : null,
       },
       fees: FEE_WORDS.umbrella,
+      feeProv: noFeeProv(feeVault(v), "umbrella"),
       exposure: u?.reserve
         ? {
             kind: "rows",
@@ -294,6 +331,7 @@ async function aave(v: VaultSummary): Promise<FamilyRead> {
     readAt: new Date().toISOString(),
     health: { exit: null, steward: null },
     fees: FEE_WORDS.stata,
+    feeProv: noFeeProv(feeVault(v), "stata"),
     exposure: {
       kind: "rows",
       rows: [{ label: X.stataReserve(d.vault.asset.symbol), sub: X.stataSub, share: 1 }],
@@ -322,6 +360,7 @@ async function maple(v: VaultSummary): Promise<FamilyRead> {
       steward: s.poolDelegate ? { role: "poolDelegate", address: s.poolDelegate, block: s.blockNumber } : null,
     },
     fees: FEE_WORDS.notRead,
+    feeProv: null,
     exposure:
       sum > 0
         ? topRows(parts.map((p) => ({ label: p.label, sub: p.sub, share: p.amount / sum })))
@@ -389,7 +428,10 @@ async function holdersOf(v: VaultSummary): Promise<CompareHolders> {
 // ── The page's read ────────────────────────────────────────────────────────
 
 export async function readCompare(keys: readonly string[]): Promise<CompareRead> {
-  const { vaults } = await loadVaultIndex();
+  const { vaults, yields, rosters } = await loadVaultIndex();
+  const readOf = new Map(
+    rosters.map((r) => [vaultIndexRosterKey(r), { blockNumber: r.blockNumber || undefined, readBy: r.readBy }]),
+  );
   const byKey = new Map(vaults.map((v) => [compareKey(v.chainId, v.address), v]));
   const chosen: VaultSummary[] = [];
   const notFound: string[] = [];
@@ -418,8 +460,20 @@ export async function readCompare(keys: readonly string[]): Promise<CompareRead>
       exit: r.health.exit,
       steward: r.health.steward,
     });
-    const y = health.yield.kind === "yield" ? health.yield : null;
-    const w = health.withdrawals.kind === "withdrawals" ? health.withdrawals : null;
+    const receiptVault: HealthReceiptVault = {
+      address: v.address,
+      name: vaultDisplayName(v) ?? v.address,
+      assetSymbol: v.asset.symbol,
+      decimals: v.asset.decimals,
+      priceKey: s?.priceKey ?? `vault:${v.chainId}:${v.address}`,
+      assetsKey: s?.assetsKey ?? `vault-assets:${v.chainId}:${v.address}`,
+      ...(v.assetScale ? { scaleNote: assetScaleReceiptNote(v.asset.symbol, v.assetScale) } : {}),
+    };
+    const lineProvs: Partial<Record<HealthKey, Provenance>> = {};
+    for (const k of HEALTH_KEYS) {
+      const p = healthLineProv(k, health, receiptVault, r.block ?? v.readAt.block);
+      if (p) lineProvs[k] = p;
+    }
     return {
       key,
       href: vaultIndexHref(v),
@@ -442,15 +496,12 @@ export async function readCompare(keys: readonly string[]): Promise<CompareRead>
         WORDS,
       ),
       fees: r.fees,
+      feeProv: r.feeProv,
       exposure: r.exposure,
       holders: holders[i],
-      figures: {
-        asset: v.asset.symbol,
-        held: v.totalAssets && !v.assetScale ? held(v) : null,
-        yearly30: y ? y.yearly30 : null,
-        range: y && y.yearly30 > 0 && y.low != null && y.high != null ? y.high - y.low : null,
-        withdrawable: w == null ? null : w.paused ? 0 : w.share,
-      },
+      receipts: vaultIndexRowReceipts(readOf.get(vaultIndexRosterKeyOf(v)) ?? {}, v),
+      yieldFigure: yields[vaultIndexKey(v)] ?? null,
+      lineProvs,
     };
   });
   return { columns, notFound };

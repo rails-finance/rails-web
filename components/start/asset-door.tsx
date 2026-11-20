@@ -15,7 +15,6 @@ import { VAULT_FAMILIES } from "@/lib/vaults/families";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { ASSET_DOOR, type AssetOrder } from "@/lib/vaults/health-words";
 import type { AssetCard } from "@/lib/start/asset-door";
-import { CompareBar, CompareTick } from "@/components/vaults/compare-selection";
 
 const SHOWN = 9;
 const CARD =
@@ -52,10 +51,9 @@ function Figure({ label, value, sub }: { label: string; value: string | null; su
 function Card({ c }: { c: AssetCard }) {
   const w = ASSET_DOOR.card;
   return (
-    // The tick sits beside the card's link, over its corner (E2).
-    <div className="relative h-full">
+    <div className="h-full">
       <Link href={c.href} className={CARD} data-asset-card={c.key} data-asset-card-hidden={c.hidden ? "" : undefined}>
-        <div className="mb-3 flex items-center gap-2.5 pr-20">
+        <div className="mb-3 flex items-center gap-2.5">
           <VaultLead vault={c.vault} size={28} />
           <div className="min-w-0">
             <div className="truncate font-medium text-foreground" title={c.name}>
@@ -80,7 +78,6 @@ function Card({ c }: { c: AssetCard }) {
           />
         </dl>
       </Link>
-      <CompareTick vaultKey={c.key} name={c.name} className="absolute top-2.5 right-2.5" />
     </div>
   );
 }
@@ -153,7 +150,6 @@ export function AssetDoorCards({
         </Link>
         <span className={MUTED}>{ASSET_DOOR.allTail}</span>
       </p>
-      <CompareBar />
     </div>
   );
 }

@@ -6,7 +6,7 @@
 // (V6) per vault, through the shared roster (components/vaults/vault-roster.tsx;
 // ui-jobs 605). The family is a facet and the Kind cell on the row: a reader
 // narrowing to one asset still sees which rows are a slashable stake and which
-// are wrapped supply. Compare ticks as on /vaults (E2, E3).
+// are wrapped supply.
 // The family's own mechanic reads (deposit cap, wrapped aToken, cooldown and
 // slashing) are on the vault's page; the mechanics in words, the catalogue count
 // and Aave's pages are on the vaults info page, since the roster opens on its
@@ -18,7 +18,6 @@
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import { ProvSection } from "@/components/shared/section-menu";
 import { ROSTER_SCOPE, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
-import { CompareBar } from "@/components/vaults/compare-selection";
 import { AAVE_FAMILY_LABEL } from "@/components/vaults/aave-vault-format";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { ethereumVaultHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
@@ -82,7 +81,6 @@ export function AaveVaultDirectoryView({
           head={{ drawer: null }}
         />
       </ProvSection>
-      <CompareBar />
     </>
   );
 }

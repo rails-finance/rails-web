@@ -44,14 +44,13 @@ import { AimChainButton, AimSearchButton, useAimSuggestScope } from "@/component
 import {
   ADDRESS_RE,
   ENS_RE,
-  expandIndex,
   isOpenable,
   suggest,
   type SearchIndex,
-  type SearchIndexWire,
   type Suggestion,
   type SuggestBookmark,
 } from "@/lib/search/suggest";
+import { loadSearchIndex } from "@/lib/search/index-client";
 
 /** What the field takes, said on the field (Arbitrum item 31). */
 export const SEARCH_PLACEHOLDER = "Wallet address or ENS name";
@@ -498,21 +497,6 @@ export function FrontDoorSearch({
 }
 
 // ── Suggestions (ui-jobs 482) ───────────────────────────────────────────────
-
-/** The index, fetched once per page load on the first focus and kept. */
-let indexPromise: Promise<SearchIndex | null> | null = null;
-function loadSearchIndex(): Promise<SearchIndex | null> {
-  indexPromise ??= fetch("/api/search/index")
-    .then((r) => (r.ok ? (r.json() as Promise<SearchIndexWire>) : null))
-    .then((wire) => (wire?.v === 2 ? expandIndex(wire) : null))
-    .catch(() => null)
-    .then((index) => {
-      // A failed read is asked again on the next focus.
-      if (index == null) indexPromise = null;
-      return index;
-    });
-  return indexPromise;
-}
 
 /** ENS answers by name, for the page's life: an address, or null for none. */
 const ensAnswers = new Map<string, string | null>();

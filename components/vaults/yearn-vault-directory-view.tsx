@@ -5,7 +5,7 @@
 // What /ethereum/yearn/vaults shows — the Vaults tab of the Yearn V3 rail, and
 // the explorer's landing page (rails-ops decision 0027 call 2). One table row
 // (V6) per catalogued vault, through the shared roster (components/vaults/
-// vault-roster.tsx; ui-jobs 605). Compare ticks as on /vaults (E2, E3).
+// vault-roster.tsx; ui-jobs 605).
 //
 // THE ENDORSEMENT IS EARNED, THE FAMILY WORD IS NOT. "Yearn V3" and the release
 // sit in every row's Kind cell; the "endorsed" pill only where
@@ -21,7 +21,6 @@
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import { ProvSection } from "@/components/shared/section-menu";
 import { ROSTER_SCOPE, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
-import { CompareBar } from "@/components/vaults/compare-selection";
 import { yearnVaultHref } from "@/lib/vaults/routes";
 import { yearnEmptyCountProv, type YearnVaultCoords } from "@/lib/yearn/vault-provenance";
 import { releaseLabel } from "@/lib/vaults/families";
@@ -99,7 +98,6 @@ export function YearnVaultDirectoryView({
           head={{ drawer: null }}
         />
       </ProvSection>
-      <CompareBar />
     </>
   );
 }

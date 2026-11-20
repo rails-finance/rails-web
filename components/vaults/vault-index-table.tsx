@@ -3,11 +3,13 @@
 // The vault table (rails-ops ui-jobs 538, V6): the rows of every family's
 // roster (ui-jobs 605), drawn inside the shared roster's controls.
 // ----------------------------------------------------------------------------
-// One row per vault in the house table (components/shared/data-table): Vault (the asset's icon, the name linking the vault's
-// page under its protocol, the standing pills beneath where there are any),
-// then Kind (the family's kind; on a roster its family and release, as its
-// cards printed them, `kindOf`), Total assets, Share price, Yield and Holders (the census's open
-// count), Steward, and last the Compare tick (E2, ui-jobs 553 door 3). The
+// One row per vault in the house table (components/shared/data-table): Vault
+// (the asset's icon, the name linking the vault's page under its protocol,
+// the standing pills beneath where there are any), then Kind (the family's
+// kind; on a roster its family and release, as its cards printed them,
+// `kindOf`), Total assets, Share price, Yield and Holders (the census's open
+// count), and Steward; no row menu (ui-jobs 779: comparing is /vaults/compare's
+// search). The
 // figures print as the row prints them (vaultHeads, yieldPct), each in its
 // family's receipt at its roster's block (decision 0062 point 5; ui-jobs
 // 571): every row is its own receipts scope, so the locator pulse stays in the
@@ -47,7 +49,6 @@ import {
   DataTableHeader,
   DataTableRow,
   DataTableRowLink,
-  DataTableRowMenu,
 } from "@/components/shared/data-table/data-table";
 import {
   STANDING_WORD,
@@ -69,9 +70,6 @@ import { assetScaleAbsentTip, assetScaleSentence } from "@/lib/vaults/asset-scal
 import { formatCompact } from "@/lib/shared/format-compact";
 import { sharePriceText } from "@/lib/shared/vault-amount-text";
 import { perShareFace } from "@/lib/liquity-v2/sbold-per-share";
-import { useCompareSelection } from "@/components/vaults/compare-selection";
-import { compareKey } from "@/lib/vaults/compare";
-import { COMPARE_TICK } from "@/lib/vaults/compare-words";
 
 type SortKey = "vault" | "assets" | "price" | "yield" | "holders";
 
@@ -354,7 +352,6 @@ export function VaultIndexTable({
             />,
           ])}
           <DataTableHeader label="Steward" data-col-head="steward" />
-          <DataTableHeader label={<span className="sr-only">Actions</span>} data-col-head="menu" />
         </DataTableHead>
         <DataTableBody>
           {sorted.map((v) => {
@@ -565,11 +562,6 @@ export function VaultIndexTable({
                       </span>
                     )}
                   </DataTableCell>
-                  {/* The row's ⋮ (D7), Compare first (E2); it stands above the
-                    row's cover, and on a card sits at its top right. */}
-                  <DataTableCell valign="middle" className="dt-row-menu w-px whitespace-nowrap" data-col="menu">
-                    <VaultRowMenu vaultKey={compareKey(v.chainId, v.address)} name={name ?? v.address} />
-                  </DataTableCell>
                 </DataTableRow>
               </RowScope>
             );
@@ -577,27 +569,5 @@ export function VaultIndexTable({
         </DataTableBody>
       </DataTable>
     </div>
-  );
-}
-
-/** A /vaults row's ⋮ (D7): the comparison entry (E2), through the same
- *  selection as the asset step's tick, so the bar (E3) and a refused fifth
- *  pick behave as there. */
-function VaultRowMenu({ vaultKey, name }: { vaultKey: string; name: string }) {
-  const { keys, toggle } = useCompareSelection();
-  const on = keys.includes(vaultKey);
-  return (
-    <DataTableRowMenu
-      label={`Actions for ${name}`}
-      items={[
-        {
-          key: "compare",
-          label: on ? COMPARE_TICK.remove : COMPARE_TICK.add,
-          checked: on,
-          onSelect: () => toggle(vaultKey),
-          hooks: { "data-anatomy": "E2", "data-compare-tick": vaultKey, "data-compare-checked": on ? "" : undefined },
-        },
-      ]}
-    />
   );
 }

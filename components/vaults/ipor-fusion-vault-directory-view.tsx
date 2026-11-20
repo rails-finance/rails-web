@@ -10,7 +10,6 @@ import type { ServerRead } from "@/lib/shared/server-head-read";
 import type { ChainId } from "@/lib/shared/chains";
 import { ProvSection } from "@/components/shared/section-menu";
 import { ROSTER_SCOPE, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
-import { CompareBar } from "@/components/vaults/compare-selection";
 import { iporFusionVaultHref } from "@/lib/vaults/routes";
 import { iporEmptyCountProv, type IporFusionCoords } from "@/lib/ipor-fusion/vault-provenance";
 import { releaseLabel } from "@/lib/vaults/families";
@@ -74,7 +73,6 @@ export function IporFusionVaultDirectoryView({
           head={{ drawer: null }}
         />
       </ProvSection>
-      <CompareBar />
     </>
   );
 }

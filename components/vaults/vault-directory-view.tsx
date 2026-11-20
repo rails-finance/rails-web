@@ -8,8 +8,7 @@
 // (components/vaults/vault-roster.tsx; ui-jobs 605). What the family supplies:
 // its receipts, its Family facet (the two factory releases, also the Kind
 // cell). Above the rows the read stamp alone (ui-jobs 771): the census and the
-// family's words are on the vaults info page. Compare ticks as on /vaults
-// (E2, E3).
+// family's words are on the vaults info page.
 //
 // SHARE PRICE is `convertToAssets(10^18)` — one whole share, in the vault's
 // own asset. No USD.
@@ -17,7 +16,6 @@
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import { ProvSection } from "@/components/shared/section-menu";
 import { ROSTER_SCOPE, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
-import { CompareBar } from "@/components/vaults/compare-selection";
 import { metaMorphoVaultHref, metaMorphoVaultsListingHref, type MetaMorphoRouteChain } from "@/lib/vaults/routes";
 import { vaultDirectoryEmptyCountProv, type MorphoVaultCoords } from "@/lib/morpho-base/vault-provenance";
 import { releaseLabel } from "@/lib/vaults/families";
@@ -82,7 +80,6 @@ export function VaultDirectoryView({
           head={{ drawer: null }}
         />
       </ProvSection>
-      <CompareBar />
     </>
   );
 }

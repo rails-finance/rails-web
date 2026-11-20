@@ -1,12 +1,11 @@
-// The vault comparison's rules (rails-ops ui-jobs 553, door 3; /vaults/compare):
-// which vaults a selection holds, how the columns sort, and the holder donut's
-// slices. The page's words are lib/vaults/compare-words.ts; its reads are
+// The vault comparison's rules (rails-ops ui-jobs 553 door 3, 779;
+// /vaults/compare): which vaults a selection holds, which facts differ, and
+// the holder donut's slices. The page's words are lib/vaults/compare-words.ts; its reads are
 // lib/vaults/compare-read.ts.
 // ----------------------------------------------------------------------------
-// A selection is two to four vaults, each `<chain id>:<lowercased address>`;
-// a fifth is refused. The sort orders columns only, by a measured figure, a
-// vault with no figure after those with one, ties by size. Rails scores
-// nothing: each sort is a figure the page states.
+// A selection is two to four vaults, each `<chain id>:<lowercased address>`,
+// in the order the reader picked them. Rails scores and ranks nothing: the
+// columns keep the picker's order.
 //
 // Pure, with no imports: scripts/test/vault-compare.test.mjs reads it.
 
@@ -40,59 +39,19 @@ export const isCompareKey = (k: string): boolean => KEY_RE.test(k);
 export const compareHref = (keys: readonly string[]): string =>
   keys.length ? `${COMPARE_HREF}?v=${keys.join(",")}` : COMPARE_HREF;
 
-/** A tick pressed: removed if held, added if there is room, else refused. */
-export function toggleCompare(keys: readonly string[], key: string): { keys: string[]; refused: boolean } {
-  if (keys.includes(key)) return { keys: keys.filter((k) => k !== key), refused: false };
-  if (keys.length >= COMPARE_MAX) return { keys: [...keys], refused: true };
-  return { keys: [...keys, key], refused: false };
+/** The picker's slots as the page's keys: the filled ones in slot order,
+ *  each once, at most four. */
+export function pickedKeys(slots: readonly (string | null)[]): string[] {
+  const out: string[] = [];
+  for (const k of slots) if (k && !out.includes(k)) out.push(k);
+  return out.slice(0, COMPARE_MAX);
 }
 
-// ── The sort ───────────────────────────────────────────────────────────────
+// ── Differences ────────────────────────────────────────────────────────────
 
-export type CompareSort = "size" | "yield" | "range" | "withdrawable";
-
-export const COMPARE_SORTS: readonly CompareSort[] = ["size", "yield", "range", "withdrawable"];
-
-export const isCompareSort = (s: string | null | undefined): s is CompareSort =>
-  (COMPARE_SORTS as readonly string[]).includes(s ?? "");
-
-/** The figures a column sorts by; null where the vault has none. */
-export interface CompareFigures {
-  /** The asset the size is in: sizes compare within one asset only. */
-  asset: string;
-  /** What the vault holds, in its asset. */
-  held: number | null;
-  /** The 30-day yield, yearly. */
-  yearly30: number | null;
-  /** The spread of the three 30-day yields inside the 90; null unless the
-   *  share price grew over the 30 days. */
-  range: number | null;
-  /** The share of the vault that could be withdrawn at the last read, 0..1. */
-  withdrawable: number | null;
-}
-
-/** Highest first, none last. */
-const desc = (a: number | null, b: number | null) => (a == null ? (b == null ? 0 : 1) : b == null ? -1 : b - a);
-/** Lowest first, none last. */
-const asc = (a: number | null, b: number | null) => (a == null ? (b == null ? 0 : 1) : b == null ? -1 : a - b);
-
-/** The columns in the sort's order; the input is left alone. Size compares
- *  amounts in one asset only, so vaults in different assets sort by asset
- *  first (A to Z), then by size within each. */
-export function sortColumns<T extends { figures: CompareFigures }>(cols: readonly T[], sort: CompareSort): T[] {
-  const bySize = (a: T, b: T) => desc(a.figures.held, b.figures.held);
-  const cmp: Record<CompareSort, (a: T, b: T) => number> = {
-    size: (a, b) => a.figures.asset.localeCompare(b.figures.asset, "en-US") || bySize(a, b),
-    yield: (a, b) => desc(a.figures.yearly30, b.figures.yearly30) || bySize(a, b),
-    range: (a, b) => asc(a.figures.range, b.figures.range) || bySize(a, b),
-    withdrawable: (a, b) => desc(a.figures.withdrawable, b.figures.withdrawable) || bySize(a, b),
-  };
-  return [...cols].sort(cmp[sort]);
-}
-
-/** Do the columns hold more than one asset? The Size sort then says so. */
-export const mixedAssets = (cols: readonly { figures: CompareFigures }[]): boolean =>
-  new Set(cols.map((c) => c.figures.asset)).size > 1;
+/** Does a fact differ across the columns? Each value is what the column
+ *  prints; an absent one (null) counts as a value of its own. */
+export const differs = (values: readonly (string | null)[]): boolean => new Set(values).size > 1;
 
 // ── The holder donut ───────────────────────────────────────────────────────
 

@@ -3,8 +3,9 @@
 // data only. SERVER-ONLY: reads RAILS_API_URL and the bearer token.
 //
 // - Explorers: the protocol registry (lib/shared/protocols.ts).
-// - Morpho on Base and Yearn V3 on Ethereum: the rosters the box writes, over
-//   the baked catalogues (lib/morpho-base/vault-roster.ts, lib/yearn/vault-roster.ts).
+// - MetaMorpho on Base and on Ethereum, and Yearn V3 on Ethereum: the rosters
+//   the box writes, over the baked catalogues (lib/metamorpho/vault-roster.ts,
+//   lib/yearn/vault-roster.ts).
 // - Aave's vaults on Ethereum: the box's vault census (sGHO, the stata tokens,
 //   the Umbrella stake tokens), with the five the address book names as the
 //   floor when the census does not answer.
@@ -22,7 +23,7 @@ import "server-only";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { LAUNCHED_PROTOCOLS } from "@/lib/shared/protocols";
 import { BASE_CHAIN_ID, CHAINS, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
-import { loadMorphoBaseVaultRoster } from "@/lib/morpho-base/vault-roster";
+import { loadMetaMorphoVaultRoster } from "@/lib/metamorpho/vault-roster";
 import { loadYearnVaultRoster } from "@/lib/yearn/vault-roster";
 import { AAVE_ETHEREUM_BOOK_VAULTS } from "@/lib/aave-vaults/vault-catalog";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
@@ -30,6 +31,7 @@ import {
   baseVaultRosterHref,
   ethereumVaultRosterHref,
   maplePoolsHref,
+  metaMorphoVaultRosterHref,
   yearnVaultRosterHref,
 } from "@/lib/vaults/routes";
 import { SBOLD_PAGE_PATH, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
@@ -54,13 +56,15 @@ interface CensusRow {
   oraclePriceE8: string | null;
 }
 
-/** One chain's census header from the box, or [] when it does not answer. */
-async function loadCensus(chainId: number): Promise<CensusRow[]> {
+/** One chain's census header from the box, or [] when it does not answer.
+ *  `families` scopes it: chain 1's default is Aave's three families, and
+ *  MetaMorpho's is `morpho`. */
+async function loadCensus(chainId: number, families?: "morpho"): Promise<CensusRow[]> {
   const base = process.env.RAILS_API_URL;
   if (!base) return [];
   try {
     const res = await fetch(
-      `${base}/api/vaults/positions?chain=${chainId}&limit=1`,
+      `${base}/api/vaults/positions?chain=${chainId}&limit=1${families ? `&families=${families}` : ""}`,
       createAuthFetchOptions({ next: { revalidate: 3600 }, signal: AbortSignal.timeout(8000) }),
     );
     if (!res.ok) return [];
@@ -90,11 +94,13 @@ function censusSize(c: CensusRow | undefined): number {
 }
 
 export async function buildSearchIndex(): Promise<SearchIndexWire> {
-  const [morpho, yearn, baseCensus, ethCensus] = await Promise.all([
-    loadMorphoBaseVaultRoster(),
+  const [morpho, morphoEth, yearn, baseCensus, ethCensus, ethMorphoCensus] = await Promise.all([
+    loadMetaMorphoVaultRoster(BASE_CHAIN_ID),
+    loadMetaMorphoVaultRoster(MAINNET_CHAIN_ID),
     loadYearnVaultRoster(),
     loadCensus(BASE_CHAIN_ID),
     loadCensus(MAINNET_CHAIN_ID),
+    loadCensus(MAINNET_CHAIN_ID, "morpho"),
   ]);
   const base = chainName(BASE_CHAIN_ID);
   const eth = chainName(MAINNET_CHAIN_ID);
@@ -106,8 +112,9 @@ export async function buildSearchIndex(): Promise<SearchIndexWire> {
     ["Maple", eth, maplePoolsHref(), 0],
     // sBOLD is no explorer's product (ui-jobs 765): its row says what it is.
     ["ERC-4626 vault", eth, SBOLD_PAGE_PATH, 0],
+    ["Morpho", eth, `${metaMorphoVaultRosterHref(MAINNET_CHAIN_ID)}/`, 1],
   ];
-  const [MORPHO, AAVE, YEARN, MAPLE, SBOLD] = [0, 1, 2, 3, 4];
+  const [MORPHO, AAVE, YEARN, MAPLE, SBOLD, MORPHO_ETH] = [0, 1, 2, 3, 4, 5];
   const row = (name: string, symbol: string, asset: string, roster: number, address: string): WireVault => [
     name,
     symbol === name ? "" : symbol,
@@ -122,6 +129,11 @@ export async function buildSearchIndex(): Promise<SearchIndexWire> {
   for (const v of morpho.vaults) {
     const c = baseByVault.get(v.address);
     sized.push({ row: row(v.name, v.symbol, c?.assetSymbol ?? "", MORPHO, v.address), size: censusSize(c) });
+  }
+  const ethMorphoByVault = new Map(ethMorphoCensus.map((c) => [c.vault.toLowerCase(), c]));
+  for (const v of morphoEth.vaults) {
+    const c = ethMorphoByVault.get(v.address);
+    sized.push({ row: row(v.name, v.symbol, c?.assetSymbol ?? "", MORPHO_ETH, v.address), size: censusSize(c) });
   }
 
   const aaveSeen = new Set<string>();
