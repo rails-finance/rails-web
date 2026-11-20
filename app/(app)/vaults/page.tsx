@@ -1,49 +1,40 @@
-// The cross-protocol vault index — /vaults (rails-ops ui-jobs 39).
+// The vault overview — /vaults (rails-ops ui-jobs 776; decision 0028 point 8).
 // ----------------------------------------------------------------------------
-// Decision 0028 point 8: an index may span protocols, and it owns no vault
-// page. Every row is a vault a protocol roster lists, read by that roster's
-// loader at that roster's block (lib/vaults/index-read.ts), and opens the
-// vault's page under its protocol. It spans chains, so it sits under no chain
-// and no explorer rail. Its rows carry their rosters' receipts and the page
-// mounts the inspector (decision 0062 point 5; ui-jobs 571).
+// What a vault is, how Rails shows one, then a card per family and chain
+// linking its roster (components/vaults/vault-overview.tsx). It spans chains,
+// so it sits under no chain and no explorer rail. The counts carry their
+// rosters' receipts and the page mounts the inspector.
 
-import { VaultIndexView } from "@/components/vaults/vault-index-view";
-import { IndexNotice } from "@/components/shared/index-notice";
+import { Suspense } from "react";
+import { VaultIndexHead } from "@/components/vaults/vault-index-head";
+import { VaultOverviewCards, VaultOverviewCardsLoading, VaultOverviewIntro } from "@/components/vaults/vault-overview";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { loadVaultIndex } from "@/lib/vaults/index-read";
 import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
 import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
-import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
+import type { RawSearchParams } from "@/lib/shared/listing-ssr";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Vaults",
   description:
-    "Every vault the Morpho, Aave, Yearn and Maple rosters list on Ethereum and Base, with total assets and share price in each vault's own asset, each roster read at its own block.",
+    "What a vault is and how Rails shows one, then each vault family Rails reads: its vault count at its roster's block, and a link to its roster.",
   alternates: { canonical: VAULT_INDEX_HREF },
   ...(vaultIndexLaunched() ? {} : { robots: { index: false, follow: false } }),
 };
 
-export default async function VaultIndexPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
-  const [{ vaults, yields, rosters, indexDown }, sp] = await Promise.all([loadVaultIndex(), searchParams]);
-  const { asset } = sp;
+export default async function VaultOverviewPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+  const { asset } = await searchParams;
   return (
     <div className="min-h-screen">
-      <div className="py-8">
+      <div className="py-8" data-anatomy="E6" data-vault-overview="">
         <header className="mb-6" data-skel-section="page-header">
-          <h1 className="text-2xl font-semibold text-foreground">Vaults</h1>
+          <VaultIndexHead venue="overview" />
         </header>
-        {indexDown && <IndexNotice chainFilled={vaults.length > 0} className="mb-4 text-sm text-rb-500" />}
-        <div data-roster-panel data-vault-index>
-          <VaultIndexView
-            vaults={vaults}
-            yields={yields}
-            rosters={rosters}
-            asset={typeof asset === "string" ? asset : undefined}
-            initialSearch={toURLSearchParams(sp).toString()}
-          />
-        </div>
+        <VaultOverviewIntro />
+        <Suspense fallback={<VaultOverviewCardsLoading />}>
+          <VaultOverviewCards asset={typeof asset === "string" && asset.trim() ? asset.trim() : undefined} />
+        </Suspense>
         <ProvInspectorLayer />
       </div>
     </div>

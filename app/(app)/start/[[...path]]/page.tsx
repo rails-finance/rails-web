@@ -195,8 +195,9 @@ function ResultLine({ row, results }: { row: ResultRow; results: ResultsKey }) {
 }
 
 /** A group's coins with the vaults that hold each, most first: the count is
- *  the rows `/vaults?asset=` opens on (shownOnArrival), so it matches the
- *  roster; a coin with none is left off. */
+ *  the rows the family rosters open on under the link's `?asset=`
+ *  (shownOnArrival), summed across them; the /vaults overview's cards count
+ *  every vault over the coin, funded or not. A coin with none is left off. */
 async function coinCounts(group: GroupKey): Promise<{ label: string; symbol: string; count: number }[]> {
   const g = TREE.groups[group];
   const { vaults } = await loadVaultIndex();

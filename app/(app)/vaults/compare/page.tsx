@@ -2,14 +2,15 @@
 // rails-ops ui-jobs 553, door 3; Miles, 9 Nov 2026).
 // ----------------------------------------------------------------------------
 // Two to four vaults side by side, chosen with the ticks on the asset step and
-// /vaults. Like the index (decision 0028 point 8) it spans protocols and
-// chains, so it sits under no chain and no explorer rail, owns no vault page
-// (each name opens the vault's page under its protocol), and carries no
-// receipts and no inspector: each vault's page keeps them. The read is
-// lib/vaults/compare-read.ts.
+// the family rosters, under the /vaults head (ui-jobs 776). It spans protocols
+// and chains (decision 0028 point 8), so it sits under no chain and no
+// explorer rail, owns no vault page (each name opens the vault's page under
+// its protocol), and carries no receipts and no inspector: each vault's page
+// keeps them. The read is lib/vaults/compare-read.ts.
 
 import Link from "next/link";
 import { VaultCompare } from "@/components/vaults/vault-compare";
+import { VaultIndexHead } from "@/components/vaults/vault-index-head";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { COMPARE_HREF, COMPARE_MIN, isCompareSort, parseCompareParam } from "@/lib/vaults/compare";
 import { COMPARE_PAGE, COMPARE_TITLE } from "@/lib/vaults/compare-words";
@@ -44,7 +45,8 @@ export default async function VaultComparePage({
   return (
     <div className="min-h-screen py-8" data-anatomy="E1" data-compare-page="" data-prov-exempt={PROV_EXEMPT}>
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground">{COMPARE_TITLE}</h1>
+        <VaultIndexHead venue="compare" />
+        <h1 className="mt-4 text-lg font-semibold text-foreground">{COMPARE_TITLE}</h1>
         <p className="mt-2 max-w-2xl text-rb-500" data-compare-disclaimer="">
           {COMPARE_PAGE.lead}
         </p>

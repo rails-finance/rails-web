@@ -27,6 +27,7 @@ import { listingMetadata } from "@/lib/shared/page-metadata";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { loadYearnVaultRoster } from "@/lib/yearn/vault-roster";
+import { YEARN_VAULTS_LEAD } from "@/lib/vaults/family-leads";
 
 export const dynamic = "force-dynamic";
 
@@ -60,10 +61,7 @@ export default async function YearnVaultsInfoPage() {
   const stalePointers = factories.filter((f) => f.onStalePointer).length;
   return (
     <VaultsInfoPage chainId={MAINNET_CHAIN_ID} protocol={protocolForHref("/ethereum/yearn")!}>
-      <p>
-        The Yearn V3 roster lists every vault the V3 factories deployed on Ethereum, endorsed or not, with each
-        vault&rsquo;s totals and share price.
-      </p>
+      <p>{YEARN_VAULTS_LEAD}</p>
 
       <section data-intro-vault>
         <h2 className={INFO_H2}>How a vault works</h2>

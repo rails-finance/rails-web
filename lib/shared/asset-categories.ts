@@ -346,7 +346,7 @@ export function symbolsInCategory(category: AssetCategory): readonly string[] {
   return category === "other" ? [] : TABLE[category];
 }
 
-/** Keywords `/vaults?asset=` expands in place of a symbol, each to the
+/** Keywords `?asset=` expands in place of a symbol, each to the
  *  categories whose symbols it stands for (the guided way in's "Earning in
  *  stablecoins", ui-jobs 488). */
 export const ASSET_KEYWORDS: Record<string, readonly AssetCategory[]> = {

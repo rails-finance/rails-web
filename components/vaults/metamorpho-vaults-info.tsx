@@ -30,6 +30,7 @@ import { metaMorphoVaultRosterHref, metaMorphoVaultsListingHref } from "@/lib/va
 import { loadMetaMorphoVaultRoster, type MetaMorphoChainId } from "@/lib/metamorpho/vault-roster";
 import { vaultDirectoryCensusProv } from "@/lib/morpho-base/vault-provenance";
 import { FOOT_LINK, INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { metaMorphoLead } from "@/lib/vaults/family-leads";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -59,8 +60,7 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
   return (
     <VaultsInfoPage chainId={chainId} protocol={protocolForPathname(metaMorphoVaultRosterHref(chainId))!}>
       <p>
-        The MetaMorpho roster lists every vault the two MetaMorpho factories made on {chain}, with each vault&rsquo;s
-        totals and share price. The{" "}
+        {metaMorphoLead(chainId)} The{" "}
         <Link href={metaMorphoVaultsListingHref(chainId)} className={INLINE_LINK} prefetch={false}>
           positions listing
         </Link>{" "}

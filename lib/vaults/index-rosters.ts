@@ -8,10 +8,8 @@ import type { ServerRead } from "@/lib/shared/server-head-read";
 import {
   metaMorphoVaultHref,
   metaMorphoVaultRosterHref,
-  metaMorphoVaultsListingHref,
   ethereumVaultHref,
   ethereumVaultRosterHref,
-  ethereumVaultsListingHref,
   maplePoolHref,
   maplePoolsHref,
   yearnVaultHref,
@@ -24,18 +22,9 @@ import { SBOLD_PAGE_PATH } from "@/lib/liquity-v2/sbold";
 /** One protocol's roster: the Protocol facet's value and the row's protocol.
  *  `sbold` is the one vault no explorer deploys, its own roster of one
  *  (ui-jobs 765). */
-/** "ipor-fusion" joins `VAULT_INDEX_PROTOCOLS`, and the index, with its three
- *  chains (rails-ops TO-DO-ipor-scoping §6.3 phase C). */
+/** "ipor-fusion" joins the index with its three chains (rails-ops
+ *  TO-DO-ipor-scoping §6.3 phase C). */
 export type VaultIndexProtocol = "morpho" | "aave" | "yearn" | "maple" | "sbold" | "ipor-fusion";
-
-export const VAULT_INDEX_PROTOCOLS: readonly VaultIndexProtocol[] = [
-  "morpho",
-  "aave",
-  "yearn",
-  "maple",
-  "sbold",
-  "ipor-fusion",
-];
 
 export const VAULT_INDEX_PROTOCOL_LABEL: Record<VaultIndexProtocol, string> = {
   morpho: "Morpho",
@@ -151,6 +140,17 @@ export function vaultIndexRosterHref(p: VaultIndexProtocol, chainId: number): st
             : SBOLD_PAGE_PATH;
 }
 
+/** The rosters that read `?asset=` on arrival (VaultRoster); Maple's pools
+ *  page and sBOLD's vault page do not. */
+const TAKES_ASSET: readonly VaultIndexProtocol[] = ["morpho", "aave", "yearn", "ipor-fusion"];
+
+/** The roster's page, carrying `?asset=` where the roster reads it (the
+ *  /vaults overview's card under `?asset=`, ui-jobs 776). */
+export function rosterHrefWithAsset(p: VaultIndexProtocol, chainId: number, asset?: string): string {
+  const href = vaultIndexRosterHref(p, chainId);
+  return asset && TAKES_ASSET.includes(p) ? `${href}?asset=${encodeURIComponent(asset)}` : href;
+}
+
 /** The vault's page under its protocol (decision 0028 point 8); a Maple
  *  pool's under Maple's pools tab; sBOLD's at /ethereum/vaults/sbold. */
 export function vaultIndexHref(v: VaultSummary): string {
@@ -166,16 +166,6 @@ export function vaultIndexHref(v: VaultSummary): string {
           : p === "ipor-fusion"
             ? (iporFusionVaultHref(v.chainId, v.address) ?? SBOLD_PAGE_PATH)
             : SBOLD_PAGE_PATH;
-}
-
-/** The positions listing filtered to this vault, where its roster has one. */
-export function vaultIndexHoldersHref(v: VaultSummary): string | null {
-  const p = vaultIndexProtocol(v);
-  return p === "morpho"
-    ? metaMorphoVaultsListingHref(morphoChain(v.chainId), { vault: v.address })
-    : p === "aave"
-      ? ethereumVaultsListingHref({ vault: v.address })
-      : null;
 }
 
 /** The index is offered (the site footer, the sitemap, indexing) once every

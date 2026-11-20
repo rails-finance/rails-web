@@ -90,7 +90,7 @@ const SECTION_ITEM =
 
 const ITEMS = '[role="menuitem"]';
 
-interface Section {
+export interface Section {
   href: string;
   name: string;
   current: boolean;
@@ -104,8 +104,15 @@ interface Section {
  *  Keyboard as the profile menu (H20): the current row takes focus on
  *  opening; the arrow keys, Home and End move through the rows; Escape closes
  *  it and returns focus to the trigger; Tab, a press outside and a
- *  navigation close it. */
-function SectionsMenu({ sections }: { sections: Section[] }) {
+ *  navigation close it. The /vaults head draws it too (ui-jobs 776). */
+export function SectionsMenu({
+  sections,
+  label = "Explorer sections",
+}: {
+  sections: Section[];
+  /** The nav's accessible name; /vaults names its own (ui-jobs 776). */
+  label?: string;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLElement>(null);
@@ -167,7 +174,7 @@ function SectionsMenu({ sections }: { sections: Section[] }) {
   }, [open, close]);
 
   return (
-    <nav ref={wrap} aria-label="Explorer sections" className="relative shrink-0" data-anatomy="H5">
+    <nav ref={wrap} aria-label={label} className="relative shrink-0" data-anatomy="H5">
       <button
         ref={trigger}
         id={triggerId}

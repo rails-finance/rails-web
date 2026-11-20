@@ -36,7 +36,7 @@ export const COMPARE_PAGE = {
   exposure: "Where the money is lent",
   holders: "Who holds it",
   /** Fewer than two vaults the index knows. */
-  tooFew: "Choose two to four vaults to compare: tick them on the vault index or on an asset's step.",
+  tooFew: "Choose two to four vaults to compare: tick them on a family's roster or on an asset's step.",
   toIndex: "Vaults",
   notFound: (keys: readonly string[]) => `Not found in the vault index: ${keys.join(", ")}.`,
 };

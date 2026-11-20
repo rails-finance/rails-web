@@ -29,6 +29,7 @@ import { aaveVaultCatalogueProv } from "@/lib/aave-vaults/vault-provenance";
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { ethereumVaultsListingHref } from "@/lib/vaults/routes";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { AAVE_VAULTS_LEAD } from "@/lib/vaults/family-leads";
 import { hasUnpricedSentence, UnpricedSentence } from "@/components/vaults/unpriced-sentence";
 import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
 import { ssrHop } from "@/lib/shared/listing-ssr";
@@ -75,8 +76,7 @@ export default async function EthereumVaultsInfoPage() {
   return (
     <VaultsInfoPage chainId={MAINNET_CHAIN_ID} protocol={protocolForHref("/ethereum/aave")!}>
       <p>
-        The Aave vault roster lists every ERC-4626 vault Aave publishes on Ethereum, with each vault&rsquo;s totals and
-        share price. The{" "}
+        {AAVE_VAULTS_LEAD} The{" "}
         <Link href={ethereumVaultsListingHref()} className={INLINE_LINK} prefetch={false}>
           positions listing
         </Link>{" "}
