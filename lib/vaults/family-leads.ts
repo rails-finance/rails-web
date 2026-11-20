@@ -1,6 +1,6 @@
 // Each vault family's lead (rails-ops ui-jobs 776): the first sentence of its
-// vaults info page, which the /vaults overview's card for that family and
-// chain repeats. One source: the info pages render their first sentence from
+// vaults info page, which the /vaults overview's card for that family
+// repeats (over all its chains, ui-jobs 782). One source: the info pages render their first sentence from
 // here, so the card cannot drift from the page. Maple's comes from its info
 // page's Pools page section; sBOLD has no info page, so its lead heads the
 // vault's page.
@@ -12,8 +12,15 @@ export type FamilyLeadProtocol = "morpho" | "aave" | "yearn" | "maple" | "sbold"
 const CHAIN: Record<number, string> = { 1: "Ethereum", 8453: "Base", 42161: "Arbitrum" };
 
 /** The MetaMorpho roster's lead on Ethereum or Base. */
-export const metaMorphoLead = (chainId: number) =>
-  `The MetaMorpho roster lists every vault the two MetaMorpho factories made on ${CHAIN[chainId] ?? chainId}, with each vault’s totals and share price.`;
+export const metaMorphoLead = (chainId: number) => metaMorphoLeadOn([chainId]);
+
+/** The lead over several chains' rosters, as the /vaults family card states
+ *  it (ui-jobs 782): "… made on Base and Ethereum, …". */
+export const metaMorphoLeadOn = (chainIds: readonly number[]) => {
+  const names = chainIds.map((c) => CHAIN[c] ?? String(c));
+  const on = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
+  return `The MetaMorpho ${names.length > 1 ? "rosters list" : "roster lists"} every vault the two MetaMorpho factories made on ${on}, with each vault’s totals and share price.`;
+};
 
 export const AAVE_VAULTS_LEAD =
   "The Aave vault roster lists every ERC-4626 vault Aave publishes on Ethereum, with each vault’s totals and share price.";
@@ -31,10 +38,11 @@ export const SBOLD_LEAD =
 export const IPOR_FUSION_LEAD =
   "An IPOR Fusion vault takes deposits of one token and issues shares for them. Its curator moves the token into other protocols through fuses, small contracts that each act in one protocol.";
 
-export function vaultFamilyLead(p: FamilyLeadProtocol, chainId: number): string {
+/** A family's lead; MetaMorpho's names the chains given. */
+export function vaultFamilyLead(p: FamilyLeadProtocol, chainIds: readonly number[]): string {
   switch (p) {
     case "morpho":
-      return metaMorphoLead(chainId);
+      return metaMorphoLeadOn(chainIds);
     case "aave":
       return AAVE_VAULTS_LEAD;
     case "yearn":

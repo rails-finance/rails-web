@@ -3,7 +3,7 @@
 // compiles or the head renders.
 
 import { VaultIndexHead } from "@/components/vaults/vault-index-head";
-import { VaultOverviewCardsLoading, VaultOverviewIntro } from "@/components/vaults/vault-overview";
+import { VaultOverviewCardsLoading } from "@/components/vaults/vault-overview";
 
 export default function Loading() {
   return (
@@ -12,7 +12,6 @@ export default function Loading() {
         <header className="mb-6" data-skel-section="page-header">
           <VaultIndexHead venue="overview" />
         </header>
-        <VaultOverviewIntro />
         <VaultOverviewCardsLoading />
       </div>
     </div>

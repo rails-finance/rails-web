@@ -34,8 +34,7 @@ export default async function VaultFrontsPage() {
     <div className="min-h-screen py-8" data-anatomy="E5" data-fronts-page="" data-prov-exempt={PROV_EXEMPT}>
       <header className="mb-6">
         <VaultIndexHead venue="fronts" />
-        <h1 className="mt-4 text-lg font-semibold text-foreground">{FRONTS_TITLE}</h1>
-        <p className="mt-2 max-w-2xl text-rb-500">{FRONTS_PAGE.lead}</p>
+        <p className="mt-4 max-w-2xl text-rb-500">{FRONTS_PAGE.lead}</p>
       </header>
       <VaultFronts rows={rows} />
     </div>
