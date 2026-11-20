@@ -24,12 +24,13 @@
 //      roster's read stamp at that block
 //   3  each card's lead is the first sentence of its family's info page (sBOLD:
 //      the line under its page's header)
-//   4  each card links its roster, which answers 200
+//   4  each card links its roster, which answers 200, named for family and chain
 //   5  no roster links the overview: each opens on its read stamp alone (ui-jobs 771)
 //   6  the counts carry receipts and the page offers the inspector (ui-jobs 571)
 //   7  /vaults/about is gone (404); Fronts and Compare light their menu entry
 //   8  ?asset=: the line names the asset, the cards count its vaults, the roster
-//      links carry it, and a roster opens on those rows
+//      links carry it, and a roster opens on those rows; removing its Asset pill
+//      takes ?asset= out of the URL
 
 import { chromium } from "playwright";
 import fs from "node:fs";
@@ -187,6 +188,7 @@ const cards = await page.locator("[data-overview-card]").evaluateAll((els) =>
     ),
     stampBlock: Number(el.querySelector("[data-roster-read-block]")?.getAttribute("data-roster-read-block") ?? 0),
     href: el.querySelector("[data-overview-roster]")?.getAttribute("href") ?? null,
+    name: el.querySelector("[data-overview-roster]")?.getAttribute("aria-label") ?? null,
   })),
 );
 const byKey = Object.fromEntries(cards.map((c) => [c.key, c]));
@@ -212,6 +214,11 @@ for (const k of KEYS) {
     `4  ${k}: the card links ${ROSTER[k].href}, which answers 200`,
     c.href === ROSTER[k].href && rosterPages[k].status === 200,
     `${c.href} ${rosterPages[k].status}`,
+  );
+  check(
+    `4b ${k}: the link is named for its family and chain`,
+    /^Open the .+ on (Base|Ethereum|Arbitrum) (roster|pools page|vault)$/.test(c.name ?? ""),
+    c.name ?? "no name",
   );
 }
 
@@ -290,6 +297,24 @@ for (const k of KEYS.filter((k) => !k.startsWith("sbold:"))) {
     tokens.length > 0 && tokens.every((t) => t === "USDC"),
     `${tokens.length} rows, ${[...new Set(tokens)].join(", ")}`,
   );
+  // Removing the Asset pill takes ?asset= out of the URL, so a reload does not
+  // bring the filter back.
+  const p = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+  await p.goto(`${BASE}/ethereum/morpho/vaults?asset=USDC&show=all`, {
+    waitUntil: "domcontentloaded",
+    timeout: 300_000,
+  });
+  await p.waitForSelector("[data-vault-row]", { timeout: 120_000 });
+  await p.waitForTimeout(1500);
+  await p.locator('[data-filter-pill="Asset"] [data-pill-remove]').first().click();
+  await p.waitForTimeout(300);
+  const url = new URL(p.url());
+  check(
+    "8d removing the Asset pill takes ?asset= out of the URL, the other params kept",
+    !url.searchParams.has("asset") && url.searchParams.get("show") === "all",
+    url.search,
+  );
+  await p.close();
 }
 
 await browser.close();

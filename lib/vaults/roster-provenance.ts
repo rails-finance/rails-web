@@ -34,14 +34,14 @@ const utc = (at: number | null) =>
         .replace("T", " ")
         .replace(/\.\d+Z$/, " UTC");
 
-/** One roster's vault count on its /vaults overview card (ui-jobs 776): the
- *  vaults its roster lists, or those over `asset` under `?asset=`, read at its
- *  block. */
+/** One roster's vault count on its /vaults overview card (ui-jobs 776):
+ *  every vault its roster lists, or every one over `asset` under `?asset=`,
+ *  funded or not, read at its block. */
 export const rosterCountProv = (read: RosterRead, count: number, asset?: string): Provenance => ({
   kind: "chain",
   pclass: "state",
   ...(read.block > 0 ? { source: { block: read.block } } : {}),
-  summary: `${read.label} — ${n(count)} ${asset ? `${asset} ` : ""}vaults on this roster, read at ${
+  summary: `${read.label} — ${n(count)} vaults${asset ? ` over ${asset}` : ""} on this roster, funded or not, read at ${
     read.block > 0 ? `block ${n(read.block)} (${utc(read.at)})` : "its roster's read block"
   }.`,
   via: "vault overview · the roster's rows @ its read block",

@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Vaults",
   description:
-    "What a vault is and how Rails shows one, then each vault family Rails reads on Ethereum and Base: its vault count at its roster's block, and its roster.",
+    "What a vault is and how Rails shows one, then each vault family Rails reads: its vault count at its roster's block, and a link to its roster.",
   alternates: { canonical: VAULT_INDEX_HREF },
   ...(vaultIndexLaunched() ? {} : { robots: { index: false, follow: false } }),
 };

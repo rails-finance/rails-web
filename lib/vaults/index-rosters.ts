@@ -140,6 +140,17 @@ export function vaultIndexRosterHref(p: VaultIndexProtocol, chainId: number): st
             : SBOLD_PAGE_PATH;
 }
 
+/** The rosters that read `?asset=` on arrival (VaultRoster); Maple's pools
+ *  page and sBOLD's vault page do not. */
+const TAKES_ASSET: readonly VaultIndexProtocol[] = ["morpho", "aave", "yearn", "ipor-fusion"];
+
+/** The roster's page, carrying `?asset=` where the roster reads it (the
+ *  /vaults overview's card under `?asset=`, ui-jobs 776). */
+export function rosterHrefWithAsset(p: VaultIndexProtocol, chainId: number, asset?: string): string {
+  const href = vaultIndexRosterHref(p, chainId);
+  return asset && TAKES_ASSET.includes(p) ? `${href}?asset=${encodeURIComponent(asset)}` : href;
+}
+
 /** The vault's page under its protocol (decision 0028 point 8); a Maple
  *  pool's under Maple's pools tab; sBOLD's at /ethereum/vaults/sbold. */
 export function vaultIndexHref(v: VaultSummary): string {

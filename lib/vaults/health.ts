@@ -52,7 +52,7 @@ export interface HealthInput {
   /** The holder's claim and `maxWithdraw` at the page block, raw; absent off a holder page. */
   holder?: { block: number; claim: string; maxWithdraw: string } | null;
   exit: ExitInput | null;
-  /** The contract says withdrawals are paused (sGHO's `paused()`, the index's standing). */
+  /** The contract says withdrawals are paused (sGHO's `paused()`, the roster's standing). */
   paused?: boolean;
   /** The vault says it is shut down (Yearn's `isShutdown()`). */
   shutdown?: boolean;

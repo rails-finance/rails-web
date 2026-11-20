@@ -4,7 +4,7 @@
 // family's lead (lib/vaults/family-leads.ts, the first sentence of its info
 // page), its roster's vault count at that roster's block with the roster's
 // read stamp, and links the roster. Each roster is read at a block of its
-// chain, so each card carries its own stamp.
+// chain, so each card carries a stamp.
 
 import Link from "next/link";
 import { IndexNotice } from "@/components/shared/index-notice";
@@ -23,7 +23,7 @@ import {
   chainName,
   VAULT_INDEX_LISTED,
   VAULT_INDEX_PROTOCOL_LABEL,
-  vaultIndexRosterHref,
+  rosterHrefWithAsset,
   vaultIndexRosterKey,
   vaultIndexRosterKeyOf,
   type VaultIndexProtocol,
@@ -75,20 +75,19 @@ export function VaultOverviewIntro() {
   );
 }
 
-/** The link's words: Maple's roster is its pools page, sBOLD's is the vault. */
-const OPEN: Partial<Record<VaultIndexProtocol, string>> = {
-  maple: "Open the pools page",
-  sbold: "Open the vault",
+/** What the card links: Maple's roster is its pools page, sBOLD's the vault. */
+const NOUN: Partial<Record<VaultIndexProtocol, string>> = {
+  maple: "pools page",
+  sbold: "vault",
 };
-
-/** The rosters that read `?asset=` on arrival (VaultRoster); Maple's pools
- *  page and sBOLD's vault page do not. */
-const TAKES_ASSET: readonly VaultIndexProtocol[] = ["morpho", "aave", "yearn", "ipor-fusion"];
 
 /** Under `?asset=`: the param, its words, and the roster's vaults over it. */
 interface AssetCut {
   param: string;
-  label: string;
+  /** Before a noun: "USDC", "stablecoin". */
+  adjective: string;
+  /** After "over": "USDC", "stablecoins". */
+  over: string;
   count: number;
 }
 
@@ -98,12 +97,13 @@ function OverviewCard({ roster, cut }: { roster: VaultIndexRoster; cut: AssetCut
   const read: RosterRead = {
     label: `${label} on ${chainName(chainId)}`,
     block: roster.blockNumber,
-    at: isoSeconds(roster.readAt),
+    // The block's time where rails-server stamped it, as the rosters show it.
+    at: roster.readBy?.blockTime || isoSeconds(roster.readAt),
   };
   const counted = roster.blockNumber > 0;
   const count = cut ? cut.count : roster.count;
-  const noun = `${cut ? `${cut.label} ` : ""}${count === 1 ? "vault" : "vaults"}`;
-  const href = vaultIndexRosterHref(protocol, chainId);
+  const noun = `${cut ? `${cut.adjective} ` : ""}${count === 1 ? "vault" : "vaults"}`;
+  const opens = NOUN[protocol] ?? "roster";
   return (
     <article
       className={`${CARD} flex flex-col`}
@@ -122,7 +122,7 @@ function OverviewCard({ roster, cut }: { roster: VaultIndexRoster; cut: AssetCut
       <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-3 text-sm">
         {counted ? (
           <span className="text-foreground" data-overview-vaults="">
-            <Prov info={rosterCountProv(read, count, cut?.label)}>
+            <Prov info={rosterCountProv(read, count, cut?.over)}>
               {n(count)} {noun}
             </Prov>
           </span>
@@ -135,12 +135,13 @@ function OverviewCard({ roster, cut }: { roster: VaultIndexRoster; cut: AssetCut
           <RosterReadStamp reads={[read]} />
         </span>
         <Link
-          href={cut && TAKES_ASSET.includes(protocol) ? `${href}?asset=${encodeURIComponent(cut.param)}` : href}
+          href={rosterHrefWithAsset(protocol, chainId, cut?.param)}
+          aria-label={`Open the ${label} on ${chainName(chainId)} ${opens}`}
           className={`ml-auto ${PAGE_LINK}`}
           prefetch={false}
           data-overview-roster=""
         >
-          {OPEN[protocol] ?? "Open the roster"}
+          Open the {opens}
         </Link>
       </div>
     </article>
@@ -197,7 +198,7 @@ export async function VaultOverviewCards({ asset }: { asset?: string }) {
               <OverviewCard
                 key={k}
                 roster={r}
-                cut={asset && adjective ? { param: asset, label: adjective, count: overCount(k) } : null}
+                cut={asset && label && adjective ? { param: asset, adjective, over: label, count: overCount(k) } : null}
               />
             );
           })}
