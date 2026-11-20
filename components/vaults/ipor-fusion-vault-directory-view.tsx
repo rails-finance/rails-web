@@ -16,11 +16,7 @@ import { releaseLabel } from "@/lib/vaults/families";
 import type { VaultSummary } from "@/lib/vaults/summary";
 import { iporFusionRowReceipts } from "@/lib/vaults/row-receipts";
 
-export const IPOR_FUSION_DOCS = {
-  title: "IPOR's documentation",
-  subtitle: "ipor.io/docs: What is a fuse",
-  href: "https://ipor.io/docs/build-on-fusion/architecture-overview/what-is-a-fuse",
-};
+export { IPOR_FUSION_DOCS } from "@/lib/vaults/family-docs";
 
 const FACETS: VaultRosterFacet[] = [
   {

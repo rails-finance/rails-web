@@ -31,11 +31,12 @@ import { loadMetaMorphoVaultRoster, type MetaMorphoChainId } from "@/lib/metamor
 import { vaultDirectoryCensusProv } from "@/lib/morpho-base/vault-provenance";
 import { FOOT_LINK, INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { metaMorphoLead } from "@/lib/vaults/family-leads";
+import { MORPHO_VAULT_V1_ROLES_DOCS } from "@/lib/vaults/family-docs";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
 const MORPHO_VAULT_V2_DOCS = "https://docs.morpho.org/learn/concepts/vault-v2/";
-const MORPHO_VAULT_DOCS = "https://docs.morpho.org/curate/concepts/roles/#morpho-vaults-v1-roles";
+const MORPHO_VAULT_DOCS = MORPHO_VAULT_V1_ROLES_DOCS;
 const MORPHO_MARKET_DOCS = "https://docs.morpho.org/learn/concepts/blue/#what-is-a-variable-rate-market";
 
 /** The chain's facts in the three-blocks section. */

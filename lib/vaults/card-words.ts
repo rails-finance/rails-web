@@ -4,12 +4,13 @@
 // page view.
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { MORPHO_VAULT_V1_ROLES_DOCS } from "./family-docs";
 
 // The cards describe MetaMorpho (Vaults V1) vaults: the docs' V1 sections,
 // not /learn/concepts/vault/, which answers with the Vault V2 page (ui-jobs 628).
 const MORPHO_VAULT_DOCS = {
   label: "docs.morpho.org: Vaults V1 roles",
-  url: "https://docs.morpho.org/curate/concepts/roles/#morpho-vaults-v1-roles",
+  url: MORPHO_VAULT_V1_ROLES_DOCS,
 };
 const MORPHO_VAULT_QUEUE_DOCS = {
   label: "docs.morpho.org: Vaults V1 liquidity",
@@ -38,6 +39,42 @@ export const STEWARD_TIP = {
     "Yearn's role manager: the address that hands out every role over the vault, from adding a strategy to shutting it down.",
 } as const;
 
+/** A MetaMorpho vault's fee and roles, as its configuration states them; /vaults/products repeats them. */
+export const METAMORPHO_FEE_TIP =
+  "The share of the interest the vault earns that it pays to the fee recipient, as new shares. Read from fee(), a fraction of 10^18.";
+export const METAMORPHO_ROLE_WHAT = {
+  owner: "It sets the curator, the guardian and the fee.",
+  curator: "It chooses the markets and their caps.",
+  guardian: "It can cancel a change while the timelock runs.",
+} as const;
+
+/** A Yearn V3 vault's accountant, as its page's tip states it. */
+export const YEARN_ACCOUNTANT_TIP = "The contract that charges the vault's fees when a strategy reports.";
+
+/** The sBOLD vault's owner, as its page's tip states it. */
+export const SBOLD_OWNER_TIP = "The address the vault's owner() names.";
+
+/** The family modals' sentences /vaults/products repeats. */
+export const UMBRELLA_COOLDOWN_TEXT =
+  "a holder starts a cooldown, waits it out, then has the unstake window to redeem. Outside the window, nothing is redeemable.";
+export const STATA_REWARDS_TEXT =
+  "incentives the Aave market pays on the aToken are claimed outside the share and are not in its price.";
+export const UMBRELLA_REWARDS_TEXT = "Umbrella pays rewards outside the share; they are not in its price or its yield.";
+export const MAPLE_QUEUE_TEXT =
+  "withdrawals wait in a queue, first in, first out, and are paid from the cash in the pool as it allows.";
+export const MAPLE_LIQUID_TEXT = "the asset in the pool, the only part a withdrawal can be paid from at once.";
+export const IPOR_ROLES_TEXT =
+  "the owner appoints the vault's Atomist, owners and guardians; the curator, IPOR's Alpha, moves the assets between markets.";
+export const IPOR_FEES_TEXT =
+  "a performance fee on the share price's gains and a yearly management fee, each minted to its fee account as new shares.";
+
+/** The MetaMorpho assets modal's queue sentences. */
+export const MORPHO_QUEUE_SUPPLY = "The vault supplies its asset to the Morpho Blue markets in its withdraw queue";
+export const MORPHO_QUEUE_ORDER = "A withdrawal takes from them in that order.";
+
+/** Savings GHO's Risk bullet on its vault page. */
+export const SGHO_WITHDRAW_CLAMP = "Withdrawals are clamped to the GHO the contract holds.";
+
 export const SHARES_ISSUED_TIP = "Every share of the vault in existence.";
 
 export const morphoVaultCardContent = (): LearnMoreContent => ({
@@ -65,8 +102,7 @@ export const morphoVaultCardContent = (): LearnMoreContent => ({
 
 export const morphoVaultAssetsContent = (): LearnMoreContent => ({
   title: "Where a MetaMorpho vault's assets are",
-  intro:
-    "The vault supplies its asset to the Morpho Blue markets in its withdraw queue, listed here in the queue's order. A withdrawal takes from them in that order.",
+  intro: `${MORPHO_QUEUE_SUPPLY}, listed here in the queue's order. ${MORPHO_QUEUE_ORDER}`,
   detailsHeading: "Key concepts:",
   details: [
     {
@@ -115,14 +151,14 @@ export function aaveVaultCardContent(family: "sgho" | "stata" | "umbrella-stake"
             },
             {
               bold: "Rewards",
-              text: "incentives the Aave market pays on the aToken are claimed outside the share and are not in its price.",
+              text: STATA_REWARDS_TEXT,
             },
             YIELD_CONCEPT,
           ]
         : [
             {
               bold: "Cooldown, then a window",
-              text: "a holder starts a cooldown, waits it out, then has the unstake window to redeem. Outside the window, nothing is redeemable.",
+              text: UMBRELLA_COOLDOWN_TEXT,
             },
             {
               bold: "Slashable",
@@ -130,7 +166,7 @@ export function aaveVaultCardContent(family: "sgho" | "stata" | "umbrella-stake"
             },
             {
               bold: "Rewards",
-              text: "Umbrella pays rewards outside the share; they are not in its price or its yield.",
+              text: UMBRELLA_REWARDS_TEXT,
             },
             YIELD_CONCEPT,
           ];
@@ -204,7 +240,7 @@ export const iporFusionVaultCardContent = (): LearnMoreContent => ({
   details: [
     {
       bold: "Owner and curator",
-      text: "the owner appoints the vault's Atomist, owners and guardians; the curator, IPOR's Alpha, moves the assets between markets.",
+      text: IPOR_ROLES_TEXT,
     },
     {
       bold: "Fuses",
@@ -212,7 +248,7 @@ export const iporFusionVaultCardContent = (): LearnMoreContent => ({
     },
     {
       bold: "Fees",
-      text: "a performance fee on the share price's gains and a yearly management fee, each minted to its fee account as new shares.",
+      text: IPOR_FEES_TEXT,
     },
     {
       bold: "Factory",
@@ -317,7 +353,7 @@ export const maplePoolCardContent = (): LearnMoreContent => ({
     },
     {
       bold: "Withdrawal queue",
-      text: "withdrawals wait in a queue, first in, first out, and are paid from the cash in the pool as it allows.",
+      text: MAPLE_QUEUE_TEXT,
     },
     {
       bold: "Yield",
@@ -333,7 +369,7 @@ export const maplePoolAssetsContent = (): LearnMoreContent => ({
     "The pool keeps some cash, which pays withdrawals, and lends the rest through two loan books and any other strategy it uses. Together they make the pool's total assets.",
   detailsHeading: "Key concepts:",
   details: [
-    { bold: "Liquid now", text: "the asset in the pool, the only part a withdrawal can be paid from at once." },
+    { bold: "Liquid now", text: MAPLE_LIQUID_TEXT },
     { bold: "Fixed-term loans", text: "loans that run to a maturity date: principal and the interest accrued so far." },
     {
       bold: "Open-term loans",

@@ -63,3 +63,23 @@ export const rosterReadProv = (reads: RosterRead[]): Provenance => {
       : "vault index · each roster's contract calls @ its read block",
   };
 };
+
+/** One family's part of a roster that carries several (Aave's: Savings GHO,
+ *  static aTokens, Umbrella stake tokens) on /vaults/products (ui-jobs 773):
+ *  the roster's rows of that family, out of all its rows, at its block. */
+export const rosterFamilyCountProv = (
+  read: RosterRead,
+  roster: string,
+  family: string,
+  count: number,
+  total: number,
+): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  ...(read.block > 0 ? { source: { block: read.block } } : {}),
+  summary: `${n(count)} of the ${roster} roster's ${n(total)} vaults are ${family}, read at ${
+    read.block > 0 ? `block ${n(read.block)} (${utc(read.at)})` : "its roster's read block"
+  }.`,
+  via: `vault products · the ${roster} roster's rows @ its read block, filtered to family ${family}`,
+  formula: `count of the roster's rows whose family is ${family}`,
+});

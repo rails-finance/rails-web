@@ -8,6 +8,7 @@ import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { MAPLE_POOLS_LEAD } from "@/lib/vaults/family-leads";
+import { MAPLE_LENDER_DOCS } from "@/lib/vaults/family-docs";
 
 export const metadata = infoMetadata("maple");
 
@@ -150,7 +151,7 @@ export default function InfoPage() {
       ]}
       views={views}
       search="You can search by wallet address. The listing filters by Status (Open or Closed), Queue (In withdrawal queue), Pool (syrupUSDC or syrupUSDT), Deposited (an amount in the pool's token) and Transactions (a count). It sorts by Recent activity or Deposited."
-      docs={{ label: "Maple documentation", href: `${DOCS}/maple-institutional-for-lenders/introduction` }}
+      docs={MAPLE_LENDER_DOCS}
     />
   );
 }

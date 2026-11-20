@@ -2,7 +2,7 @@
 // the page and its rows name them. Client-safe: the read is lib/vaults/index-read.ts.
 
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
-import { isUnlaunchedPath } from "@/lib/shared/protocols";
+import { isUnlaunchedPath, protocolForPathname } from "@/lib/shared/protocols";
 import type { VaultSummary } from "@/lib/vaults/summary";
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import {
@@ -138,6 +138,16 @@ export function vaultIndexRosterHref(p: VaultIndexProtocol, chainId: number): st
           : p === "ipor-fusion"
             ? (iporFusionVaultRosterHref(chainId) ?? SBOLD_PAGE_PATH)
             : SBOLD_PAGE_PATH;
+}
+
+/** The page that says how a protocol's vaults on a chain are listed: a
+ *  roster's `/info` (its rail's About), Maple's explorer info page, which
+ *  holds its pools page's section; null for sBOLD, which has none
+ *  (/vaults/products, ui-jobs 773). */
+export function vaultIndexInfoHref(p: VaultIndexProtocol, chainId: number): string | null {
+  if (p === "sbold") return null;
+  if (p === "maple") return protocolForPathname(maplePoolsHref())?.infoHref ?? null;
+  return `${vaultIndexRosterHref(p, chainId)}/info`;
 }
 
 /** The rosters that read `?asset=` on arrival (VaultRoster); Maple's pools

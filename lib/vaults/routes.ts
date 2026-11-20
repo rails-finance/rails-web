@@ -292,6 +292,9 @@ export const VAULT_INDEX_HREF = "/vaults";
 /** The vault fronts page (ui-jobs 774), the /vaults menu's Fronts. */
 export const FRONTS_HREF = `${VAULT_INDEX_HREF}/fronts`;
 
+/** The vault products page (ui-jobs 773), the /vaults menu's Products: how each family works. */
+export const PRODUCTS_HREF = `${VAULT_INDEX_HREF}/products`;
+
 /** One Maple pool's page, `/ethereum/maple/pools/<key>`: `pool` is the
  *  catalogue key ("syrupusdc") or the pool's address. */
 export function maplePoolHref(pool: string): string {

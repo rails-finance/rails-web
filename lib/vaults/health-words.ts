@@ -119,7 +119,8 @@ const ROLE_NOUN: Record<StewardRole, string> = {
   poolDelegate: "Pool delegate",
 };
 
-const ROLE_SENTENCE: Record<StewardRole, string> = {
+/** Each steward role's sentence; /vaults/products repeats them. */
+export const ROLE_SENTENCE: Record<StewardRole, string> = {
   curator: "The address that picks the markets the vault lends to and their caps.",
   owner: "The address that sets the vault's curator, fees and markets.",
   roleManager: "The address that hands out every role in the vault.",
@@ -141,13 +142,17 @@ const SERIES_NONE: Record<NoneReason, (f: VaultFamily) => string> = {
   "no-series": () => "Rails keeps no daily series for this vault yet.",
 };
 
-const WITHDRAWALS_UNREAD: Partial<Record<VaultFamily, string>> = {
+/** Where a static aToken's withdrawal comes from; /vaults/products repeats it. */
+export const STATA_FROM_RESERVE = "A withdrawal takes cash from its Aave reserve";
+
+/** Why a family's Withdrawals line is not read; /vaults/products repeats them. */
+export const WITHDRAWALS_UNREAD: Partial<Record<VaultFamily, string>> = {
   sgho: "Rails does not read how much can be withdrawn from Savings GHO yet.",
-  stata: "A withdrawal takes cash from its Aave reserve, and Rails does not read the reserve's free cash here yet.",
+  stata: `${STATA_FROM_RESERVE}, and Rails does not read the reserve's free cash here yet.`,
   "maple-pool": "Maple pools pay withdrawals through a queue, which Rails reads on the pools page only.",
 };
 
-const STEWARD_UNREAD: Partial<Record<VaultFamily, string>> = {
+export const STEWARD_UNREAD: Partial<Record<VaultFamily, string>> = {
   sgho: "Aave's governance holds its roles, and Rails does not read them here.",
   stata: "Aave's governance holds its roles, and Rails does not read them here.",
   "maple-pool": "Rails does not read who runs a Maple pool yet.",
@@ -178,6 +183,11 @@ function lostWords(lost: LostAssetsRead | null | undefined, c: HealthContext, f:
   return v > 0 ? `Lost assets on record: ${f.amount(v)} ${c.assetSymbol}.` : "No lost assets on record.";
 }
 
+/** Yearn V3's exit, in two sentences /vaults/products repeats. */
+export const IDLE_READY = "Idle assets sit in the vault, ready for a withdrawal.";
+export const STRATEGIES_PAY =
+  "The rest was lent to its strategies, which pay a withdrawal as far as they can free the asset.";
+
 /** The vault's own exit figure: a headline, and the clause that explains it. */
 function exitWords(
   e: ExitInput,
@@ -196,11 +206,11 @@ function exitWords(
       head: `${flooredPct(s)} of the vault's assets idle at the last read`,
       rest:
         s >= 0.999
-          ? "Idle assets sit in the vault, ready for a withdrawal."
+          ? IDLE_READY
           : [
               s === 0
                 ? "All of them were lent to its strategies, which pay a withdrawal as far as they can free the asset."
-                : "The rest was lent to its strategies, which pay a withdrawal as far as they can free the asset.",
+                : STRATEGIES_PAY,
               // The holder figure is maxWithdraw(holder), which draws on the
               // strategies through the default queue, so it can exceed idle.
               holder
