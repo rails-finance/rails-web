@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // The vault comparison, /vaults/compare (anatomy E1–E4; rails-ops TO-DO-ui-jobs 553, door 3):
-// choosing vaults with the Compare entry in a /vaults row's ⋮ (E2) and the compare bar (E3),
+// choosing vaults with the Compare entry in a roster row's ⋮ (E2) and the compare bar (E3),
 // the page's columns, its "Sort by", the holder donut (E4), the two widths, and keys the index
 // does not hold. Like the index, the page owns no vault page and no receipts (decision 0028
 // point 8): each column links the vault's page under its protocol, and the page draws no
 // receipt and no inspector.
 //
 // Expectations come from outside the code under test where they can: each column's link,
-// size, asset and live holder count are read off the vault's /vaults row (`data-vault-row`,
+// size, asset and live holder count are read off the vault's roster row (`data-vault-row`,
 // `data-total-assets-raw`, `data-held-assets-raw`, `data-token`, `data-holders-live`), and the
 // sort's order is checked against the figures the page prints in each column, parsed back.
 // ----------------------------------------------------------------------------
@@ -15,30 +15,31 @@
 // Ethereum (Steakhouse USDC, Gauntlet USDC Prime), Aave's static aToken for USDC (no
 // withdrawable share read, so it sorts last there), and the Umbrella stake on it (asset
 // waEthUSDC, so Size sorts by asset first; a cooldown, so no withdrawable share either).
-// FIFTH is any other /vaults row, for the refused fifth pick.
+// FIFTH is any other roster row, for the refused fifth pick.
 //
 // Checks:
-//   1. /vaults at 1440px: every fixture is a row; the ⋮ entry "Add to compare" ticks it
-//      (E2), the bar (E3) appears at two and counts to three, the entry then reads
-//      "Remove from compare"; a fifth pick is refused with the bar's line and the bar stays
+//   1. The Morpho and Aave rosters on Ethereum at 1440px (ui-jobs 776): every fixture is a
+//      row; the ⋮ entry "Add to compare" ticks it (E2), the selection carries from one
+//      roster to the other, the bar (E3) appears at two and counts to three, the entry then
+//      reads "Remove from compare"; a fifth pick is refused with the bar's line and the bar stays
 //      at four; "Compare 3 vaults" lands on /vaults/compare with the three keys in `?v=`,
 //      in pick order, and draws those three columns. The asset step
 //      (/start/asset/stablecoins/usdc) carries a tick on every card and the same selection's
 //      bar; "Clear" removes the bar.
 //   2. The direct URL with all four: four columns, the thead order the same as
 //      `data-compare-columns`; each name links the vault's page under its protocol, the
-//      same href as its /vaults row, and that page answers 200; the page is `data-prov-exempt`
-//      with no receipt span, no pickable value and no inspector control (/vaults, which has
+//      same href as its roster row, and that page answers 200; the page is `data-prov-exempt`
+//      with no receipt span, no pickable value and no inspector control (a roster, which has
 //      receipts, is the control).
 //   3. Sort by: Size pressed with no `?sort=`; each of the four presses presses only itself,
 //      writes `?sort=` off the default, and orders the table's and the phone list's columns
 //      as `data-compare-columns`. The order agrees with the figures: Size by asset A to Z
-//      then held amount (from the /vaults rows), 30-day yield highest first, 90-day range
+//      then held amount (from the roster rows), 30-day yield highest first, 90-day range
 //      narrowest first (counting only vaults whose yield is above zero), share withdrawable
 //      highest first; a vault with no figure after every vault with one. The range sort and
 //      the mixed-asset Size sort say so. The four orders are not all the same. A load with
 //      `?sort=withdrawable` draws that order; `?sort=bogus` falls back to Size.
-//   4. The holder donut, each column: `data-compare-donut` equals the /vaults row's live
+//   4. The holder donut, each column: `data-compare-donut` equals the roster row's live
 //      holders; slices carry `data-breakdown-slice` with unique keys, the largest first,
 //      "others" last; the shares in their titles sum to 100% within the flooring; each
 //      slice has its own fill; the key beside it lists the same slices with the same swatch
@@ -77,7 +78,7 @@ const FIXTURES = {
   stata: { chainId: 1, address: "0xd4fa2d31b7968e448877f69a96de69f5de8cd23e" }, // static aEthUSDC
   umbrella: { chainId: 1, address: "0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6" }, // Umbrella stake waEthUSDC
 };
-const FIFTH = { chainId: 1, address: "0x974c8fbf4fd795f66b85b73ebc988a51f1a040a9" }; // a fifth /vaults row
+const FIFTH = { chainId: 1, address: "0x974c8fbf4fd795f66b85b73ebc988a51f1a040a9" }; // a fifth roster row
 const UNKNOWN = "1:0x000000000000000000000000000000000000dead"; // well-formed, not a vault
 const MALFORMED = "1:0xnotanaddress";
 const ASSET_STEP = "/start/asset/stablecoins/usdc";
@@ -162,36 +163,53 @@ const readColumns = (page) =>
 
 const browser = await chromium.launch();
 
-// ── 1. Choosing on /vaults ─────────────────────────────────────────────────
+// ── 1. Choosing on the family rosters ──────────────────────────────────────
+// The ticks are on each roster's rows (ui-jobs 605); /vaults is an overview
+// with no rows (ui-jobs 776). Every fixture is on Ethereum, one roster each.
+const ROSTERS = ["/ethereum/morpho/vaults?show=all", "/ethereum/aave/vaults?show=all"];
 const index = {};
+/** The roster page each fixture is a row of. */
+const rosterOf = {};
 let vaultsInspector = 0;
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await ctx.newPage();
-  await page.goto(`${BASE}/vaults`, NAV);
-  await page.locator("[data-vault-row]").first().waitFor({ timeout: WAIT });
-  // The profile menu's switch arms /vaults (ui-jobs 625); put down again at
-  // once, so the picks below are row presses.
-  vaultsInspector = (await armInspector(page)) ? 1 : 0;
-  if (vaultsInspector) await page.keyboard.press("Escape");
-  for (const f of [...Object.values(FIXTURES), FIFTH]) {
-    const k = keyOf(f);
-    const row = page.locator(`[data-vault-row="${f.address}"][data-chain="${f.chainId}"]`).first();
-    const there = (await row.count()) > 0;
-    check(`1a ${k} is a /vaults row`, there);
-    if (!there) continue;
-    index[k] = await row.evaluate((e) => ({
-      href: e.getAttribute("href") ?? e.querySelector("a[href]")?.getAttribute("href") ?? null,
-      held: e.getAttribute("data-held-assets-raw") || e.getAttribute("data-total-assets-raw") || "",
-      token: e.getAttribute("data-token"),
-      live: e.getAttribute("data-holders-live"),
-    }));
+  const onRoster = async (href) => {
+    if (page.url() === `${BASE}${href}`) return;
+    await page.goto(`${BASE}${href}`, NAV);
+    await page.locator("[data-vault-row]").first().waitFor({ timeout: WAIT });
+    // The ⋮ answers once the rows have hydrated.
+    await page.waitForTimeout(1500);
+  };
+  for (const href of ROSTERS) {
+    await onRoster(href);
+    // The profile menu's switch arms the roster (ui-jobs 625); put down again
+    // at once, so the picks below are row presses.
+    if (!vaultsInspector) {
+      vaultsInspector = (await armInspector(page)) ? 1 : 0;
+      if (vaultsInspector) await page.keyboard.press("Escape");
+    }
+    for (const f of [...Object.values(FIXTURES), FIFTH]) {
+      const k = keyOf(f);
+      if (index[k]) continue;
+      const row = page.locator(`[data-vault-row="${f.address}"]`).first();
+      if ((await row.count()) === 0) continue;
+      rosterOf[k] = href;
+      index[k] = await row.evaluate((e) => ({
+        href: e.getAttribute("href") ?? e.querySelector("a[href]")?.getAttribute("href") ?? null,
+        held: e.getAttribute("data-held-assets-raw") || e.getAttribute("data-total-assets-raw") || "",
+        token: e.getAttribute("data-token"),
+        live: e.getAttribute("data-holders-live"),
+      }));
+    }
   }
+  for (const f of [...Object.values(FIXTURES), FIFTH]) check(`1a ${keyOf(f)} is a roster row`, !!index[keyOf(f)]);
 
   const bar = page.locator("[data-compare-bar]");
   const pick = async (k) => {
     const f = [...Object.values(FIXTURES), FIFTH].find((x) => keyOf(x) === k);
-    const row = page.locator(`[data-vault-row="${f.address}"][data-chain="${f.chainId}"]`).first();
+    await onRoster(rosterOf[k]);
+    const row = page.locator(`[data-vault-row="${f.address}"]`).first();
     await row.locator("button[data-row-menu]").click();
     const item = page.locator(`[data-row-menu-list] [data-compare-tick="${k}"]`);
     await item.waitFor({ timeout: 10000 });
@@ -222,11 +240,8 @@ let vaultsInspector = 0;
     // Reopen A's menu: the entry now reads Remove, checked; Escape leaves it as it is.
     {
       const f = FIXTURES.steakhouse;
-      await page
-        .locator(`[data-vault-row="${f.address}"][data-chain="1"]`)
-        .first()
-        .locator("button[data-row-menu]")
-        .click();
+      await onRoster(rosterOf[A]);
+      await page.locator(`[data-vault-row="${f.address}"]`).first().locator("button[data-row-menu]").click();
       const item = page.locator(`[data-row-menu-list] [data-compare-tick="${A}"]`);
       await item.waitFor({ timeout: 10000 });
       check(
@@ -284,7 +299,7 @@ let vaultsInspector = 0;
       check("1m Clear removes the bar", (await barCount()) == null);
     } else check("1m Clear removes the bar", false, "no bar to clear");
   } else {
-    check("1b–1m picking needs every fixture on /vaults", false, "a fixture is missing");
+    check("1b–1m picking needs every fixture on its roster", false, "a fixture is missing");
   }
   await ctx.close();
 }
@@ -341,9 +356,9 @@ let vaultsInspector = 0;
       (await p.locator("[data-prov-inspect-on]").count()) + (await p.locator("[data-prov-pickable]").count());
     await p.close();
     check(
-      "2g the switch on, the page does not arm (the switch arms /vaults)",
+      "2g the switch on, the page does not arm (the switch arms a roster)",
       armedHere === 0 && vaultsInspector > 0,
-      `compare ${armedHere}, /vaults ${vaultsInspector}`,
+      `compare ${armedHere}, roster ${vaultsInspector}`,
     );
   }
 
@@ -378,7 +393,7 @@ let vaultsInspector = 0;
       `pressed ${(await pressed()).join()}, ?sort=${q}`,
     );
     if (s === "size") {
-      // From outside: the /vaults rows' asset and held amount.
+      // From outside: the roster rows' asset and held amount.
       const want = [...c.attr].sort(
         (a, b) =>
           index[a].token.localeCompare(index[b].token, "en-US") ||
@@ -482,7 +497,7 @@ let vaultsInspector = 0;
   for (const d of donuts) {
     const tag = d.key.slice(0, 10);
     check(
-      `4b ${tag} E4, live count equals its /vaults row`,
+      `4b ${tag} E4, live count equals its roster row`,
       d.anatomy === "E4" && d.live === index[d.key]?.live,
       `${d.live} vs ${index[d.key]?.live}`,
     );

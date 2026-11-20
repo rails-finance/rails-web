@@ -33,6 +33,7 @@
 //     vaults are shown.
 
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { assetParamNames, vaultHasAsset } from "@/lib/vaults/asset-param";
 import { assetKey } from "@/lib/shared/asset-family";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -80,8 +81,7 @@ export interface VaultRosterHead {
   /** The intro drawer's body (standards/explanation-copy-charter.md §8a);
    *  null draws no (i) and no drawer. */
   drawer: ReactNode;
-  /** In place of the one "Read at block N" line: the index's stamp and, after
-   *  it, its (i) (ui-jobs 776). */
+  /** In place of the one "Read at block N" line: the index's line per roster. */
   readAt?: ReactNode;
 }
 
@@ -142,7 +142,7 @@ export function VaultRoster({
   /** The empty count's receipt; absent on the index, which states none (ui-jobs 538). */
   emptyCountProv?: (count: number) => Provenance;
   head: VaultRosterHead;
-  /** The facets chosen on arrival (the index's `?asset=`, ui-jobs 482). */
+  /** The facets chosen on arrival; absent, `?asset=` in `initialSearch` chooses the Asset facet's. */
   initialFilters?: Filters;
   /** The query string the page was served with: the preset and the sort on
    *  first paint, before the roster reads the live URL. */
@@ -160,7 +160,18 @@ export function VaultRoster({
   facetsInUrl?: boolean;
 }) {
   const [introOpen, setIntroOpen] = useState(false);
-  const [filters, setFilters] = useState<Filters>(initialFilters ?? {});
+  // `?asset=` on arrival (ui-jobs 482, 776: the /vaults overview passes it
+  // on): the Asset facet's values of the vaults it names; a name with none is
+  // dropped.
+  const [arrivalFilters] = useState<Filters>(() => {
+    if (initialFilters) return initialFilters;
+    const names = assetParamNames(new URLSearchParams(initialSearch).get("asset"));
+    if (names.size === 0) return {};
+    const valueOf = assetFacet?.valueOf ?? ((v: VaultSummary) => v.asset.address);
+    const values = [...new Set(allVaults.filter((v) => vaultHasAsset(v, names)).map(valueOf))];
+    return values.length > 0 ? { [assetFacet?.id ?? "asset"]: values } : {};
+  });
+  const [filters, setFilters] = useState<Filters>(arrivalFilters);
   const [emptyOpen, setEmptyOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -203,7 +214,7 @@ export function VaultRoster({
   // A link that arrives with facets chosen keeps the preset, unless the preset
   // would leave one of the values it asked for with no funded vault.
   const [arrivalShow] = useState<"used" | "all">(() => {
-    for (const [id, values] of Object.entries(initialFilters ?? {})) {
+    for (const [id, values] of Object.entries(arrivalFilters)) {
       const f = all.find((x) => x.id === id);
       if (!f) continue;
       for (const value of values) {
@@ -383,16 +394,14 @@ export function VaultRoster({
     <section className="mb-5" data-skel-section={`${skel}-denominator`}>
       {head.readAt ? (
         // The index's read line names each roster's block, the anchor its rows'
-        // receipts name; its (i) stands after the stamp, in `readAt` (ui-jobs 776).
+        // receipts name.
         <div className="flex items-center gap-1 text-[11px] text-rb-500" data-prov-exempt>
-          {head.drawer != null && (
-            <InfoDisclosureTrigger
-              open={introOpen}
-              onToggle={() => setIntroOpen((o) => !o)}
-              label="about these vaults"
-              ariaControls="vault-roster-intro"
-            />
-          )}
+          <InfoDisclosureTrigger
+            open={introOpen}
+            onToggle={() => setIntroOpen((o) => !o)}
+            label="about these vaults"
+            ariaControls="vault-roster-intro"
+          />
           {/* The stamp stands at the right (ui-jobs 730). */}
           <span className="ml-auto flex items-center gap-1">{head.readAt}</span>
         </div>

@@ -2,18 +2,19 @@
 // The steward's record (anatomy V14) and bad debt in its vaults (V14.1), rails-ops
 // TO-DO-ui-jobs 554 piece C.
 // ----------------------------------------------------------------------------
-// V14 lists the vaults the page's curator, owner or pool delegate runs, from the /vaults
-// directory; V14.1 lists the liquidations that left bad debt in markets those vaults supply,
-// each with the vault's part and that part's share of the vault at the block before.
+// V14 lists the vaults the page's curator, owner or pool delegate runs, from the vault
+// index (lib/vaults/index-read.ts); V14.1 lists the liquidations that left bad debt in
+// markets those vaults supply, each with the vault's part and that part's share of the
+// vault at the block before.
 //
 // Expectations come from outside the section where they can: each steward row's key and
-// link are read off the vault's /vaults row (`data-vault-row`, its link), with every vault
-// shown (`?show=all`) and the empty group opened. Held amounts are not compared: the
+// link are read off the vault's roster row (`data-vault-row`, its link; a Maple pool from
+// its catalogue), with every vault shown (`?show=all`) and the empty group opened. Held amounts are not compared: the
 // directory re-read can sit at a later block than the page's. The rows before "Show all"
 // are recomputed from the full list by the component's rule (LIMIT, the empty-vault rule).
 //
-// Fixtures: Adpend's USDC vault on Ethereum, Lumetra on Base, and the first Maple pool on
-// /vaults (the pool delegate's record, no V14.1). What V14.1 states about each is read off
+// Fixtures: Adpend's USDC vault on Ethereum, Lumetra on Base, and the first Maple pool in
+// its catalogue (the pool delegate's record, no V14.1). What V14.1 states about each is read off
 // the page; the run needs at least one fixture with bad debt at 0.01% of a vault or more.
 //
 // Checks, per MetaMorpho fixture:
@@ -25,7 +26,7 @@
 //   4. Order: the page's vault's token first (`data-steward-token`), then the other tokens
 //      A to Z; within each, held amount largest first, an unread amount last. At least one
 //      row carries a held amount. The order line says so.
-//   5. Each row is a /vaults row, and each linked row links the same href; at least one
+//   5. Each row is a roster row, and each linked row links the same href; at least one
 //      row besides the page's vault is linked.
 //   6. V14.1 sits in V14 and answered with at-block reads. The rows at 0.01% of the vault
 //      or more name `data-bad-debt-large` distinct liquidations; the rows before "Show all"
@@ -38,14 +39,19 @@
 //   8. V14.3: `data-steward-before-count` equals the ran-before rows after its "Show all"
 //      (no V14.3 where it is 0); no ran-before vault is a row of the vaults run now; each
 //      row's first block is at or before its last; the rows go latest end first; a linked
-//      row links its /vaults href.
+//      row links its roster href.
 // Maple fixture: V14 headed "The pool delegate's record", no V14.1, no V14.2 or V14.3.
 //
 // Chain reads: V14 reads none. V14.1 makes one Multicall3 eth_call per liquidation block,
 // plus one withdraw-queue read per chain; both are cached, so a second run reads nothing new.
 
 import { chromium } from "playwright";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const FIXTURES = [
   {
@@ -83,31 +89,40 @@ async function open(path, ready) {
   return page;
 }
 
-// The directory: every /vaults row's link, by key, with every vault shown and the empty
-// group opened. A row's data-vault-row is its address; its chain is the link's first segment.
+// The directory: every roster row's link, by key, with every vault shown and the empty
+// group opened (/vaults is an overview with no rows, ui-jobs 776). A row's data-vault-row is
+// its address; its chain is the link's first segment. Maple's pools page draws no vault
+// rows, so its pools come from lib/maple/asset-catalog.ts, each at /ethereum/maple/pools/<key>.
 const CHAIN = { ethereum: 1, base: 8453, arbitrum: 42161, optimism: 10 };
-const dir = await open("/vaults?show=all", "[data-vault-row]");
-const emptyGroup = dir.locator("[data-empty-group] > button");
-if ((await emptyGroup.count()) && (await emptyGroup.first().getAttribute("aria-expanded")) !== "true")
-  await emptyGroup.first().click();
-await dir.waitForTimeout(1000);
-const index = Object.fromEntries(
-  (
-    await dir.evaluate(() =>
-      [...document.querySelectorAll("[data-vault-row]")].map((r) => ({
-        address: r.getAttribute("data-vault-row").toLowerCase(),
-        href:
-          r.querySelector("[data-vault-link]")?.getAttribute("href") ??
-          r.querySelector("a[href]")?.getAttribute("href") ??
-          null,
-      })),
-    )
-  ).map((r) => [`${CHAIN[r.href?.split("/")[1]] ?? "?"}:${r.address}`, r.href]),
-);
-await dir.close();
+const ROSTERS = ["/base/morpho/vaults", "/ethereum/morpho/vaults", "/ethereum/aave/vaults", "/ethereum/yearn/vaults"];
+const index = {};
+for (const roster of ROSTERS) {
+  const dir = await open(`${roster}?show=all`, "[data-vault-row]");
+  const emptyGroup = dir.locator("[data-empty-group] > button");
+  if ((await emptyGroup.count()) && (await emptyGroup.first().getAttribute("aria-expanded")) !== "true")
+    await emptyGroup.first().click();
+  await dir.waitForTimeout(1000);
+  for (const r of await dir.evaluate(() =>
+    [...document.querySelectorAll("[data-vault-row]")].map((r) => ({
+      address: r.getAttribute("data-vault-row").toLowerCase(),
+      href:
+        r.querySelector("[data-vault-link]")?.getAttribute("href") ??
+        r.querySelector("a[href]")?.getAttribute("href") ??
+        null,
+    })),
+  ))
+    index[`${CHAIN[r.href?.split("/")[1]] ?? "?"}:${r.address}`] = r.href;
+  await dir.close();
+}
+{
+  const src = fs.readFileSync(path.join(ROOT, "lib/maple/asset-catalog.ts"), "utf8");
+  const body = src.slice(src.indexOf("export const MAPLE_POOLS"), src.indexOf("/** Pool key → catalog entry"));
+  for (const m of body.matchAll(/key: "([^"]+)",[\s\S]*?pool: "(0x[0-9a-f]{40})"/g))
+    index[`1:${m[2].toLowerCase()}`] = `/ethereum/maple/pools/${m[1]}`;
+}
 const maplePath = Object.values(index).find((h) => h?.startsWith("/ethereum/maple/pools/"));
 check(
-  "/vaults: the directory answers, with a Maple pool among its rows",
+  "the rosters answer, with a Maple pool among the directory",
   Object.keys(index).length > 0 && !!maplePath,
   `${Object.keys(index).length} rows`,
 );
@@ -216,12 +231,12 @@ for (const f of FIXTURES) {
     head.order,
   );
 
-  // Each row against /vaults, by key and link.
+  // Each row against the rosters, by key and link.
   const missing = rows.filter((r) => !(r.key in index));
   const offLink = rows.filter((r) => r.href != null && index[r.key] !== r.href);
   const linked = rows.filter((r) => !r.current && r.href != null).length;
   check(
-    `${f.tag}: every row is a /vaults row with the same link, and other rows are linked`,
+    `${f.tag}: every row is a roster row with the same link, and other rows are linked`,
     missing.length === 0 && offLink.length === 0 && linked > 0,
     JSON.stringify({
       missing: missing.map((r) => r.key),
@@ -258,7 +273,7 @@ for (const f of FIXTURES) {
   );
   const offBefore = ran.filter((r) => r.href != null && index[r.key] !== r.href);
   check(
-    `${f.tag}: a linked ran-before row links its /vaults href`,
+    `${f.tag}: a linked ran-before row links its roster href`,
     offBefore.length === 0,
     offBefore.map((r) => `${r.href} / ${index[r.key]}`).join(","),
   );

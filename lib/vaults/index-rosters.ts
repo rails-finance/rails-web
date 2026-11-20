@@ -8,14 +8,10 @@ import type { ServerRead } from "@/lib/shared/server-head-read";
 import {
   metaMorphoVaultHref,
   metaMorphoVaultRosterHref,
-  metaMorphoVaultsListingHref,
   ethereumVaultHref,
   ethereumVaultRosterHref,
-  ethereumVaultsListingHref,
-  mapleInfoHref,
   maplePoolHref,
   maplePoolsHref,
-  vaultRosterInfoHref,
   yearnVaultHref,
   yearnVaultRosterHref,
   iporFusionVaultHref,
@@ -26,18 +22,9 @@ import { SBOLD_PAGE_PATH } from "@/lib/liquity-v2/sbold";
 /** One protocol's roster: the Protocol facet's value and the row's protocol.
  *  `sbold` is the one vault no explorer deploys, its own roster of one
  *  (ui-jobs 765). */
-/** "ipor-fusion" joins `VAULT_INDEX_PROTOCOLS`, and the index, with its three
- *  chains (rails-ops TO-DO-ipor-scoping §6.3 phase C). */
+/** "ipor-fusion" joins the index with its three chains (rails-ops
+ *  TO-DO-ipor-scoping §6.3 phase C). */
 export type VaultIndexProtocol = "morpho" | "aave" | "yearn" | "maple" | "sbold" | "ipor-fusion";
-
-export const VAULT_INDEX_PROTOCOLS: readonly VaultIndexProtocol[] = [
-  "morpho",
-  "aave",
-  "yearn",
-  "maple",
-  "sbold",
-  "ipor-fusion",
-];
 
 export const VAULT_INDEX_PROTOCOL_LABEL: Record<VaultIndexProtocol, string> = {
   morpho: "Morpho",
@@ -153,21 +140,6 @@ export function vaultIndexRosterHref(p: VaultIndexProtocol, chainId: number): st
             : SBOLD_PAGE_PATH;
 }
 
-/** A roster's info page, the /vaults About page's link (ui-jobs 776): the
- *  roster's `info`; Maple's explorer About, its pools tab having none; sBOLD's
- *  page, which has none. An IPOR Fusion chain's links only once launched, the
- *  gate its holder tag uses (lib/ipor-fusion/label-href.ts); null before. */
-export function vaultIndexInfoHref(p: VaultIndexProtocol, chainId: number): string | null {
-  if (p === "maple") return mapleInfoHref();
-  if (p === "sbold") return SBOLD_PAGE_PATH;
-  if (p === "ipor-fusion") {
-    const roster = iporFusionVaultRosterHref(chainId);
-    const href = roster ? vaultRosterInfoHref(roster) : null;
-    return href && !isUnlaunchedPath(href) ? href : null;
-  }
-  return vaultRosterInfoHref(vaultIndexRosterHref(p, chainId));
-}
-
 /** The vault's page under its protocol (decision 0028 point 8); a Maple
  *  pool's under Maple's pools tab; sBOLD's at /ethereum/vaults/sbold. */
 export function vaultIndexHref(v: VaultSummary): string {
@@ -183,16 +155,6 @@ export function vaultIndexHref(v: VaultSummary): string {
           : p === "ipor-fusion"
             ? (iporFusionVaultHref(v.chainId, v.address) ?? SBOLD_PAGE_PATH)
             : SBOLD_PAGE_PATH;
-}
-
-/** The positions listing filtered to this vault, where its roster has one. */
-export function vaultIndexHoldersHref(v: VaultSummary): string | null {
-  const p = vaultIndexProtocol(v);
-  return p === "morpho"
-    ? metaMorphoVaultsListingHref(morphoChain(v.chainId), { vault: v.address })
-    : p === "aave"
-      ? ethereumVaultsListingHref({ vault: v.address })
-      : null;
 }
 
 /** The index is offered (the site footer, the sitemap, indexing) once every

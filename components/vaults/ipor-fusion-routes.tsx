@@ -32,6 +32,7 @@ import { listingMetadata } from "@/lib/shared/page-metadata";
 import { PROTOCOLS } from "@/lib/shared/protocols";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
 import { FOOT_LINK } from "@/lib/shared/ui-grammar";
+import { IPOR_FUSION_LEAD } from "@/lib/vaults/family-leads";
 import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 
@@ -125,10 +126,8 @@ export function IporFusionInfoPage({ chainId }: { chainId: IporFusionChainId }) 
   return (
     <VaultsInfoPage chainId={chainId as ChainId} protocol={entryOf(chainId)}>
       <p data-intro-membership>
-        An IPOR Fusion vault takes deposits of one token and issues shares for them. Its curator moves the token into
-        other protocols through fuses, small contracts that each act in one protocol. A share converts to more of the
-        token as those positions earn; the Share price column is the vault&rsquo;s answer to{" "}
-        <code>convertToAssets</code>, in its asset.
+        {IPOR_FUSION_LEAD} A share converts to more of the token as those positions earn; the Share price column is the
+        vault&rsquo;s answer to <code>convertToAssets</code>, in its asset.
       </p>
       <p data-intro-roster>
         The roster is every vault the IPOR Fusion factory made on {chain}:{" "}

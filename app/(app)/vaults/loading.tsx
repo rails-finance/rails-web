@@ -1,9 +1,20 @@
-// The index's skeleton: its first paint waits on the index read, which is
-// cached and is slow only when the cache is cold (lib/vaults/index-read.ts).
-// `ListingRouteLoading` draws no rail where the path is on no explorer.
+// The overview's skeleton: the page streams its cards behind Suspense
+// (components/vaults/vault-overview.tsx), so this shows only while the route
+// compiles or the head renders.
 
-import { ListingRouteLoading } from "@/components/shared/listing-route-loading";
+import { VaultIndexHead } from "@/components/vaults/vault-index-head";
+import { VaultOverviewCardsLoading, VaultOverviewIntro } from "@/components/vaults/vault-overview";
 
 export default function Loading() {
-  return <ListingRouteLoading />;
+  return (
+    <div className="min-h-screen">
+      <div className="py-8">
+        <header className="mb-6" data-skel-section="page-header">
+          <VaultIndexHead venue="overview" />
+        </header>
+        <VaultOverviewIntro />
+        <VaultOverviewCardsLoading />
+      </div>
+    </div>
+  );
 }

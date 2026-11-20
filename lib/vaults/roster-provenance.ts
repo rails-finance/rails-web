@@ -34,16 +34,17 @@ const utc = (at: number | null) =>
         .replace("T", " ")
         .replace(/\.\d+Z$/, " UTC");
 
-/** One roster's count in the index's breakdown (ui-jobs 776): the rows it
- *  gives the index, read at its block. */
-export const rosterCountProv = (read: RosterRead, count: number): Provenance => ({
+/** One roster's vault count on its /vaults overview card (ui-jobs 776): the
+ *  vaults its roster lists, or those over `asset` under `?asset=`, read at its
+ *  block. */
+export const rosterCountProv = (read: RosterRead, count: number, asset?: string): Provenance => ({
   kind: "chain",
   pclass: "state",
   ...(read.block > 0 ? { source: { block: read.block } } : {}),
-  summary: `${read.label} vaults — ${n(count)} on this roster, read at ${
+  summary: `${read.label} — ${n(count)} ${asset ? `${asset} ` : ""}vaults on this roster, read at ${
     read.block > 0 ? `block ${n(read.block)} (${utc(read.at)})` : "its roster's read block"
-  }. Each is a row of the index.`,
-  via: "vault index · the roster's rows @ its read block",
+  }.`,
+  via: "vault overview · the roster's rows @ its read block",
 });
 
 /** The read stamp's receipt: each roster's block and its time. The stamp's age

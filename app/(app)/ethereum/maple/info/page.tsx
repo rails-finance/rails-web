@@ -7,6 +7,7 @@ import Link from "next/link";
 import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { MAPLE_POOLS_LEAD } from "@/lib/vaults/family-leads";
 
 export const metadata = infoMetadata("maple");
 
@@ -95,8 +96,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
     heading: "Pools page",
     body: (
       <p>
-        The pools page shows each pool&apos;s cash available to pay exits, its fixed-term and open-term loans, and its
-        exit rate.{" "}
+        {MAPLE_POOLS_LEAD}{" "}
         <Link href="/ethereum/maple/pools" className={INLINE_LINK}>
           Open the pools page
         </Link>{" "}

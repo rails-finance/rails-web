@@ -2,13 +2,11 @@
 
 // The roster's read stamp (ui-jobs 485): the age of the read the page shows,
 // in H6's form (components/wallet/read-stamp.tsx), a press switching to the
-// block. On the index it states the oldest roster's read, and its receipt
-// lists every roster's block and time. `RosterBlock` is one roster's block
-// in its "about these vaults" panel, linked, under the same receipt.
+// block. Given several rosters' reads it states the oldest, and its receipt
+// lists every roster's block and time; the /vaults overview gives each card
+// its roster's one read (ui-jobs 776).
 
-import { BlockRef } from "@/components/shared/block-ref";
 import { Prov } from "@/components/shared/provenance";
-import type { ChainId } from "@/lib/shared/chains";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { rosterReadProv, type RosterRead } from "@/lib/vaults/roster-provenance";
 
@@ -35,14 +33,3 @@ export const isoSeconds = (iso: string | null | undefined): number | null => {
   const t = iso ? Date.parse(iso) : NaN;
   return Number.isFinite(t) ? Math.floor(t / 1000) : null;
 };
-
-/** One roster's read block, linked to the chain's explorer, with its receipt;
- *  "the read block" where the read did not answer. */
-export function RosterBlock({ read, chainId }: { read: RosterRead; chainId: ChainId }) {
-  if (read.block <= 0) return <>the read block</>;
-  return (
-    <Prov info={rosterReadProv([read])}>
-      block <BlockRef block={read.block} chainId={chainId} />
-    </Prov>
-  );
-}
