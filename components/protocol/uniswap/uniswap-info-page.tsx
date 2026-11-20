@@ -163,6 +163,7 @@ function views(version: UniswapVersion, d: UniDeployment): readonly [InfoView, .
   return [
     {
       heading: "A wallet's positions",
+      section: "intro",
       body: (
         <>
           <p>
@@ -183,6 +184,7 @@ function views(version: UniswapVersion, d: UniDeployment): readonly [InfoView, .
     },
     {
       heading: "Position page",
+      section: "intro",
       body: (
         <p>
           The position page shows the two tokens the position holds now, their worth in the quote token, its fees not

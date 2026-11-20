@@ -36,6 +36,7 @@ const SORT = "The listing sorts by recent activity, debt, supply or health facto
 function listing(extra?: ReactNode): InfoView {
   return {
     heading: "Listing",
+    section: "positions",
     body: (
       <>
         <ul className={UL}>
@@ -61,6 +62,7 @@ function listing(extra?: ReactNode): InfoView {
 
 const POSITION_PAGE: InfoView = {
   heading: "Position page",
+  section: "positions",
   body: (
     <ul className={UL}>
       <li>
@@ -121,16 +123,31 @@ export function AaveV4InfoPage({ deployment }: { deployment: "ethereum" | "base"
           ),
           POSITION_PAGE,
           {
-            heading: "Equities hub",
+            heading: "Spokes",
+            section: "markets",
             body: (
               <p>
-                The Equities hub page lists each reserve on Mag7 with its price and when the price was published, its
-                collateral factor and its maximum liquidation bonus. It also shows the supply against the reserve&apos;s
-                cap and the borrowing against the credit line. Use this link to open it:{" "}
+                The{" "}
+                <Link href="/base/aave-v4/markets" className={INLINE_LINK}>
+                  spokes page
+                </Link>{" "}
+                shows Base&apos;s one spoke, Mag7, with the hub it draws from, its reserves, what it has supplied and
+                borrowed, and how many positions it holds. It links to the spoke&apos;s reserves and to its positions.
+              </p>
+            ),
+          },
+          {
+            heading: "Equities hub",
+            section: "hubs",
+            body: (
+              <p>
+                The{" "}
                 <Link href="/base/aave-v4/hubs" className={INLINE_LINK}>
-                  the Equities hub page
-                </Link>
-                .
+                  Equities hub page
+                </Link>{" "}
+                lists each reserve on Mag7 with its price and when the price was published, its collateral factor and
+                its maximum liquidation bonus. It also shows the supply against the reserve&apos;s cap and the borrowing
+                against the credit line.
               </p>
             ),
           },
@@ -174,17 +191,32 @@ export function AaveV4InfoPage({ deployment }: { deployment: "ethereum" | "base"
         listing(),
         POSITION_PAGE,
         {
-          heading: "Hub comparison",
+          heading: "Spokes",
+          section: "markets",
           body: (
             <p>
-              The hub comparison shows each hub&apos;s supply, borrowing, mix of assets and spokes. It then gives one
-              table of every asset in every hub, with the amount supplied, the amount borrowed, the supply and borrow
-              APY and the utilization, which is the share of an asset&apos;s liquidity that is borrowed. Use this link
-              to open it:{" "}
+              The{" "}
+              <Link href="/ethereum/aave-v4/markets" className={INLINE_LINK}>
+                spokes page
+              </Link>{" "}
+              shows a panel for each spoke, the one with the most supplied first. Each panel names the hubs the spoke
+              draws from and gives its reserves, what it has supplied and borrowed, and how many positions it holds. It
+              links to the spoke&apos;s reserves and to its positions.
+            </p>
+          ),
+        },
+        {
+          heading: "Hub comparison",
+          section: "hubs",
+          body: (
+            <p>
+              The{" "}
               <Link href="/ethereum/aave-v4/hubs" className={INLINE_LINK}>
-                the hub comparison page
-              </Link>
-              .
+                hub comparison
+              </Link>{" "}
+              shows each hub&apos;s supply, borrowing, mix of assets and spokes. It then gives one table of every asset
+              in every hub, with the amount supplied, the amount borrowed, the supply and borrow APY and the
+              utilization, which is the share of an asset&apos;s liquidity that is borrowed.
             </p>
           ),
         },

@@ -27,6 +27,7 @@ const UL = "list-disc space-y-1 pl-5";
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "A wallet's positions",
+    section: "intro",
     body: (
       <>
         <p>
@@ -45,6 +46,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Position page",
+    section: "intro",
     body: (
       <p>
         The position page shows the collateral, the debt or the supply, each in dollars where Arc has a price feed for
@@ -55,6 +57,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Markets",
+    section: "markets",
     body: (
       <p>
         The{" "}

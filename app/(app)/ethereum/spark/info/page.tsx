@@ -59,6 +59,7 @@ export default function InfoPage() {
       views={[
         {
           heading: "Listing",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>The listing shows one card per wallet, with its collateral, its debt and its status.</li>
@@ -71,6 +72,7 @@ export default function InfoPage() {
         },
         {
           heading: "Position page",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>
@@ -82,6 +84,7 @@ export default function InfoPage() {
         },
         {
           heading: "Market page",
+          section: "markets",
           body: (
             <p>
               The market page lists every asset in the Pool with its size, its supply and borrow APYs and its risk

@@ -113,6 +113,7 @@ export default function InfoPage() {
       views={[
         {
           heading: "Listing",
+          section: "positions",
           body: (
             <>
               <p>
@@ -137,6 +138,7 @@ export default function InfoPage() {
         },
         {
           heading: "Position page",
+          section: "positions",
           body: (
             <>
               <p>
@@ -156,6 +158,7 @@ export default function InfoPage() {
         },
         {
           heading: "Savings Rate history",
+          section: "rates",
           body: (
             <p>
               The{" "}

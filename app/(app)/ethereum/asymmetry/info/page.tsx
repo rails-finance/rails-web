@@ -79,6 +79,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "Listing",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>Each row is one Trove.</li>
@@ -95,6 +96,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Branches page",
+    section: "branches",
     body: (
       <p>
         The branches page shows the seven branches side by side. It also shows the order in which redemptions reach the

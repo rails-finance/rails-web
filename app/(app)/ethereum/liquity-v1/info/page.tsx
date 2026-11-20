@@ -60,6 +60,7 @@ export default function InfoPage() {
       views={[
         {
           heading: "Listing",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>The listing has one card per Trove, showing its ETH collateral, its LUSD debt and its status.</li>
@@ -69,6 +70,7 @@ export default function InfoPage() {
         },
         {
           heading: "Trove page",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>The top card shows the collateral, the debt and the collateral ratio, read from the chain now.</li>
@@ -78,6 +80,7 @@ export default function InfoPage() {
         },
         {
           heading: "System page",
+          section: "system",
           body: (
             <p>
               The system page shows the total collateral ratio against the 150% line, the Stability Pool against the

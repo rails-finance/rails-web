@@ -92,6 +92,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "Listing",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>Each row is one position, which is one borrower in one market.</li>
@@ -108,6 +109,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Position page",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>
@@ -121,6 +123,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Markets page",
+    section: "markets",
     body: (
       <p>
         The markets page lists every market by version, with its debt, borrow rate, utilisation, A, loan discount and

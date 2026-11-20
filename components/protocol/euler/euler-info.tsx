@@ -95,6 +95,7 @@ function views(chain: EulerChainId): readonly [InfoView, ...InfoView[]] {
   return [
     {
       heading: "A wallet's accounts",
+      section: "intro",
       body: (
         <>
           <p>
@@ -123,6 +124,7 @@ function views(chain: EulerChainId): readonly [InfoView, ...InfoView[]] {
     },
     {
       heading: "Holding page",
+      section: "intro",
       body: (
         <p>
           A deposit&apos;s page shows what its shares redeem for, what the share price added over the last 30 days, and

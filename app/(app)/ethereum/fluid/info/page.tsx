@@ -103,6 +103,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "Listing",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>Each row is one position, identified by its NFT id and its current owner.</li>
@@ -113,6 +114,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Position page",
+    section: "positions",
     body: (
       <p>
         The position page shows the position&apos;s current collateral and debt, read from the blockchain. Its timeline
@@ -122,16 +124,17 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Vaults page",
+    section: "vaults",
     body: (
       <p>
-        The vaults page lists every vault Fluid has created, grouped by type (T1 to T4, by which sides hold DEX pool
-        shares), with its collateral, debt, rates, the positions it has opened and its limits. The page&apos;s head
-        counts the positions open now. Each vault opens its own page, with what can be borrowed now, the oracle price
-        and the liquidation penalty.{" "}
+        The{" "}
         <Link href="/ethereum/fluid/vaults" className={INLINE_LINK}>
-          Open the vaults page to see every vault
-        </Link>
-        .
+          vaults page
+        </Link>{" "}
+        lists every vault Fluid has created, grouped by type (T1 to T4, by which sides hold DEX pool shares), with its
+        collateral, debt, rates, the positions it has opened and its limits. The page&apos;s head counts the positions
+        open now. Each vault opens its own page, with what can be borrowed now, the oracle price and the liquidation
+        penalty.
       </p>
     ),
   },

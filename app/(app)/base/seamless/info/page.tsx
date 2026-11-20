@@ -77,6 +77,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "Listing",
+    section: "positions",
     body: (
       <>
         <ul className={UL}>
@@ -99,6 +100,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Position page",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>
@@ -110,14 +112,15 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Market page",
+    section: "markets",
     body: (
       <p>
-        The market page shows each reserve with its size, rates, risk settings and price, and explains the supply and
-        borrow caps and the frozen reserves.{" "}
+        The{" "}
         <Link href="/base/seamless/markets" className={INLINE_LINK}>
-          Open the market page
-        </Link>
-        .
+          market page
+        </Link>{" "}
+        shows each reserve with its size, rates, risk settings and price, and explains the supply and borrow caps and
+        the frozen reserves.
       </p>
     ),
   },

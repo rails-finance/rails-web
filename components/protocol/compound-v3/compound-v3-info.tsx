@@ -168,16 +168,17 @@ function readsFor(deployment: CompoundV3InfoDeployment): InfoReads {
   };
 }
 
-function marketsView(href: string, body: string): InfoView {
+function marketsView(href: string, shows: string): InfoView {
   return {
     heading: "Market view",
+    section: "markets",
     body: (
       <p>
-        {body} Open{" "}
+        The{" "}
         <Link href={href} className={INLINE_LINK}>
-          the market view
+          market view
         </Link>{" "}
-        to see them.
+        {shows}
       </p>
     ),
   };
@@ -215,6 +216,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
         views={[
           {
             heading: "Listing",
+            section: "positions",
             body: (
               <>
                 <ul className={UL}>
@@ -235,6 +237,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
           },
           {
             heading: "Account page",
+            section: "positions",
             body: (
               <ul className={UL}>
                 <li>
@@ -248,7 +251,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
           },
           marketsView(
             "/ethereum/compound-v3/markets",
-            "The market view shows each market with its base asset, collateral assets, interest rates and reserves.",
+            "shows each market with its base asset, collateral assets, interest rates and reserves.",
           ),
         ]}
         docs={docs}
@@ -284,6 +287,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
         views={[
           {
             heading: "Listing",
+            section: "positions",
             body: (
               <>
                 <ul className={UL}>
@@ -312,6 +316,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
           },
           {
             heading: "Account page",
+            section: "positions",
             body: (
               <ul className={UL}>
                 <li>The top card shows the account&apos;s balances in one market, read from its contract.</li>
@@ -324,7 +329,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
           },
           marketsView(
             "/base/compound-v3/markets",
-            "The market view shows each Base market with its base asset, collateral assets, interest rates and reserves.",
+            "shows each Base market with its base asset, collateral assets, interest rates and reserves.",
           ),
         ]}
         docs={docs}
@@ -360,6 +365,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
       views={[
         {
           heading: "Listing",
+          section: "positions",
           body: (
             <>
               <ul className={UL}>
@@ -380,6 +386,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
         },
         {
           heading: "Account page",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>
@@ -392,7 +399,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
         },
         marketsView(
           "/arbitrum/compound-v3/markets",
-          "The market view shows each Arbitrum market with its base asset, collateral assets, interest rates and reserves.",
+          "shows each Arbitrum market with its base asset, collateral assets, interest rates and reserves.",
         ),
       ]}
       docs={docs}

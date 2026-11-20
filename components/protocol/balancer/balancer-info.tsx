@@ -91,6 +91,7 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
 const views = (chainId: BalChainId): readonly [InfoView, ...InfoView[]] => [
   {
     heading: "A wallet's pools",
+    section: "intro",
     body: (
       <>
         <p>
@@ -119,6 +120,7 @@ const views = (chainId: BalChainId): readonly [InfoView, ...InfoView[]] => [
   },
   {
     heading: "BPT page",
+    section: "intro",
     body: (
       <p>
         The BPT page shows the wallet&apos;s share of the pool, its part of each token, any BPT staked in the

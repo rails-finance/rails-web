@@ -140,6 +140,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "Listing",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>
@@ -156,6 +157,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Trove page",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>
@@ -184,19 +186,21 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Branches page",
+    section: "branches",
     body: (
       <p>
-        The branches page shows, for each branch, its debt, collateral, number of Troves, span of interest rates, TCR
-        and Max LTVs. It links each branch to its Troves in redemption order.{" "}
+        The{" "}
         <Link href="/ethereum/liquity-v2/branches" className={INLINE_LINK}>
-          Open the branches page
+          branches page
         </Link>{" "}
-        to see them.
+        shows, for each branch, its debt, collateral, number of Troves, span of interest rates, TCR and Max LTVs. It
+        links each branch to its Troves in redemption order.
       </p>
     ),
   },
   {
     heading: "Stability Pool deposits",
+    section: "stability-pool",
     body: (
       <ul className={UL}>
         <li>

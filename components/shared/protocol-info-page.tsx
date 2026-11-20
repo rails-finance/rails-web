@@ -16,7 +16,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { RailHeader } from "@/components/shared/rail-header";
-import { protocolForSession } from "@/lib/shared/protocols";
+import { positionNounPlural, protocolForSession } from "@/lib/shared/protocols";
+import { ASSETS_SEGMENT as ASSETS_KEY } from "@/lib/shared/assets-by-protocol";
 import { CHAINS, explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { FOOT_LINK, INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { shortAddress } from "@/lib/shared/asset-roster";
@@ -66,8 +67,16 @@ export interface InfoTerm {
 }
 
 export interface InfoView {
-  /** "Listing", "Position page", "System page": the view as the rail names it. */
+  /** "Listing", "Position page", "Markets": the view as the rail names it. Drawn
+   *  as a sub-heading where its section holds more than one view, and always in
+   *  the intro. */
   heading: string;
+  /** The menu entry the view belongs under (ui-jobs 790): `positions` for the
+   *  position listing and the pages it opens, a sub-page's `segment` ("markets",
+   *  "vaults", "branches"), or `intro` for a page the menu does not name (a
+   *  wallet page on an explorer with no listing). A key the explorer's menu
+   *  lacks throws, so a view cannot drop off the page. */
+  section: string;
   body: ReactNode;
 }
 
@@ -312,6 +321,58 @@ export function ProtocolInfoShell({ session, children }: { session: SessionProto
   );
 }
 
+/** A menu entry as the About page reads it: its key (`InfoView.section`) and
+ *  its label, which is the section's heading. */
+interface MenuSection {
+  key: string;
+  label: string;
+  href: string;
+}
+
+const POSITIONS_KEY = "positions";
+
+/** The explorer's menu, in order, without About: what `RailHeader` draws.
+ *  Stand-in until 786 stage 2's `explorerSections()` lands, which both will read. */
+function menuSections(session: SessionProtocol): MenuSection[] {
+  const entry = protocolForSession(session);
+  if (!entry) return [];
+  return [
+    ...(entry.positionListing !== false
+      ? [{ key: POSITIONS_KEY, label: positionNounPlural(session), href: entry.listingHref }]
+      : []),
+    ...entry.subPages.map((s) => ({ key: s.segment, label: s.tab, href: s.href })),
+  ];
+}
+
+/** The Assets section every explorer with an Assets page draws, worded once. */
+function assetsView(session: SessionProtocol, href: string): InfoView {
+  const entry = protocolForSession(session);
+  const label = entry?.label ?? "";
+  const chain = entry ? CHAINS[entry.chainId].name : "";
+  return {
+    heading: "Assets",
+    section: ASSETS_KEY,
+    body: (
+      <p>
+        The{" "}
+        <Link href={href} className={INLINE_LINK}>
+          Assets page
+        </Link>{" "}
+        lists the assets {label} uses on {chain}. Each opens with its price over the last 30 days, what it is in {label}
+        , and the other explorers that use it on {chain}.
+      </p>
+    ),
+  };
+}
+
+/** The house hairline (`--edge-row-line`, the rule between the house table's
+ *  rows, D1), in light and dark. */
+const RULE = "border-[var(--edge-row-line)]";
+const HAIRLINE = `border-t ${RULE} pt-5`;
+const INTRO_KEY = "intro";
+const H2 = "text-sm font-semibold text-foreground";
+const H3 = "mt-3 text-sm font-medium text-foreground";
+
 export interface ProtocolInfoPageProps {
   session: SessionProtocol;
   /** Slot 1: what the explorer tracks, one or two sentences, with what it does not cover. */
@@ -322,7 +383,7 @@ export interface ProtocolInfoPageProps {
   howItWorks: readonly [ReactNode, ...ReactNode[]];
   /** Slot 2a, "How Rails reads it": omitted on an explorer that reads no contract directly. */
   reads?: InfoReads;
-  /** Slot 4: one section per view, each a few lines. */
+  /** Slot 4: the views, each a few lines, each under the menu entry it belongs to. */
   views: readonly [InfoView, ...InfoView[]];
   /** Slot 5: the search and filter line, only where the listing has them. */
   search?: ReactNode;
@@ -341,6 +402,28 @@ export interface ProtocolInfoPageProps {
   figures?: ReactNode;
 }
 
+/** The glossary list (I4). */
+function GlossaryList({ glossary, chainId }: { glossary: readonly InfoTerm[]; chainId: ChainId }) {
+  return (
+    <dl className="mt-1.5 space-y-2" data-anatomy="I4">
+      {glossary.map((t) => (
+        <div key={t.term} id={glossaryId(t.term)} className="scroll-mt-20">
+          <dt className="inline font-semibold text-foreground">{t.term}</dt>
+          <dd className="inline">
+            {": "}
+            {t.definition}
+            <TermSources sources={t.sources} chainId={chainId} />
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** The About page (ui-jobs 790): the intro, then one section per menu entry in
+ *  the menu's order, each under a hairline, then the closing sections. The
+ *  glossary stands in a right column from sm up and after everything else below
+ *  it; DOM order puts it last, so the narrow layout needs no reordering. */
 export function ProtocolInfoPage({
   session,
   tracks,
@@ -357,6 +440,17 @@ export function ProtocolInfoPage({
 }: ProtocolInfoPageProps) {
   const entry = protocolForSession(session);
   const chainId = entry?.chainId ?? MAINNET_CHAIN_ID;
+  const menu = menuSections(session);
+  for (const v of views) {
+    if (v.section !== INTRO_KEY && !menu.some((m) => m.key === v.section))
+      throw new Error(`ProtocolInfoPage: "${v.heading}" names section "${v.section}", not in ${session}'s menu`);
+  }
+  const introViews = views.filter((v) => v.section === INTRO_KEY);
+  const drawn = menu.flatMap((m) => {
+    const own = views.filter((v) => v.section === m.key);
+    const parts = own.length > 0 ? own : m.key === ASSETS_KEY ? [assetsView(session, m.href)] : [];
+    return parts.length > 0 ? [{ ...m, parts }] : [];
+  });
   return (
     <div className="py-8">
       <div className="mb-6">
@@ -365,73 +459,88 @@ export function ProtocolInfoPage({
       <h1 className="text-2xl font-semibold text-foreground" data-anatomy="I1">
         About this explorer
       </h1>
-      {/* Decisions 0061 and 0063: an explorer with a `history` opens with
-          its tag and line. */}
       {entry?.history && <InfoHistoryLine id={entry.id} />}
-      <div className="mt-3 max-w-3xl space-y-2 text-sm text-rb-500" data-anatomy="I2">
-        <p>{tracks}</p>
+      <div className="mt-3 text-sm text-rb-500 sm:grid sm:grid-cols-[minmax(0,1fr)_15rem] sm:gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:gap-12">
+        <div className="min-w-0 max-w-3xl">
+          <div className="space-y-2" data-anatomy="I2" data-info-section="intro">
+            <p>{tracks}</p>
+            <h2 className={`${H3} mt-4`}>How it works</h2>
+            <ul className={UL}>
+              {howItWorks.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
+            {introViews.map((v) => (
+              <div key={v.heading}>
+                <h3 className={H3}>{v.heading}</h3>
+                <div className="mt-1.5 space-y-2">{v.body}</div>
+              </div>
+            ))}
+          </div>
 
-        <h2 className={H}>How it works</h2>
-        <ul className={UL}>
-          {howItWorks.map((item, i) => (
-            <li key={i}>{item}</li>
+          {drawn.map((s) => (
+            <section key={s.key} className={`mt-6 ${HAIRLINE}`} data-info-section={s.key}>
+              <h2 className={H2}>{s.label}</h2>
+              {s.parts.map((p) => (
+                <div key={p.heading}>
+                  {s.parts.length > 1 && <h3 className={H3}>{p.heading}</h3>}
+                  <div className="mt-1.5 space-y-2">{p.body}</div>
+                </div>
+              ))}
+              {s.key === POSITIONS_KEY && search && (
+                <p className="mt-3" data-anatomy="I5">
+                  {search}
+                </p>
+              )}
+              {s.key === POSITIONS_KEY && (
+                <p className="mt-3" data-anatomy="I6">
+                  {guide ?? GUIDE_DEFAULT}
+                </p>
+              )}
+            </section>
           ))}
-        </ul>
 
-        {reads && <InfoReadsSection reads={reads} chainId={chainId} />}
+          {figures && <div className={`mt-6 ${HAIRLINE}`}>{figures}</div>}
 
-        <h2 id="glossary" className={`${H} scroll-mt-20`}>
-          {GLOSSARY_HEADING}
-        </h2>
-        <dl className="mt-1.5 space-y-2" data-anatomy="I4">
-          {glossary.map((t) => (
-            <div key={t.term} id={glossaryId(t.term)} className="scroll-mt-20">
-              <dt className="inline font-semibold text-foreground">{t.term}</dt>
-              <dd className="inline">
-                {": "}
-                {t.definition}
-                <TermSources sources={t.sources} chainId={chainId} />
-              </dd>
+          {reads && (
+            <div className={`mt-6 ${HAIRLINE} [&>section>h2]:mt-0`}>
+              <InfoReadsSection reads={reads} chainId={chainId} />
             </div>
-          ))}
-        </dl>
+          )}
 
-        {docsAndChain && docsAndChain.length > 0 && <InfoDocsAndChainSection items={docsAndChain} />}
+          {docsAndChain && docsAndChain.length > 0 && (
+            <div className={`mt-6 ${HAIRLINE} [&>div]:mt-0`}>
+              <InfoDocsAndChainSection items={docsAndChain} />
+            </div>
+          )}
 
-        {views.map((v) => (
-          <section key={v.heading}>
-            <h2 className={H}>{v.heading}</h2>
-            <div className="mt-1.5">{v.body}</div>
-          </section>
-        ))}
+          <div className={`mt-6 ${HAIRLINE}`}>
+            <p data-anatomy="I3">
+              {notCovered && <span className="block">{notCovered}</span>}
+              <Link href={`/coverage/${CHAINS[chainId].slug}`} className={FOOT_LINK}>
+                See what Rails covers on each {CHAINS[chainId].name} explorer
+              </Link>
+            </p>
+            <p className="mt-2" data-anatomy="I7">
+              Official documentation:{" "}
+              <a href={docs.href} className={INLINE_LINK} target="_blank" rel="noopener">
+                {docs.label}
+              </a>
+            </p>
+          </div>
+        </div>
 
-        {figures}
-
-        {search && (
-          <p className="mt-5" data-anatomy="I5">
-            {search}
-          </p>
-        )}
-
-        <p className="mt-5" data-anatomy="I6">
-          {guide ?? GUIDE_DEFAULT}
-        </p>
+        <aside
+          className={`mt-8 border-t ${RULE} pt-5 sm:mt-0 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6`}
+          aria-labelledby="glossary"
+          data-info-glossary=""
+        >
+          <h2 id="glossary" className={`${H2} scroll-mt-20`}>
+            {GLOSSARY_HEADING}
+          </h2>
+          <GlossaryList glossary={glossary} chainId={chainId} />
+        </aside>
       </div>
-      <p className="mt-4 text-sm text-rb-500" data-anatomy="I3">
-        {notCovered && <span className="block">{notCovered}</span>}
-        <Link href={`/coverage/${CHAINS[chainId].slug}`} className={FOOT_LINK}>
-          See what Rails covers on each {CHAINS[chainId].name} explorer
-        </Link>
-      </p>
-      <p className="mt-2 text-sm text-rb-500" data-anatomy="I7">
-        Official documentation:{" "}
-        <a href={docs.href} className={INLINE_LINK} target="_blank" rel="noopener">
-          {docs.label}
-        </a>
-      </p>
-      {/* The page's one inspector layer, for the docs-and-chain receipts and
-          any receipt an explorer passes in its own slots. It draws nothing
-          until a figure is picked. */}
       <ProvInspectorLayer />
     </div>
   );

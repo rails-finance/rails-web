@@ -26,6 +26,7 @@ const UL = "list-disc space-y-1 pl-5";
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "A wallet's account",
+    section: "intro",
     body: (
       <>
         <p>
@@ -50,6 +51,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Market overview and reserves",
+    section: "markets",
     body: (
       <p>
         <Link href={`${OP_ROUTE}/markets`} className={INLINE_LINK}>
