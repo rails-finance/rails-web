@@ -112,16 +112,17 @@ check(
   usdcRow?.markets[0],
 );
 const alsoAll = rows.flatMap((r) => r.also.map(([id, href]) => ({ id, href, token: r.line.slice(2) })));
-// An explorer with an Assets page is opened at its page for the token; the
-// rest keep their chip's link until they gain one (stage 1b).
-const liquityPills = alsoAll.filter((a) => a.id === "liquity");
+// Every other explorer is opened at its page for the token (stage 1b gave
+// each explorer with an asset list an Assets page); a vault no explorer
+// deploys keeps its own page.
 check(
-  '2e "Also used in" never names Aave V3; Liquity V2\'s opens its page for the token',
+  '2e "Also used in" never names Aave V3; each opens that explorer\'s page for the token',
   alsoAll.length > 10 &&
     alsoAll.every((a) => a.id !== "aave-v3") &&
-    liquityPills.length > 0 &&
-    liquityPills.every((a) => a.href === `/ethereum/liquity-v2/assets/${a.token}`),
-  `${alsoAll.length} marks, ${liquityPills.length} Liquity V2`,
+    alsoAll
+      .filter((a) => a.id !== "sbold")
+      .every((a) => /^\/[a-z]+\/[a-z0-9-]+\/assets\/0x[0-9a-f]{40}$/.test(a.href) && a.href.endsWith(a.token)),
+  `${alsoAll.length} marks`,
 );
 await shot(page, "aave-assets-1280");
 await go(page, "/ethereum/aave-v3/assets?cat=stablecoin");

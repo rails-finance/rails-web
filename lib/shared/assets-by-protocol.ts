@@ -20,7 +20,16 @@ export interface AssetsExplorer {
   id: string;
   label: string;
   href: string;
+  /** Its positions' name, plural: "Positions", "Troves", "Accounts". */
+  noun: string;
 }
+
+/** The explorers with a page per asset at `markets/<underlying>`: a reserve
+ *  page (M3) on the Aave family, a market page on the others. */
+const RESERVE_PAGES = new Set(["aave-v3", "aave-v3-base", "spark", "seamless"]);
+const MARKET_PAGES = new Set(["compound-v2", "moonwell", "moonwell-base"]);
+/** The Liquity family: a collateral is a branch. */
+const BRANCHES = new Set(["liquity", "asymmetry", "ebisu", "basedollar"]);
 
 /** One asset the explorer uses on its chain. */
 export interface ProtocolAssetLine {
@@ -32,21 +41,26 @@ export interface ProtocolAssetLine {
   also: AssetChip[];
 }
 
+/** "/markets" or "/markets/0x…" under the explorer: "Markets". */
+const pageWord = (e: AssetsExplorer, href: string): string => {
+  const seg = href.slice(e.href.length).split(/[/?#]/)[1] ?? "";
+  return seg ? seg[0].toUpperCase() + seg.slice(1).replace(/-/g, " ") : e.label;
+};
+
 /** What the asset is in the protocol, as links (ui-jobs 786): the uses the
- *  explorer's list names (BOLD's trove debt and Stability Pools), else Aave
- *  V3's reserve page, Liquity V2's branch, else the chip's market page or its
- *  listing filtered to the asset. */
-export function assetMarkets(e: AssetsExplorer, chip: AssetChip, symbol: string, token: string): ChipUse[] {
+ *  explorer's list names (a debt token's Trove debt and Stability Pools, a
+ *  Pendle market), else its reserve or market page where the explorer has a
+ *  page per asset, its branch on the Liquity family, then the chip's page
+ *  ("Markets", "Vaults") or the listing filtered to it (the positions' noun). */
+export function assetMarkets(e: AssetsExplorer, chip: AssetChip, token: string): ChipUse[] {
   if (chip.uses?.length) return chip.uses;
-  if (e.id === "aave-v3") return [{ label: "Reserve", href: `${e.href}/markets/${token.toLowerCase()}` }];
-  if (e.id === "liquity")
-    return [
-      { label: "Branch", href: `${e.href}/branches` },
-      { label: "Troves", href: chip.href },
-    ];
-  if (chip.link === "page") return [{ label: "Market", href: chip.href }];
-  if (chip.link === "filtered") return [{ label: `Positions with ${symbol}`, href: chip.href }];
-  return [];
+  const t = token.toLowerCase();
+  if (RESERVE_PAGES.has(e.id)) return [{ label: "Reserve", href: `${e.href}/markets/${t}` }];
+  if (MARKET_PAGES.has(e.id)) return [{ label: "Market", href: `${e.href}/markets/${t}` }];
+  const out: ChipUse[] = BRANCHES.has(e.id) ? [{ label: "Branch", href: `${e.href}/branches` }] : [];
+  if (chip.link === "page") out.push({ label: pageWord(e, chip.href), href: chip.href });
+  if (chip.link === "filtered") out.push({ label: e.noun, href: chip.href });
+  return out;
 }
 
 /** A chip as these pages link it: an explorer's page for the token, where
@@ -77,7 +91,7 @@ export function protocolAssetLines(
     out.push({
       card,
       line: { ...line, href: protocolAssetsHref(e.href, line.token) },
-      markets: assetMarkets(e, chip, card.symbol, line.token),
+      markets: assetMarkets(e, chip, line.token),
       also: line.chips.filter((ch) => ch.explorer !== e.id).map((ch) => chipToProtocolPage(ch, line.token, hrefOf)),
     });
   }
