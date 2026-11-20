@@ -280,7 +280,10 @@ export function RailHeader({
           chain's glyph and the sections menu stay on the line. */}
       <div className="flex items-center gap-3" data-anatomy="H3">
         <div className="flex min-w-0">
-          <ProtocolIdentity session={session} scale="title" linked={false} />
+          {/* Plain text where the sections menu is the way to the explorer's
+              pages (ui-jobs 786); an explorer with About alone draws no menu,
+              so its title keeps the link back to its route. */}
+          <ProtocolIdentity session={session} scale="title" linked={sections.length <= 1} />
         </div>
         <ChainLabel chainId={entry.chainId} />
         {/* An explorer with one section (About alone) draws no menu. */}

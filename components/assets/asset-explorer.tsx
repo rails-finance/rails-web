@@ -695,7 +695,7 @@ const LineFigures = memo(function LineFigures({
 
 /** A line's price on its chain (A5.1), with the stored round's mark and the
  *  flag on the row's chain; else BOLD's live read, the card's figure or "No
- *  price". /assets' protocol view draws it too. */
+ *  price". A protocol's Assets pages draw it too (components/assets/assets-by-protocol.tsx). */
 export function PriceCell({ line: l, figure }: { line: CardLine; figure: CardFigure | null }) {
   const price = l.price;
   const flag = l.main && l.row?.flag ? flagWords(l.row.flag) : null;
@@ -797,11 +797,12 @@ export const PhoneLine = memo(function PhoneLine({
   line: CardLine;
   symbol: string;
   first: boolean;
-  /** The marks at the row's end: the line's explorers, or on /assets'
-   *  protocol view the others that use it there. */
+  /** The marks at the row's end: the line's explorers, or on a protocol's
+   *  Assets page (components/assets/assets-by-protocol.tsx) the other explorers
+   *  that use it there. */
   chips?: AssetChip[];
-  /** The chain's mark and name lead the row; /assets' protocol view, on one
-   *  chain, leaves them out. */
+  /** The chain's mark and name lead the row; a protocol's Assets page
+   *  (components/assets/assets-by-protocol.tsx), on one chain, leaves them out. */
   chainNamed?: boolean;
 }) {
   const price = l.price;

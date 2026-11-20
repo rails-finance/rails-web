@@ -59,7 +59,7 @@ const entryOf = (id: string): ProtocolEntry => {
   return e;
 };
 /** An explorer's route where it has an Assets sub-page; null elsewhere, so a
- *  link to it keeps its chip's own target. */
+ *  link to it keeps its chip's target. */
 const hrefOf = (id: string) => {
   const p = PROTOCOLS.find((x) => x.id === id);
   return p?.subPages.some((s) => s.segment === ASSETS_SEGMENT) ? p.href : null;
@@ -80,7 +80,7 @@ export function protocolAssetsMetadata(id: string): Metadata {
   const where = CHAINS[e.chainId].name;
   return {
     title: `${e.label} on ${where}: assets`,
-    description: `The assets ${e.label} uses on ${where}, each with its price over the last 30 days, what it is in ${e.label}, and the other protocols that use it.`,
+    description: `The assets ${e.label} uses on ${where}, each with its price over the last 30 days, what it is in ${e.label}, and the other explorers that use it.`,
     alternates: { canonical: protocolAssetsHref(e.href) },
     robots: { index: false, follow: false },
   };
@@ -110,7 +110,7 @@ export async function ProtocolAssetsPage({ id, searchParams }: { id: string; sea
               data-asset-prices-day={data.day ?? undefined}
             >
               The table below lists the assets {e.label} uses on {where}, with each one&rsquo;s price, what it is in{" "}
-              {e.label}, and the other protocols that use it there.
+              {e.label}, and the other explorers that use it there.
               {data.day != null && <> Prices are at the close of {formatDate(new Date(data.day * DAY_MS))}.</>}
             </p>
             <ProtocolAssets
@@ -146,7 +146,7 @@ export async function protocolAssetMetadata(id: string, token: string): Promise<
   return {
     title: card ? `${card.symbol} in ${e.label} on ${CHAINS[e.chainId].name}` : "Asset",
     description: card
-      ? `${card.symbol} in ${e.label}: its price from each oracle on ${CHAINS[e.chainId].name}, what it is in ${e.label}, and the other protocols that use it.`
+      ? `${card.symbol} in ${e.label}: its price from each oracle on ${CHAINS[e.chainId].name}, what it is in ${e.label}, and the other explorers that use it.`
       : undefined,
     alternates: { canonical },
     robots: { index: false, follow: false },
@@ -163,13 +163,23 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
     fetchAssetExplorerServer(readerIp).catch(() => null),
     fetchAssetRosterServer(t).catch(() => null),
   ]);
-  const line = data ? linesFor(data.cards, e).find((l) => l.line.token === t) : undefined;
+  // A failed read is no answer about the token: the page says so, as the
+  // Assets page does, rather than a 404.
+  if (!data)
+    return (
+      <Frame protocol={e}>
+        <p className="text-sm text-rb-500" data-asset-prices="failed">
+          The assets were not read.
+        </p>
+      </Frame>
+    );
+  const line = linesFor(data.cards, e).find((l) => l.line.token === t);
   // A token the explorer does not use on its chain has no page under it.
   if (!line) notFound();
   const { card } = line;
 
   const aside = <ProtocolUse protocol={e} line={line} chain={chain} />;
-  const relationsFor = (page: AssetPage | null) => relations(page, card, chain, data!.cards, e);
+  const relationsFor = (page: AssetPage | null) => relations(page, card, chain, data.cards, e);
   const opened = answer ? assetPage(answer, chain) : null;
 
   if (!opened || !opened.chains.some((c) => c.chain === chain)) {

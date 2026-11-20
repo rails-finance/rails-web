@@ -52,9 +52,9 @@ export function ProtocolIdentity({
 }: {
   session: SessionProtocol;
   scale?: keyof typeof SCALE;
-  /** False on the explorer's title row (H3): the name is plain text and the
-   *  sections menu beside it is the way to the explorer's pages (Miles, 20 Nov
-   *  2026, ui-jobs 786). */
+  /** False on the explorer's title row (H3) where it draws the sections menu:
+   *  the name is plain text and the menu is the way to the explorer's pages
+   *  (Miles, 20 Nov 2026, ui-jobs 786). */
   linked?: boolean;
 }) {
   const entry = protocolForSession(session);
