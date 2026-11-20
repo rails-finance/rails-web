@@ -176,7 +176,7 @@ function marketsView(href: string, shows: string): InfoView {
       <p>
         The{" "}
         <Link href={href} className={INLINE_LINK}>
-          market view
+          market page
         </Link>{" "}
         {shows}
       </p>

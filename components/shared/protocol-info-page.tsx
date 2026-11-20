@@ -75,7 +75,8 @@ export interface InfoView {
    *  position listing and the pages it opens, a sub-page's `segment` ("markets",
    *  "vaults", "branches"), or `intro` for a page the menu does not name (a
    *  wallet page on an explorer with no listing). A key the explorer's menu
-   *  lacks throws, so a view cannot drop off the page. */
+   *  lacks throws outside production and lands in the intro in production, so a
+   *  view cannot drop off the page. */
   section: string;
   body: ReactNode;
 }
@@ -442,16 +443,34 @@ export function ProtocolInfoPage({
   const entry = protocolForSession(session);
   const chainId = entry?.chainId ?? MAINNET_CHAIN_ID;
   const menu = menuSections(session);
-  for (const v of views) {
-    if (v.section !== INTRO_KEY && !menu.some((m) => m.key === v.section))
-      throw new Error(`ProtocolInfoPage: "${v.heading}" names section "${v.section}", not in ${session}'s menu`);
-  }
-  const introViews = views.filter((v) => v.section === INTRO_KEY);
+  const inMenu = (v: InfoView) => v.section === INTRO_KEY || menu.some((m) => m.key === v.section);
+  // A view naming an entry this explorer's menu lacks: an error outside
+  // production (scripts/test/info-sections.test.mjs reads the same keys);
+  // in production the view moves into the intro, so its copy stays on the page.
+  const stray = views.find((v) => !inMenu(v));
+  if (stray && process.env.NODE_ENV !== "production")
+    throw new Error(`ProtocolInfoPage: "${stray.heading}" names section "${stray.section}", not in ${session}'s menu`);
+  const introViews = views.filter((v) => !inMenu(v) || v.section === INTRO_KEY);
   const drawn = menu.flatMap((m) => {
     const own = views.filter((v) => v.section === m.key);
     const parts = own.length > 0 ? own : m.key === ASSETS_KEY ? [assetsView(session, m.href)] : [];
     return parts.length > 0 ? [{ ...m, parts }] : [];
   });
+  // The search line (I5) and the pointer line (I6) close Positions; on an
+  // explorer with no positions section they close the intro.
+  const hasPositions = drawn.some((s) => s.key === POSITIONS_KEY);
+  const readingLines = (
+    <>
+      {search && (
+        <p className="mt-3" data-anatomy="I5">
+          {search}
+        </p>
+      )}
+      <p className="mt-3" data-anatomy="I6">
+        {guide ?? GUIDE_DEFAULT}
+      </p>
+    </>
+  );
   return (
     <div className="py-8">
       <div className="mb-6">
@@ -477,6 +496,7 @@ export function ProtocolInfoPage({
                 <div className="mt-1.5 space-y-2">{v.body}</div>
               </div>
             ))}
+            {!hasPositions && readingLines}
           </div>
 
           {drawn.map((s) => (
@@ -488,16 +508,7 @@ export function ProtocolInfoPage({
                   <div className="mt-1.5 space-y-2">{p.body}</div>
                 </div>
               ))}
-              {s.key === POSITIONS_KEY && search && (
-                <p className="mt-3" data-anatomy="I5">
-                  {search}
-                </p>
-              )}
-              {s.key === POSITIONS_KEY && (
-                <p className="mt-3" data-anatomy="I6">
-                  {guide ?? GUIDE_DEFAULT}
-                </p>
-              )}
+              {s.key === POSITIONS_KEY && readingLines}
             </section>
           ))}
 

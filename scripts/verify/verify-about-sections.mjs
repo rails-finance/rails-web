@@ -26,7 +26,11 @@ const PAGES = process.env.PAGES
 const NOT_SECTIONS = new Set(["Overview", "About"]);
 
 const fails = [];
-const check = (cond, msg) => (cond ? console.log("  ok:", msg) : (fails.push(msg), console.log("  FAIL:", msg)));
+const check = (cond, msg) => {
+  if (cond) console.log("  ok:", msg);
+  else (fails.push(msg), console.log("  FAIL:", msg));
+  return cond;
+};
 
 const browser = await chromium.launch();
 for (const [width, tag] of [
@@ -35,7 +39,10 @@ for (const [width, tag] of [
 ]) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
   for (const path of PAGES) {
-    await page.goto(BASE + path, { waitUntil: "networkidle" });
+    // A 500 is a failure here, not a timeout further on.
+    const res = await page.goto(BASE + path, { waitUntil: "networkidle" }).catch((e) => e);
+    const status = res instanceof Error ? res.message.split("\n")[0] : res?.status();
+    if (!check(typeof status === "number" && status < 400, `${tag} ${path}: loads (${status})`)) continue;
     const got = await page.evaluate(() => {
       const menu = [...document.querySelectorAll("[data-sections-menu] [role=menuitem]")].map((a) =>
         a.textContent.trim(),
@@ -51,11 +58,13 @@ for (const [width, tag] of [
         intro: rect('[data-info-section="intro"]'),
         glossary: rect("[data-info-glossary]"),
         docs: rect('[data-anatomy="I7"]'),
+        pointer: document.querySelectorAll('[data-anatomy="I6"]').length,
       };
     });
     const menu = got.menu.filter((m) => !NOT_SECTIONS.has(m));
     const headings = got.sections.filter((s) => s.key !== "intro").map((s) => s.heading);
     check(got.sections[0]?.key === "intro", `${tag} ${path}: opens with the intro`);
+    check(got.pointer === 1, `${tag} ${path}: draws the pointer line (I6) once (got ${got.pointer})`);
     // Every section is a menu entry, in the menu's order; an entry with no
     // copy is left off, and the desktop pass names it.
     const inMenuOrder = headings.every((h, i) => menu.indexOf(h) > (i ? menu.indexOf(headings[i - 1]) : -1));

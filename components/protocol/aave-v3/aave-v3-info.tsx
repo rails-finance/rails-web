@@ -61,7 +61,7 @@ function marketView(href: string, market: string): InfoView {
       <p>
         The{" "}
         <Link href={href} className={INLINE_LINK}>
-          market view
+          market page
         </Link>{" "}
         shows each {market} reserve with its size, rates, risk settings and price.
       </p>

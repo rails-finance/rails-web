@@ -212,7 +212,7 @@ export function AaveV4InfoPage({ deployment }: { deployment: "ethereum" | "base"
             <p>
               The{" "}
               <Link href="/ethereum/aave-v4/hubs" className={INLINE_LINK}>
-                hub comparison
+                hubs page
               </Link>{" "}
               shows each hub&apos;s supply, borrowing, mix of assets and spokes. It then gives one table of every asset
               in every hub, with the amount supplied, the amount borrowed, the supply and borrow APY and the

@@ -133,7 +133,7 @@ export function MoonwellInfoPage({ deployment }: { deployment: MoonwellInfoDeplo
               <p>
                 The{" "}
                 <Link href={`${route}/markets`} className={INLINE_LINK}>
-                  markets view
+                  markets page
                 </Link>{" "}
                 shows each market with what it holds, what is borrowed and available, and its supply and borrow rates.
                 Each market opens a page with its rate curve and parameters. A supply cap is the most the market accepts

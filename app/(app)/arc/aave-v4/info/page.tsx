@@ -63,8 +63,9 @@ const views: readonly [InfoView, ...InfoView[]] = [
     section: "markets",
     body: (
       <p>
+        The{" "}
         <Link href={`${ROUTE}/markets`} className={INLINE_LINK}>
-          Spokes
+          spokes page
         </Link>{" "}
         lists the three spokes with what each has supplied and borrowed; each opens its reserves, and each reserve its
         page, with the spoke&apos;s terms beside the hub&apos;s figures for that asset.
@@ -76,8 +77,9 @@ const views: readonly [InfoView, ...InfoView[]] = [
     section: "hubs",
     body: (
       <p>
+        The{" "}
         <Link href={`${ROUTE}/hubs`} className={INLINE_LINK}>
-          Hubs
+          hubs page
         </Link>{" "}
         shows the Core hub&apos;s assets, its credit lines to each spoke and their APYs.
       </p>
