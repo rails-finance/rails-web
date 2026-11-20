@@ -323,8 +323,20 @@ for (const k of KEYS.filter((k) => !k.startsWith("sbold:"))) {
 }
 
 // ── 9: /vaults/products (E7, ui-jobs 773) ──────────────────────────────────
+// /vaults is read again just before, so its cards and the products rows come
+// from one index read (cached five minutes), and rows are matched to cards by
+// protocol and chain.
 {
   const p = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+  await p.goto(`${BASE}/vaults`, { waitUntil: "networkidle", timeout: 300_000 });
+  await p.waitForSelector("[data-overview-card]", { timeout: 120_000 });
+  const fresh = await p.locator("[data-overview-card]").evaluateAll((els) =>
+    els.map((el) => ({
+      key: el.getAttribute("data-overview-card"),
+      count: el.getAttribute("data-overview-count"),
+      block: Number(el.getAttribute("data-overview-block")),
+    })),
+  );
   const r = await p.goto(`${BASE}/vaults/products`, { waitUntil: "networkidle", timeout: 300_000 });
   check("9a /vaults/products answers 200", r?.status() === 200, String(r?.status()));
   await p.waitForSelector('[data-product-layout="table"] [data-product-row]', { timeout: 120_000 });
@@ -337,12 +349,13 @@ for (const k of KEYS.filter((k) => !k.startsWith("sbold:"))) {
     sbold: ["sbold"],
     "ipor-fusion": ["ipor-fusion"],
   };
-  const want = [...new Set(cards.flatMap((c) => FAMILIES[c.key.split(":")[0]] ?? []))];
+  const want = [...new Set(fresh.flatMap((c) => FAMILIES[c.key.split(":")[0]] ?? []))];
   const rows = await p.locator('[data-product-layout="table"] [data-product-row]').evaluateAll((els) =>
     els.map((el) => ({
       family: el.getAttribute("data-product-row"),
       cells: [...el.querySelectorAll("[data-product-cell]")].map((c) => c.getAttribute("data-product-cell")),
       counts: [...el.querySelectorAll("[data-product-count]")].map((c) => ({
+        roster: c.getAttribute("data-product-roster"),
         count: c.getAttribute("data-product-count"),
         block: Number(c.getAttribute("data-product-block")),
         receipted: !!c.querySelector("[data-prov-covered], .prov-locate-box, [data-prov-pickable]"),
@@ -359,20 +372,16 @@ for (const k of KEYS.filter((k) => !k.startsWith("sbold:"))) {
     rows.map((r) => r.family).join() === want.join() && cardRows === want.length,
     `${rows.map((r) => r.family).join(", ")} | ${cardRows} cards`,
   );
-  const SIX = ["redemption", "stewards", "timelock", "fees", "vaults", "leave"];
+  const SIX = ["withdrawals", "stewards", "timelock", "fees", "vaults", "withdrawable"];
   check(
     "9c every row states the six facts",
     rows.every((r) => SIX.every((k) => r.cells.includes(k))),
     rows.map((r) => `${r.family} ${r.cells.join("/")}`).join("; "),
   );
-  for (const c of cards) {
+  for (const c of fresh) {
     const fams = FAMILIES[c.key.split(":")[0]] ?? [];
     const chain = Number(c.key.split(":")[1]);
-    const mine = fams.flatMap((f) => {
-      const row = rows.find((r) => r.family === f);
-      const i = cards.filter((x) => x.key.split(":")[0] === c.key.split(":")[0]).findIndex((x) => x.key === c.key);
-      return row?.counts[i] ? [row.counts[i]] : [];
-    });
+    const mine = fams.flatMap((f) => rows.find((r) => r.family === f)?.counts.filter((m) => m.roster === c.key) ?? []);
     const total = mine.reduce((a, m) => a + Number(m.count), 0);
     check(
       `9d ${c.key}: the products count${fams.length > 1 ? "s sum" : ""} to the overview card's, at its block, in a receipt`,

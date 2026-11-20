@@ -142,10 +142,13 @@ const SERIES_NONE: Record<NoneReason, (f: VaultFamily) => string> = {
   "no-series": () => "Rails keeps no daily series for this vault yet.",
 };
 
+/** Where a static aToken's withdrawal comes from; /vaults/products repeats it. */
+export const STATA_FROM_RESERVE = "A withdrawal takes cash from its Aave reserve";
+
 /** Why a family's Withdrawals line is not read; /vaults/products repeats them. */
 export const WITHDRAWALS_UNREAD: Partial<Record<VaultFamily, string>> = {
   sgho: "Rails does not read how much can be withdrawn from Savings GHO yet.",
-  stata: "A withdrawal takes cash from its Aave reserve, and Rails does not read the reserve's free cash here yet.",
+  stata: `${STATA_FROM_RESERVE}, and Rails does not read the reserve's free cash here yet.`,
   "maple-pool": "Maple pools pay withdrawals through a queue, which Rails reads on the pools page only.",
 };
 

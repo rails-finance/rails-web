@@ -25,6 +25,7 @@ import { loadVaultIndex } from "@/lib/vaults/index-read";
 import {
   chainName,
   VAULT_INDEX_LISTED,
+  VAULT_INDEX_PROTOCOL_LABEL,
   vaultIndexProtocol,
   vaultIndexRosterKey,
   type VaultIndexProtocol,
@@ -36,7 +37,7 @@ import {
   type ProductCell,
   type ProductRole,
 } from "@/lib/vaults/products-words";
-import { rosterCountProv, type RosterRead } from "@/lib/vaults/roster-provenance";
+import { rosterCountProv, rosterFamilyCountProv, type RosterRead } from "@/lib/vaults/roster-provenance";
 
 const C = PRODUCTS_PAGE.columns;
 const MUTED = "text-xs text-rb-500";
@@ -69,9 +70,12 @@ const PROTOCOL: Record<VaultFamily, VaultIndexProtocol> = {
 /** A family's vaults on one chain, at its roster's read. */
 interface ProductCount {
   chainId: number;
+  protocol: VaultIndexProtocol;
   read: RosterRead;
   /** Null where the roster's read failed. */
   count: number | null;
+  /** Where the roster carries several families (Aave's): its whole count. */
+  rosterTotal: number | null;
 }
 
 interface ProductRow {
@@ -101,9 +105,12 @@ async function readProducts(): Promise<{ rows: ProductRow[]; indexDown: boolean 
           at: r?.readBy?.blockTime || isoSeconds(r?.readAt),
         };
         const counted = r != null && r.blockNumber > 0;
+        const shared = ORDER.filter((f) => PROTOCOL[f] === protocol).length > 1;
         return {
           chainId: l.chainId,
+          protocol,
           read,
+          rosterTotal: counted && shared ? r.count : null,
           count: counted
             ? vaults.filter((v) => v.family === family && v.chainId === l.chainId && vaultIndexProtocol(v) === protocol)
                 .length
@@ -142,12 +149,18 @@ function Stewards({ stewards }: { stewards: ProductRole[] | ProductCell }) {
   );
 }
 
-function Counts({ counts }: { counts: ProductCount[] }) {
+function Counts({ counts, familyLabel }: { counts: ProductCount[]; familyLabel: string }) {
   const named = counts.length > 1;
   return (
     <span className="flex flex-col gap-1.5" data-product-cell="vaults">
       {counts.map((c) => (
-        <span key={c.chainId} className="block" data-product-count={c.count ?? ""} data-product-block={c.read.block}>
+        <span
+          key={c.chainId}
+          className="block"
+          data-product-count={c.count ?? ""}
+          data-product-block={c.read.block}
+          data-product-roster={vaultIndexRosterKey(c)}
+        >
           {c.count == null ? (
             <span className="block text-rb-500">
               {named ? `${chainName(c.chainId)}: ` : ""}
@@ -156,7 +169,21 @@ function Counts({ counts }: { counts: ProductCount[] }) {
           ) : (
             <span className="block text-foreground">
               {named ? `${chainName(c.chainId)}: ` : ""}
-              <Prov info={rosterCountProv(c.read, c.count)}>{vaultCountText(c.count)}</Prov>
+              <Prov
+                info={
+                  c.rosterTotal != null
+                    ? rosterFamilyCountProv(
+                        c.read,
+                        VAULT_INDEX_PROTOCOL_LABEL[c.protocol],
+                        familyLabel,
+                        c.count,
+                        c.rosterTotal,
+                      )
+                    : rosterCountProv(c.read, c.count)
+                }
+              >
+                {vaultCountText(c.count)}
+              </Prov>
             </span>
           )}
           <span className="block text-[11px] text-rb-500">
@@ -173,7 +200,8 @@ function Family({ family }: { family: VaultFamily }) {
   return (
     <>
       <span className="block font-semibold text-foreground">{f.label}</span>
-      {f.kind !== f.label && <span className={`mt-0.5 block ${MUTED}`}>{f.kind}</span>}
+      {/* The kind, where it says more than the family's name. */}
+      {f.kind !== f.label && f.kind !== f.singular && <span className={`mt-0.5 block ${MUTED}`}>{f.kind}</span>}
     </>
   );
 }
@@ -182,12 +210,12 @@ function Family({ family }: { family: VaultFamily }) {
 function facts(row: ProductRow): [string, ReactNode][] {
   const w = PRODUCT_FAMILY_WORDS[row.family];
   return [
-    [C.redemption, <Cell key="r" cell={w.redemption} hook="redemption" />],
+    [C.withdrawals, <Cell key="w" cell={w.withdrawals} hook="withdrawals" />],
     [C.stewards, <Stewards key="s" stewards={w.stewards} />],
     [C.timelock, <Cell key="t" cell={w.timelock} hook="timelock" />],
     [C.fees, <Cell key="f" cell={w.fees} hook="fees" />],
-    [C.vaults, <Counts key="v" counts={row.counts} />],
-    [C.leave, <Cell key="l" cell={w.leave} hook="leave" />],
+    [C.vaults, <Counts key="v" counts={row.counts} familyLabel={VAULT_FAMILIES[row.family].label} />],
+    [C.withdrawable, <Cell key="l" cell={w.withdrawable} hook="withdrawable" />],
   ];
 }
 
@@ -201,12 +229,12 @@ function ProductsTable({ rows }: { rows: ProductRow[] }) {
     >
       <DataTableHead>
         <DataTableHeader label={C.family} className="w-[11%]" />
-        <DataTableHeader label={C.redemption} className="w-[17%]" />
+        <DataTableHeader label={C.withdrawals} className="w-[17%]" />
         <DataTableHeader label={C.stewards} className="w-[18%]" />
         <DataTableHeader label={C.timelock} className="w-[19%]" />
         <DataTableHeader label={C.fees} className="w-[13%]" />
         <DataTableHeader label={C.vaults} className="w-[10%]" />
-        <DataTableHeader label={C.leave} className="w-[12%]" />
+        <DataTableHeader label={C.withdrawable} className="w-[12%]" />
       </DataTableHead>
       <DataTableBody>
         {rows.map((r) => (

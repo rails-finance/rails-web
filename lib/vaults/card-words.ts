@@ -67,6 +67,13 @@ export const IPOR_ROLES_TEXT =
 export const IPOR_FEES_TEXT =
   "a performance fee on the share price's gains and a yearly management fee, each minted to its fee account as new shares.";
 
+/** The MetaMorpho assets modal's queue sentences. */
+export const MORPHO_QUEUE_SUPPLY = "The vault supplies its asset to the Morpho Blue markets in its withdraw queue";
+export const MORPHO_QUEUE_ORDER = "A withdrawal takes from them in that order.";
+
+/** Savings GHO's Risk bullet on its vault page. */
+export const SGHO_WITHDRAW_CLAMP = "Withdrawals are clamped to the GHO the contract holds.";
+
 export const SHARES_ISSUED_TIP = "Every share of the vault in existence.";
 
 export const morphoVaultCardContent = (): LearnMoreContent => ({
@@ -94,8 +101,7 @@ export const morphoVaultCardContent = (): LearnMoreContent => ({
 
 export const morphoVaultAssetsContent = (): LearnMoreContent => ({
   title: "Where a MetaMorpho vault's assets are",
-  intro:
-    "The vault supplies its asset to the Morpho Blue markets in its withdraw queue, listed here in the queue's order. A withdrawal takes from them in that order.",
+  intro: `${MORPHO_QUEUE_SUPPLY}, listed here in the queue's order. ${MORPHO_QUEUE_ORDER}`,
   detailsHeading: "Key concepts:",
   details: [
     {

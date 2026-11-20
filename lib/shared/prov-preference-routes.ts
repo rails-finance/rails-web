@@ -311,6 +311,7 @@ export const PROV_PREFERENCE_ROUTES: readonly string[] = [
   "/sepolia/polaris/reserve-loans/[id]/event/[eventId]",
   "/sepolia/polaris/stability-pool/[market]/[id]",
   "/sepolia/polaris/stability-pool/[market]/[id]/event/[eventId]",
+  "/vaults/products",
   "/wallet/[address]",
 ];
 
