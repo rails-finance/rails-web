@@ -131,8 +131,11 @@ export interface CardLine {
 /** A card's lines, one per chain, in `order` (the chains' order). */
 export function cardLines(c: AssetCard, order: readonly number[]): CardLine[] {
   const rows = [c.row, ...(c.others ?? [])].filter((r): r is AssetPriceRow => r != null);
-  const at = (chain: number) => {
+  // A row prices its token alone, on its chain or its other chains, so a
+  // merged wrapper (USDbC in USDC's card) cannot take USDC's price.
+  const at = (chain: number, token: string) => {
     for (const r of rows) {
+      if (r.token.toLowerCase() !== token.toLowerCase()) continue;
       if (r.chain === chain) return { price: r as ChainPrice, row: r, main: true };
       const e = r.elsewhere.find((x) => x.chain === chain);
       if (e) return { price: e, row: r, main: false };
@@ -146,7 +149,7 @@ export function cardLines(c: AssetCard, order: readonly number[]): CardLine[] {
       chain: x.chain,
       token: x.token,
       href: x.href,
-      ...at(x.chain),
+      ...at(x.chain, x.token),
       chips: c.chips.filter((ch) => ch.chain === x.chain),
     }));
 }

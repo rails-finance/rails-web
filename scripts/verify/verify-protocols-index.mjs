@@ -22,8 +22,8 @@
 //   3  Assets per line: "Any token" on a DEX or trading line; elsewhere at
 //      most five marks, then "+N", the cell one link to /assets on that
 //      explorer that a press reaches past the line's cover; every chain and
-//      asset mark draws at 24px; no Vaults or Coverage link; each coverage
-//      page still holds its explorers' ids. Aave V3's three lines are logged
+//      asset mark draws at 24px; no Vaults or Coverage link. Aave V3's three
+//      lines are logged
 //   4  ?chain= keeps the chain's lines and ?type= the category's groups, the
 //      first line shown taking the name; the facets read Chain and Category;
 //      the search keeps a group on its name and a line on its chain; the
@@ -36,8 +36,7 @@
 //      an Assets link under the chooser opens /assets
 //   6  at 375 and 1280 the page has no horizontal scroll; at 375 a group on
 //      /protocols and /assets is one card (its head once, a compact row per
-//      chain, no per-line labels), and a coverage link's #<id> scrolls the
-//      explorer's card into view
+//      chain, no per-line labels)
 
 import { chromium } from "playwright";
 import fs from "node:fs";
@@ -270,16 +269,6 @@ check(
   "3f no Vaults or Coverage link left in a line",
   lines.every((l) => l.oldLinks === 0),
 );
-const covPages = {};
-for (const slug of [...new Set(launched.map((e) => SLUG[e.chainId]))]) {
-  const got = await page.request.get(`${BASE}/coverage/${slug}`, { timeout: 300_000 });
-  covPages[slug] = { status: got.status(), html: await got.text() };
-}
-const noAnchor = launched.filter((e) => {
-  const p = covPages[SLUG[e.chainId]];
-  return p.status !== 200 || !p.html.includes(`id="${e.id}"`);
-});
-check("3g each coverage page holds its explorers' ids", noAnchor.length === 0, noAnchor.map((e) => e.id).join(" "));
 // For Miles: how far Aave V3's three lists differ.
 {
   const aave = (shownGroups.get("aave-v3") ?? []).map((l) => ({
@@ -559,16 +548,6 @@ for (const width of [375, 1280]) {
         JSON.stringify(v),
       );
     }
-    await p.goto(`${BASE}/coverage/base#morpho-base`, { waitUntil: "networkidle", timeout: 300_000 });
-    await p.waitForTimeout(500);
-    const top = await p.evaluate(
-      () => document.querySelector('[data-coverage-card="morpho-base"]')?.getBoundingClientRect().top ?? null,
-    );
-    check(
-      "6b 375px: /coverage/base#morpho-base scrolls the explorer's card into view",
-      top != null && top >= 0 && top < 400,
-      `card top ${top}`,
-    );
   }
   await p.close();
 }

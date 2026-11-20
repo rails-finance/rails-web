@@ -126,9 +126,11 @@ export function AssetExplorer({
 }) {
   const scope = useAssetScope();
   const [query, setQuery] = useState("");
-  // The first SHOWN_FIRST assets draw until "Show all"; a filter, a search or
-  // a sort change goes back to them. Not in the URL (ui-jobs 781).
-  const [showAll, setShowAll] = useState(false);
+  // The first SHOWN_FIRST assets draw until "Show all", which holds for the
+  // list it was pressed on (`listKey`); any change that reshapes the list (a
+  // filter, a search, a sort, "Add assets", the focus) goes back to them. Not
+  // in the URL (ui-jobs 781).
+  const [shownFor, setShownFor] = useState<object | null>(null);
   const [filters, setFiltersState] = useState<Omit<Filters, "q">>({
     cats: initial.cats,
     chains: initial.chains.map(String),
@@ -226,7 +228,6 @@ export function AssetExplorer({
 
   const state: Filters = { q: query, ...filters };
   const onToolbar = (next: Filters) => {
-    setShowAll(false);
     if (next.q !== query) setQuery(next.q);
     const { q: _q, ...rest } = next; // eslint-disable-line @typescript-eslint/no-unused-vars
     setFiltersState(rest);
@@ -234,7 +235,6 @@ export function AssetExplorer({
   };
 
   const setSort = (sortBy: CardSort, sortOrder: DataTableDir) => {
-    setShowAll(false);
     const next = { ...filters, sortBy, sortOrder };
     setFiltersState(next);
     writeUrl(next);
@@ -375,6 +375,10 @@ export function AssetExplorer({
     [cards, query, filters, scope.on, inFocus], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const shown = shownLines.map((x) => x.card);
+  // A new list (cards narrowed by the focus, "Add assets", a filter, a
+  // search, a sort) is a new key, so "Show all" lapses with no effect to run.
+  const listKey = useMemo(() => ({}), [cards, manage, query, filters]);
+  const showAll = shownFor === listKey;
   const filtering =
     query.trim() !== "" ||
     filters.cats.length + filters.chains.length + filters.explorers.length + (scope.on ? filters.focus.length : 0) > 0;
@@ -525,7 +529,7 @@ export function AssetExplorer({
             <div className="mt-4 flex justify-center">
               <button
                 type="button"
-                onClick={() => setShowAll(true)}
+                onClick={() => setShownFor(listKey)}
                 className={`inline-flex min-h-11 items-center px-3 text-sm font-semibold ${INPLACE_TEXT}`}
                 data-asset-show-all={shownLines.length}
               >
@@ -650,7 +654,9 @@ function AssetRow({
           </span>
         </span>
       </DataTableCell>
-      <LineFigures line={l} symbol={c.symbol} figure={first ? c.figure : null} />
+      {/* The priceless figure belongs to the token that made the card (its id is
+          chain:token), so it shows on that token's line alone. */}
+      <LineFigures line={l} symbol={c.symbol} figure={`${l.chain}:${l.token}` === c.id ? c.figure : null} />
       {/* The row's ⋮ (D7): the Focus entry, on the group's first line; on a
           card it sits at the top right. */}
       <DataTableCell valign="middle" className="dt-row-menu w-px whitespace-nowrap" data-col="menu">

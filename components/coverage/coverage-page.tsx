@@ -220,7 +220,7 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
               return cell !== true && cell !== false;
             });
             return (
-              <div key={p.id} className="scroll-mt-24 rounded-2xl bg-raised p-4" data-coverage-card={p.id}>
+              <div key={p.id} className="rounded-2xl bg-raised p-4">
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                   <Link href={p.href} className="flex items-center gap-2.5">
                     <ProtocolIcon id={p.id} className="h-7 w-7 shrink-0" />

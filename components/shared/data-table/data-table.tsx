@@ -290,7 +290,7 @@ export function DataTableRow({
   ...rest
 }: HTMLAttributes<HTMLTableRowElement> & { href?: string; drawer?: boolean; child?: boolean }) {
   const stacked = useContext(Stacked);
-  // A row's own code joins D4 rather than replacing it: D4 is what draws the
+  // A row's code joins D4 rather than replacing it: D4 is what draws the
   // linked row's hover border (globals.css), so a page that names its row
   // (A5.4, E8.1) keeps the house hover (ui-jobs 781).
   const { "data-anatomy": own, ...others } = rest as typeof rest & { "data-anatomy"?: string };

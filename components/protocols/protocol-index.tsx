@@ -8,7 +8,7 @@
 // line shown carries the mark, name and category; a dashed hairline runs
 // between its lines and a solid one between groups. Each line is its
 // explorer's link (D4, its hover the house blue border on that line alone):
-// the chain's mark (not a link: the line is), and the assets that explorer
+// the chain's mark (the line is the link), and the assets that explorer
 // lists as one link to /assets on it. Ordered by name with no sort control: an index finds a row and ranks
 // none. The selection lives in the URL (`?chain=`, `?type=`), written in place
 // without a reload. The chain, the search and Focus act a line at a time; the
@@ -50,7 +50,7 @@ import { INDEX_FIRST_COL, MARK_LINK, MARK_TILE } from "@/lib/shared/ui-grammar";
 const n = (v: number) => v.toLocaleString("en-US");
 const CATEGORY_NOTE = "Rails’ classification of the protocol";
 const typeLabel = (t: ProtocolType) => PROTOCOL_TYPE_LABELS[t];
-/** A token's mark in the Assets group: its own round shape at the tiles'
+/** A token's mark in the Assets group: its round shape at the tiles'
  *  24px, ringed in the page's ground so the overlap reads. */
 const TOKEN_MARK =
   "inline-flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-background ring-2 ring-background";
@@ -262,7 +262,7 @@ function LineAssets({
       data-prov-exempt=""
     >
       {assets.slice(0, ASSETS_SHOWN).map((a) => (
-        // Slightly overlapping, each ringed in the page's ground.
+        // Overlapping, each ringed in the page's ground.
         <span
           key={`${a.chainId}:${a.symbol}`}
           className={`${TOKEN_MARK} not-first:-ml-1.5`}
