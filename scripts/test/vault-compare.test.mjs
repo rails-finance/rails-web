@@ -14,11 +14,16 @@ import {
 
 const A = (n) => `1:0x${String(n).padStart(40, "0")}`;
 
-test("?v= parses to at most four keys, once each, lowercased", () => {
-  assert.deepEqual(parseCompareParam(` ${A(1)},${A(1).toUpperCase().replace("X", "x")},${A(2)} `), [A(1), A(2)]);
-  assert.deepEqual(parseCompareParam([A(1), A(2), A(3), A(4), A(5)].join(",")), [A(1), A(2), A(3), A(4)]);
-  assert.deepEqual(parseCompareParam(""), []);
-  assert.deepEqual(parseCompareParam("junk"), ["junk"]);
+test("?v= parses to the first four keys of the key's shape, once each, lowercased", () => {
+  assert.deepEqual(parseCompareParam(` ${A(1)},${A(1).toUpperCase().replace("X", "x")},${A(2)} `).keys, [A(1), A(2)]);
+  assert.deepEqual(parseCompareParam([A(1), A(2), A(3), A(4), A(5)].join(",")).keys, [A(1), A(2), A(3), A(4)]);
+  assert.deepEqual(parseCompareParam(""), { keys: [], malformed: [] });
+  assert.deepEqual(parseCompareParam("junk"), { keys: [], malformed: ["junk"] });
+  // A malformed entry is named apart and takes no place among the four.
+  assert.deepEqual(parseCompareParam(["junk", A(1), A(2), A(3), A(4)].join(",")), {
+    keys: [A(1), A(2), A(3), A(4)],
+    malformed: ["junk"],
+  });
   assert.equal(compareHref([A(1), A(2)]), `/vaults/compare?v=${A(1)},${A(2)}`);
 });
 

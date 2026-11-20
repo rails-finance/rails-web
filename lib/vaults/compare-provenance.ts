@@ -44,25 +44,3 @@ export const yearnFeeProv = (
     { label: "management fee", value: `${pct(managementBps / 10_000)} a year`, kind: "chain" },
   ],
 });
-
-/** A Yearn V3 vault whose `accountant()` is the zero address. */
-export const yearnNoAccountantProv = (v: FeeVault, block: number): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block },
-  summary: `Fees — the vault's \`accountant()\` named no contract at block ${n(block)}, so nothing charges a fee.`,
-  contract: { name: v.name, address: v.address },
-  via: `eth_call accountant() @ block ${n(block)}`,
-});
-
-/** A static aToken or an Umbrella stake token: the contract has no fee. */
-export const noFeeProv = (v: FeeVault, what: "stata" | "umbrella"): Provenance => ({
-  kind: "derived",
-  pclass: "state",
-  summary:
-    what === "stata"
-      ? "Fees — the static aToken wrapper's contract charges no fee; Aave's reserve factor is taken before interest reaches the reserve's suppliers."
-      : "Fees — the Umbrella stake token's contract charges no fee.",
-  contract: { name: v.name, address: v.address },
-  via: "the contract's code: no fee is set or taken",
-});

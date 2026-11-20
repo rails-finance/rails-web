@@ -20,16 +20,20 @@ export const compareKey = (chainId: number, address: string): string => `${chain
 
 const KEY_RE = /^\d+:0x[0-9a-f]{40}$/;
 
-/** `?v=` as keys: trimmed, lowercased, once each, at most four. A malformed
- *  entry is kept, so the page can name it as not found. */
-export function parseCompareParam(v: string | null | undefined): string[] {
-  if (!v) return [];
-  const out: string[] = [];
-  for (const raw of v.split(",")) {
+/** `?v=` as keys: trimmed, lowercased, once each, the first four of the
+ *  key's shape; the entries of another shape are returned apart, so the page
+ *  can name them as not found without their taking a place. */
+export function parseCompareParam(v: string | null | undefined): { keys: string[]; malformed: string[] } {
+  const keys: string[] = [];
+  const malformed: string[] = [];
+  for (const raw of (v ?? "").split(",")) {
     const k = raw.trim().toLowerCase();
-    if (k && !out.includes(k)) out.push(k);
+    if (!k) continue;
+    if (!KEY_RE.test(k)) {
+      if (!malformed.includes(k)) malformed.push(k);
+    } else if (!keys.includes(k) && keys.length < COMPARE_MAX) keys.push(k);
   }
-  return out.slice(0, COMPARE_MAX);
+  return { keys, malformed };
 }
 
 /** Is this a key's shape (`1:0x…`)? */

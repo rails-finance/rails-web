@@ -14,9 +14,10 @@
 //
 // Checks:
 //   1. The rosters at 1440px draw no Compare: no ⋮ entry, no tick, no bar; the asset step's
-//      cards carry no tick. The picker (E1.1) at 1440px: two slots and "Add a vault"; Compare
-//      disabled under two picks; typing "Steakhouse USDC" offers the Ethereum vault (Morpho
-//      on Ethereum is in the search index); a pick fills the slot, × clears it; a picked
+//      cards carry no tick. The picker (E1.1) at 1440px: two slots and "Add a vault";
+//      Compare aria-disabled under two picks, described by "Pick two to four vaults.";
+//      typing "Steakhouse USDC" offers the Ethereum vault (Morpho on Ethereum is in the
+//      search index); a pick fills the slot, × clears it and focuses its field; a picked
 //      vault is not offered again; four slots and no fifth; Compare writes `?v=` in slot
 //      order and the page draws those columns, the picker filled from `?v=`.
 //   2. The direct URL with all four: four columns in `?v=` order, each name linking the
@@ -35,7 +36,8 @@
 //   6. Keys the index does not hold: an unknown address is named and the rest compare; a
 //      malformed key with one good vault names it and draws the picker alone; no `?v=` draws
 //      the picker alone; an upper-case and a repeated key read as one vault; a fifth key is
-//      dropped; at 390px the not-found line causes no sideways scroll.
+//      dropped; a malformed key ahead of four takes no place; at 390px the not-found line
+//      causes no sideways scroll.
 //
 // Run with the dev server up:
 //   BASE=http://localhost:3000 node scripts/verify/verify-vault-compare.mjs
@@ -152,7 +154,12 @@ const index = {};
   const go = page.locator("[data-compare-go]");
   check(
     "1d the picker opens with two slots, Add a vault, and Compare disabled",
-    (await slots()) === 2 && (await page.locator("[data-compare-add]").count()) === 1 && (await go.isDisabled()),
+    (await slots()) === 2 &&
+      (await page.locator("[data-compare-add]").count()) === 1 &&
+      (await go.getAttribute("aria-disabled")) === "true" &&
+      ((await page.locator(`#${await go.getAttribute("aria-describedby")}`).textContent()) ?? "").includes(
+        "Pick two to four",
+      ),
     `${await slots()} slots`,
   );
   /** Types into slot `n` and returns the offered keys. */
@@ -202,10 +209,14 @@ const index = {};
   );
   await page.locator(`[data-compare-clear="${C}"]`).click();
   await page.waitForTimeout(150);
-  check("1j × clears a pick", (await page.locator(`[data-compare-pick="${C}"]`).count()) === 0);
+  check(
+    "1j × clears a pick, and the focus goes to the slot's field",
+    (await page.locator(`[data-compare-pick="${C}"]`).count()) === 0 &&
+      (await page.evaluate(() => document.activeElement?.getAttribute("data-compare-input"))) === "3",
+  );
   const got = await offer(3, FIXTURES.stata.address);
   if (got.includes(C)) await choose(C);
-  check("1k Compare is enabled with picks", !(await go.isDisabled()));
+  check("1k Compare is enabled with picks", (await go.getAttribute("aria-disabled")) === "false");
   await Promise.all([page.waitForURL(/\/vaults\/compare\?v=/, { timeout: WAIT }), go.click()]);
   const v = new URL(page.url()).searchParams.get("v");
   check("1l Compare writes ?v= in slot order", v === ALL.join(","), v ?? "");
@@ -470,6 +481,12 @@ for (const w of [390, 1440]) {
   check(
     "6d an upper-case and a repeated key read as one vault",
     g.status === 200 && g.notFound == null && g.cols.length === 2,
+    JSON.stringify(g),
+  );
+  g = await open(compareUrl([MALFORMED, ...ALL]));
+  check(
+    "6g a malformed key is named and takes no place: the four after it compare",
+    g.status === 200 && g.notFound === MALFORMED && g.cols.join() === ALL.join(),
     JSON.stringify(g),
   );
   g = await open(compareUrl([...ALL, keyOf(FIFTH)]));

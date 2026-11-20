@@ -11,6 +11,8 @@
 //   floor when the census does not answer.
 // - Maple: the two syrup pools in lib/maple/asset-catalog.ts.
 // - sBOLD (lib/liquity-v2/sbold.ts): one vault, opening its page under /ethereum/vaults.
+// - IPOR Fusion: each chain's baked census (lib/ipor-fusion/vault-roster.ts),
+//   on the chains the vault index lists (VAULT_INDEX_LISTED: from launch).
 // - The vault fronts (lib/vaults/fronts.ts): each app's products and their
 //   vaults, matched by the app's name.
 //
@@ -24,12 +26,15 @@ import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { LAUNCHED_PROTOCOLS } from "@/lib/shared/protocols";
 import { BASE_CHAIN_ID, CHAINS, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { loadMetaMorphoVaultRoster } from "@/lib/metamorpho/vault-roster";
+import { iporFusionRoster, type IporFusionChainId } from "@/lib/ipor-fusion/vault-roster";
+import { VAULT_INDEX_LISTED } from "@/lib/vaults/index-rosters";
 import { loadYearnVaultRoster } from "@/lib/yearn/vault-roster";
 import { AAVE_ETHEREUM_BOOK_VAULTS } from "@/lib/aave-vaults/vault-catalog";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import {
   baseVaultRosterHref,
   ethereumVaultRosterHref,
+  iporFusionVaultRosterHref,
   maplePoolsHref,
   metaMorphoVaultRosterHref,
   yearnVaultRosterHref,
@@ -152,6 +157,19 @@ export async function buildSearchIndex(): Promise<SearchIndexWire> {
   for (const p of MAPLE_POOLS) sized.push({ row: row(p.symbol, p.symbol, p.assetSymbol, MAPLE, p.pool), size: 0 });
 
   sized.push({ row: row("sBOLD", "sBOLD", "BOLD", SBOLD, SBOLD_VAULT), size: 0 });
+
+  // IPOR Fusion on each chain the index lists; none before its launch. A
+  // vault the census read as holding nothing goes with the empty ones.
+  for (const r of VAULT_INDEX_LISTED()) {
+    const href = r.protocol === "ipor-fusion" ? iporFusionVaultRosterHref(r.chainId) : null;
+    if (!href) continue;
+    const at = rosters.push(["IPOR Fusion", chainName(r.chainId), `${href}/`, 1]) - 1;
+    for (const v of iporFusionRoster(r.chainId as IporFusionChainId).vaults)
+      sized.push({
+        row: row(v.name ?? "", v.symbol ?? "", v.asset.symbol, at, v.address),
+        size: v.totalAssets === "0" ? -1 : 0,
+      });
+  }
 
   // A stable sort: the unsized keep their roster order behind the sized, and
   // the vaults the census shows empty (size -1) go last.

@@ -84,21 +84,9 @@ export const FEE_WORDS = {
         },
   yearn: (performance: number, management: number): CompareCell => ({
     headline: performance === 0 ? "No performance fee" : `${pct(performance)} performance fee`,
-    sentence: `${management === 0 ? "No management fee" : `A ${pct(management)} yearly management fee`}. Both are set by the vault's accountant.`,
+    sentence: `${management === 0 ? "No management fee" : `A ${pct(management)} yearly management fee`}. The vault's accountant sets both.`,
     read: true,
   }),
-  yearnNoAccountant: {
-    headline: "None stated",
-    sentence: "The vault names no accountant, the contract that charges its fees.",
-    read: true,
-  } as CompareCell,
-  stata: {
-    headline: "None stated",
-    sentence:
-      "The wrapper sets no fee. Aave keeps its reserve factor's part of the interest before it reaches the reserve's suppliers.",
-    read: true,
-  } as CompareCell,
-  umbrella: { headline: "None stated", sentence: "The stake token sets no fee.", read: true } as CompareCell,
   notRead: { headline: null, sentence: "Not read yet.", read: false } as CompareCell,
   unanswered: { headline: null, sentence: "The read did not answer.", read: false } as CompareCell,
 };

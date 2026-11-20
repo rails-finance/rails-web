@@ -23,8 +23,7 @@ import { VAULT_FAMILIES } from "@/lib/vaults/families";
 import { differs } from "@/lib/vaults/compare";
 import { COMPARE_PAGE, DIFFERENCE_LABELS as D, EXPOSURE_WORDS, type CompareCell } from "@/lib/vaults/compare-words";
 import { flooredPct, type HealthLine } from "@/lib/vaults/health-words";
-import { measuredYield, yieldPct } from "@/lib/vaults/yield";
-import { vaultHoldersProv, vaultYieldProv } from "@/lib/vaults/row-provenance";
+import { vaultHoldersProv } from "@/lib/vaults/row-provenance";
 import type { CompareColumn, CompareExposure, CompareHolders } from "@/lib/vaults/compare-read";
 
 const MUTED = "text-rb-500";
@@ -92,12 +91,9 @@ const plain = (text: string) => (
 const head = (c: CompareColumn, id: string) =>
   vaultHeads({
     vault: c.vault,
-    yieldFigure: c.yieldFigure ?? undefined,
     holdersHref: null,
     receipts: c.receipts,
   }).find((h) => h.id === id)?.value ?? none;
-
-const yieldOf = (c: CompareColumn) => measuredYield(c.yieldFigure ?? undefined, c.vault.totalAssets?.raw);
 
 const DIFFERENCES: readonly Row[] = [
   { key: "asset", label: D.asset, cell: (c) => plain(c.vault.asset.symbol), same: (c) => c.vault.asset.symbol },
@@ -115,25 +111,13 @@ const DIFFERENCES: readonly Row[] = [
     cell: (c) => head(c, "share-price"),
     same: (c) => (c.vault.sharePrice ? `${c.vault.sharePrice.raw} ${c.vault.asset.address}` : null),
   },
+  // The readout's line, as the full record states it: one yield figure per
+  // vault on the page.
   {
     key: "yield",
     label: D.yield,
-    cell: (c) => {
-      const y = yieldOf(c);
-      return y && "yearly" in y ? (
-        <span className="font-semibold text-foreground">
-          <Prov info={vaultYieldProv(c.vault, y)}>{yieldPct(y.yearly)}</Prov>
-        </span>
-      ) : line(c, "yield") ? (
-        <Cell c={line(c, "yield")!} prov={c.lineProvs.yield} />
-      ) : (
-        none
-      );
-    },
-    same: (c) => {
-      const y = yieldOf(c);
-      return y && "yearly" in y ? yieldPct(y.yearly) : lineText(line(c, "yield"));
-    },
+    cell: (c) => (line(c, "yield") ? <Cell c={line(c, "yield")!} prov={c.lineProvs.yield} /> : none),
+    same: (c) => lineText(line(c, "yield")),
   },
   {
     key: "holder-count",

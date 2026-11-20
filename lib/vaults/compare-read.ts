@@ -8,17 +8,18 @@
 // the readout's five lines (lib/vaults/health.ts), with no holder. Then:
 //
 //   Fees: MetaMorpho's `fee()` (WAD) at the loader's block; a Yearn vault's
-//     accountant's `getVaultConfig(vault)`; the static aTokens and Umbrella
-//     stake tokens set none; Savings GHO's and Maple's are not read.
+//     accountant's `getVaultConfig(vault)`; every other family's are not read
+//     (the Aave tokens sit behind upgradeable proxies, so no fee is stated).
 //   Where the money is lent: as the vault's page states it.
 //   Who holds it: the census's six largest live holders and its live count
 //     (Maple has no census).
 //
 // No figure here is scored or ranked; the columns stand in the order the
-// reader picked them (ui-jobs 779). Every figure carries its receipt: the
-// roster row's at the index's block (lib/vaults/row-receipts.ts), the
-// readout lines' at the family loader's block (lib/vaults/health-provenance.ts)
-// and the Fees line's (lib/vaults/compare-provenance.ts).
+// reader picked them (ui-jobs 779). The figures carry receipts: the roster
+// row's at the index's block (lib/vaults/row-receipts.ts), the readout lines'
+// at the family loader's block (lib/vaults/health-provenance.ts) and the Fees
+// line's (lib/vaults/compare-provenance.ts). Where the money is lent and the
+// holder shares carry none here; the vault's page traces them.
 //
 // SERVER-ONLY: the loaders read the chain and the bearer token.
 
@@ -38,19 +39,12 @@ import { VAULT_SHAPE_FACET_LABEL, isVaultPositionShape } from "@/lib/aave-vaults
 import type { MetaMorphoChainId } from "@/lib/metamorpho/vault-roster";
 import { VAULT_FAMILIES } from "@/lib/vaults/families";
 import { loadVaultIndex } from "@/lib/vaults/index-read";
-import {
-  chainName,
-  vaultIndexHref,
-  vaultIndexKey,
-  vaultIndexRosterKey,
-  vaultIndexRosterKeyOf,
-} from "@/lib/vaults/index-rosters";
+import { chainName, vaultIndexHref, vaultIndexRosterKey, vaultIndexRosterKeyOf } from "@/lib/vaults/index-rosters";
 import { vaultIndexRowReceipts } from "@/lib/vaults/row-receipts";
 import type { VaultRowReceipts } from "@/components/vaults/vault-heads";
 import type { Provenance } from "@/components/shared/provenance";
-import type { VaultYield } from "@/lib/vaults/yield";
 import { healthLineProv, type HealthReceiptVault } from "@/lib/vaults/health-provenance";
-import { metaMorphoFeeProv, noFeeProv, yearnFeeProv, yearnNoAccountantProv } from "@/lib/vaults/compare-provenance";
+import { metaMorphoFeeProv, yearnFeeProv } from "@/lib/vaults/compare-provenance";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
 import { vaultHealth, shareOf, type HealthInput, type HealthKey } from "@/lib/vaults/health";
 import { healthLines, shortHex, type HealthLine } from "@/lib/vaults/health-words";
@@ -102,8 +96,6 @@ export interface CompareColumn {
   holders: CompareHolders;
   /** The roster row's receipts for Total assets and Share price, at the index's block. */
   receipts: VaultRowReceipts;
-  /** The daily store's yield figure, as the roster row reads it. */
-  yieldFigure: VaultYield | null;
   /** Each readout line's receipt, at the family loader's block. */
   lineProvs: Partial<Record<HealthKey, Provenance>>;
 }
@@ -230,8 +222,10 @@ async function yearn(v: VaultSummary): Promise<FamilyRead> {
   const d: YearnVaultResponse = await loadYearnEthereumVault(v.address);
   if (d.chainStale) return fromSummary(v);
   const { totalIdle, totalAssets, accountant } = d.vault;
-  let fees: CompareCell = FEE_WORDS.yearnNoAccountant;
-  let feeProv: Provenance | null = yearnNoAccountantProv(feeVault(v), d.blockNumber);
+  // The loader's `accountant()` is null for the zero address and for a call
+  // that did not answer alike, so a vault without one says "Not read".
+  let fees: CompareCell = FEE_WORDS.notRead;
+  let feeProv: Provenance | null = null;
   if (accountant) {
     const config = await vaultHeadClient(1)
       .readContract({
@@ -313,8 +307,8 @@ async function aave(v: VaultSummary): Promise<FamilyRead> {
             : null,
         steward: u?.owner ? { role: "umbrellaOwner", address: u.owner, block } : null,
       },
-      fees: FEE_WORDS.umbrella,
-      feeProv: noFeeProv(feeVault(v), "umbrella"),
+      fees: FEE_WORDS.notRead,
+      feeProv: null,
       exposure: u?.reserve
         ? {
             kind: "rows",
@@ -330,8 +324,8 @@ async function aave(v: VaultSummary): Promise<FamilyRead> {
     block,
     readAt: new Date().toISOString(),
     health: { exit: null, steward: null },
-    fees: FEE_WORDS.stata,
-    feeProv: noFeeProv(feeVault(v), "stata"),
+    fees: FEE_WORDS.notRead,
+    feeProv: null,
     exposure: {
       kind: "rows",
       rows: [{ label: X.stataReserve(d.vault.asset.symbol), sub: X.stataSub, share: 1 }],
@@ -375,6 +369,8 @@ async function familyRead(v: VaultSummary): Promise<FamilyRead> {
     if (v.family === "maple-pool") return await maple(v);
     // sBOLD: the summary's figures, its paused standing and owner() (ui-jobs 765).
     if (v.family === "sbold") return fromSummary(v);
+    // IPOR Fusion: the index row's readings (no family read here yet).
+    if (v.family === "ipor-fusion") return fromSummary(v);
     return await aave(v);
   } catch (error) {
     console.error(`vault compare: ${v.family} ${v.address} did not answer`, error);
@@ -428,7 +424,7 @@ async function holdersOf(v: VaultSummary): Promise<CompareHolders> {
 // ── The page's read ────────────────────────────────────────────────────────
 
 export async function readCompare(keys: readonly string[]): Promise<CompareRead> {
-  const { vaults, yields, rosters } = await loadVaultIndex();
+  const { vaults, rosters } = await loadVaultIndex();
   const readOf = new Map(
     rosters.map((r) => [vaultIndexRosterKey(r), { blockNumber: r.blockNumber || undefined, readBy: r.readBy }]),
   );
@@ -500,7 +496,6 @@ export async function readCompare(keys: readonly string[]): Promise<CompareRead>
       exposure: r.exposure,
       holders: holders[i],
       receipts: vaultIndexRowReceipts(readOf.get(vaultIndexRosterKeyOf(v)) ?? {}, v),
-      yieldFigure: yields[vaultIndexKey(v)] ?? null,
       lineProvs,
     };
   });

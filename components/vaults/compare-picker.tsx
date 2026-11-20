@@ -8,7 +8,7 @@
 // symbol, asset or address, best match first, a funded vault before an empty
 // one. A vault already picked is not offered again.
 
-import { useEffect, useId, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
@@ -91,6 +91,14 @@ function Slot({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const rows = useMemo(() => (index ? matches(index, q, taken) : []), [index, q, taken]);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // A × clears the pick and hands the focus to the field that takes its place.
+  const [refocus, setRefocus] = useState(false);
+  useEffect(() => {
+    if (pick || !refocus) return;
+    inputRef.current?.focus();
+    setRefocus(false);
+  }, [pick, refocus]);
 
   if (pick)
     return (
@@ -105,7 +113,10 @@ function Slot({
         </span>
         <button
           type="button"
-          onClick={onClear}
+          onClick={() => {
+            setRefocus(true);
+            onClear();
+          }}
           aria-label={W.clear(pick.name)}
           className="-mr-2 inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-rb-500 hover:bg-[var(--surface-row-hover)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-none dark:hover:bg-rb-800"
           data-compare-clear={pick.key}
@@ -124,7 +135,7 @@ function Slot({
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setOpen(true);
-      setActive((a) => Math.min(a + 1, rows.length - 1));
+      setActive((a) => Math.max(0, Math.min(a + 1, rows.length - 1)));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActive((a) => Math.max(a - 1, 0));
@@ -133,11 +144,13 @@ function Slot({
       choose(rows[active]);
     } else if (e.key === "Escape") setOpen(false);
   };
-  const said = !q.trim() ? null : failed ? W.failed : !index ? W.loading : rows.length === 0 ? W.noMatch : null;
+  const said = !q.trim() ? "" : failed ? W.failed : !index ? W.loading : rows.length === 0 ? W.noMatch : "";
+  const listed = open && rows.length > 0;
 
   return (
     <div className="relative" data-compare-slot={n}>
       <input
+        ref={inputRef}
         type="search"
         value={q}
         onChange={(e) => {
@@ -154,8 +167,8 @@ function Slot({
         placeholder={W.placeholder}
         aria-label={W.slot(n)}
         role="combobox"
-        aria-expanded={open && rows.length > 0}
-        aria-controls={listId}
+        aria-expanded={listed}
+        aria-controls={listed ? listId : undefined}
         aria-autocomplete="list"
         aria-activedescendant={open && rows[active] ? `${listId}-${active}` : undefined}
         autoComplete="off"
@@ -163,7 +176,7 @@ function Slot({
         className="min-h-11 w-full rounded-xl border border-rb-300 bg-raised px-4 py-2 text-base text-foreground placeholder:text-rb-500 focus:border-teal-500 focus:outline-none sm:text-sm dark:border-rb-600"
         data-compare-input={n}
       />
-      {open && rows.length > 0 && (
+      {listed && (
         <ul
           id={listId}
           role="listbox"
@@ -190,11 +203,10 @@ function Slot({
           ))}
         </ul>
       )}
-      {said && (
-        <p className="mt-1.5 px-1 text-xs text-rb-500" role="status" data-compare-said="">
-          {said}
-        </p>
-      )}
+      {/* Kept mounted, its text changing, so a screen reader hears each change. */}
+      <p className={`px-1 text-xs text-rb-500 ${said ? "mt-1.5" : ""}`} role="status" data-compare-said="">
+        {said}
+      </p>
     </div>
   );
 }
@@ -227,6 +239,7 @@ export function ComparePicker({ initial }: { initial: ComparePick[] }) {
   const taken = useMemo(() => new Set(keys), [keys.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (i: number, p: ComparePick | null) => setSlots((s) => s.map((x, j) => (j === i ? p : x)));
   const ready = keys.length >= COMPARE_MIN;
+  const needId = useId();
 
   return (
     <form
@@ -261,10 +274,12 @@ export function ComparePicker({ initial }: { initial: ComparePick[] }) {
         ))}
       </ol>
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+        {/* aria-disabled, not disabled: the button stays in the tab order and says why. */}
         <button
           type="submit"
-          disabled={!ready}
-          className={`${PILL_CTA} disabled:cursor-not-allowed disabled:opacity-50`}
+          aria-disabled={!ready}
+          aria-describedby={needId}
+          className={`${PILL_CTA} aria-disabled:cursor-not-allowed aria-disabled:opacity-50`}
           data-compare-go=""
         >
           {W.go}
@@ -279,11 +294,9 @@ export function ComparePicker({ initial }: { initial: ComparePick[] }) {
             {W.add}
           </button>
         )}
-        {!ready && (
-          <span className="text-xs text-rb-500" data-compare-need="">
-            {W.needTwo}
-          </span>
-        )}
+        <span id={needId} className="text-xs text-rb-500" role="status" data-compare-need={ready ? undefined : ""}>
+          {ready ? "" : W.needTwo}
+        </span>
       </div>
     </form>
   );
