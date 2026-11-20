@@ -9,7 +9,7 @@ import { buildSearchIndex } from "@/lib/search/index-build";
 
 const REVALIDATE_SECONDS = 3600;
 
-const cachedIndex = unstable_cache(buildSearchIndex, ["search-index-v8"], { revalidate: REVALIDATE_SECONDS });
+const cachedIndex = unstable_cache(buildSearchIndex, ["search-index-v9"], { revalidate: REVALIDATE_SECONDS });
 
 export async function GET() {
   const index = await cachedIndex();

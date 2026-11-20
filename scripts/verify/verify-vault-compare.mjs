@@ -1,65 +1,43 @@
 #!/usr/bin/env node
-// The vault comparison, /vaults/compare (anatomy E1–E4; rails-ops TO-DO-ui-jobs 553, door 3):
-// choosing vaults with the Compare entry in a roster row's ⋮ (E2) and the compare bar (E3),
-// the page's columns, its "Sort by", the holder donut (E4), the two widths, and keys the index
-// does not hold. Like the index, the page owns no vault page and no receipts (decision 0028
-// point 8): each column links the vault's page under its protocol, and the page draws no
-// receipt and no inspector.
+// The vault comparison, /vaults/compare (anatomy E1, E1.1, E1.2, E4; rails-ops TO-DO-ui-jobs
+// 553 door 3, 779): the search-fed picker, the Differences table and the full record, each
+// figure in its receipt, the holder donut, the two widths, and keys the index does not hold.
+// The rosters' rows and the asset step's cards no longer choose vaults (E2, E3 retired).
 //
-// Expectations come from outside the code under test where they can: each column's link,
-// size, asset and live holder count are read off the vault's roster row (`data-vault-row`,
-// `data-total-assets-raw`, `data-held-assets-raw`, `data-token`, `data-holders-live`), and the
-// sort's order is checked against the figures the page prints in each column, parsed back.
+// Expectations come from outside the code under test where they can: each column's link
+// and live holder count are read off the vault's roster row (`data-vault-row`, its link,
+// `data-holders-live`), and Differences is checked against the facts the record prints.
 // ----------------------------------------------------------------------------
-// Fixtures (inputs below; a fixture that is gone is a FAIL): two MetaMorpho USDC vaults on
-// Ethereum (Steakhouse USDC, Gauntlet USDC Prime), Aave's static aToken for USDC (no
-// withdrawable share read, so it sorts last there), and the Umbrella stake on it (asset
-// waEthUSDC, so Size sorts by asset first; a cooldown, so no withdrawable share either).
-// FIFTH is any other roster row, for the refused fifth pick.
+// Fixtures (a fixture that is gone is a FAIL): two MetaMorpho USDC vaults on Ethereum
+// (Steakhouse USDC, Gauntlet USDC Prime), Aave's static aToken for USDC and the Umbrella
+// stake on it (asset waEthUSDC). FIFTH is another MetaMorpho Ethereum vault.
 //
 // Checks:
-//   1. The Morpho and Aave rosters on Ethereum at 1440px (ui-jobs 776): every fixture is a
-//      row; the ⋮ entry "Add to compare" ticks it (E2), the selection carries from one
-//      roster to the other, the bar (E3) appears at two and counts to three, the entry then
-//      reads "Remove from compare"; a fifth pick is refused with the bar's line and the bar stays
-//      at four; "Compare 3 vaults" lands on /vaults/compare with the three keys in `?v=`,
-//      in pick order, and draws those three columns. The asset step
-//      (/start/asset/stablecoins/usdc) carries a tick on every card and the same selection's
-//      bar; "Clear" removes the bar.
-//   2. The direct URL with all four: four columns, the thead order the same as
-//      `data-compare-columns`; each name links the vault's page under its protocol, the
-//      same href as its roster row, and that page answers 200; the page is `data-prov-exempt`
-//      with no receipt span, no pickable value and no inspector control (a roster, which has
-//      receipts, is the control).
-//   3. Sort by: Size pressed with no `?sort=`; each of the four presses presses only itself,
-//      writes `?sort=` off the default, and orders the table's and the phone list's columns
-//      as `data-compare-columns`. The order agrees with the figures: Size by asset A to Z
-//      then held amount (from the roster rows), 30-day yield highest first, 90-day range
-//      narrowest first (counting only vaults whose yield is above zero), share withdrawable
-//      highest first; a vault with no figure after every vault with one. The range sort and
-//      the mixed-asset Size sort say so. The four orders are not all the same. A load with
-//      `?sort=withdrawable` draws that order; `?sort=bogus` falls back to Size.
-//   4. The holder donut, each column: `data-compare-donut` equals the roster row's live
-//      holders; slices carry `data-breakdown-slice` with unique keys, the largest first,
-//      "others" last; the shares in their titles sum to 100% within the flooring; each
-//      slice has its own fill; the key beside it lists the same slices with the same swatch
-//      and share. Where slices carry `data-seg` (ShareDonut given a scope), hovering a slice
-//      dims the others; where none do, that is said as a NOTE.
-//   5. 390px and 1440px: no sideways scroll; at 390px the phone layout shows and the
-//      table does not, its vault list in the sort's order.
-//   6. Keys the index does not hold: an unknown address is named in
-//      `data-compare-not-found` and the rest still compare; a malformed key with one good
-//      vault names it and draws the too-few line linking /vaults (no sideways scroll at
-//      390px); no `?v=` draws the too-few line and names nothing; an upper-case and a
-//      repeated key read as one vault; a fifth key is dropped (four columns). Each answers 200.
-//
-// Proved it can fail (2026-11-12): with lib/vaults/compare.ts's yield comparator reversed
-// (`desc(b…, a…)`), 3b went red:
-//   FAIL  3b sort yield: order agrees with the figures — 0x6bf1 0.00% | 0xd4fa 4.20% | 0xdd0f 4.50% | 0xbeef 4.60%
-// (reverted with git checkout).
-//
-// 6f found a defect on its first run (2026-11-12): the not-found line printed the key
-// unbroken, and at 390px a 40-hex address ran the page to 420px. The line now breaks.
+//   1. The rosters at 1440px draw no Compare: no ⋮ entry, no tick, no bar; the asset step's
+//      cards carry no tick. The picker (E1.1) at 1440px: two slots and "Add a vault";
+//      Compare aria-disabled under two picks, described by "Pick two to four vaults.";
+//      typing "Steakhouse USDC" offers the Ethereum vault (Morpho on Ethereum is in the
+//      search index); a pick fills the slot, × clears it and focuses its field; a picked
+//      vault is not offered again; four slots and no fifth; Compare writes `?v=` in slot
+//      order and the page draws those columns, the picker filled from `?v=`.
+//   2. The direct URL with all four: four columns in `?v=` order, each name linking the
+//      vault's page under its protocol, the same href as its roster row, answering 200; no
+//      sort control and no `?sort=`; the page carries receipts and the profile menu's switch
+//      arms it.
+//   3. Differences (E1.2): Asset and Family differ for these four and are listed; every row
+//      listed has two values that differ in the record's text or the figures; Total assets,
+//      Share price, Holders and Fees cells carry a receipt where a figure is printed; the
+//      same two MetaMorpho vaults alone list no Family row.
+//   4. The holder donut, each column (E4): `data-compare-donut` equals the roster row's live
+//      holders; slices unique, largest first, "others" last; shares sum to 100% within the
+//      flooring; each slice its own fill; the key lists the same slices.
+//   5. 390px and 1440px: no sideways scroll; at 390px the phone layout shows and the tables
+//      do not, its vault list in `?v=` order.
+//   6. Keys the index does not hold: an unknown address is named and the rest compare; a
+//      malformed key with one good vault names it and draws the picker alone; no `?v=` draws
+//      the picker alone; an upper-case and a repeated key read as one vault; a fifth key is
+//      dropped; a malformed key ahead of four takes no place; at 390px the not-found line
+//      causes no sideways scroll.
 //
 // Run with the dev server up:
 //   BASE=http://localhost:3000 node scripts/verify/verify-vault-compare.mjs
@@ -99,43 +77,12 @@ const norm = (s) => (s ?? "").replace(/\s+/g, " ").trim();
 const noScroll = (page) =>
   page.evaluate(() => ({ sw: document.scrollingElement.scrollWidth, cw: document.documentElement.clientWidth }));
 
-/** "4.6%" or "−3.2%" as a fraction. */
-const pctOf = (t) => Number(t.replace("−", "-").replace(/,/g, "")) / 100;
-
-/** The figures a column prints, parsed back from its cells. Null where it prints none. */
-function figuresOf(cells) {
-  const y = cells.yield ?? "";
-  let yearly30 = null;
-  let range = null;
-  const ym = y.match(/^(−?[\d.,]+)% a year over the last \d+ days/);
-  if (ym) yearly30 = pctOf(ym[1]);
-  else if (/^0\.0% over \d+ days/.test(y)) yearly30 = 0;
-  const rm = y.match(/earned between (−?[\d.,]+)% and (−?[\d.,]+)%/);
-  if (rm && yearly30 != null && yearly30 > 0) range = pctOf(rm[2]) - pctOf(rm[1]);
-  const w = cells.withdrawals ?? "";
-  let withdrawable = null;
-  const wm = w.match(/^([\d.,]+)% of the vault's assets (withdrawable|idle)/);
-  if (wm) withdrawable = pctOf(wm[1]);
-  else if (/^Withdrawals are paused|^paused\(\) answers true/.test(w)) withdrawable = 0;
-  const held = (cells.size ?? "").match(/Held [\d.,]+[KMBT]? (\S+) on \d/);
-  return { yearly30, range, withdrawable, heldAsset: held ? held[1] : null };
-}
-
-/** Is `vals` in order (dir 1 highest first, -1 lowest first) within `tol`, nulls last? */
-function inOrder(vals, dir, tol) {
-  const firstNull = vals.findIndex((v) => v == null);
-  if (firstNull >= 0 && vals.slice(firstNull).some((v) => v != null)) return false;
-  const nums = firstNull >= 0 ? vals.slice(0, firstNull) : vals;
-  for (let i = 1; i < nums.length; i++) if (dir * (nums[i - 1] - nums[i]) < -tol) return false;
-  return true;
-}
-
 /** The page's columns as drawn: the attribute, the table's head, the phone list, and each cell's text. */
 const readColumns = (page) =>
   page.evaluate(() => {
     const root = document.querySelector("[data-compare-columns]");
-    const table = root?.querySelector("[data-compare-table]");
-    const phone = root?.querySelector("[data-compare-phone]");
+    const table = root?.querySelector('[data-compare-table="record"]');
+    const phone = root?.querySelector("ol[data-compare-phone]");
     const cells = {};
     for (const tr of table?.querySelectorAll("tr[data-compare-row]") ?? []) {
       for (const td of tr.querySelectorAll("td[data-compare-cell]")) {
@@ -163,144 +110,126 @@ const readColumns = (page) =>
 
 const browser = await chromium.launch();
 
-// ── 1. Choosing on the family rosters ──────────────────────────────────────
-// The ticks are on each roster's rows (ui-jobs 605); /vaults is an overview
-// with no rows (ui-jobs 776). Every fixture is on Ethereum, one roster each.
+// ── 1. No Compare on the rows; the picker ──────────────────────────────────
 const ROSTERS = ["/ethereum/morpho/vaults?show=all", "/ethereum/aave/vaults?show=all"];
 const index = {};
-/** The roster page each fixture is a row of. */
-const rosterOf = {};
-let vaultsInspector = 0;
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await ctx.newPage();
-  const onRoster = async (href) => {
-    if (page.url() === `${BASE}${href}`) return;
+  for (const href of ROSTERS) {
     await page.goto(`${BASE}${href}`, NAV);
     await page.locator("[data-vault-row]").first().waitFor({ timeout: WAIT });
-    // The ⋮ answers once the rows have hydrated.
     await page.waitForTimeout(1500);
-  };
-  for (const href of ROSTERS) {
-    await onRoster(href);
-    // The profile menu's switch arms the roster (ui-jobs 625); put down again
-    // at once, so the picks below are row presses.
-    if (!vaultsInspector) {
-      vaultsInspector = (await armInspector(page)) ? 1 : 0;
-      if (vaultsInspector) await page.keyboard.press("Escape");
-    }
+    const leftover = await page.evaluate(
+      () =>
+        document.querySelectorAll("[data-vault-row] [data-row-menu], [data-compare-tick], [data-compare-bar]").length,
+    );
+    check(`1a ${href}: no row ⋮, no tick, no bar`, leftover === 0, `${leftover} left`);
     for (const f of [...Object.values(FIXTURES), FIFTH]) {
       const k = keyOf(f);
       if (index[k]) continue;
       const row = page.locator(`[data-vault-row="${f.address}"]`).first();
       if ((await row.count()) === 0) continue;
-      rosterOf[k] = href;
       index[k] = await row.evaluate((e) => ({
         href: e.getAttribute("href") ?? e.querySelector("a[href]")?.getAttribute("href") ?? null,
-        held: e.getAttribute("data-held-assets-raw") || e.getAttribute("data-total-assets-raw") || "",
-        token: e.getAttribute("data-token"),
         live: e.getAttribute("data-holders-live"),
       }));
     }
   }
-  for (const f of [...Object.values(FIXTURES), FIFTH]) check(`1a ${keyOf(f)} is a roster row`, !!index[keyOf(f)]);
+  for (const f of [...Object.values(FIXTURES), FIFTH]) check(`1b ${keyOf(f)} is a roster row`, !!index[keyOf(f)]);
 
-  const bar = page.locator("[data-compare-bar]");
-  const pick = async (k) => {
-    const f = [...Object.values(FIXTURES), FIFTH].find((x) => keyOf(x) === k);
-    await onRoster(rosterOf[k]);
-    const row = page.locator(`[data-vault-row="${f.address}"]`).first();
-    await row.locator("button[data-row-menu]").click();
-    const item = page.locator(`[data-row-menu-list] [data-compare-tick="${k}"]`);
-    await item.waitFor({ timeout: 10000 });
-    const said = { label: norm(await item.textContent()), checked: await item.getAttribute("aria-checked") };
-    await item.click();
-    await page.waitForTimeout(200);
-    return said;
+  await page.goto(`${BASE}${ASSET_STEP}`, NAV);
+  await page.locator("[data-asset-card]").first().waitFor({ timeout: WAIT });
+  await page.waitForTimeout(1000);
+  check(
+    `1c ${ASSET_STEP}: the cards carry no tick and the step no bar`,
+    (await page.locator("[data-compare-tick], [data-compare-bar]").count()) === 0,
+  );
+
+  await page.goto(`${BASE}/vaults/compare`, NAV);
+  const picker = page.locator("[data-compare-picker]");
+  await picker.waitFor({ timeout: WAIT });
+  await page.waitForTimeout(1000);
+  const slots = () => page.locator("[data-compare-slot]").count();
+  const go = page.locator("[data-compare-go]");
+  check(
+    "1d the picker opens with two slots, Add a vault, and Compare disabled",
+    (await slots()) === 2 &&
+      (await page.locator("[data-compare-add]").count()) === 1 &&
+      (await go.getAttribute("aria-disabled")) === "true" &&
+      ((await page.locator(`#${await go.getAttribute("aria-describedby")}`).textContent()) ?? "").includes(
+        "Pick two to four",
+      ),
+    `${await slots()} slots`,
+  );
+  /** Types into slot `n` and returns the offered keys. */
+  const offer = async (n, text) => {
+    const input = page.locator(`[data-compare-input="${n}"]`);
+    await input.click();
+    await input.fill(text);
+    await page
+      .locator("[data-compare-option]")
+      .first()
+      .waitFor({ timeout: 60000 })
+      .catch(() => {});
+    return page
+      .locator("[data-compare-option]")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-compare-option")));
   };
-  const barCount = async () => ((await bar.count()) ? await bar.getAttribute("data-compare-bar") : null);
-
-  if ([A, B, C, D, keyOf(FIFTH)].every((k) => index[k])) {
-    const first = await pick(A);
-    check(
-      "1b the ⋮ entry reads Add to compare, unchecked",
-      first.label === "Add to compare" && first.checked === "false",
-      JSON.stringify(first),
-    );
-    check("1c one pick draws no bar", (await barCount()) == null, String(await barCount()));
-    await pick(B);
-    check("1d two picks draw the bar at 2", (await barCount()) === "2", String(await barCount()));
-    await pick(C);
-    const go = page.locator("[data-compare-go]");
-    check(
-      "1e three picks: the bar reads Compare 3 vaults",
-      (await barCount()) === "3" && norm(await go.textContent()) === "Compare 3 vaults",
-      `${await barCount()} "${norm(await go.textContent())}"`,
-    );
-    // Reopen A's menu: the entry now reads Remove, checked; Escape leaves it as it is.
-    {
-      const f = FIXTURES.steakhouse;
-      await onRoster(rosterOf[A]);
-      await page.locator(`[data-vault-row="${f.address}"]`).first().locator("button[data-row-menu]").click();
-      const item = page.locator(`[data-row-menu-list] [data-compare-tick="${A}"]`);
-      await item.waitFor({ timeout: 10000 });
-      check(
-        "1f a picked vault's entry reads Remove from compare, checked",
-        norm(await item.textContent()) === "Remove from compare" &&
-          (await item.getAttribute("aria-checked")) === "true" &&
-          (await item.getAttribute("data-compare-checked")) === "",
-      );
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(200);
-    }
-    await pick(D);
-    await pick(keyOf(FIFTH));
-    const refused = page.locator("[data-compare-refused]");
-    check(
-      "1g a fifth pick is refused and the bar stays at 4",
-      (await barCount()) === "4" &&
-        (await refused.count()) === 1 &&
-        norm(await refused.textContent()) === "Four vaults is the most one comparison holds.",
-      `${await barCount()} "${(await refused.count()) ? norm(await refused.textContent()) : ""}"`,
-    );
-    await pick(D);
-    check(
-      "1h unpicking one: the bar at 3, the refusal gone",
-      (await barCount()) === "3" && (await refused.count()) === 0,
-    );
-    const href = await go.getAttribute("href");
-    await Promise.all([page.waitForURL(/\/vaults\/compare\?/, { timeout: WAIT }), go.click()]);
-    const v = new URL(page.url()).searchParams.get("v");
-    check(
-      "1i the bar lands on /vaults/compare with the three keys in pick order",
-      v === [A, B, C].join(","),
-      `${href} → ${v}`,
-    );
-    await page.locator("[data-compare-columns]").waitFor({ timeout: WAIT });
-    const cols = await readColumns(page);
-    check(
-      "1j it draws those three columns",
-      cols.attr.length === 3 && [A, B, C].every((k) => cols.attr.includes(k)),
-      cols.attr.join(","),
-    );
-
-    // The asset step: the same selection, a tick on every card.
-    await page.goto(`${BASE}${ASSET_STEP}`, NAV);
-    await page.locator("[data-asset-card]").first().waitFor({ timeout: WAIT });
-    const cards = await page.locator("[data-asset-card]").count();
-    const ticks = await page.locator("[data-compare-tick][data-anatomy='E2']").count();
-    check(`1k ${ASSET_STEP}: a tick on every card`, cards > 0 && ticks >= cards, `${ticks} ticks, ${cards} cards`);
-    // The bar draws after hydration (the server's snapshot is empty).
-    await bar.waitFor({ timeout: 30000 }).catch(() => {});
-    check("1l the asset step shows the same selection's bar", (await barCount()) === "3", String(await barCount()));
-    if (await bar.count()) {
-      await page.locator("[data-compare-clear]").click();
-      await page.waitForTimeout(200);
-      check("1m Clear removes the bar", (await barCount()) == null);
-    } else check("1m Clear removes the bar", false, "no bar to clear");
-  } else {
-    check("1b–1m picking needs every fixture on its roster", false, "a fixture is missing");
+  const choose = async (k) => {
+    await page.locator(`[data-compare-option="${k}"]`).click();
+    await page.waitForTimeout(150);
+  };
+  let offered = await offer(1, "Steakhouse USDC");
+  check(
+    "1e Steakhouse USDC on Ethereum is offered (Morpho on Ethereum is in the index)",
+    offered.includes(A),
+    offered.join(","),
+  );
+  if (offered.includes(A)) await choose(A);
+  check("1f a pick fills its slot", (await page.locator(`[data-compare-pick="${A}"]`).count()) === 1);
+  offered = await offer(2, "Steakhouse USDC");
+  check("1g a picked vault is not offered again", offered.length > 0 && !offered.includes(A), offered.join(","));
+  await page.keyboard.press("Escape");
+  await page.locator(`[data-compare-input="2"]`).fill("");
+  for (const [n, f, q] of [
+    [2, FIXTURES.gauntlet, "Gauntlet USDC Prime"],
+    [3, FIXTURES.stata, FIXTURES.stata.address],
+    [4, FIXTURES.umbrella, FIXTURES.umbrella.address],
+  ]) {
+    if ((await slots()) < n) await page.locator("[data-compare-add]").click();
+    const got = await offer(n, q);
+    const k = keyOf(f);
+    check(`1h slot ${n}: ${q.slice(0, 20)} offers ${k.slice(0, 12)}`, got.includes(k), got.join(","));
+    if (got.includes(k)) await choose(k);
   }
+  check(
+    "1i four slots, no fifth: Add a vault is gone",
+    (await slots()) === 4 && (await page.locator("[data-compare-add]").count()) === 0,
+  );
+  await page.locator(`[data-compare-clear="${C}"]`).click();
+  await page.waitForTimeout(150);
+  check(
+    "1j × clears a pick, and the focus goes to the slot's field",
+    (await page.locator(`[data-compare-pick="${C}"]`).count()) === 0 &&
+      (await page.evaluate(() => document.activeElement?.getAttribute("data-compare-input"))) === "3",
+  );
+  const got = await offer(3, FIXTURES.stata.address);
+  if (got.includes(C)) await choose(C);
+  check("1k Compare is enabled with picks", (await go.getAttribute("aria-disabled")) === "false");
+  await Promise.all([page.waitForURL(/\/vaults\/compare\?v=/, { timeout: WAIT }), go.click()]);
+  const v = new URL(page.url()).searchParams.get("v");
+  check("1l Compare writes ?v= in slot order", v === ALL.join(","), v ?? "");
+  await page.locator("[data-compare-columns]").waitFor({ timeout: WAIT });
+  const cols = await readColumns(page);
+  const filled = await page
+    .locator("[data-compare-pick]")
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-compare-pick")));
+  check(
+    "1m it draws those columns, the picker filled from ?v=",
+    cols.attr.join() === ALL.join() && filled.join() === ALL.join(),
+    `${cols.attr.join(",")} | ${filled.join(",")}`,
+  );
   await ctx.close();
 }
 
@@ -312,8 +241,8 @@ let vaultsInspector = 0;
   await page.locator("[data-compare-columns]").waitFor({ timeout: WAIT });
   const cols = await readColumns(page);
   check(
-    "2b four columns, the head in the attribute's order",
-    cols.attr.length === 4 && cols.head.join() === cols.attr.join(),
+    "2b four columns in ?v= order, the head the same",
+    cols.attr.join() === ALL.join() && cols.head.join() === ALL.join(),
     cols.head.join(","),
   );
   for (const l of cols.links) {
@@ -323,7 +252,7 @@ let vaultsInspector = 0;
       l.linkKey === l.key &&
         /^\/(ethereum|base)\/(morpho|aave|yearn|maple)\/(vaults|pools)\//.test(l.href ?? "") &&
         l.href === want,
-      `${l.href} (index ${want})`,
+      `${l.href} (roster ${want})`,
     );
     if (l.href) {
       const r = await fetch(`${BASE}${l.href}`, { signal: AbortSignal.timeout(300000) }).catch((e) => ({
@@ -332,142 +261,73 @@ let vaultsInspector = 0;
       check(`2d ${l.href} answers 200`, r.status === 200, String(r.status));
     }
   }
-  const prov = await page.evaluate(() => {
-    const root = document.querySelector("[data-compare-page]");
-    return {
-      exempt: root?.getAttribute("data-prov-exempt") ?? "",
-      anatomy: root?.getAttribute("data-anatomy"),
-      marks:
-        root?.querySelectorAll(".prov-locate-box, [data-prov-covered], [data-prov-pickable], [data-prov-inspect]")
-          .length ?? -1,
-    };
-  });
-  check("2e the page is E1 and data-prov-exempt", prov.anatomy === "E1" && prov.exempt.length > 0, prov.exempt);
-  check("2f no receipt marks on the page's figures", prov.marks === 0, `${prov.marks} marks`);
-  {
-    // The switch on, the compare page does not arm (no route of the switch).
-    const p = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-    await p.goto(compareUrl(ALL), NAV);
-    await p.evaluate(() => localStorage.setItem("rails-prov-inspector", "1"));
-    await p.reload(NAV);
-    await p.locator("[data-compare-columns]").waitFor({ timeout: WAIT });
-    await p.waitForTimeout(1500);
-    const armedHere =
-      (await p.locator("[data-prov-inspect-on]").count()) + (await p.locator("[data-prov-pickable]").count());
-    await p.close();
-    check(
-      "2g the switch on, the page does not arm (the switch arms a roster)",
-      armedHere === 0 && vaultsInspector > 0,
-      `compare ${armedHere}, roster ${vaultsInspector}`,
-    );
-  }
+  check("2e no sort control", (await page.locator("[data-compare-sort], [data-compare-sort-note]").count()) === 0);
+  const marks = await page
+    .locator("[data-compare-columns] [data-prov-covered], [data-compare-columns] .prov-locate-box")
+    .count();
+  const uncovered = await page.locator("[data-prov-uncovered]").count();
+  check(
+    "2f the figures carry receipts, and the tripwire finds none uncovered",
+    marks > 0 && uncovered === 0,
+    `${marks} receipt spans, ${uncovered} uncovered`,
+  );
+  const armed = await armInspector(page);
+  const picks = await page.locator("[data-compare-columns] [data-prov-pickable]").count();
+  check("2g the profile menu's switch arms the page", armed && picks > 0, `${picks} pickable values`);
+  if (armed) await page.keyboard.press("Escape");
 
-  // ── 3. Sort by ──
-  const sortNote = page.locator("[data-compare-sort-note]");
-  const pressed = async () =>
-    page
-      .locator("[data-compare-sort]")
-      .evaluateAll((els) =>
-        els.filter((e) => e.getAttribute("aria-pressed") === "true").map((e) => e.getAttribute("data-compare-sort")),
-      );
-  check("3a Size pressed with no ?sort=", (await pressed()).join() === "size");
-  const orders = {};
-  const RULES = {
-    size: null,
-    yield: { fig: "yearly30", dir: 1, tol: 0.0005 },
-    range: { fig: "range", dir: -1, tol: 0.0011 },
-    withdrawable: { fig: "withdrawable", dir: 1, tol: 0.001 },
-  };
-  for (const s of ["yield", "range", "withdrawable", "size"]) {
-    await page.locator(`[data-compare-sort="${s}"]`).click();
-    await page.waitForTimeout(250);
-    const c = await readColumns(page);
-    orders[s] = c.attr.join(",");
-    const q = new URL(page.url()).searchParams.get("sort");
-    check(
-      `3b sort ${s}: pressed alone, ?sort=${s === "size" ? "(none)" : s}, table and phone in the attribute's order`,
-      (await pressed()).join() === s &&
-        q === (s === "size" ? null : s) &&
-        c.head.join() === c.attr.join() &&
-        c.phone.join() === c.attr.join(),
-      `pressed ${(await pressed()).join()}, ?sort=${q}`,
-    );
-    if (s === "size") {
-      // From outside: the roster rows' asset and held amount.
-      const want = [...c.attr].sort(
-        (a, b) =>
-          index[a].token.localeCompare(index[b].token, "en-US") ||
-          (BigInt(index[b].held) > BigInt(index[a].held) ? 1 : BigInt(index[b].held) < BigInt(index[a].held) ? -1 : 0),
-      );
-      const assetsAgree = c.attr.every((k) => figuresOf(c.cells[k]).heldAsset === index[k].token);
-      check(
-        "3b sort size: order agrees with the figures — asset A to Z, then held",
-        c.attr.join() === want.join() && assetsAgree,
-        c.attr.map((k) => `${index[k].token} ${index[k].held}`).join(" | "),
-      );
-      check(
-        "3c the mixed-asset Size sort says so",
-        norm(await sortNote.textContent()) ===
-          "Vaults in different assets sort by asset first, then by size within each.",
-        norm(await sortNote.textContent()),
-      );
-    } else {
-      const r = RULES[s];
-      const vals = c.attr.map((k) => figuresOf(c.cells[k])[r.fig]);
-      check(
-        `3b sort ${s}: order agrees with the figures`,
-        inOrder(vals, r.dir, r.tol),
-        c.attr
-          .map((k, i) => `${k.slice(2, 8)} ${vals[i] == null ? "none" : (vals[i] * 100).toFixed(2) + "%"}`)
-          .join(" | "),
-      );
-      if (s === "withdrawable")
-        check(
-          "3d a vault with no withdrawable share is drawn, after those with one",
-          vals.includes(null) && vals.length === 4,
-          vals.map(String).join(","),
-        );
-      if (s === "range")
-        check(
-          "3e the range sort says vaults whose share price grew come first",
-          norm(await sortNote.textContent()) ===
-            "Vaults whose share price grew over the 30 days come first; the others follow.",
-          norm(await sortNote.textContent()),
-        );
+  // ── 3. Differences ──
+  const diff = await page.evaluate(() => {
+    const sec = document.querySelector('[data-anatomy="E1.2"]');
+    const table = sec?.querySelector('[data-compare-table="differences"]');
+    const rows = {};
+    for (const tr of table?.querySelectorAll("tr[data-compare-row]") ?? []) {
+      rows[tr.getAttribute("data-compare-row")] = [...tr.querySelectorAll("td[data-compare-cell]")].map((td) => ({
+        text: td.innerText.replace(/\s+/g, " ").trim(),
+        receipt: !!td.querySelector("[data-prov-covered], .prov-locate-box"),
+      }));
     }
-  }
-  check("3f the four sorts do not all draw one order", new Set(Object.values(orders)).size > 1, JSON.stringify(orders));
-  await page.close();
-
-  for (const [q, want] of [
-    ["withdrawable", "withdrawable"],
-    ["bogus", "size"],
-  ]) {
-    const p = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-    await p.goto(compareUrl(ALL, `&sort=${q}`), NAV);
-    await p.locator("[data-compare-columns]").waitFor({ timeout: WAIT });
-    const c = await readColumns(p);
-    const on = await p
-      .locator("[data-compare-sort]")
-      .evaluateAll((els) =>
-        els.filter((e) => e.getAttribute("aria-pressed") === "true").map((e) => e.getAttribute("data-compare-sort")),
-      );
+    return { attr: sec?.getAttribute("data-compare-differences") ?? "", rows };
+  });
+  const keys = Object.keys(diff.rows);
+  check(
+    "3a Asset and Family differ for these four and are listed",
+    keys.includes("asset") && keys.includes("family") && diff.attr === keys.join(","),
+    diff.attr,
+  );
+  check(
+    "3b every listed row has values that differ",
+    keys.every((k) => new Set(diff.rows[k].map((c) => c.text)).size > 1),
+    keys.filter((k) => new Set(diff.rows[k].map((c) => c.text)).size <= 1).join(",") || "all differ",
+  );
+  for (const k of ["total-assets", "share-price", "holder-count", "fees"].filter((k) => diff.rows[k])) {
+    const printed = diff.rows[k].filter((c) => /\d/.test(c.text));
     check(
-      `3g ?sort=${q} loads ${want}, in its order`,
-      on.join() === want && c.attr.join(",") === orders[want],
-      `${on.join()} ${c.attr.join(",")}`,
+      `3c ${k}: each printed figure carries a receipt`,
+      printed.length > 0 && printed.every((c) => c.receipt),
+      diff.rows[k].map((c) => `${c.text.slice(0, 24)}${c.receipt ? " ✓" : ""}`).join(" | "),
     );
-    await p.close();
   }
+  await page.close();
+  const two = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await two.goto(compareUrl([A, B]), NAV);
+  await two.locator("[data-compare-columns]").waitFor({ timeout: WAIT });
+  const attr = (await two.locator('[data-anatomy="E1.2"]').getAttribute("data-compare-differences")) ?? "";
+  check(
+    "3d two MetaMorpho USDC vaults list no Asset, Family or Chain row",
+    !/(^|,)(asset|family|chain)(,|$)/.test(attr),
+    attr,
+  );
+  await two.close();
 }
 
 // ── 4. The holder donut ────────────────────────────────────────────────────
 {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await page.goto(compareUrl(ALL), NAV);
-  await page.locator("[data-compare-table] [data-compare-donut]").first().waitFor({ timeout: WAIT });
+  await page.locator('[data-compare-table="record"] [data-compare-donut]').first().waitFor({ timeout: WAIT });
   const donuts = await page.evaluate(() =>
-    [...document.querySelectorAll("[data-compare-table] td[data-compare-cell]")]
+    [...document.querySelectorAll('[data-compare-table="record"] td[data-compare-cell]')]
       .filter((td) => td.querySelector("[data-compare-donut]"))
       .map((td) => {
         const d = td.querySelector("[data-compare-donut]");
@@ -536,11 +396,13 @@ let vaultsInspector = 0;
     if (d.slices.some((s) => s.seg != null)) wired = true;
   }
   if (wired) {
-    const slice = page.locator("[data-compare-table] [data-compare-donut] [data-breakdown-slice][data-seg]").first();
+    const slice = page
+      .locator('[data-compare-table="record"] [data-compare-donut] [data-breakdown-slice][data-seg]')
+      .first();
     await slice.hover();
     await page.waitForTimeout(400);
     const dim = await page.evaluate(() => {
-      const d = document.querySelector("[data-compare-table] [data-compare-donut]");
+      const d = document.querySelector('[data-compare-table="record"] [data-compare-donut]');
       return [...d.querySelectorAll("[data-breakdown-slice]")].map((s) => Number(getComputedStyle(s).opacity));
     });
     check("4g hovering a slice dims the others", dim[0] === 1 && dim.slice(1).every((o) => o < 1), dim.join(","));
@@ -555,12 +417,12 @@ let vaultsInspector = 0;
 // ── 5. Widths ──────────────────────────────────────────────────────────────
 for (const w of [390, 1440]) {
   const page = await browser.newPage({ viewport: { width: w, height: 900 } });
-  await page.goto(compareUrl(ALL, "&sort=yield"), NAV);
+  await page.goto(compareUrl(ALL), NAV);
   await page.locator("[data-compare-columns]").waitFor({ timeout: WAIT });
   const s = await noScroll(page);
   check(`5a ${w}px no sideways scroll`, s.sw <= s.cw, `${s.sw} vs ${s.cw}`);
-  const tableShown = await page.locator("[data-compare-table]").isVisible();
-  const phoneShown = await page.locator("[data-compare-phone]").isVisible();
+  const tableShown = await page.locator('[data-compare-table="record"]').isVisible();
+  const phoneShown = await page.locator('[data-compare-phone="record"]').isVisible();
   check(
     `5b ${w}px ${w === 390 ? "the phone layout, no table" : "the table, no phone layout"}`,
     w === 390 ? phoneShown && !tableShown : tableShown && !phoneShown,
@@ -568,11 +430,7 @@ for (const w of [390, 1440]) {
   );
   if (w === 390) {
     const c = await readColumns(page);
-    check(
-      "5c 390px the vault list in the sort's order",
-      c.phone.join() === c.attr.join() && c.attr.length === 4,
-      c.phone.join(","),
-    );
+    check("5c 390px the vault list in ?v= order", c.phone.join() === ALL.join(), c.phone.join(","));
   }
   await page.close();
 }
@@ -585,13 +443,12 @@ for (const w of [390, 1440]) {
     await page.locator("[data-compare-page]").waitFor({ timeout: WAIT });
     return page.evaluate((status) => {
       const nf = document.querySelector("[data-compare-not-found]");
-      const few = document.querySelector("[data-compare-too-few]");
       return {
         status,
         notFound: nf?.getAttribute("data-compare-not-found") ?? null,
         notFoundText: nf?.textContent?.replace(/\s+/g, " ").trim() ?? "",
-        tooFew: !!few,
-        toIndex: few?.querySelector("a")?.getAttribute("href") ?? null,
+        pickerOnly:
+          !!document.querySelector("[data-compare-picker]") && !document.querySelector("[data-compare-columns]"),
         cols: document.querySelector("[data-compare-columns]")?.getAttribute("data-compare-columns")?.split(",") ?? [],
       };
     }, r?.status());
@@ -600,19 +457,23 @@ for (const w of [390, 1440]) {
   let g = await open(compareUrl([A, UNKNOWN, B]));
   check(
     "6a an unknown address is named, the other two compare",
-    g.status === 200 && g.notFound === UNKNOWN && g.notFoundText.includes(UNKNOWN) && g.cols.length === 2 && !g.tooFew,
+    g.status === 200 &&
+      g.notFound === UNKNOWN &&
+      g.notFoundText.includes(UNKNOWN) &&
+      g.cols.length === 2 &&
+      !g.pickerOnly,
     JSON.stringify(g),
   );
   g = await open(compareUrl([A, MALFORMED]));
   check(
-    "6b a malformed key is named; one vault left draws the too-few line linking /vaults",
-    g.status === 200 && g.notFound === MALFORMED && g.tooFew && g.toIndex === "/vaults" && g.cols.length === 0,
+    "6b a malformed key is named; one vault left draws the picker alone",
+    g.status === 200 && g.notFound === MALFORMED && g.pickerOnly && g.cols.length === 0,
     JSON.stringify(g),
   );
   g = await open(`${BASE}/vaults/compare`);
   check(
-    "6c no ?v= draws the too-few line and names nothing",
-    g.status === 200 && g.tooFew && g.notFound == null,
+    "6c no ?v= draws the picker alone and names nothing",
+    g.status === 200 && g.pickerOnly && g.notFound == null,
     JSON.stringify(g),
   );
   const upper = `1:0x${FIXTURES.steakhouse.address.slice(2).toUpperCase()}`;
@@ -620,6 +481,12 @@ for (const w of [390, 1440]) {
   check(
     "6d an upper-case and a repeated key read as one vault",
     g.status === 200 && g.notFound == null && g.cols.length === 2,
+    JSON.stringify(g),
+  );
+  g = await open(compareUrl([MALFORMED, ...ALL]));
+  check(
+    "6g a malformed key is named and takes no place: the four after it compare",
+    g.status === 200 && g.notFound === MALFORMED && g.cols.join() === ALL.join(),
     JSON.stringify(g),
   );
   g = await open(compareUrl([...ALL, keyOf(FIFTH)]));

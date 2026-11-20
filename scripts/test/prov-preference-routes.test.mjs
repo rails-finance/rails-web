@@ -51,7 +51,8 @@ test("catch-all segments", () => {
 test("the allow-list reads", () => {
   assert.ok(provPreferenceAllows("/vaults", {}));
   assert.ok(provPreferenceAllows("/ethereum/yearn/vaults", {}));
-  assert.ok(!provPreferenceAllows("/vaults/compare", {}));
+  assert.ok(provPreferenceAllows("/vaults/compare", {}));
+  assert.ok(!provPreferenceAllows("/vaults/fronts", {}));
   assert.ok(!provPreferenceAllows("/ethereum/aave/vaults/info", {}));
   assert.ok(!provPreferenceAllows(null, {}));
   // Every page that mounts the inspector layer is listed (ui-jobs 625): an

@@ -20,6 +20,7 @@
 export const PROV_PREFERENCE_ROUTES: readonly string[] = [
   "/",
   "/vaults",
+  "/vaults/compare",
   "/about/provenance",
   "/assets/[chain]/[token]",
   "/arbitrum/aave-v3",
