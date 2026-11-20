@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import type { CoveredPositions } from "@/lib/home/covered-positions";
 import type { HomeStats } from "@/lib/home/home-stats";
 import { formatValueHeld, spokenValueHeld, type ValueHeld } from "@/lib/home/value-held";
@@ -24,7 +23,7 @@ const COUNTED_SCOPE = launchedProductionChainNames();
  * it in the same sentence, and appears only when the whole roster answered
  * (value-held.ts). The open/closed split, the wallet clause and the breakdown
  * are on /about/figures (CoveredCaption, components/about/figures-body.tsx),
- * reached from the link under the sentence (ui-jobs 523).
+ * reached from the count (ui-jobs 523, 785).
  *
  * The split was withheld until 2026-07-15 (server migrations 115/116 made
  * openness chain-rooted); CoveredPositions.openPositions carries that history and
@@ -84,7 +83,7 @@ export function CoveredStats({
         <IndexNotice />
       </div>
     );
-  const count = <span className={FIGURE}>{covered.totalPositions.toLocaleString("en-US")}</span>;
+  const count = <FiguresLink total={covered.totalPositions} />;
 
   // Without the value the band is the count's line alone, as before 476.
   if (!valueHeld)
@@ -97,7 +96,6 @@ export function CoveredStats({
           </span>
           <span className={LABEL}>positions across {COUNTED_SCOPE} DeFi</span>
         </p>
-        <FiguresLink />
       </div>
     );
 
@@ -108,8 +106,8 @@ export function CoveredStats({
           a group that never breaks, so does "DeFi (i)", and the value never
           splits; everything else wraps as ordinary centred text. One <p>, so a
           screen reader reads it as one sentence. Sizes step at breakpoints and
-          never scale with the viewport. Under it, the link to how the figures
-          are counted (ui-jobs 523). */}
+          never scale with the viewport. The count links to how the figures are
+          counted (ui-jobs 785). */}
       <p className={`${LABEL} text-balance`} data-anatomy="S3.1">
         <span className={GROUP}>
           <span>Explore</span>
@@ -126,7 +124,6 @@ export function CoveredStats({
         <br className="hidden lg:inline" />
         across {COUNTED_SCOPE} DeFi
       </p>
-      <FiguresLink />
     </div>
   );
 }
@@ -139,12 +136,42 @@ const GROUP = "inline-flex flex-nowrap items-center gap-x-2 whitespace-nowrap sm
 const FIGURE =
   "font-sans text-foreground font-semibold leading-none tracking-tighter tabular-nums text-4xl sm:text-5xl";
 const LABEL = "font-sans font-light tracking-tight text-rb-500 text-lg sm:text-xl lg:text-[28px]";
-/** Under the sentence: the way to how the figures are counted, in the link blue. */
-function FiguresLink() {
+/** The count, linking to how the figures are counted (ui-jobs 785; until 20 Nov
+ *  2026 a "How these are counted" line under the sentence). Discreet: no colour
+ *  of its own and the receipts' dotted underline on hover, with a name that says
+ *  where it goes. */
+function FiguresLink({ total }: { total: number }) {
+  const figure = total.toLocaleString("en-US");
   return (
-    <Link href="/about/figures" className={`mt-4 text-sm font-medium ${FOOT_LINK}`} data-anatomy="S3.3">
-      How these are counted
+    <Link
+      href="/about/figures"
+      className={`${FIGURE} tip-underline rounded-sm focus-ring`}
+      aria-label={`${figure}: how the figures are counted`}
+      data-anatomy="S3.3"
+    >
+      {figure}
     </Link>
+  );
+}
+
+/** The home sentence restated as the claim /about/figures backs, the page's
+ *  first line (ui-jobs 785). */
+export function CoveredClaim({ covered, valueHeld }: { covered: CoveredPositions; valueHeld: ValueHeld | null }) {
+  return (
+    <>
+      The home page says Rails explores{" "}
+      <span className="font-semibold tabular-nums">{covered.totalPositions.toLocaleString("en-US")}</span> positions
+      {valueHeld && (
+        <>
+          , holding{" "}
+          <span className="font-semibold tabular-nums" aria-label={spokenValueHeld(valueHeld.totalUsd)}>
+            {formatValueHeld(valueHeld.totalUsd)}
+          </span>
+          ,
+        </>
+      )}{" "}
+      across {COUNTED_SCOPE} DeFi. This page shows how those figures are counted.
+    </>
   );
 }
 
