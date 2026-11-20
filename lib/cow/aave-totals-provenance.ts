@@ -83,7 +83,6 @@ const priceLeaf = (t: CowAaveTotals): ProvInput => ({
   value: priceRuleSentence(t),
   kind: "chain",
   pclass: "oracle",
-  ...(t.family === "aave-v3" ? { contract: { name: "Aave V3 Core oracle", address: ORACLE_BY_MARKET.core } } : {}),
 });
 
 const unpricedLeaf = (t: CowAaveTotals): ProvInput[] =>
@@ -122,14 +121,14 @@ export function cowSurplusTotalProv(t: CowAaveTotals, shape?: CowSurplusShape, l
   return {
     kind: "derived",
     pclass: "indexed",
-    summary: `${what}${scope}, across the ${countText(n)} priced ${COW_TERMS.name} trades behind ${fam} position swaps on Ethereum, each in US dollars at ${priceWords(t.family)}, added up. ${COW_TERMS.name}'s docs call it surplus, "The price improvement on a user's limit price".${shape ? "" : flashSentence(t)}`,
+    summary: `${what}${scope}, across the ${countText(n)} priced ${COW_TERMS.name} trades behind ${fam} position swaps on Ethereum. Each is in US dollars at ${priceWords(t.family)}, and they are added up.${shape ? "" : flashSentence(t)}`,
     formula: "Σ surplus ÷ 10^decimals × price at the trade's block",
     inputs: [tradesLeaf(t, n, "priced trades"), priceLeaf(t), ...unpricedLeaf(t), ...SURPLUS_DOCS],
     via: "settle() input · the order as signed; Trade log · the executed amounts; oracle price at the trade's block",
     source: asOfSource(t),
     verify: {
       kind: "rollup",
-      text: `To check: add up the Surplus column of ${listingText ?? "the listing behind this figure"}; each swap's surplus and price carry a receipt.`,
+      text: `To check: add up the surplus of each swap in ${listingText ?? "the listing behind this figure"}; each carries a receipt.`,
     },
   };
 }
@@ -139,7 +138,7 @@ export function cowFeesTotalProv(t: CowAaveTotals): Provenance {
   const fam = COW_AAVE_FAMILY_NAME[t.family];
   const none =
     t.counts.noFee > 0
-      ? ` ${countText(t.counts.noFee)} trades executed above the clearing price, so state no fee and are left out.`
+      ? ` ${countText(t.counts.noFee)} trades executed above the clearing price and state no fee, and are left out.`
       : "";
   return {
     kind: "derived",
@@ -151,7 +150,7 @@ export function cowFeesTotalProv(t: CowAaveTotals): Provenance {
     source: asOfSource(t),
     verify: {
       kind: "rollup",
-      text: "To check: add up the Fees column of the listing behind this figure; each swap's fee carries a receipt.",
+      text: "To check: add up the fee of each swap in the listing behind this figure; each carries a receipt.",
     },
   };
 }
@@ -161,7 +160,7 @@ export function cowMedianFeeProv(t: CowAaveTotals): Provenance {
   return {
     kind: "derived",
     pclass: "indexed",
-    summary: `The median fee — the middle of the ${countText(t.fees.trades)} priced trades' fees, each in basis points (0.01%) of the trade's amount at its settlement's clearing price. Half the trades paid less, half more.`,
+    summary: `The median fee — the middle of the ${countText(t.fees.trades)} priced trades' fees, each in basis points (0.01%) of the trade's amount at its settlement's clearing price.`,
     formula: "median of (fee gap ÷ amount at the clearing price × 10,000)",
     inputs: [tradesLeaf(t, t.fees.trades, "priced trades with a fee"), FEES_DOCS],
     via: "settle() input · clearingPrices; Trade log · the executed amounts",
@@ -216,7 +215,7 @@ export function cowSwapUsdProv(family: CowAaveFamily, s: CowAaveSwap, figure: "s
       earlier
         ? `. No price was written at that block, so it is the newest before it, at block ${t.price.block.toLocaleString("en-US")}, ${(s.block - t.price.block).toLocaleString("en-US")} blocks earlier`
         : ""
-    }.${figure === "surplus" ? ` ${COW_TERMS.name}'s docs call it surplus, "The price improvement on a user's limit price".` : ""}`,
+    }.`,
     formula: `${sym} amount × price`,
     inputs: [
       {
@@ -251,7 +250,17 @@ export function cowSwapBpProv(s: CowAaveSwap): Provenance | null {
     kind: "derived",
     pclass: "input",
     summary: `Fees in the trade's price — what this trade gave up against its settlement's clearing price, in basis points (0.01%) of its amount at that price. The gap holds the network cost as well as protocol and partner fees; Rails does not split them.`,
-    inputs: [{ label: `the gap, in ${tokenName(s)}`, value: t.feeGap, kind: "chain", pclass: "input" }, FEES_DOCS],
+    inputs: [
+      t.token.decimals == null
+        ? { label: `the gap, in ${tokenName(s)} base units`, value: t.feeGap, kind: "chain", pclass: "input" }
+        : {
+            label: `the gap, in ${tokenName(s)}`,
+            value: shiftRaw(t.feeGap, t.token.decimals),
+            kind: "chain",
+            pclass: "input",
+          },
+      FEES_DOCS,
+    ],
     via: "settle() input · clearingPrices; Trade log · the executed amounts",
     source: { block: s.block, txHash: s.txHash },
     verify: txVerify(s),

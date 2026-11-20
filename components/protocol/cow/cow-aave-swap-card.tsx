@@ -11,7 +11,7 @@
 import Link from "next/link";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
-import type { SpineColumnProps } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineSwapLeg } from "@/components/shared/spine-column";
 import { BlockRef } from "@/components/shared/block-ref";
 import { Prov } from "@/components/shared/provenance";
 import { explorerUrl } from "@/lib/shared/chains";
@@ -62,31 +62,27 @@ export function CowAaveSwapCard({
   const tokenSym = t ? (t.token.symbol ?? shortAddress(t.token.address)) : "";
   const kind = swapKindText(s.kind);
 
+  // The Aave swap grammar (aave-v4-event-card.tsx): the swap glyph, the legs stacked beside it, given then
+  // received; a leg whose amount is not known is left out.
+  const swapLegs: SpineSwapLeg[] = [];
+  for (const [address, l, raw] of [
+    [s.given, given, s.givenAmount],
+    [s.received, received, s.receivedAmount],
+  ] as const) {
+    const value = legNumber(raw, l.decimals);
+    if (value != null && l.symbol) swapLegs.push({ symbol: l.symbol, address, value });
+  }
   const spine: SpineColumnProps = {
-    tokens: [
-      {
-        symbol: given.symbol ?? "",
-        address: s.given,
-        direction: "right",
-        popover: true,
-        value: legNumber(s.givenAmount, given.decimals),
-        verb: "gave",
-      },
-      {
-        symbol: received.symbol ?? "",
-        address: s.received,
-        direction: "left",
-        popover: true,
-        value: legNumber(s.receivedAmount, received.decimals),
-        verb: "received",
-      },
-    ],
+    icon: "swap",
+    swapLegs,
+    swapAxis: s.kind === "collateral_swap" ? "supply" : s.kind === "debt_swap" ? "debt" : "mixed",
     isLast,
   };
 
   const surplusProv = cowSwapUsdProv(family, s, "surplus");
   const feeProv = cowSwapUsdProv(family, s, "fees");
   const bpProv = cowSwapBpProv(s);
+  const noneText = t?.unpriced === "no-decimals" ? "Decimals not read" : "No price";
   const cells: EventCellSpec[] = t
     ? [
         {
@@ -96,9 +92,9 @@ export function CowAaveSwapCard({
           changed: true,
           figure: "cow-swap-surplus",
           value:
-            t.surplusUsd != null && surplusProv
+            !t.unpriced && t.surplusUsd != null && surplusProv
               ? { after: { text: usdText(t.surplusUsd), info: surplusProv, value: t.surplusUsd.toFixed(2) } }
-              : { none: "No price" },
+              : { none: noneText },
           sub: [{ content: `${tokenAmountText(t.surplus, t.token.decimals)} ${tokenSym}` }],
         },
         {
@@ -107,10 +103,11 @@ export function CowAaveSwapCard({
           label: "Fees in the trade's price",
           changed: true,
           figure: "cow-swap-fees",
-          value:
-            t.feeUsd != null && feeProv
+          value: t.unpriced
+            ? { none: noneText }
+            : t.feeUsd != null && feeProv
               ? { after: { text: usdText(t.feeUsd), info: feeProv, value: t.feeUsd.toFixed(2) } }
-              : { none: t.feeGap.startsWith("-") ? "No fee" : "No price" },
+              : { none: "No fee" },
           sub:
             !t.feeGap.startsWith("-") && bpProv
               ? [{ content: bpText(t.feeBp) }]
@@ -166,12 +163,12 @@ export function CowAaveSwapCard({
       deltas: [],
       clauses: !t
         ? ["No trade read"]
-        : t.surplusUsd == null
-          ? [`No price for ${tokenSym}`]
+        : t.unpriced
+          ? [t.unpriced === "no-decimals" ? `Decimals of ${tokenSym} not read` : `No price for ${tokenSym}`]
           : [
               <span key="s" data-cow-row-surplus="">
                 Surplus{" "}
-                {surplusProv ? (
+                {surplusProv && t.surplusUsd != null ? (
                   <Prov info={surplusProv} value={t.surplusUsd.toFixed(2)}>
                     <span className="tabular-nums text-foreground">{usdText(t.surplusUsd)}</span>
                   </Prov>
@@ -202,9 +199,13 @@ export function CowAaveSwapCard({
             {COW_TERMS.settlement.replace(/'/g, "’")}.
           </li>
           {t ? (
-            t.price ? null : (
-              <li>Aave has no price for {tokenSym}, so this swap is in neither figure.</li>
-            )
+            t.unpriced ? (
+              <li>
+                {t.unpriced === "no-decimals"
+                  ? `The decimals of ${tokenSym} are not read, so this swap is in neither figure.`
+                  : `Aave has no price for ${tokenSym}, so this swap is in neither figure.`}
+              </li>
+            ) : null
           ) : (
             <li>No trade is read for this swap&rsquo;s settlement yet, so it is in neither figure.</li>
           )}

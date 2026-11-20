@@ -87,15 +87,14 @@ export function cowSurplusProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCo
   const fee = c.limit.fee !== "0" || trade.fee !== "0";
   const part = c.partiallyFillable ? " pro rata to the part filled in this transaction," : "";
   const label = cowSurplusLabel(c.kind, c.route);
-  const docs = `CoW Protocol's docs call it surplus, "The price improvement on a user's limit price".`;
   return {
     kind: "derived",
     pclass: "input",
     summary: sell
-      ? `${label} — the ${sym} this sell order received above the least it would accept: the buy amount the order signed,${part} taken from what the order bought. ${docs}`
+      ? `${label} — the ${sym} this sell order received above the least it would accept: the buy amount the order signed,${part} taken from what the order bought.`
       : c.route !== "cow_adapter"
-        ? `${label} — the ${sym} this buy order did not spend of the most it would pay: the sell amount the wallet's order signed,${part} less what the order sold. ${docs}`
-        : `${label} — the ${sym} this buy order did not spend of the most it would pay: the sell amount the order signed,${part} less what the order sold. The front end that placed the order sets that limit with a slippage allowance, and the adapter sends the unused part to the wallet in the same transaction: one amount. ${docs}`,
+        ? `${label} — the ${sym} this buy order did not spend of the most it would pay: the sell amount the wallet's order signed,${part} less what the order sold.`
+        : `${label} — the ${sym} this buy order did not spend of the most it would pay: the sell amount the order signed,${part} less what the order sold. The front end that placed the order sets that limit with a slippage allowance, and the adapter sends the unused part to the wallet in the same transaction: one amount.`,
     formula: sell
       ? `bought − ⌈limit buy × (sold${fee ? " − fee" : ""}) ÷ limit sell⌉`
       : `⌊limit sell × bought ÷ limit buy⌋${fee ? " + ⌊limit fee × bought ÷ limit buy⌋" : ""} − sold`,

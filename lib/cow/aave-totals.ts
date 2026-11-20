@@ -162,11 +162,12 @@ export function shiftRaw(raw: string, decimals: number): string {
   return (neg ? "-" : "") + int + (frac ? `.${frac}` : "");
 }
 
-/** A token amount for a row: up to six significant places below 1, two above. */
+/** A token amount for a row: four significant places below 1, two decimals from 1 up; a negative amount takes
+ *  the minus sign (U+2212). */
 export function tokenAmountText(raw: string, decimals: number | null): string {
   if (decimals == null) return `${raw} (raw)`;
   const v = Number(shiftRaw(raw, decimals));
   const abs = Math.abs(v);
   const opts: Intl.NumberFormatOptions = abs >= 1 ? { maximumFractionDigits: 2 } : { maximumSignificantDigits: 4 };
-  return v.toLocaleString("en-US", opts);
+  return `${v < 0 ? "−" : ""}${abs.toLocaleString("en-US", opts)}`;
 }

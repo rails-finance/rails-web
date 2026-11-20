@@ -38,5 +38,6 @@ test("formats: dollars, bp, token amounts", () => {
   assert.equal(T.tokenAmountText("241762538", 8), "2.42");
   assert.equal(T.tokenAmountText("3652647014197408", 18), "0.003653");
   assert.equal(T.tokenAmountText("5", null), "5 (raw)");
+  assert.equal(T.tokenAmountText("-100000000000000000", 18), "−0.1", "a negative gap takes U+2212");
   assert.equal(T.swapKindText("repay_with_collateral"), "Repay with collateral");
 });

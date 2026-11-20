@@ -7,7 +7,7 @@
 // Drawn as the CoW wallet page draws its trades (cow-wallet-view.tsx). Read on
 // the client: the server holds the swaps an hour, and a cold read takes seconds.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RailHeader } from "@/components/shared/rail-header";
@@ -19,7 +19,6 @@ import { EventDateContext } from "@/components/shared/event-time";
 import { FilterDropdown } from "@/components/shared/filter-dropdown";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { CARD_INSET_START, INLINE_LINK, SECTION_HEADING } from "@/lib/shared/ui-grammar";
-import { COW_TERMS } from "@/lib/cow/terms";
 import {
   COW_AAVE_FAMILY_NAME,
   COW_SHAPES,
@@ -42,7 +41,8 @@ import {
   cowSurplusTotalProv,
 } from "@/lib/cow/aave-totals-provenance";
 import { CowAaveSwapCard } from "@/components/protocol/cow/cow-aave-swap-card";
-import { COW_FIGURES_HEADING } from "@/components/protocol/cow/cow-aave-figures";
+import { CowFiguresWait, useCowAaveTotals } from "@/components/protocol/cow/cow-aave-figures";
+import { useCowAaveRead } from "@/components/protocol/cow/use-cow-aave-read";
 
 const PAGE = 50;
 
@@ -77,59 +77,51 @@ export function CowAaveSwapsView({ family }: { family: CowAaveFamily }) {
   const sp = useSearchParams();
   const { figure, sort } = parseCowSwapsQuery(sp);
   const fam = COW_AAVE_FAMILY_NAME[family];
-  const [totals, setTotals] = useState<CowAaveTotals | null>(null);
-  const [swaps, setSwaps] = useState<CowAaveSwap[]>([]);
-  const [labels, setLabels] = useState<CowAaveSwapsPage["tokens"]>({});
-  const [matched, setMatched] = useState<number | null>(null);
-  const [loading, setLoading] = useState<"list" | "more" | null>("list");
-  const [failed, setFailed] = useState(false);
-  const reqId = useRef(0);
+  const totalsRead = useCowAaveTotals(family);
+  const totals = totalsRead.status === "ready" ? totalsRead.value : null;
+  const base = `/api/cow/ethereum/aave/${family}/swaps?${new URLSearchParams({ figure, sort, limit: String(PAGE) })}`;
+  // The first page reads under the same retry rule as the figures; later pages are read on demand.
+  const first = useCowAaveRead<CowAaveSwapsPage>(`${base}&offset=0`);
+  const [more, setMore] = useState<{ base: string; pages: CowAaveSwapsPage[] }>({ base, pages: [] });
+  const [moreState, setMoreState] = useState<"idle" | "reading" | "failed">("idle");
+  const pages = useMemo(
+    () => [...(first.status === "ready" ? [first.value] : []), ...(more.base === base ? more.pages : [])],
+    [first, more, base],
+  );
+  // Rows by swap key, once each: a page read after the server's hourly re-read can repeat a row.
+  const swaps = useMemo(() => {
+    const seen = new Set<string>();
+    const out: CowAaveSwap[] = [];
+    for (const p of pages)
+      for (const sw of p.swaps)
+        if (!seen.has(sw.swapKey)) {
+          seen.add(sw.swapKey);
+          out.push(sw);
+        }
+    return out;
+  }, [pages]);
+  const labels = useMemo(() => Object.assign({}, ...pages.map((p) => p.tokens)) as CowAaveSwapsPage["tokens"], [pages]);
+  const matched = first.status === "ready" ? first.value.matched : null;
   const registry = useReceiptRegistry();
 
-  const read = useCallback(
-    async (offset: number) => {
-      const id = ++reqId.current;
-      setLoading(offset ? "more" : "list");
-      setFailed(false);
-      try {
-        const qs = new URLSearchParams({ figure, sort, offset: String(offset), limit: String(PAGE) });
-        const res = await fetch(`/api/cow/ethereum/aave/${family}/swaps?${qs}`);
-        const body = (await res.json()) as CowAaveSwapsPage & { success: boolean };
-        if (id !== reqId.current) return;
-        if (!res.ok || !body.success) throw new Error(String(res.status));
-        setSwaps((prev) => (offset ? [...prev, ...body.swaps] : body.swaps));
-        setMatched(body.matched);
-        setLabels((prev) => ({ ...prev, ...body.tokens }));
-      } catch {
-        if (id === reqId.current) setFailed(true);
-      } finally {
-        if (id === reqId.current) setLoading(null);
-      }
-    },
-    [family, figure, sort],
-  );
-
-  useEffect(() => {
-    void read(0);
-  }, [read]);
-
-  useEffect(() => {
-    let live = true;
-    fetch(`/api/cow/ethereum/aave/${family}/totals`)
-      .then((r) => r.json())
-      .then((b: CowAaveTotals & { success: boolean }) => {
-        if (live && b.success) setTotals(b);
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [family]);
+  const readMore = useCallback(async () => {
+    setMoreState("reading");
+    try {
+      const res = await fetch(`${base}&offset=${swaps.length}`);
+      const body = (await res.json()) as CowAaveSwapsPage & { success: boolean };
+      if (!res.ok || !body.success) throw new Error(String(res.status));
+      setMore((prev) => ({ base, pages: [...(prev.base === base ? prev.pages : []), body] }));
+      setMoreState("idle");
+    } catch {
+      setMoreState("failed");
+    }
+  }, [base, swaps.length]);
 
   const go = (next: { figure?: CowAaveFigure; sort?: CowAaveSort }) => {
     const p = new URLSearchParams({ figure: next.figure ?? figure });
     const s = next.sort ?? sort;
     if (s !== "recent") p.set("sort", s);
+    setMoreState("idle");
     router.replace(`${pathname}?${p.toString()}`, { scroll: false });
   };
 
@@ -143,10 +135,10 @@ export function CowAaveSwapsView({ family }: { family: CowAaveFamily }) {
       <RailHeader session={family} venue="info" />
       <div>
         <h1 className="text-2xl font-semibold text-foreground" data-anatomy="I10.1">
-          {fam} swaps via {COW_TERMS.name}
+          {fam} swaps via CoW
         </h1>
         <p className="mt-1 text-sm text-rb-500">
-          The swaps behind the {COW_FIGURES_HEADING} figures on{" "}
+          The swaps behind the CoW figures on{" "}
           <Link href={`/ethereum/${family}/info`} className={INLINE_LINK}>
             the {fam} info page
           </Link>
@@ -154,13 +146,13 @@ export function CowAaveSwapsView({ family }: { family: CowAaveFamily }) {
         </p>
       </div>
 
-      {totals && <FigurePanel t={totals} figure={figure} />}
+      {totals ? <FigurePanel t={totals} figure={figure} /> : <CowFiguresWait read={totalsRead} />}
 
       <section className="space-y-4" data-anatomy="I10.2" aria-label="Swaps" data-cow-swaps={figure}>
         <div className={`flex flex-wrap items-baseline justify-between gap-2 ${CARD_INSET_START}`}>
           <h2 className={SECTION_HEADING}>Swaps</h2>
           <span className="text-xs tabular-nums text-rb-500" aria-live="polite" data-cow-count="">
-            {loading === "list"
+            {first.status === "reading"
               ? "Reading…"
               : matched != null
                 ? `${countText(matched)} ${matched === 1 ? "swap" : "swaps"}`
@@ -190,10 +182,7 @@ export function CowAaveSwapsView({ family }: { family: CowAaveFamily }) {
           )}
         </div>
         <ProvReceiptsScope registry={registry}>
-          <div
-            className={loading === "list" ? "opacity-60 transition-opacity" : "transition-opacity"}
-            data-cow-swap-rows=""
-          >
+          <div data-cow-swap-rows="">
             {swaps.map((s, i) => (
               <EventDateContext.Provider
                 key={s.swapKey}
@@ -211,24 +200,27 @@ export function CowAaveSwapsView({ family }: { family: CowAaveFamily }) {
                 </SpineTipContext.Provider>
               </EventDateContext.Provider>
             ))}
-            {swaps.length === 0 && loading == null && !failed && (
+            {first.status === "ready" && swaps.length === 0 && (
               <p className="py-6 text-sm text-rb-500">No swap is behind this figure.</p>
             )}
           </div>
         </ProvReceiptsScope>
-        {failed && (
-          <p className="text-sm text-rb-500">The swaps could not be read just now. Reload the page to try again.</p>
+        {first.status === "not-yet" && (
+          <p className="text-sm text-rb-500">The swaps are still being read. Reload the page in a minute.</p>
+        )}
+        {(first.status === "failed" || moreState === "failed") && (
+          <p className="text-sm text-rb-500">The swaps could not be read. Reload the page to try again.</p>
         )}
         {matched != null && swaps.length < matched && (
           <div className={CARD_INSET_START}>
             <button
               type="button"
-              onClick={() => void read(swaps.length)}
-              disabled={loading != null}
+              onClick={() => void readMore()}
+              disabled={moreState === "reading"}
               className="inline-flex h-8 items-center rounded-full border border-teal-500/60 px-3 text-xs font-semibold text-teal-600 transition-colors hover:bg-teal-500/10 disabled:opacity-50 dark:text-teal-400"
               data-cow-more=""
             >
-              {loading === "more" ? "Reading…" : `Show ${PAGE} more`}
+              {moreState === "reading" ? "Reading…" : `Show ${PAGE} more`}
             </button>
           </div>
         )}
@@ -273,25 +265,28 @@ function FigurePanel({ t, figure }: { t: CowAaveTotals; figure: CowAaveFigure })
             <Prov info={cowFeesTotalProv(t)} value={t.fees.usd.toFixed(2)}>
               <span className="font-semibold tabular-nums text-foreground">{usdText(t.fees.usd)}</span>
             </Prov>{" "}
-            across {countText(t.fees.trades)} trades, a median of{" "}
+            across {countText(t.fees.trades)} trades
             {t.fees.medianBp != null && (
-              <Prov info={cowMedianFeeProv(t)} value={String(t.fees.medianBp)}>
-                <span className="tabular-nums text-foreground">{bpText(t.fees.medianBp)}</span>
-              </Prov>
+              <>
+                , a median of{" "}
+                <Prov info={cowMedianFeeProv(t)} value={String(t.fees.medianBp)}>
+                  <span className="tabular-nums text-foreground">{bpText(t.fees.medianBp)}</span>
+                </Prov>
+              </>
             )}
             .
           </p>
         )}
         {figure === "no-fee" && (
           <p>
-            These trades executed above their settlement&apos;s clearing price, so state no fee. Their surplus is in the
-            surplus figure.
+            These trades executed above their settlement&apos;s clearing price and state no fee. Their surplus counts in
+            the surplus figure.
           </p>
         )}
         {figure === "unpriced" && (
           <p>
-            Aave has no price for the token these trades&apos; surplus and fees are in, at their block or within{" "}
-            {countText(t.freshnessBlocks)} blocks before it, so they are in neither figure.
+            Aave has no price for the token these trades&apos; surplus and fees are in, within about two days of each
+            trade, so they are in neither figure.
           </p>
         )}
         {figure === "not-decoded" && (
@@ -299,7 +294,7 @@ function FigurePanel({ t, figure }: { t: CowAaveTotals; figure: CowAaveFigure })
         )}
         {(figure === "surplus" || figure === "fees") && (
           <p>
-            Priced at Aave&apos;s oracle price at each trade&apos;s block:{" "}
+            Priced at Aave&apos;s oracle price when each trade settled:{" "}
             <Prov info={cowPricedProv(t)} value={String(c.priced)}>
               {countText(c.priced)} of {countText(c.trades)} trades
             </Prov>

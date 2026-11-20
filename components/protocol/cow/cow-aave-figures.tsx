@@ -10,7 +10,7 @@
 // answers 503 or 504, the block draws its loading line, never a zero.
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCowAaveRead, type CowAaveRead } from "@/components/protocol/cow/use-cow-aave-read";
 import { Prov } from "@/components/shared/provenance";
 import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
 import { BlockRef } from "@/components/shared/block-ref";
@@ -38,35 +38,23 @@ import {
 
 export const COW_FIGURES_HEADING = "CoW swaps";
 
-/** Waits between reads while the server's figures are not ready (503) or the read runs past its budget (504). */
-const RETRY_MS = [3_000, 6_000, 12_000, 20_000];
+/** The family's figures, read with the retry rule of useCowAaveRead. */
+export function useCowAaveTotals(family: CowAaveFamily): CowAaveRead<CowAaveTotals> {
+  return useCowAaveRead<CowAaveTotals>(`/api/cow/ethereum/aave/${family}/totals`);
+}
 
-type State = { status: "reading" } | { status: "ready"; totals: CowAaveTotals } | { status: "not-yet" };
-
-function useCowAaveTotals(family: CowAaveFamily): State {
-  const [state, setState] = useState<State>({ status: "reading" });
-  useEffect(() => {
-    let live = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const attempt = async (n: number) => {
-      try {
-        const res = await fetch(`/api/cow/ethereum/aave/${family}/totals`);
-        const body = (await res.json()) as CowAaveTotals & { success: boolean };
-        if (!live) return;
-        if (res.ok && body.success) return setState({ status: "ready", totals: body });
-      } catch {
-        if (!live) return;
-      }
-      if (n < RETRY_MS.length) timer = setTimeout(() => void attempt(n + 1), RETRY_MS[n]);
-      else setState({ status: "not-yet" });
-    };
-    void attempt(0);
-    return () => {
-      live = false;
-      if (timer) clearTimeout(timer);
-    };
-  }, [family]);
-  return state;
+/** The block's line while the figures are not in hand: reading, still not ready, or failed. */
+export function CowFiguresWait({ read }: { read: CowAaveRead<unknown> }) {
+  if (read.status === "ready") return null;
+  return (
+    <p className="mt-3 text-rb-500" data-cow-figures-state={read.status} aria-live="polite">
+      {read.status === "reading"
+        ? "Reading the CoW figures…"
+        : read.status === "not-yet"
+          ? "The CoW figures are still being read. Reload the page in a minute."
+          : "The CoW figures could not be read. Reload the page to try again."}
+    </p>
+  );
 }
 
 const TILE = "rounded-xl border border-rb-200 p-4 dark:border-rb-700";
@@ -83,17 +71,8 @@ export function CowAaveFigures({ family }: { family: CowAaveFamily }) {
           Aave&apos;s app can route a position swap through {COW_TERMS.name}, which settles the order in a batch with
           others. The figures below cover every such swap on {fam} positions on Ethereum.
         </p>
-        {state.status === "reading" && (
-          <p className="mt-3 text-rb-500" data-cow-figures-state="reading" aria-live="polite">
-            Reading the {COW_TERMS.name} figures…
-          </p>
-        )}
-        {state.status === "not-yet" && (
-          <p className="mt-3 text-rb-500" data-cow-figures-state="not-yet">
-            The {COW_TERMS.name} figures are still being read. Reload the page in a minute to see them.
-          </p>
-        )}
-        {state.status === "ready" && <Figures t={state.totals} />}
+        <CowFiguresWait read={state} />
+        {state.status === "ready" && <Figures t={state.value} />}
       </ProvSection>
     </div>
   );
@@ -156,7 +135,7 @@ function Figures({ t }: { t: CowAaveTotals }) {
       </div>
       <ul className="mt-3 list-disc space-y-1 pl-5" data-cow-figures-notes="">
         <li data-cow-note="priced">
-          Each trade is priced in US dollars at its block, at Aave&apos;s oracle price for the token:{" "}
+          Each trade is priced in US dollars at Aave&apos;s oracle price for the token when it settled:{" "}
           <Prov info={cowPricedProv(t)} value={String(c.priced)}>
             {countText(c.priced)} of {countText(c.trades)} trades
           </Prov>
@@ -174,8 +153,8 @@ function Figures({ t }: { t: CowAaveTotals }) {
         )}
         {c.noFee > 0 && (
           <li data-cow-note="no-fee">
-            {countText(c.noFee)} trades executed above their settlement&apos;s clearing price, so state no fee: they are
-            in the surplus and not in the fees.{" "}
+            {countText(c.noFee)} trades executed above their settlement&apos;s clearing price and state no fee, so they
+            count in the surplus only.{" "}
             <Link href={cowSwapsHref(t.family, "no-fee")} className={INLINE_LINK}>
               See them
             </Link>
