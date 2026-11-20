@@ -49,6 +49,8 @@
 // History lead), a rounded tile inset in its cell: `DataTableLeadHeader` and
 // `DataTableLeadCell`.
 
+import { HeadingFilter, type HeadingFilterProps } from "@/components/shared/data-table/heading-filter";
+import { HeadingSearch, type HeadingSearchProps } from "@/components/shared/data-table/heading-search";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { Check, ChevronRight, EllipsisVertical } from "lucide-react";
@@ -217,6 +219,8 @@ export function DataTableSortButton({
  *  `ariaSort` then states the sort. */
 export function DataTableHeader({
   label,
+  filter,
+  search,
   sort,
   after,
   align = "left",
@@ -227,6 +231,12 @@ export function DataTableHeader({
   ...rest
 }: {
   label?: ReactNode;
+  /** A roster's column filter in the heading (D9, decision 0070), in the
+   *  label's place. */
+  filter?: HeadingFilterProps;
+  /** A roster's search in its name column's heading (D10, decision 0070),
+   *  in the label's place. */
+  search?: HeadingSearchProps;
   sort?: { dir: DataTableDir | null; onSort: () => void; ariaLabel?: string; describedBy?: string };
   after?: ReactNode;
   align?: Align;
@@ -260,6 +270,10 @@ export function DataTableHeader({
               ariaLabel={sort.ariaLabel}
               describedBy={sort.describedBy}
             />
+          ) : filter ? (
+            <HeadingFilter {...filter} />
+          ) : search ? (
+            <HeadingSearch {...search} />
           ) : (
             label
           )}

@@ -22,7 +22,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { SessionProtocol } from "@/lib/shared/sessions";
-import { positionNounPlural, protocolForSession, subPageForPathname } from "@/lib/shared/protocols";
+import { explorerSections, protocolForSession, subPageForPathname } from "@/lib/shared/protocols";
 import { ProtocolIdentity } from "@/components/shared/protocol-identity";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
@@ -79,9 +79,6 @@ export type RailVenue = "listing" | "subPage" | "info";
 // tabs (B4) wear these.
 export const TAB_ACTIVE = `${TAB_BASE} border-current text-foreground`;
 export const TAB_IDLE = `${TAB_BASE} border-transparent text-rb-500 transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]`;
-
-/** The info page's name in the sections menu, as the front door's link (N5). */
-const ABOUT = "About";
 
 /** A menu row: 44px tall, neutral at rest, link blue on hover and keyboard
  *  focus (each row opens another page; color-grammar §4a), the blue focus
@@ -259,20 +256,18 @@ export function RailHeader({
       : venue === "listing" && entry.positionListing === false
         ? entry.subPages[0]
         : undefined;
-  const sections: Section[] = [
-    // A front-door explorer (the Arbitrum position-first ones) opens its front
-    // door first: the title row is plain text (ui-jobs 786), so the menu is the
-    // way back to it. The front door draws no rail header, so it is never current.
-    ...(entry.frontDoor ? [{ href: entry.href, name: "Overview", current: false }] : []),
-    // A vault-native explorer has no position listing — a share in a vault is
-    // not a position in the roster's sense (rails-ops decision 0027 call 2) —
-    // so its first section is its first sub-page.
-    ...(entry.positionListing !== false
-      ? [{ href: entry.listingHref, name: positionNounPlural(session), current: venue === "listing" }]
-      : []),
-    ...entry.subPages.map((sub) => ({ href: sub.href, name: sub.tab, current: sub === litSubPage })),
-    { href: entry.infoHref, name: ABOUT, current: venue === "info" },
-  ];
+  // The menu's entries (explorerSections, lib/shared/protocols.ts): a front
+  // door is never current, as it draws no rail header.
+  const sections: Section[] = explorerSections(entry).map((x) => ({
+    href: x.href,
+    name: x.name,
+    current:
+      x.kind === "listing"
+        ? venue === "listing"
+        : x.kind === "info"
+          ? venue === "info"
+          : x.kind === "subPage" && x.sub === litSubPage,
+  }));
   return (
     <div className="flex flex-col gap-2">
       {/* The page's largest type (rails-ops TO-DO-ui-jobs 67), set in

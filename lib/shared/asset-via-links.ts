@@ -1,19 +1,12 @@
 // The protocol context of an asset link (lib/shared/asset-via.ts) as the
-// roster names it: the explorer a path sits in, the `via` it carries, and the
-// back link's words for the path it came from. The market is the series key's
+// roster names it: the explorer a path sits in and the `via` it carries. The market is the series key's
 // second part: an Aave V3 position's `?market=` (`aave-v3:core`), a Compound V3
 // position's Comet from its path (`compound:0xc3d6…`, the path's market key
 // mapped to its Comet), a Liquity V2 or fork trove's branch from its path
 // (`liquity:wstETH`).
 
-import {
-  POSITION_NOUN,
-  PROTOCOLS,
-  protocolForPathname,
-  subPageForPathname,
-  type ProtocolEntry,
-} from "@/lib/shared/protocols";
-import { parseVia, safeFrom, type ViaExplorer } from "@/lib/shared/asset-via";
+import { PROTOCOLS, protocolForPathname, type ProtocolEntry } from "@/lib/shared/protocols";
+import { parseVia, type ViaExplorer } from "@/lib/shared/asset-via";
 import { COMPOUND_DEPLOYMENT } from "@/lib/compound/asset-catalog";
 import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
 
@@ -63,21 +56,3 @@ export function viaForPathname(pathname: string | null, search?: string | null):
 
 /** The `via` value for an explorer: its id, and its market where it names one. */
 export const viaValue = (v: ViaExplorer) => (v.market ? `${v.id}:${v.market}` : v.id);
-
-/** The back link for a `from`: "← Back to the Aave V3 position",
- *  "← Back to the Compound V3 Markets", "← Back to Aave V3",
- *  "← Back to the asset explorer". Null for a `from` off this site. */
-export function backLink(from: string | null | undefined): { href: string; label: string } | null {
-  const href = safeFrom(from);
-  if (!href) return null;
-  const path = href.split(/[?#]/)[0];
-  if (path === "/assets") return { href, label: "← Back to the asset explorer" };
-  const p = protocolForPathname(path);
-  if (!p) return { href, label: "← Back" };
-  if (path === p.href || path === p.listingHref) return { href, label: `← Back to ${p.label}` };
-  const sub = subPageForPathname(p, path);
-  if (sub && (path === sub.href || path === `${sub.href}/positions`))
-    return { href, label: `← Back to the ${p.label} ${sub.tab.toLowerCase()}` };
-  if (/\/event\//.test(path)) return { href, label: `← Back to the ${p.label} event` };
-  return { href, label: `← Back to the ${p.label} ${POSITION_NOUN[p.session].toLowerCase()}` };
-}
