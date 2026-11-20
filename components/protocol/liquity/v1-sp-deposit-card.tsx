@@ -37,6 +37,8 @@ import { RawFigure, tokenIcon, V1_SP_TOKENS } from "./v1-sp-parts";
 const NOUN = "Deposit";
 const MARKET = "Stability Pool";
 const ZERO = BigInt(0);
+/** Where the chain has seen a touch the index has not read. */
+const INDEX_BEHIND = "the index has not yet read the newest touch";
 
 export interface LiquityV1DepositCardProps {
   row: LiquityV1DepositRow;
@@ -48,6 +50,9 @@ export interface LiquityV1DepositCardProps {
   pending?: boolean;
   /** The pool's getTotalLUSDDeposits() and the block of the read `now` came from. */
   pool?: { totalRaw: bigint; block: number } | null;
+  /** The chain's deposits(depositor) differs from the index's recorded
+   *  deposit: the chain has seen a touch the index has not read yet. */
+  indexBehind?: boolean;
   explanation?: ReactNode;
 }
 
@@ -84,6 +89,7 @@ export function liquityV1DepositSlots({
   now,
   pending = false,
   pool,
+  indexBehind = false,
   explanation,
 }: LiquityV1DepositCardProps): PositionCardSlots {
   const detail = surface === "detail";
@@ -259,17 +265,23 @@ export function liquityV1DepositSlots({
   const left: PositionPanelRow[] = [];
   const right: PositionPanelRow[] = [];
   if (lifetime) {
-    left.push({
-      id: "recorded",
-      label: "At the last touch",
-      tip: "The LUSD the deposit held after its last touch.",
-      asset: { symbol: "LUSD", address: V1_SP_TOKENS.LUSD },
-      value: (
-        <Prov info={spSumProv("recorded")}>
-          <RawFigure raw={lifetime.recorded} symbol="LUSD" />
-        </Prov>
-      ),
-    });
+    // Where the chain has seen a touch the index has not read, the recorded
+    // deposit would not add up with the chain's figures: one line says so.
+    left.push(
+      indexBehind
+        ? { id: "index-behind", label: "At the last touch", value: null, unavailable: INDEX_BEHIND }
+        : {
+            id: "recorded",
+            label: "At the last touch",
+            tip: "The LUSD the deposit held after its last touch.",
+            asset: { symbol: "LUSD", address: V1_SP_TOKENS.LUSD },
+            value: (
+              <Prov info={spSumProv("recorded")}>
+                <RawFigure raw={lifetime.recorded} symbol="LUSD" />
+              </Prov>
+            ),
+          },
+    );
     left.push({
       id: "eth-paid",
       label: "ETH paid",

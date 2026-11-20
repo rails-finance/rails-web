@@ -219,7 +219,7 @@ export function LiquityV1DepositSinceTouchRow({
   return (
     <NoteRowShell
       icon="live-window"
-      label={net != null ? `${since}: ${signedUsd(net)} change in USD` : since}
+      label={net != null ? `${since}: ${signedUsd(net)} change in USD, LQTY not valued` : since}
       marker={{ attr: "data-live-window", value: "liquity-v1-sp-since-touch" }}
       header={
         <>
@@ -234,7 +234,7 @@ export function LiquityV1DepositSinceTouchRow({
           </span>
           {net != null && netProv && (
             <>
-              <span className="text-xs text-rb-500">change in USD</span>
+              <span className="text-xs text-rb-500">change in USD · LQTY not valued</span>
               {/* An ECHO of the receipt in the sheet's note: one fact, stated
                   where the row is closed and again where it opens. */}
               <Prov echo info={netProv} value={String(net)}>

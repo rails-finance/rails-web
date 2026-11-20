@@ -24,7 +24,12 @@ import {
   redemptionLegProv,
   type LiquityV1Coords,
 } from "@/lib/liquity-v1/event-provenance";
-import { COLLATERAL_SYMBOL, DEBT_SYMBOL, LIQUITY_V1_ADDRESSES } from "@/lib/liquity-v1/asset-catalog";
+import {
+  COLLATERAL_ADDRESS,
+  COLLATERAL_SYMBOL,
+  DEBT_SYMBOL,
+  LIQUITY_V1_ADDRESSES,
+} from "@/lib/liquity-v1/asset-catalog";
 import {
   LIQUIDATION_COLL_VERB,
   LIQUIDATION_DEBT_VERB,
@@ -71,6 +76,7 @@ function liquityV1Deltas(ctx: LiquityV1Context, coords: LiquityV1Coords): ChainT
     deltas.push({
       value: -split.ethToRedeemer,
       symbol: COLLATERAL_SYMBOL,
+      address: COLLATERAL_ADDRESS,
       prov: redemptionLegProv(coords, "redeemer", legVals),
       label: "Reduced",
       tone: "caution",
@@ -79,6 +85,7 @@ function liquityV1Deltas(ctx: LiquityV1Context, coords: LiquityV1Coords): ChainT
     deltas.push({
       value: coll,
       symbol: COLLATERAL_SYMBOL,
+      address: COLLATERAL_ADDRESS,
       // Operand values ride into the receipt: the emitted after, and the
       // previous event's value it was diffed against (after − delta).
       prov: collDeltaProv(coords, {
@@ -171,7 +178,11 @@ function clauseNode(c: LiquityV1T1Clause, ctx: LiquityV1Context, coords: Liquity
       <Prov info={redemptionLegProv(coords, "surplus", legVals)} value={formatExact(c.surplus)} symbol={c.symbol}>
         <span className="font-bold text-foreground">{c.surplus.toFixed(4)}</span>
       </Prov>
-      <TokenChipIcon symbol={c.symbol} size={16} />
+      <TokenChipIcon
+        symbol={c.symbol}
+        address={c.symbol === COLLATERAL_SYMBOL ? COLLATERAL_ADDRESS : undefined}
+        size={16}
+      />
       <span className={c.claimedAt === undefined ? "text-green-700 dark:text-green-400" : undefined}>
         {c.word}
         {c.claimedAt != null && <> {formatDate(c.claimedAt)}</>}

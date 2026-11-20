@@ -217,7 +217,7 @@ function depositTimeline(
       restBySide: { collateral: "Burned since the last touch", debt: "Paid in since the last touch" },
       basis: {
         collateral: "Every figure is in LUSD.",
-        debt: "Every figure is in ETH; the bar does not price ETH in LUSD.",
+        debt: "Every figure is in ETH.",
       },
       heldBasis: {
         collateral: "the deposit recorded at its last touch; the pool records a deposit only when it is touched.",

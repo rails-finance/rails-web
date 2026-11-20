@@ -27,7 +27,7 @@ const TIPS = {
   depositLast: "The deposit the previous touch recorded.",
   burned:
     "The deposit liquidations used since the previous touch, written by this one: the ETHGainWithdrawn's _LUSDLoss.",
-  depositBefore: "The deposit just before this touch's change: the last event's, less the burn.",
+  depositBefore: "The deposit just before this touch's change: the last touch's, less the burn.",
   change: "The LUSD this touch moved: its _newDeposit less the deposit before it, net of the burn.",
   depositTotal: "The deposit after this touch: the UserDepositChanged's _newDeposit.",
   eth: "The ETH liquidations paid the deposit since the previous touch: the ETHGainWithdrawn's _ETH.",
@@ -40,9 +40,9 @@ const TIPS = {
 const RECEIPT: Record<keyof typeof TIPS, string> = {
   deposit: "Deposit",
   gains: "Gains paid",
-  depositLast: "Deposit at the last event",
+  depositLast: "Deposit at the last touch",
   burned: "Burned since last touch",
-  depositBefore: "Deposit before this event",
+  depositBefore: "Deposit before this touch",
   change: "Deposited or withdrawn",
   depositTotal: "Deposit after",
   eth: "ETH paid in",
@@ -159,7 +159,7 @@ export function spDepositSheet(row: LiquityV1DepositEventRow): EventSheet {
             ? {
                 key: "before",
                 label: SHEET_WORDS.before,
-                amount: l(before, fmt(before), spReplayedProv(said("depositBefore"), "last event − burned")),
+                amount: l(before, fmt(before), spReplayedProv(said("depositBefore"), "last touch − burned")),
                 tip: TIPS.depositBefore,
               }
             : undefined,

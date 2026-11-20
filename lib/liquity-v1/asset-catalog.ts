@@ -48,5 +48,9 @@ export const LIQUITY_V1_CCR = 1.5;
 
 /** Collateral is always native ETH; debt is always LUSD — both 18 decimals. */
 export const COLLATERAL_SYMBOL = "ETH";
+/** Native ETH's sentinel (the asset roster's NATIVE): passed with the
+ *  collateral's icon, it draws the plain ETH mark and opens native ETH's asset
+ *  page (Miles, 20 Nov 2026: plain ETH everywhere in Liquity V1). */
+export const COLLATERAL_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 export const DEBT_SYMBOL = "LUSD";
 export const ASSET_DECIMALS = 18;

@@ -61,6 +61,7 @@ import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/compone
 import { liquityFlowTimeline, liquityFocusEvents } from "@/lib/shared/liquity-flows";
 import { LiquityV1FlowsNote } from "@/lib/shared/liquity-flows-explanation";
 import { liquityV1FlowEvents, liquityV1FlowTxs } from "@/lib/liquity-v1/flows";
+import { COLLATERAL_ADDRESS } from "@/lib/liquity-v1/asset-catalog";
 import { useLiquityDailyPrices } from "@/hooks/useLiquityDailyPrices";
 import { liquityV1RedemptionTotals } from "@/lib/liquity-v1/economics";
 import { liquityV1RedemptionOutcome } from "@/lib/liquity-v1/economics-explanation";
@@ -525,7 +526,14 @@ export default function LiquityV1TroveView({
           owner={{ wallet }}
           assets={
             chain && view?.status === "open" && chain.price > 0
-              ? [{ symbol: "ETH", price: chain.price, info: protocolPriceProv(serverReadOf(chain)) }]
+              ? [
+                  {
+                    symbol: "ETH",
+                    address: COLLATERAL_ADDRESS,
+                    price: chain.price,
+                    info: protocolPriceProv(serverReadOf(chain)),
+                  },
+                ]
               : []
           }
           closed={view != null && view.status !== "open"}
@@ -543,6 +551,7 @@ export default function LiquityV1TroveView({
                     ? [
                         {
                           symbol: "ETH",
+                          address: COLLATERAL_ADDRESS,
                           price: usd,
                           info: eventPriceProv({ txHash: row.txHash, blockNumber: row.blockNumber }, usd),
                         },

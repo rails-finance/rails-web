@@ -45,7 +45,7 @@ import {
   collateralUsdProv,
   debtUsdProv,
 } from "@/lib/liquity-v1/position-provenance";
-import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
+import { COLLATERAL_ADDRESS, COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
 import { liquityV1PositionModal, type LiquityV1EndedBy } from "@/lib/liquity-v1/event-templates";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
@@ -101,11 +101,21 @@ function Figure({ value, symbol, exact }: { value: number; symbol: string; exact
   );
 }
 
-const assetIcon = (symbol: string, exact: string, price?: string, priceSource?: string) => (
-  <AssetPopover symbol={symbol} figure={`${exact} ${symbol}`} price={price} priceSource={priceSource}>
-    <TokenChipIcon symbol={symbol} size={28} filterable={false} untitled />
-  </AssetPopover>
-);
+const assetIcon = (symbol: string, exact: string, price?: string, priceSource?: string) => {
+  // ETH is native: its sentinel draws the plain mark and opens native ETH's page.
+  const address = symbol === COLLATERAL_SYMBOL ? COLLATERAL_ADDRESS : undefined;
+  return (
+    <AssetPopover
+      symbol={symbol}
+      address={address}
+      figure={`${exact} ${symbol}`}
+      price={price}
+      priceSource={priceSource}
+    >
+      <TokenChipIcon symbol={symbol} address={address} size={28} filterable={false} untitled />
+    </AssetPopover>
+  );
+};
 
 /** The ⋮'s link to this Trove's page. */
 function TroveLinkRow({ pagePath }: { pagePath: string }) {
