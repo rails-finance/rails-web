@@ -39,6 +39,8 @@ export function AssetPageHead({
   back,
   note,
   livePrice,
+  aside,
+  chainLabel = true,
 }: {
   /** The chain the page opens on: the h1's glyph and the first group of chips. */
   chain: number;
@@ -59,6 +61,11 @@ export function AssetPageHead({
    *  the Curve BOLD/USDC pool, A1.7), in the no-price line's place. It draws
    *  the card's figure too, inside its receipts scope. */
   livePrice?: ReactNode;
+  /** Under a protocol (decision 0069, A7): the band's right half in Read by's
+   *  place, the asset's use in the protocol and the others using it. */
+  aside?: ReactNode;
+  /** The chain's label after the h1; under a protocol its heading names the chain. */
+  chainLabel?: boolean;
 }) {
   return (
     <header className="mb-2" data-skel-section="page-header" data-anatomy="A1">
@@ -75,7 +82,7 @@ export function AssetPageHead({
             <TokenChipIcon symbol={symbol} address={token} size={24} filterable={false} untitled />
           </ChainProvider>
           <span className="min-w-0 truncate">{symbol}</span>
-          <ChainLabel chainId={chain as ChainId} anatomy={null} className="ml-1" />
+          {chainLabel && <ChainLabel chainId={chain as ChainId} anatomy={null} className="ml-1" />}
         </h1>
         <CategoryBadge category={category} />
       </div>
@@ -99,7 +106,7 @@ export function AssetPageHead({
           )}
           {token.toLowerCase() !== NATIVE && <ContractLine chain={chain} token={token} />}
         </div>
-        <ReadBy chain={chain} token={token} symbol={symbol} chips={chips} chains={chains} />
+        {aside ?? <ReadBy chain={chain} token={token} symbol={symbol} chips={chips} chains={chains} />}
       </div>
       {relations.length > 0 && <RelationLine chain={chain} groups={relations} />}
       {note}

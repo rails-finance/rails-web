@@ -4,7 +4,8 @@
 // 68, 497, 514, 680). The protocol's identity (ProtocolIdentity), the chain's
 // glyph after the name (ChainLabel), then the sections menu (SectionsMenu,
 // H5): the current section's name and a chevron, opening the explorer's
-// sections as links — the position listing (named by the protocol's noun:
+// sections as links — a front-door explorer's front door ("Overview"), the
+// position listing (named by the protocol's noun:
 // Troves, Vaults, Accounts; absent on an explorer that has none), each of the
 // roster's sub-pages in order (Markets, Branches, System, …), then About, the
 // info page. On a sub-page the current section is the one whose route holds
@@ -259,6 +260,10 @@ export function RailHeader({
         ? entry.subPages[0]
         : undefined;
   const sections: Section[] = [
+    // A front-door explorer (the Arbitrum position-first ones) opens its front
+    // door first: the title row is plain text (ui-jobs 786), so the menu is the
+    // way back to it. The front door draws no rail header, so it is never current.
+    ...(entry.frontDoor ? [{ href: entry.href, name: "Overview", current: false }] : []),
     // A vault-native explorer has no position listing — a share in a vault is
     // not a position in the roster's sense (rails-ops decision 0027 call 2) —
     // so its first section is its first sub-page.
@@ -275,7 +280,10 @@ export function RailHeader({
           chain's glyph and the sections menu stay on the line. */}
       <div className="flex items-center gap-3" data-anatomy="H3">
         <div className="flex min-w-0">
-          <ProtocolIdentity session={session} scale="title" />
+          {/* Plain text where the sections menu is the way to the explorer's
+              pages (ui-jobs 786); an explorer with About alone draws no menu,
+              so its title keeps the link back to its route. */}
+          <ProtocolIdentity session={session} scale="title" linked={sections.length <= 1} />
         </div>
         <ChainLabel chainId={entry.chainId} />
         {/* An explorer with one section (About alone) draws no menu. */}

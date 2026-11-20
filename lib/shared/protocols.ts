@@ -226,7 +226,10 @@ const SPECS: ProtocolSpec[] = [
     type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Single-pool lending on Ethereum: one cross-collateralised account per wallet, valued at Aave's oracle, with every liquidation traced",
-    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Market overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "aave-v3-base",
@@ -779,6 +782,7 @@ const SPECS: ProtocolSpec[] = [
     subPages: [
       { segment: "branches", label: "Branches", tab: "Branches" },
       { segment: "stability-pool", label: "Stability Pool deposits", tab: "Stability Pool" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },
   {
