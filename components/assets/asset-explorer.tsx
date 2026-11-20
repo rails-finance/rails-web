@@ -681,78 +681,11 @@ const LineFigures = memo(function LineFigures({
   /** The priceless figure, on the group's first line. */
   figure: CardFigure | null;
 }) {
-  const price = l.price;
-  const flag = l.main && l.row?.flag ? flagWords(l.row.flag) : null;
-  const boldRead = useContext(BoldReadContext);
-  const onChain = `${symbol} on ${chainName(l.chain)}`;
   return (
     <>
-      <DataTableCell
-        data-dt-stack-hidden=""
-        align="right"
-        valign="middle"
-        className="tabular-nums sm:whitespace-nowrap"
-      >
-        {price && price.price != null && l.row ? (
-          // On a phone's stacked row the flag may wrap under the price rather
-          // than run over the 30-day line beside it.
-          <span
-            className="inline-flex flex-wrap items-center justify-end gap-1 sm:flex-nowrap"
-            data-asset-price-row={`${l.chain}:${l.token}`}
-            data-anatomy="A5.1"
-          >
-            <PriceUnitMark unit={l.row.unit} size={14} />
-            <span className="font-semibold text-foreground">{fmtRowPrice(price.price)}</span>
-            {price.asOf && (
-              <span
-                className="ml-1 text-[11px] text-rb-500"
-                title={`The stored round in force ${asOfWords(price.asOf)}`}
-                data-asset-price-as-of={price.asOf.block}
-                data-anatomy="A5.3"
-              >
-                {asOfMark(price.asOf)}
-              </span>
-            )}
-            {flag && (
-              <span
-                className="ml-1.5 rounded border border-[var(--caution)] px-1 text-[11px] leading-4 text-[var(--caution)]"
-                title={flag.text}
-                data-asset-price-flag={l.row.flag?.gap ? "gap" : "fixed"}
-                data-anatomy="A5.2"
-              >
-                {flag.mark}
-              </span>
-            )}
-          </span>
-        ) : boldRead !== undefined && holdsBold([{ chain: l.chain, token: l.token }]) ? (
-          <BoldCardPrice read={boldRead} />
-        ) : figure ? (
-          <FigureRow figure={figure} />
-        ) : (
-          <span className="text-xs text-rb-500" title={PRICELESS_WHY} data-asset-priceless="" data-anatomy="A5.10">
-            No price
-          </span>
-        )}
-      </DataTableCell>
-      <DataTableCell data-dt-stack-hidden="" align="right" valign="middle">
-        {price && price.spark.length ? (
-          <PriceSparkline points={price.spark} label={`${onChain} over 30 days`} className="ml-auto h-7 w-24" />
-        ) : (
-          <None />
-        )}
-      </DataTableCell>
-      <DataTableCell data-dt-stack-hidden="" align="right" valign="middle" className="whitespace-nowrap tabular-nums">
-        {price?.change != null ? (
-          <span
-            className={`text-xs ${price.change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-            data-asset-price-change={price.change}
-          >
-            {fmtChange(price.change)}
-          </span>
-        ) : (
-          <None />
-        )}
-      </DataTableCell>
+      <PriceCell line={l} figure={figure} />
+      <SparkCell line={l} symbol={symbol} />
+      <ChangeCell line={l} />
       <DataTableCell data-dt-stack-hidden="" valign="middle" className="whitespace-nowrap sm:w-full">
         <ExplorerMarks symbol={symbol} chips={l.chips} />
       </DataTableCell>
@@ -760,27 +693,128 @@ const LineFigures = memo(function LineFigures({
   );
 });
 
+/** A line's price on its chain (A5.1), with the stored round's mark and the
+ *  flag on the row's chain; else BOLD's live read, the card's figure or "No
+ *  price". /assets' protocol view draws it too. */
+export function PriceCell({ line: l, figure }: { line: CardLine; figure: CardFigure | null }) {
+  const price = l.price;
+  const flag = l.main && l.row?.flag ? flagWords(l.row.flag) : null;
+  const boldRead = useContext(BoldReadContext);
+  return (
+    <DataTableCell data-dt-stack-hidden="" align="right" valign="middle" className="tabular-nums sm:whitespace-nowrap">
+      {price && price.price != null && l.row ? (
+        // On a phone's stacked row the flag may wrap under the price rather
+        // than run over the 30-day line beside it.
+        <span
+          className="inline-flex flex-wrap items-center justify-end gap-1 sm:flex-nowrap"
+          data-asset-price-row={`${l.chain}:${l.token}`}
+          data-anatomy="A5.1"
+        >
+          <PriceUnitMark unit={l.row.unit} size={14} />
+          <span className="font-semibold text-foreground">{fmtRowPrice(price.price)}</span>
+          {price.asOf && (
+            <span
+              className="ml-1 text-[11px] text-rb-500"
+              title={`The stored round in force ${asOfWords(price.asOf)}`}
+              data-asset-price-as-of={price.asOf.block}
+              data-anatomy="A5.3"
+            >
+              {asOfMark(price.asOf)}
+            </span>
+          )}
+          {flag && (
+            <span
+              className="ml-1.5 rounded border border-[var(--caution)] px-1 text-[11px] leading-4 text-[var(--caution)]"
+              title={flag.text}
+              data-asset-price-flag={l.row.flag?.gap ? "gap" : "fixed"}
+              data-anatomy="A5.2"
+            >
+              {flag.mark}
+            </span>
+          )}
+        </span>
+      ) : boldRead !== undefined && holdsBold([{ chain: l.chain, token: l.token }]) ? (
+        <BoldCardPrice read={boldRead} />
+      ) : figure ? (
+        <FigureRow figure={figure} />
+      ) : (
+        <span className="text-xs text-rb-500" title={PRICELESS_WHY} data-asset-priceless="" data-anatomy="A5.10">
+          No price
+        </span>
+      )}
+    </DataTableCell>
+  );
+}
+
+/** A line's 30-day line on its chain. */
+export function SparkCell({ line: l, symbol }: { line: CardLine; symbol: string }) {
+  const price = l.price;
+  return (
+    <DataTableCell data-dt-stack-hidden="" align="right" valign="middle">
+      {price && price.spark.length ? (
+        <PriceSparkline
+          points={price.spark}
+          label={`${symbol} on ${chainName(l.chain)} over 30 days`}
+          className="ml-auto h-7 w-24"
+        />
+      ) : (
+        <None />
+      )}
+    </DataTableCell>
+  );
+}
+
+function ChangeCell({ line: l }: { line: CardLine }) {
+  const price = l.price;
+  return (
+    <DataTableCell data-dt-stack-hidden="" align="right" valign="middle" className="whitespace-nowrap tabular-nums">
+      {price?.change != null ? (
+        <span
+          className={`text-xs ${price.change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+          data-asset-price-change={price.change}
+        >
+          {fmtChange(price.change)}
+        </span>
+      ) : (
+        <None />
+      )}
+    </DataTableCell>
+  );
+}
+
 /** A line below sm (ui-jobs 781): the group reads as one card, its head once
  *  and a compact row per chain: the chain's mark and name, the price and its
  *  change, a small 30-day line, and the explorers that list it there (nothing
  *  where none does). The table's cells are not drawn below sm. Memoised as
  *  LineFigures is. */
-const PhoneLine = memo(function PhoneLine({
+export const PhoneLine = memo(function PhoneLine({
   line: l,
   symbol,
   first,
+  chips = l.chips,
+  chainNamed = true,
 }: {
   line: CardLine;
   symbol: string;
   first: boolean;
+  /** The marks at the row's end: the line's explorers, or on /assets'
+   *  protocol view the others that use it there. */
+  chips?: AssetChip[];
+  /** The chain's mark and name lead the row; /assets' protocol view, on one
+   *  chain, leaves them out. */
+  chainNamed?: boolean;
 }) {
   const price = l.price;
   return (
     <div className={`flex min-w-0 items-center gap-1.5 sm:hidden ${first ? "mt-2" : ""}`} data-phone-line="">
-      <span className={`${MARK_TILE} text-rb-500`} aria-hidden>
-        <ChainGlyph id={l.chain as ChainId} className="h-3.5 w-3.5" />
-      </span>
-      <span className="w-16 shrink-0 truncate text-sm text-foreground">{chainName(l.chain)}</span>
+      {chainNamed && (
+        <>
+          <span className={`${MARK_TILE} text-rb-500`} aria-hidden>
+            <ChainGlyph id={l.chain as ChainId} className="h-3.5 w-3.5" />
+          </span>
+          <span className="w-16 shrink-0 truncate text-sm text-foreground">{chainName(l.chain)}</span>
+        </>
+      )}
       <span className="min-w-0 shrink truncate text-sm font-semibold text-foreground tabular-nums">
         {price?.price != null && l.row ? (
           fmtRowPrice(price.price)
@@ -802,16 +836,16 @@ const PhoneLine = memo(function PhoneLine({
           className="h-5 w-10 shrink-0"
         />
       )}
-      {l.chips.length > 0 && (
+      {chips.length > 0 && (
         <span className="ml-auto shrink-0">
-          <ExplorerMarks symbol={symbol} chips={l.chips} shown={2} />
+          <ExplorerMarks symbol={symbol} chips={chips} shown={2} />
         </span>
       )}
     </div>
   );
 });
 
-const None = () => (
+export const None = () => (
   <span className="text-sm text-rb-500">
     <span aria-hidden>–</span>
     <span className="sr-only">no figure</span>
@@ -821,17 +855,20 @@ const None = () => (
 /** The explorers that list the asset on the line's chain: up to four marks,
  *  each linking where its chip links (A5.9), then "+N"; their names in each
  *  mark's title. */
-function ExplorerMarks({
+export function ExplorerMarks({
   symbol,
   chips,
   shown = MARKS_SHOWN,
+  empty = "None",
 }: {
   symbol: string;
   chips: AssetChip[];
+  /** What an empty cell says. */
+  empty?: string;
   /** The marks drawn before "+N" (two on a phone's compact row). */
   shown?: number;
 }) {
-  if (!chips.length) return <span className="text-xs text-rb-500">None</span>;
+  if (!chips.length) return <span className="text-xs text-rb-500">{empty}</span>;
   const more = chips.length - shown;
   return (
     <span className="flex items-center gap-1" data-asset-chips={chips.length}>

@@ -137,9 +137,9 @@ const FIGURE =
   "font-sans text-foreground font-semibold leading-none tracking-tighter tabular-nums text-4xl sm:text-5xl";
 const LABEL = "font-sans font-light tracking-tight text-rb-500 text-lg sm:text-xl lg:text-[28px]";
 /** The count, linking to how the figures are counted (ui-jobs 785; until 20 Nov
- *  2026 a "How these are counted" line under the sentence). Discreet: no colour
- *  of its own and the receipts' dotted underline on hover, with a name that says
- *  where it goes. */
+ *  2026 a "How these are counted" line under the sentence). Discreet: it takes
+ *  the figure's colour and the receipts' dotted underline on hover, with a name
+ *  that says where it goes. */
 function FiguresLink({ total }: { total: number }) {
   const figure = total.toLocaleString("en-US");
   return (
