@@ -15,6 +15,7 @@ import type { ChainId } from "@/lib/shared/chains";
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import type { AssetScale } from "@/lib/vaults/asset-scale-words";
 import type { VaultConfig } from "@/lib/vaults/config-read";
+import { METAMORPHO_FEE_TIP, METAMORPHO_ROLE_WHAT } from "@/lib/vaults/card-words";
 import {
   configCallProv,
   configCreatedProv,
@@ -157,7 +158,7 @@ export function metaMorphoConfigTile({
             kind: "fact",
             id: "fee",
             label: "Performance fee",
-            tip: "The share of the interest the vault earns that it pays to the fee recipient, as new shares. Read from fee(), a fraction of 10^18.",
+            tip: METAMORPHO_FEE_TIP,
             value:
               own && config.fee != null ? (
                 <span data-fee-raw={config.fee}>
@@ -191,7 +192,7 @@ export function metaMorphoConfigTile({
             label: "Owner",
             note: "sets the curator, the guardian and the fee",
             address: owner,
-            prov: role(card, "Owner", "owner()", "It sets the curator, the guardian and the fee."),
+            prov: role(card, "Owner", "owner()", METAMORPHO_ROLE_WHAT.owner),
           },
           {
             kind: "address",
@@ -199,7 +200,7 @@ export function metaMorphoConfigTile({
             label: "Curator",
             note: "chooses the markets and their caps",
             address: curator,
-            prov: role(card, "Curator", "curator()", "It chooses the markets and their caps."),
+            prov: role(card, "Curator", "curator()", METAMORPHO_ROLE_WHAT.curator),
           },
           {
             kind: "address",
@@ -208,7 +209,7 @@ export function metaMorphoConfigTile({
             note: "can cancel a change while it waits",
             address: config.guardian,
             read: own != null,
-            prov: role(own ?? card, "Guardian", "guardian()", "It can cancel a change while the timelock runs."),
+            prov: role(own ?? card, "Guardian", "guardian()", METAMORPHO_ROLE_WHAT.guardian),
           },
         ],
         foot: "Allocators are not listed here.",

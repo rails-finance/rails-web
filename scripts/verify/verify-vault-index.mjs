@@ -18,7 +18,7 @@
 // `data-overview-card`).
 //
 //   0  /vaults answers 200, "Vaults" its h1; the menu lists Overview (current),
-//      Fronts and Compare; the intro (E6.1) stands above the cards
+//      Products, Fronts and Compare; the intro (E6.1) stands above the cards
 //   1  a card per listed roster (an unlaunched IPOR Fusion chain draws none)
 //   2  each card's count equals its roster's, at a block, in a receipt, with the
 //      roster's read stamp at that block
@@ -27,10 +27,15 @@
 //   4  each card links its roster, which answers 200, named for family and chain
 //   5  no roster links the overview: each opens on its read stamp alone (ui-jobs 771)
 //   6  the counts carry receipts and the page offers the inspector (ui-jobs 571)
-//   7  /vaults/about is gone (404); Fronts and Compare light their menu entry
+//   7  /vaults/about is gone (404); Products, Fronts and Compare light their menu entry
 //   8  ?asset=: the line names the asset, the cards count its vaults, the roster
 //      links carry it, and a roster opens on those rows; removing its Asset pill
 //      takes ?asset= out of the URL
+//   9  /vaults/products (E7, ui-jobs 773): a row per listed family in the
+//      table and the cards; each row states the six facts; each count equals
+//      the overview card's (Aave's three families summing to its card), at the
+//      card's block, in a receipt; a "Not read" head is muted; steward roles
+//      use the lexicon's words; no USD figure and no curator brand
 
 import { chromium } from "playwright";
 import fs from "node:fs";
@@ -141,7 +146,7 @@ const page = await (await browser.newContext({ viewport: { width: 1280, height: 
 const res = await page.goto(`${BASE}/vaults`, { waitUntil: "networkidle", timeout: 300_000 });
 check("0a /vaults answers 200", res?.status() === 200, String(res?.status()));
 await page.waitForSelector("[data-overview-card]", { timeout: 120_000 });
-const MENU = ["/vaults", "/vaults/fronts", "/vaults/compare"];
+const MENU = ["/vaults", "/vaults/products", "/vaults/fronts", "/vaults/compare"];
 const readMenu = async (p) => {
   await p.locator("[data-vault-index-head] [data-sections-trigger]").click();
   const entries = await p.locator('[data-vault-index-head] [data-sections-menu] [role="menuitem"]').evaluateAll((els) =>
@@ -159,9 +164,9 @@ const readMenu = async (p) => {
   check('0b "Vaults" is the page\'s one h1', h1.length === 1 && h1[0].trim() === "Vaults", h1.join(" | "));
   const entries = await readMenu(page);
   check(
-    "0c the menu lists Overview (current), Fronts and Compare",
+    "0c the menu lists Overview (current), Products, Fronts and Compare",
     entries.map((e) => e.href).join() === MENU.join() &&
-      entries.map((e) => e.name).join() === "Overview,Fronts,Compare" &&
+      entries.map((e) => e.name).join() === "Overview,Products,Fronts,Compare" &&
       entries[0]?.current === "page",
     entries.map((e) => `${e.name} ${e.href}${e.current ? " (current)" : ""}`).join(", "),
   );
@@ -245,12 +250,12 @@ for (const k of KEYS.filter((k) => !k.startsWith("sbold:"))) {
   if (armed) await page.keyboard.press("Escape");
 }
 
-// ── 7: /vaults/about is gone; Fronts and Compare light their entry ──────────
+// ── 7: /vaults/about is gone; Products, Fronts and Compare light their entry ─
 {
   const about = await get("/vaults/about");
   check("7a /vaults/about answers 404", about.status === 404, String(about.status));
   const p = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
-  for (const href of ["/vaults/fronts", "/vaults/compare"]) {
+  for (const href of ["/vaults/products", "/vaults/fronts", "/vaults/compare"]) {
     await p.goto(`${BASE}${href}`, { waitUntil: "domcontentloaded", timeout: 300_000 });
     await p.waitForSelector("[data-vault-index-head] [data-sections-trigger]", { timeout: 60_000 });
     const entries = await readMenu(p);
@@ -313,6 +318,94 @@ for (const k of KEYS.filter((k) => !k.startsWith("sbold:"))) {
     "8d removing the Asset pill takes ?asset= out of the URL, the other params kept",
     !url.searchParams.has("asset") && url.searchParams.get("show") === "all",
     url.search,
+  );
+  await p.close();
+}
+
+// ── 9: /vaults/products (E7, ui-jobs 773) ──────────────────────────────────
+{
+  const p = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+  const r = await p.goto(`${BASE}/vaults/products`, { waitUntil: "networkidle", timeout: 300_000 });
+  check("9a /vaults/products answers 200", r?.status() === 200, String(r?.status()));
+  await p.waitForSelector('[data-product-layout="table"] [data-product-row]', { timeout: 120_000 });
+  // The family each listed roster carries (Aave's roster carries three).
+  const FAMILIES = {
+    morpho: ["metamorpho"],
+    aave: ["sgho", "stata", "umbrella-stake"],
+    yearn: ["yearn-v3"],
+    maple: ["maple-pool"],
+    sbold: ["sbold"],
+    "ipor-fusion": ["ipor-fusion"],
+  };
+  const want = [...new Set(cards.flatMap((c) => FAMILIES[c.key.split(":")[0]] ?? []))];
+  const rows = await p.locator('[data-product-layout="table"] [data-product-row]').evaluateAll((els) =>
+    els.map((el) => ({
+      family: el.getAttribute("data-product-row"),
+      cells: [...el.querySelectorAll("[data-product-cell]")].map((c) => c.getAttribute("data-product-cell")),
+      counts: [...el.querySelectorAll("[data-product-count]")].map((c) => ({
+        count: c.getAttribute("data-product-count"),
+        block: Number(c.getAttribute("data-product-block")),
+        receipted: !!c.querySelector("[data-prov-covered], .prov-locate-box, [data-prov-pickable]"),
+      })),
+      roles: [...el.querySelectorAll("[data-product-role]")].map((c) => c.getAttribute("data-product-role")),
+      unreadLoud: [...el.querySelectorAll('[data-product-read="not-read"] > span:first-child')].some(
+        (s) => !s.className.includes("text-rb-500"),
+      ),
+    })),
+  );
+  const cardRows = await p.locator('[data-product-layout="cards"] [data-product-row]').count();
+  check(
+    "9b a row per listed family, in the table and the cards",
+    rows.map((r) => r.family).join() === want.join() && cardRows === want.length,
+    `${rows.map((r) => r.family).join(", ")} | ${cardRows} cards`,
+  );
+  const SIX = ["redemption", "stewards", "timelock", "fees", "vaults", "leave"];
+  check(
+    "9c every row states the six facts",
+    rows.every((r) => SIX.every((k) => r.cells.includes(k))),
+    rows.map((r) => `${r.family} ${r.cells.join("/")}`).join("; "),
+  );
+  for (const c of cards) {
+    const fams = FAMILIES[c.key.split(":")[0]] ?? [];
+    const chain = Number(c.key.split(":")[1]);
+    const mine = fams.flatMap((f) => {
+      const row = rows.find((r) => r.family === f);
+      const i = cards.filter((x) => x.key.split(":")[0] === c.key.split(":")[0]).findIndex((x) => x.key === c.key);
+      return row?.counts[i] ? [row.counts[i]] : [];
+    });
+    const total = mine.reduce((a, m) => a + Number(m.count), 0);
+    check(
+      `9d ${c.key}: the products count${fams.length > 1 ? "s sum" : ""} to the overview card's, at its block, in a receipt`,
+      mine.length === fams.length &&
+        total === Number(c.count) &&
+        mine.every((m) => m.block === c.block && m.receipted && m.count !== ""),
+      `${fams.join("+")} on ${chain}: ${mine.map((m) => `${m.count}@${m.block}`).join(", ")} vs card ${c.count}@${c.block}`,
+    );
+  }
+  check(
+    '9e a "Not read" head is muted',
+    rows.every((r) => !r.unreadLoud),
+  );
+  const LEXICON = new Set([
+    "Owner",
+    "Curator",
+    "Guardian",
+    "Role manager",
+    "Accountant",
+    "Pool delegate",
+    "Owner and curator",
+  ]);
+  const roles = rows.flatMap((r) => r.roles);
+  check(
+    "9f steward roles use the lexicon's words",
+    roles.length > 0 && roles.every((x) => LEXICON.has(x)),
+    roles.join(", "),
+  );
+  const text = await p.locator("[data-products-page]").innerText();
+  check(
+    "9g no USD figure, no curator brand",
+    !/\$\s?\d|USD\b/.test(text) &&
+      !/\b(Gauntlet|Steakhouse|Re7|MEV Capital|Block Analitica|Hyperithm|Keyrock)\b/.test(text),
   );
   await p.close();
 }

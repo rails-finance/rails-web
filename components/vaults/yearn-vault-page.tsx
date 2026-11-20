@@ -38,6 +38,7 @@ import { YEARN_REGISTRY } from "@/lib/yearn/vault-catalog";
 import {
   SHARES_ISSUED_TIP,
   STEWARD_TIP,
+  YEARN_ACCOUNTANT_TIP,
   yearnVaultAssetsContent,
   yearnVaultCardContent,
 } from "@/lib/vaults/card-words";
@@ -234,7 +235,7 @@ export function YearnVaultPage({
     {
       id: "accountant",
       label: "Accountant",
-      tip: "The contract that charges the vault's fees when a strategy reports.",
+      tip: YEARN_ACCOUNTANT_TIP,
       value: fig(
         "accountant",
         undefined,

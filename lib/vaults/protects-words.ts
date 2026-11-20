@@ -202,6 +202,15 @@ export function mapleWait(f: Extract<ProtectsFact, { kind: "maple" }>): { delay:
   return waits.every((w) => w.delay === first.delay && w.window === first.window) ? first : null;
 }
 
+/** The rules of each family's waits, said here and on /vaults/products. */
+export const METAMORPHO_TIMELOCKED =
+  "Adding a market, raising a cap, removing a market that still holds deposits, shortening the timelock and replacing the guardian";
+export const METAMORPHO_AT_ONCE = "Lowering a cap and moving money between markets take effect at once.";
+export const YEARN_NO_WAIT =
+  "The vault applies a role holder's change in the transaction that makes it, with no wait of its own.";
+export const YEARN_HANDOVER = "Handing on the role manager takes two steps: the new address must accept.";
+export const MAPLE_UPGRADES_WAIT = "The pool delegate's upgrades wait on Maple's timelock";
+
 export function protectsLine(f: ProtectsFact): ProtectsLine {
   switch (f.kind) {
     case "metamorpho": {
@@ -222,12 +231,12 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
         };
       return {
         label: "Timelock",
-        headline: `Adding a market, raising a cap, removing a market that still holds deposits, shortening the timelock and replacing the guardian each wait ${days(f.timelock)}`,
+        headline: `${METAMORPHO_TIMELOCKED} each wait ${days(f.timelock)}`,
         sentence: [
           f.guardian
             ? `The guardian, ${shortHex(f.guardian)}, or the owner, ${shortHex(f.owner)}, can cancel any of them during the wait.`
             : `No guardian is set; the owner, ${shortHex(f.owner)}, can cancel any of them during the wait.`,
-          "Lowering a cap and moving money between markets take effect at once.",
+          METAMORPHO_AT_ONCE,
           ...pending,
         ].join(" "),
         gap: null,
@@ -244,8 +253,8 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
           (f.roleManager === ZERO
             ? "No role manager is set."
             : `The role manager, ${shortHex(f.roleManager)}, assigns every role.`) +
-          " The vault applies a role holder's change in the transaction that makes it, with no wait of its own." +
-          " Handing on the role manager takes two steps: the new address must accept.",
+          ` ${YEARN_NO_WAIT}` +
+          ` ${YEARN_HANDOVER}`,
         gap: "Whether a role holder's address is a timelock or a multisig is not read.",
       };
     case "aave-gov": {
@@ -282,7 +291,7 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
         label: "Upgrades",
         headline: w
           ? `The pool delegate's upgrades wait ${days(w.delay)}, then must run within ${days(w.window)}`
-          : "The pool delegate's upgrades wait on Maple's timelock",
+          : MAPLE_UPGRADES_WAIT,
         sentence:
           (f.delegate
             ? `The pool delegate, ${shortHex(f.delegate)}, runs the pool's lending; `
