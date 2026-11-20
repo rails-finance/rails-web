@@ -17,9 +17,9 @@ const SETTLEMENT = {
   address: GPV2_SETTLEMENT,
 };
 
-const DEFINITIONS = "https://docs.cow.fi/cow-protocol/reference/core/definitions";
-const EXPLORER_ORDER = "https://docs.cow.fi/cow-protocol/tutorials/cow-explorer/order";
-const FEES = "https://docs.cow.fi/governance/fees";
+export const DEFINITIONS = "https://docs.cow.fi/cow-protocol/reference/core/definitions";
+export const EXPLORER_ORDER = "https://docs.cow.fi/cow-protocol/tutorials/cow-explorer/order";
+export const FEES = "https://docs.cow.fi/governance/fees";
 
 /** The executed amounts of the swap's Trade log, base units. */
 export interface CowTradeRaw {

@@ -336,6 +336,9 @@ export interface ProtocolInfoPageProps {
   /** After the glossary: where the protocol's docs and its contracts or chain
    *  differ, with both sources. Absent or empty, nothing is drawn. */
   docsAndChain?: readonly InfoDocsAndChain[];
+  /** After the views: a block of figures the explorer adds up across its positions (slot I10, the Aave V3 and V4
+   *  CoW figures on Ethereum). Absent, nothing is drawn. */
+  figures?: ReactNode;
 }
 
 export function ProtocolInfoPage({
@@ -350,6 +353,7 @@ export function ProtocolInfoPage({
   notCovered,
   docs,
   docsAndChain,
+  figures,
 }: ProtocolInfoPageProps) {
   const entry = protocolForSession(session);
   const chainId = entry?.chainId ?? MAINNET_CHAIN_ID;
@@ -400,6 +404,8 @@ export function ProtocolInfoPage({
             <div className="mt-1.5">{v.body}</div>
           </section>
         ))}
+
+        {figures}
 
         {search && (
           <p className="mt-5" data-anatomy="I5">

@@ -9,6 +9,7 @@ import { GlossaryLink, ProtocolInfoPage, type InfoView } from "@/components/shar
 import { BaseLendingCoverageNote } from "@/components/shared/base-lending-coverage-banner";
 import { aaveV4Glossary } from "@/lib/aave-v4/event-templates";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { CowAaveFigures } from "@/components/protocol/cow/cow-aave-figures";
 
 const UL = "list-disc space-y-1 pl-5";
 
@@ -189,6 +190,7 @@ export function AaveV4InfoPage({ deployment }: { deployment: "ethereum" | "base"
         },
       ]}
       docs={docs}
+      figures={<CowAaveFigures family="aave-v4" />}
     />
   );
 }
