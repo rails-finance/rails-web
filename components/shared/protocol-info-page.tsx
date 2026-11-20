@@ -16,7 +16,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { RailHeader } from "@/components/shared/rail-header";
-import { positionNounPlural, protocolForSession } from "@/lib/shared/protocols";
+import { explorerSections, protocolForSession } from "@/lib/shared/protocols";
 import { ASSETS_SEGMENT as ASSETS_KEY } from "@/lib/shared/assets-by-protocol";
 import { CHAINS, explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { FOOT_LINK, INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -331,17 +331,18 @@ interface MenuSection {
 
 const POSITIONS_KEY = "positions";
 
-/** The explorer's menu, in order, without About: what `RailHeader` draws.
- *  Stand-in until 786 stage 2's `explorerSections()` lands, which both will read. */
+/** The explorer's menu (`explorerSections`, the list H5 draws), in order,
+ *  without the front door and About, which have no section here. */
 function menuSections(session: SessionProtocol): MenuSection[] {
   const entry = protocolForSession(session);
   if (!entry) return [];
-  return [
-    ...(entry.positionListing !== false
-      ? [{ key: POSITIONS_KEY, label: positionNounPlural(session), href: entry.listingHref }]
-      : []),
-    ...entry.subPages.map((s) => ({ key: s.segment, label: s.tab, href: s.href })),
-  ];
+  return explorerSections(entry).flatMap((x) =>
+    x.kind === "listing"
+      ? [{ key: POSITIONS_KEY, label: x.name, href: x.href }]
+      : x.kind === "subPage" && x.sub
+        ? [{ key: x.sub.segment, label: x.name, href: x.href }]
+        : [],
+  );
 }
 
 /** The Assets section every explorer with an Assets page draws, worded once. */
