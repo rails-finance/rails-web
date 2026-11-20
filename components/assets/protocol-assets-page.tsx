@@ -46,6 +46,7 @@ import { formatDate } from "@/lib/date";
 import { PROTOCOLS, positionNounPlural, type ProtocolEntry } from "@/lib/shared/protocols";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { comptrollerMarketLinks } from "@/lib/comptroller/market-pages";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -76,7 +77,13 @@ async function read() {
 }
 
 const linesFor = (cards: readonly AssetCard[], e: ProtocolEntry): ProtocolAssetLine[] =>
-  protocolAssetLines(cards, explorerOf(e), (c) => cardLines(c, CHAIN_ORDER), hrefOf);
+  protocolAssetLines(
+    cards,
+    explorerOf(e),
+    (c) => cardLines(c, CHAIN_ORDER),
+    hrefOf,
+    (chip, token) => comptrollerMarketLinks(e.id, e.href, token, chip.href),
+  );
 
 // ── /<chain>/<slug>/assets ──────────────────────────────────────────────────
 

@@ -76,6 +76,9 @@ interface Hit {
   from: "roster" | "catalog";
   facet?: { param: string; value: string };
   page?: string;
+  /** On Aave V3 on Ethereum: the market the token is a reserve of ("core",
+   *  "prime", "etherfi"), from the roster's series key. */
+  market?: string;
   /** The symbol, where the list names it. */
   symbol?: string;
   /** What the token is to the explorer (lib/shared/asset-uses.ts). */
@@ -109,7 +112,7 @@ function rosterHit(asset: RosterAsset, key: string): Hit | null {
   if (chain === 1) {
     switch (family) {
       case "aave-v3":
-        return { ...base, explorer: "aave-v3", page: "/market" };
+        return { ...base, explorer: "aave-v3", page: "/market", ...(a ? { market: a } : {}) };
       case "spark":
         return { ...base, explorer: "spark", facet: sparkFacet(a) };
       case "aave-v4":
@@ -157,7 +160,7 @@ function staticCatalogHits(): Hit[] {
   const out: Hit[] = [];
   const hit = (h: Omit<Hit, "from">) => out.push({ ...h, token: lc(h.token), from: "catalog" });
   for (const a of AAVE_V3_CATALOG)
-    hit({ explorer: "aave-v3", chain: 1, token: a.address, page: "/market", symbol: a.symbol });
+    hit({ explorer: "aave-v3", chain: 1, token: a.address, page: "/market", market: "core", symbol: a.symbol });
   for (const a of SPARK_CATALOG)
     hit({ explorer: "spark", chain: 1, token: a.address, facet: sparkFacet(a.address), symbol: a.symbol });
   for (const [explorer, d] of [
@@ -401,6 +404,7 @@ export async function assetChips(
         href = `${p.href}${page}`;
         link = "page";
       }
+      const markets = [...new Set(hs.flatMap((h) => (h.market ? [h.market] : [])))].sort();
       const uses = chipUses(
         p.href,
         hs.flatMap((h) => h.uses ?? []),
@@ -413,6 +417,7 @@ export async function assetChips(
         link,
         from: [...new Set(hs.map((h) => h.from))].sort(),
         ...(uses.length ? { uses } : {}),
+        ...(markets.length ? { markets } : {}),
       });
     }
     chips.sort((x, y) => x.chain - y.chain || x.label.localeCompare(y.label));

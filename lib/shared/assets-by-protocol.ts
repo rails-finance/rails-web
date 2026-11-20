@@ -24,12 +24,15 @@ export interface AssetsExplorer {
   noun: string;
 }
 
-/** The explorers with a page per asset at `markets/<underlying>`: a reserve
- *  page (M3) on the Aave family, a market page on the others. */
-const RESERVE_PAGES = new Set(["aave-v3", "aave-v3-base", "spark", "seamless"]);
-const MARKET_PAGES = new Set(["compound-v2", "moonwell", "moonwell-base"]);
+/** The Aave family's explorers with a reserve page at `markets/<underlying>`
+ *  (M3) on one market; Aave V3 on Ethereum names its markets on the chip. */
+const RESERVE_PAGES = new Set(["aave-v3-base", "spark", "seamless"]);
 /** The Liquity family: a collateral is a branch. */
 const BRANCHES = new Set(["liquity", "asymmetry", "ebisu", "basedollar"]);
+/** The explorers whose filtered listing is a pool's (decision 0065: their term). */
+const POOLS = new Set(["maple", "fx"]);
+/** Aave V3 on Ethereum's markets, as its `?market=` names them. */
+const AAVE_V3_MARKET: Record<string, string> = { core: "Core", prime: "Prime", etherfi: "EtherFi" };
 
 /** One asset the explorer uses on its chain. */
 export interface ProtocolAssetLine {
@@ -49,17 +52,32 @@ const pageWord = (e: AssetsExplorer, href: string): string => {
 
 /** What the asset is in the protocol, as links (ui-jobs 786): the uses the
  *  explorer's list names (a debt token's Trove debt and Stability Pools, a
- *  Pendle market), else its reserve or market page where the explorer has a
- *  page per asset, its branch on the Liquity family, then the chip's page
- *  ("Markets", "Vaults") or the listing filtered to it (the positions' noun). */
-export function assetMarkets(e: AssetsExplorer, chip: AssetChip, token: string): ChipUse[] {
+ *  Pendle market); else its reserve pages on the Aave family (Aave V3 on
+ *  Ethereum one per market, "Prime reserve"), its market pages on Compound V2
+ *  and Moonwell (`marketPages`, by the server from their catalogs), its branch
+ *  on the Liquity family; then the chip's page named by its route ("Markets",
+ *  "Vaults") or the listing filtered to it, named "Pool" on Maple and f(x) and
+ *  by the positions' noun elsewhere. */
+export function assetMarkets(
+  e: AssetsExplorer,
+  chip: AssetChip,
+  token: string,
+  marketPages: ChipUse[] | null = null,
+): ChipUse[] {
   if (chip.uses?.length) return chip.uses;
   const t = token.toLowerCase();
+  if (e.id === "aave-v3") {
+    const markets = chip.markets?.length ? chip.markets : ["core"];
+    return markets.map((m) => ({
+      label: markets.length === 1 && m === "core" ? "Reserve" : `${AAVE_V3_MARKET[m] ?? m} reserve`,
+      href: `${e.href}/markets/${t}${m === "core" ? "" : `?market=${m}`}`,
+    }));
+  }
   if (RESERVE_PAGES.has(e.id)) return [{ label: "Reserve", href: `${e.href}/markets/${t}` }];
-  if (MARKET_PAGES.has(e.id)) return [{ label: "Market", href: `${e.href}/markets/${t}` }];
+  if (marketPages?.length) return marketPages;
   const out: ChipUse[] = BRANCHES.has(e.id) ? [{ label: "Branch", href: `${e.href}/branches` }] : [];
   if (chip.link === "page") out.push({ label: pageWord(e, chip.href), href: chip.href });
-  if (chip.link === "filtered") out.push({ label: e.noun, href: chip.href });
+  if (chip.link === "filtered") out.push({ label: POOLS.has(e.id) ? "Pool" : e.noun, href: chip.href });
   return out;
 }
 
@@ -81,6 +99,7 @@ export function protocolAssetLines(
   e: AssetsExplorer,
   linesOf: (c: AssetCard) => CardLine[],
   hrefOf: (explorer: string) => string | null,
+  marketPagesOf: (chip: AssetChip, token: string) => ChipUse[] | null = () => null,
 ): ProtocolAssetLine[] {
   const out: ProtocolAssetLine[] = [];
   for (const card of cards) {
@@ -91,7 +110,7 @@ export function protocolAssetLines(
     out.push({
       card,
       line: { ...line, href: protocolAssetsHref(e.href, line.token) },
-      markets: assetMarkets(e, chip, line.token),
+      markets: assetMarkets(e, chip, line.token, marketPagesOf(chip, line.token)),
       also: line.chips.filter((ch) => ch.explorer !== e.id).map((ch) => chipToProtocolPage(ch, line.token, hrefOf)),
     });
   }

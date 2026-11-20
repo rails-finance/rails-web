@@ -10,7 +10,9 @@
 //   c. the first line's page answers 200 under the protocol (A7), and its
 //      "Also used in" links each open an explorer's page for the same token,
 //      or a vault's page.
-// Then one explorer the roster gives no Assets has no such page (a 404).
+// Then every distinct "In <protocol>" link answers with its market (reserve
+// pages checked against their market's read), and one explorer the roster
+// gives no Assets has no such page (a 404).
 
 import fs from "node:fs";
 import path from "node:path";
@@ -81,6 +83,68 @@ for (const e of explorers) {
     `${page.status}; ${alsoHrefs.length} others${wrong.length ? `; wrong ${JSON.stringify(wrong.slice(0, 2))}` : ""}`,
   );
 }
+
+// The "In <protocol>" links (A6.2), every distinct one: an Aave-family
+// reserve page is drawn in the browser from its market's read, so the token
+// must be in that read; every other page answers 200 without the reserve
+// page's missing state, and a Comptroller market page names its market.
+const AAVE_API = {
+  "aave-v3": {
+    core: "/api/chain/aave-v3/market",
+    prime: "/api/chain/aave-v3/market?market=prime",
+    etherfi: "/api/chain/aave-v3/market?market=etherfi",
+  },
+  "aave-v3-base": { core: "/api/chain/aave-v3-base/market" },
+  spark: { core: "/api/chain/spark/market" },
+  seamless: { core: "/api/chain/seamless/market" },
+};
+const apiText = new Map();
+const readApi = async (p) => {
+  if (!apiText.has(p))
+    apiText.set(
+      p,
+      fetch(`${BASE}${p}`)
+        .then((r) => (r.ok ? r.text() : ""))
+        .then((t) => t.toLowerCase()),
+    );
+  return apiText.get(p);
+};
+const marketLinks = [];
+for (const e of explorers) {
+  const list = await get(`${e.href}/assets`);
+  const hrefs = [...new Set(attrs(list.html, /data-asset-market="([^"]+)"/g).map((h) => h.replace(/&amp;/g, "&")))];
+  for (const h of hrefs) marketLinks.push({ id: e.id, href: h });
+}
+const bad = [];
+const queue = [...marketLinks];
+await Promise.all(
+  Array.from({ length: 4 }, async () => {
+    while (queue.length) {
+      const { id, href } = queue.shift();
+      const reserve = /\/markets\/(0x[0-9a-f]{40})(?:\?market=([a-z]+))?$/.exec(href);
+      if (AAVE_API[id] && reserve) {
+        const api = AAVE_API[id][reserve[2] ?? "core"];
+        const text = api ? await readApi(api) : "";
+        if (!text.includes(reserve[1])) bad.push(`${id} ${href}: not a reserve of ${api ?? "an unknown market"}`);
+        continue;
+      }
+      const r = await fetch(`${BASE}${href}`, { redirect: "follow" });
+      const html = r.ok ? await r.text() : "";
+      if (r.status !== 200) bad.push(`${id} ${href}: ${r.status}`);
+      else if (/data-reserve-missing=""/.test(html)) bad.push(`${id} ${href}: the market's missing state`);
+      else if (
+        /\/(compound-v2|moonwell)\/markets\/0x/.test(href) &&
+        !/data-reserve-symbol="">(?!Reserve<)[^<]+</.test(html)
+      )
+        bad.push(`${id} ${href}: names no market`);
+    }
+  }),
+);
+check(
+  `the "In <protocol>" links: ${marketLinks.length} distinct, each a page that names its market, reserve, branch or listing`,
+  marketLinks.length > 100 && bad.length === 0,
+  bad.slice(0, 8).join(" | ") + (bad.length > 8 ? ` | +${bad.length - 8} more` : ""),
+);
 
 const none = await get("/ethereum/uniswap-v3/assets");
 check("an explorer without Assets has no such page", none.status === 404, `${none.status}`);

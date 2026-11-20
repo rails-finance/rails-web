@@ -101,8 +101,31 @@ test("what the asset is in the protocol", () => {
   assert.deepEqual(assetMarkets(x, chip("x", 1, { link: "filtered", href: "/ethereum/x?market=usdc" }), "0x1"), [
     { label: "Accounts", href: "/ethereum/x?market=usdc" },
   ]);
-  assert.deepEqual(assetMarkets({ ...x, id: "moonwell" }, chip("moonwell", 1), "0xAB"), [
-    { label: "Market", href: "/ethereum/x/markets/0xab" },
+  // Compound V2 and Moonwell take their market pages from the server.
+  const pages = [
+    { label: "cWBTC market", href: "/ethereum/x/markets/0xc11b" },
+    { label: "cWBTC2 market", href: "/ethereum/x/markets/0xccf4" },
+  ];
+  assert.deepEqual(
+    assetMarkets({ ...x, id: "compound-v2" }, chip("compound-v2", 1, { link: "filtered" }), "0x2260", pages),
+    pages,
+  );
+  // Maple and f(x) name a pool.
+  assert.deepEqual(
+    assetMarkets(
+      { ...x, id: "maple" },
+      chip("maple", 1, { link: "filtered", href: "/ethereum/maple?pool=USDC" }),
+      "0x1",
+    ),
+    [{ label: "Pool", href: "/ethereum/maple?pool=USDC" }],
+  );
+  // Aave V3 on Ethereum: a reserve page per market the token is in.
+  assert.deepEqual(assetMarkets(AAVE, chip("aave-v3", 1, { markets: ["core", "prime"] }), "0xA0B8"), [
+    { label: "Core reserve", href: "/ethereum/aave-v3/markets/0xa0b8" },
+    { label: "Prime reserve", href: "/ethereum/aave-v3/markets/0xa0b8?market=prime" },
+  ]);
+  assert.deepEqual(assetMarkets(AAVE, chip("aave-v3", 1, { markets: ["prime"] }), "0xA0B8"), [
+    { label: "Prime reserve", href: "/ethereum/aave-v3/markets/0xa0b8?market=prime" },
   ]);
 });
 
