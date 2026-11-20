@@ -80,7 +80,7 @@ const sentence = (s: string) => `${s[0].toUpperCase()}${s.slice(1)}`;
 const cell = (head: string, ...lines: string[]): ProductCell => ({ head, lines, read: true });
 const unread = (...lines: string[]): ProductCell => ({ head: PRODUCTS_PAGE.notRead, lines, read: false });
 
-const AAVE_GOV_WAIT = "Changes pass an Aave vote, then wait; each vault's page states both lengths.";
+const AAVE_GOV_WAIT = "Aave governance can change the vault; each vault's page states both lengths.";
 
 export const PRODUCT_FAMILY_WORDS: Record<VaultFamily, ProductFamilyWords> = {
   metamorpho: {
@@ -117,14 +117,14 @@ export const PRODUCT_FAMILY_WORDS: Record<VaultFamily, ProductFamilyWords> = {
     stewards: unread(STEWARD_UNREAD.stata!),
     timelock: cell("An Aave vote, then a wait", AAVE_GOV_WAIT),
     fees: unread(sentence(STATA_REWARDS_TEXT)),
-    leave: unread(WITHDRAWALS_UNREAD.stata!),
+    leave: unread(),
   },
   "umbrella-stake": {
     redemption: cell("Cooldown, then a window", sentence(UMBRELLA_COOLDOWN_TEXT)),
     stewards: [{ role: "Owner", what: ROLE_SENTENCE.umbrellaOwner }],
     timelock: cell(
       "An Aave vote, then a wait",
-      "Aave governance can change Umbrella after a vote and a wait; each vault's page states both lengths.",
+      "Aave governance can change Umbrella; each vault's page states both lengths.",
     ),
     fees: unread(UMBRELLA_REWARDS_TEXT),
     leave: cell("Stated per vault", "Each vault's page states its cooldown and unstake window."),
@@ -136,7 +136,7 @@ export const PRODUCT_FAMILY_WORDS: Record<VaultFamily, ProductFamilyWords> = {
       { role: "Accountant", what: YEARN_ACCOUNTANT_TIP },
     ],
     timelock: cell("None in the vault", YEARN_NO_WAIT, YEARN_HANDOVER),
-    fees: cell("Set by the accountant", YEARN_ACCOUNTANT_TIP, "Rails does not read which kinds it charges."),
+    fees: cell("Charged by the accountant", "Rails does not read which kinds it charges."),
     leave: cell("Stated per vault", "Each vault's page states the share of its assets idle at its block."),
   },
   "maple-pool": {

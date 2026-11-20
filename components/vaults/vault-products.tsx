@@ -173,7 +173,7 @@ function Family({ family }: { family: VaultFamily }) {
   return (
     <>
       <span className="block font-semibold text-foreground">{f.label}</span>
-      <span className={`mt-0.5 block ${MUTED}`}>{f.kind}</span>
+      {f.kind !== f.label && <span className={`mt-0.5 block ${MUTED}`}>{f.kind}</span>}
     </>
   );
 }
