@@ -26,6 +26,7 @@
 import { createContext, useContext, useState } from "react";
 import { UnknownTokenSvg } from "@/components/shared/unknown-token-svg";
 import { useChainId } from "@/lib/shared/chain-context";
+import { NATIVE } from "@/lib/shared/asset-roster";
 import {
   ARBITRUM_CHAIN_ID,
   ARC_CHAIN_ID,
@@ -203,8 +204,12 @@ export function TokenChipIcon({
   //    Ethereum glyph shared with WETH across every explorer. The plain blue
   //    ether icon is reserved for gas, which looks it up under "ether" (see
   //    trove-economics). So an ETH collateral/position reads the same as WETH,
-  //    while the label text stays "ETH".
-  const iconSymbol = lookup.toLowerCase() === "eth" ? "weth" : lookup;
+  //    while the label text stays "ETH". Native ETH named by its sentinel
+  //    address (0xeeee…eeee, the asset roster's NATIVE) takes the plain ETH
+  //    mark (eth.png): the wrapped mark's dashed ring says WETH (Miles,
+  //    20 Nov 2026).
+  const native = lookup.toLowerCase() === "eth" && address?.toLowerCase() === NATIVE;
+  const iconSymbol = native ? "eth" : lookup.toLowerCase() === "eth" ? "weth" : lookup;
   const localBySymbol = getLocalTokenIcon(iconSymbol);
   if (localBySymbol) srcs.push(localBySymbol);
   // 2. Local PNG by address (LINK/USDT/EURC etc. are address-named only).

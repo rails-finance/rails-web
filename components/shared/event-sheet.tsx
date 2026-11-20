@@ -87,6 +87,9 @@ export interface SheetSide {
   tip?: string;
   /** The icons of the assets the side holds, after its name. */
   icons: string[];
+  /** Addresses for `icons` by symbol, where the family names them; else each
+   *  comes from the page's flows model (`useFlowMark`), absent before it reads. */
+  iconAddresses?: Record<string, string>;
   /** The carry-forward layer above the event's rows, drawn with the
    *  breakdown on: "Last event", the interest since it (its `sub` rows one per
    *  asset), "Market move". Holds only the rows the family can state. */
@@ -380,7 +383,17 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
             tip={s.name ? s.tip : s.side === "collateral" ? WORDS.tipCollateral : WORDS.tipDebt}
           />
         </h3>
-        {s.icons.length > 0 && <InlineAssetCluster assets={s.icons.map(markOf)} size={16} overlap={5} max={4} />}
+        {s.icons.length > 0 && (
+          <InlineAssetCluster
+            assets={s.icons.map((sym) => {
+              const own = s.iconAddresses?.[sym];
+              return own ? { symbol: sym, address: own } : markOf(sym);
+            })}
+            size={16}
+            overlap={5}
+            max={4}
+          />
+        )}
       </div>
       <div className={`${GRID} group/side`} data-sheet-usd={noUsd ? "none" : undefined}>
         {carry && (

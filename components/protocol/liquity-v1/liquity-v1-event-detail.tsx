@@ -51,7 +51,7 @@ import {
   redemptionDebtSplitProv,
   type LiquityV1Coords,
 } from "@/lib/liquity-v1/event-provenance";
-import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
+import { COLLATERAL_ADDRESS, COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
 import {
   LIQUITY_V1_RESERVE,
   fmtEth,
@@ -119,6 +119,7 @@ function buildV1LiquidationForensics(
     pricePills: [
       {
         symbol: COLLATERAL_SYMBOL,
+        address: COLLATERAL_ADDRESS,
         priceUsd: price.usd,
         priceProv: atBlockPriceProv(coords, price.usd),
         note: "Liquity's price feed at block",
@@ -204,6 +205,7 @@ export function useLiquityV1Opened({
           : undefined,
       ...(ends ? { closed: CLOSED } : { after: fig(fmtEth(s.collAfter), collAfterProv(coords), s.collAfter) }),
       icon: COLLATERAL_SYMBOL,
+      iconAddress: COLLATERAL_ADDRESS,
     },
     usd:
       usdAfter != null && usdShown(usdAfter)
@@ -389,6 +391,7 @@ export function useLiquityV1Opened({
         ? [
             {
               symbol: COLLATERAL_SYMBOL,
+              address: COLLATERAL_ADDRESS,
               usd: price,
               info: eventPriceProv(coords, price),
               title: "ETH at Liquity's price feed, at this block",

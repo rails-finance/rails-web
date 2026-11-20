@@ -51,6 +51,8 @@ const ROUTES = [
   ["aave-v3 write-off", "/ethereum/aave-v3/0x067739a4be2942a1c31e4513beaac08b814f29f0?market=core"],
   ["frankencoin", "/ethereum/frankencoin/0x6377a63b2a8caa1db4190a5419d2dc9215d74a3f"],
   ["liquity-v1", "/ethereum/liquity-v1/0x04ca2a945ccba92ca2443024c07c99f81e71547f?epoch=1"],
+  // A Stability Pool deposit: an open, claims, a gain sent to the Trove, a full withdrawal.
+  ["liquity-v1-sp", "/ethereum/liquity-v1/stability-pool/0x8aad71ecd4712c48d6443718009f73e580148b12"],
   ["ebisu", "/ethereum/ebisu/WBTC/75911241408635389930317354588378809432274724767733080584082611717827843647638"],
   [
     "asymmetry",

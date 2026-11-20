@@ -19,7 +19,12 @@ import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-su
 import { LIQUITY_V1_CELL_HEADS, useLiquityV1Opened } from "./liquity-v1-event-detail";
 import { LiquityV1EventExplainer, liquityV1LearnMoreContent } from "./liquity-v1-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { COLLATERAL_SYMBOL, DEBT_SYMBOL, LIQUITY_V1_ADDRESSES } from "@/lib/liquity-v1/asset-catalog";
+import {
+  COLLATERAL_ADDRESS,
+  COLLATERAL_SYMBOL,
+  DEBT_SYMBOL,
+  LIQUITY_V1_ADDRESSES,
+} from "@/lib/liquity-v1/asset-catalog";
 import { LIQUITY_V1_RESERVE } from "@/lib/liquity-v1/event-figures";
 import type { LiquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
@@ -73,11 +78,9 @@ export function LiquityV1EventCard({
   //
   // The debt row names LUSD's contract from the catalog, so the
   // icon chip has an address to ask a CDN about rather than a symbol to look up
-  // in the house table. The collateral row deliberately does not: V1's
-  // collateral is native ETH, which has no ERC-20 to name, and the flow records
-  // the 0xEee… sentinel that stands in for it. Passing a sentinel as if it were
-  // a contract would send the chip to two CDNs that cannot answer. ETH already
-  // resolves from the curated local mark, which is the correct source for it.
+  // in the house table. The collateral row names native ETH's 0xEee… sentinel
+  // (COLLATERAL_ADDRESS): the chip draws the plain ETH mark from the curated
+  // local set for it, and the asset panel opens native ETH's page.
   const tokens = isWarning
     ? undefined
     : (
@@ -85,6 +88,7 @@ export function LiquityV1EventCard({
           collDelta !== 0
             ? {
                 symbol: COLLATERAL_SYMBOL,
+                address: COLLATERAL_ADDRESS,
                 direction: collDelta > 0 ? ("right" as const) : ("left" as const),
                 value: Math.abs(collDelta),
               }

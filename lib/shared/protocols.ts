@@ -800,6 +800,7 @@ const SPECS: ProtocolSpec[] = [
     desc: "The original interest-free Trove: ETH collateral and exact LUSD debt emitted per event",
     subPages: [
       { segment: "system", label: "System overview", tab: "System" },
+      { segment: "stability-pool", label: "Stability Pool deposits", tab: "Stability Pool" },
       { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },

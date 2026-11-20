@@ -39,6 +39,8 @@ import { RawFigure, tokenIcon } from "./sp-parts";
 const NOUN = "Deposit";
 const BOLD = "BOLD";
 const ZERO = BigInt(0);
+/** Where the chain has seen a touch the index has not read. */
+const INDEX_BEHIND = "the index has not yet read the newest touch";
 
 export interface LiquityV2DepositCardProps {
   row: LiquityV2DepositRow;
@@ -50,6 +52,9 @@ export interface LiquityV2DepositCardProps {
   pending?: boolean;
   /** The pool's getTotalBoldDeposits() and the block of the read `now` came from. */
   pool?: { totalRaw: bigint; block: number } | null;
+  /** The chain's deposits() or stashedColl() differs from the index's: the
+   *  chain has seen a touch the index has not read yet. */
+  indexBehind?: boolean;
   explanation?: ReactNode;
 }
 
@@ -88,6 +93,7 @@ export function liquityV2DepositSlots({
   now,
   pending = false,
   pool,
+  indexBehind = false,
   explanation,
 }: LiquityV2DepositCardProps): PositionCardSlots {
   const detail = surface === "detail";
@@ -254,18 +260,24 @@ export function liquityV2DepositSlots({
   const left: PositionPanelRow[] = [];
   const right: PositionPanelRow[] = [];
   if (lifetime) {
-    left.push({
-      id: "recorded",
-      label: "At the last touch",
-      tip: "The BOLD the deposit held after its last touch.",
-      asset: { symbol: BOLD, address: boldAddr },
-      value: (
-        <Prov info={spSumProv("recorded", b)}>
-          <RawFigure raw={lifetime.recorded} symbol={BOLD} />
-        </Prov>
-      ),
-    });
-    if (lifetime.kept > ZERO)
+    // Where the chain has seen a touch the index has not read, the recorded
+    // deposit would not add up with the chain's figures: one line says so.
+    left.push(
+      indexBehind
+        ? { id: "index-behind", label: "At the last touch", value: null, unavailable: INDEX_BEHIND }
+        : {
+            id: "recorded",
+            label: "At the last touch",
+            tip: "The BOLD the deposit held after its last touch.",
+            asset: { symbol: BOLD, address: boldAddr },
+            value: (
+              <Prov info={spSumProv("recorded", b)}>
+                <RawFigure raw={lifetime.recorded} symbol={BOLD} />
+              </Prov>
+            ),
+          },
+    );
+    if (!indexBehind && lifetime.kept > ZERO)
       left.push({
         id: "yield-kept",
         label: "Yield kept",

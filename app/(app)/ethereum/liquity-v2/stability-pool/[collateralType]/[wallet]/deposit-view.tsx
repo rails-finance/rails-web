@@ -315,6 +315,7 @@ export default function DepositView({
                   lifetime={lifetime}
                   now={cardNow}
                   pending={open && !chainSettled}
+                  indexBehind={open && chain != null && lifetime != null && now == null}
                   pool={
                     chain?.totalDepositsRaw != null
                       ? { totalRaw: BigInt(chain.totalDepositsRaw), block: chain.blockNumber }

@@ -38,6 +38,7 @@ import { batchRateDebtMove } from "@/lib/liquity/batch-rate-move";
 import type { DayObs, PriceLevel, PriceMarks } from "@/lib/shared/price-series";
 import { levelByDay } from "@/lib/shared/price-series";
 import { formatDate } from "@/lib/date";
+import { NATIVE } from "@/lib/shared/asset-roster";
 import { branchMcr } from "@/lib/liquity/event-safety";
 import {
   getLiquidationThreshold,
@@ -773,6 +774,8 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
     // A closed Liquity V1 life is the page's whole position: its line ends
     // the day after its last event.
     today: family === "v1" && !open ? endDay : today,
+    // Liquity V1's collateral is native ETH: its sentinel draws the plain mark.
+    ...(family === "v1" ? { addresses: { [o.collSymbol]: NATIVE } } : {}),
     words:
       family === "v1"
         ? liquityV1FlowWords(daily.length > 0)
