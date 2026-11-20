@@ -290,15 +290,20 @@ export function DataTableRow({
   ...rest
 }: HTMLAttributes<HTMLTableRowElement> & { href?: string; drawer?: boolean; child?: boolean }) {
   const stacked = useContext(Stacked);
+  // A row's code joins D4 rather than replacing it: D4 is what draws the
+  // linked row's hover border (globals.css), so a page that names its row
+  // (A5.4, E8.1) keeps the house hover (ui-jobs 781).
+  const { "data-anatomy": own, ...others } = rest as typeof rest & { "data-anatomy"?: string };
+  const anatomy = [href ? "D4" : null, own].filter(Boolean).join(" ") || undefined;
   return (
     <RowHref.Provider value={href ?? null}>
       <tr
         role={stacked ? "row" : undefined}
         className={`group/dt-row ${href ? LINKED_ROW : ""} ${className}`}
-        data-anatomy={href ? "D4" : undefined}
+        data-anatomy={anatomy}
         data-dt-drawer={drawer ? "" : undefined}
         data-dt-child={child ? "" : undefined}
-        {...rest}
+        {...others}
       >
         {children}
       </tr>

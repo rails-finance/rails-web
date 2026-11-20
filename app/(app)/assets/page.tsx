@@ -34,16 +34,17 @@ export default async function AssetsPage({
   const initialSearch = new URLSearchParams(
     Object.entries(sp).flatMap(([k, v]) => (v == null ? [] : (Array.isArray(v) ? v : [v]).map((x) => [k, x]))),
   ).toString();
-  // The (i) drawer's body: what the list is and the day its prices read.
+  // The lead under the h1 (ui-jobs 781): what the table holds, and the day
+  // its prices read. The marked price and the stored round explain themselves
+  // in their marks' tips (A5.2, A5.3).
   const about = data?.day != null && (
     <p data-asset-prices-day={data.day}>
-      Each asset a Rails explorer lists or a lending protocol&rsquo;s oracle prices, with the explorers that list it.
-      Prices at the close of {formatDate(new Date(data.day * DAY_MS))}, from the main line on each asset&rsquo;s page;
-      {data.rounds && " a price stamped after its figure reads the line’s stored rounds, in force at the stamp;"} the
-      line and the change cover 30 days. A marked price has a fixed price on its page or a line more than 1 % from its
-      main line in those 30 days. The categories are Rails&rsquo; classification.
+      The table below lists each asset a Rails explorer lists or a lending oracle prices, with a line for each chain
+      giving its price there and the explorers that list it. Prices are at the close of{" "}
+      {formatDate(new Date(data.day * DAY_MS))}.
     </p>
   );
+
   return (
     <div className="min-h-screen">
       <div className="py-8">

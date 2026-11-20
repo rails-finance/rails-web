@@ -2260,6 +2260,12 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
     border-bottom: 1px solid var(--edge-row-line);
     transition: border-color 150ms;
   }
+  /* A row that continues the group above it (`data-dt-cont`: a protocol's
+     next chain on /protocols, ui-jobs 781): the hairline between the two is
+     dashed; a group ends on the solid one. */
+  table.dt > tbody > tr:has(+ tr[data-dt-cont]) > :is(td, th) {
+    border-bottom-style: dashed;
+  }
   table.dt > tbody > tr:last-child > *,
   table.dt > tbody > tr:has(+ tr.hidden:last-child) > *,
   table.dt > tbody > tr:has(+ tr[data-dt-drawer]:not(.hidden)) > *,
@@ -2361,6 +2367,9 @@ table.dt-stacked {
       border-bottom: 1px solid var(--edge-row-line);
       transition: border-color 150ms;
     }
+    & > tbody > tr:has(+ tr[data-dt-cont]) {
+      border-bottom-style: dashed;
+    }
     & > tbody > tr:last-child,
     & > tbody > tr:has(+ tr.hidden:last-child),
     & > tbody > tr:has(+ tr[data-dt-drawer]:not(.hidden)),
@@ -2434,6 +2443,12 @@ table.dt-stacked {
       z-index: 10;
     }
     & > tbody > tr > [role="cell"]:empty {
+      display: none;
+    }
+    /* A cell the table draws and the stacked card does not (`data-dt-stack-hidden`:
+       /assets's and /protocols' lines, whose card carries a compact row in
+       its place; ui-jobs 781). */
+    & > tbody > tr > [data-dt-stack-hidden] {
       display: none;
     }
     /* The lead zone: a 4px bar in the protocol's hue at the card's left, its
