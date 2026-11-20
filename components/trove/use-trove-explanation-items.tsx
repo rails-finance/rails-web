@@ -63,7 +63,7 @@ interface UseTroveExplanationItemsArgs {
   shutdown?: BranchShutdownState | null;
 }
 
-/** The trove pane's content: a subject-first, status lead ending in a period
+/** The trove pane's content: a subject-first status lead ending in a period
  *  (charter §4) over the plain-English explanation bullets. */
 export interface TroveExplanation {
   lead: React.ReactNode | null;
@@ -315,7 +315,7 @@ function buildOpenItems({
   const annualInterestCost = (displayRecordedDebt * displayInterestRate) / 100;
 
   // The status verdict — subject-first, one sentence, two figures, ending in a
-  // period (charter §4): the lead-in to the bullets. The two figures head
+  // period (charter §4); the bullets give its figures. The two figures head
   // the summary card's stat chrome, so they carry the bold highlight; their
   // receipts ride the bullets below, which restate both.
   const lead = (

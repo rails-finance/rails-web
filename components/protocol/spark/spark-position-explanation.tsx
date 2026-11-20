@@ -108,8 +108,8 @@ export function SparkPositionExplanation({
   // Empty position — nothing supplied and nothing borrowed. Nothing to narrate.
   if (supplySyms.length === 0 && !hasDebt) return null;
 
-  // Status lead — the one-sentence verdict, subject-first, ending in a period:
-  // the lead-in to the bullets. The health factor is a figure the card shows.
+  // Status lead — the one-sentence verdict, subject-first, ending in a period
+  // (charter §4); the bullets give its figures. The health factor is a figure the card shows.
   const lead = !hasDebt
     ? positionNodes("lead_no_debt")
     : hf != null

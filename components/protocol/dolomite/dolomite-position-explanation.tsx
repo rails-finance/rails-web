@@ -62,8 +62,8 @@ export function DolomitePositionExplanation({
   const req = chain.requiredCollateralization;
   const dropPct = c != null && req > 0 && c > req ? Math.round((1 - req / c) * 100) : null;
 
-  // Status lead — subject-first, one sentence, ending in a period: the lead-in
-  // to the bullets (charter §4).
+  // Status lead — subject-first, one sentence, ending in a period
+  // (charter §4); the bullets give its figures.
   const lead: React.ReactNode = hasDebt ? (
     <>The account borrows against its own collateral inside a single cross-margined account number.</>
   ) : supplied.length > 0 ? (

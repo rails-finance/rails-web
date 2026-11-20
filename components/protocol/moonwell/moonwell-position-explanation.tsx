@@ -162,8 +162,8 @@ export function MoonwellPositionExplanation({
 
   if (bullets.length === 0) return null;
 
-  // Subject-first status lead: a one-sentence verdict ending in a period, the
-  // lead-in to the bullets. Keyed on the resulting state.
+  // Subject-first status lead: a one-sentence verdict ending in a period; the
+  // bullets give its figures. Keyed on the resulting state.
   const lead = hasDebt
     ? chain.shortfallUsd > 0
       ? positionNodes("lead_shortfall")

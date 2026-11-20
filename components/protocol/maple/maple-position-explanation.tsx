@@ -212,7 +212,7 @@ export function MaplePositionExplanation({
   const fullyQueued = live.every((p) => p.shares <= 0 && p.escrowedShares > 0);
   const bullets: React.ReactNode[] = [];
 
-  // ── the status lead (charter §4): subject-first, ≤2 figures, ending in a period ────────
+  // ── the status lead (charter §4): subject-first, ≤2 figures, ending in a period ──
   const lead: React.ReactNode = multi ? (
     <>This position lends across {live.length} Maple pools, each claim priced at its own pool&rsquo;s exit rate.</>
   ) : fullyQueued ? (

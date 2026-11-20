@@ -105,11 +105,11 @@ const Z2_HEADINGS = [
 ];
 const Z1_HEADINGS = ["Holdings", "Risk", "Rate", "History"];
 
-/** Liquity V2's position card explanation strings in trove_words (Z1). A lead is named by its key (Z1_LEAD_KEY) and ends in a period. */
-/** A position card's status lead, by key name: it keeps the lead limits whatever its last character. */
+/** A position card's status lead is recognised by its key, so it keeps the lead limits whatever its last character. */
 const Z1_LEAD_KEY =
   /^(lead[a-z_0-9]*|liq_lead[a-z_0-9]*|closed_lead[a-z_0-9]*|open_lead[a-z_0-9]*|superseded_[a-z_0-9]*)$/;
 
+/** Liquity V2's position card explanation strings in trove_words (Z1). A lead ends in a period, and `Z1_LEAD_KEY` names it by key. */
 const Z1_IDS = [
   "liq_lead",
   "liq_lifecycle",
@@ -913,10 +913,12 @@ function otherFamilies() {
     for (const u of extractCopyUnits(readFileSync(f, "utf8"))) {
       units++;
       // A status lead is read by position: a clause pushed on `status`, or one assigned to a `lead` name.
-      const isLeadUnit = zone === "Z1" && /\bstatus\.push\(|\b\w*[Ll]ead\w*\s*=/.test(srcLines[u.line - 1] ?? "");
-      for (const seg of proseSegments(u.raw))
-        for (const [si, s] of sentencesOf(seg).entries()) {
-          const lead = isLeadUnit && si === sentencesOf(seg).length - 1;
+      const isLeadUnit =
+        zone === "Z1" && /\bstatus\.push\(|\b(\w*_)?[Ll]ead(_\w+|[A-Z]\w*)?\s*=/.test(srcLines[u.line - 1] ?? "");
+      for (const seg of proseSegments(u.raw)) {
+        const sents = sentencesOf(seg);
+        for (const [si, s] of sents.entries()) {
+          const lead = isLeadUnit && si === sents.length - 1;
           const limit = lead ? PLAIN.Z1.lead : PLAIN[zone].bullet;
           const words = countWords(s);
           if (words > limit)
@@ -930,6 +932,7 @@ function otherFamilies() {
               text: s,
             });
         }
+      }
     }
   }
   return { files: files.length, units, found };

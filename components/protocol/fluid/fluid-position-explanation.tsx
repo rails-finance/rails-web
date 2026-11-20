@@ -71,7 +71,7 @@ function FluidClosedPositionExplanation({
       liquidations in its record.
     </>
   ) : (
-    <>This {pairText} position ran its course and closed. The collateral withdrawn and the debt repaid.</>
+    <>This {pairText} position ran its course and closed, the collateral withdrawn and the debt repaid.</>
   );
 
   const list: React.ReactNode[] = [];

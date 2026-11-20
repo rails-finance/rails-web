@@ -106,8 +106,8 @@ export default function ProvenancePage() {
       <Section title="What a receipt holds">
         <p className="body-text">
           The receipt below is a real one, for the collateral a Liquity V2 trove held after one event. The TroveManager
-          contract recorded it at block {EXAMPLE.block.toLocaleString("en-US")}. The list after the receipt below
-          defines its parts, top to bottom.
+          contract recorded it at block {EXAMPLE.block.toLocaleString("en-US")}. The list after the receipt defines its
+          parts, top to bottom.
         </p>
         <div className="py-2">
           <ProvenanceExample />
