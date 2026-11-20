@@ -10,7 +10,9 @@ import { Prov } from "@/components/shared/provenance";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { rosterReadProv, type RosterRead } from "@/lib/vaults/roster-provenance";
 
-export function RosterReadStamp({ reads }: { reads: RosterRead[] }) {
+/** `inLink`: drawn inside a card's link, where a press toggles the reading
+ *  and does not open the card (the /vaults overview's cards, ui-jobs 782). */
+export function RosterReadStamp({ reads, inLink = false }: { reads: RosterRead[]; inLink?: boolean }) {
   const read = reads.filter((r) => r.block > 0);
   if (read.length === 0) return null;
   // The oldest read: the earliest block time, else the first roster with none.
@@ -22,7 +24,7 @@ export function RosterReadStamp({ reads }: { reads: RosterRead[] }) {
       data-roster-read-at={oldest.at ?? ""}
     >
       <Prov info={rosterReadProv(read)}>
-        <ReadStamp block={oldest.block} at={oldest.at ?? undefined} />
+        <ReadStamp block={oldest.block} at={oldest.at ?? undefined} inLink={inLink} />
       </Prov>
     </span>
   );

@@ -42,8 +42,7 @@ export default async function VaultComparePage({ searchParams }: { searchParams:
     <div className="min-h-screen py-8" data-anatomy="E1" data-compare-page="">
       <header className="mb-6">
         <VaultIndexHead venue="compare" />
-        <h1 className="mt-4 text-lg font-semibold text-foreground">{COMPARE_TITLE}</h1>
-        <p className="mt-2 max-w-2xl text-rb-500" data-compare-disclaimer="">
+        <p className="mt-4 max-w-2xl text-rb-500" data-compare-disclaimer="">
           {COMPARE_PAGE.lead}
         </p>
       </header>

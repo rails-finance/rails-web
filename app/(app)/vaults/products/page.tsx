@@ -32,8 +32,7 @@ export default function VaultProductsPage() {
     <div className="min-h-screen py-8" data-anatomy="E7" data-products-page="">
       <header className="mb-6" data-skel-section="page-header">
         <VaultIndexHead venue="products" />
-        <h1 className="mt-4 text-lg font-semibold text-foreground">{PRODUCTS_TITLE}</h1>
-        <p className="mt-2 max-w-2xl text-rb-500">{PRODUCTS_PAGE.lead}</p>
+        <p className="mt-4 max-w-2xl text-rb-500">{PRODUCTS_PAGE.lead}</p>
       </header>
       <Suspense fallback={<div className="h-64 animate-pulse rounded-2xl bg-raised" data-vault-products="pending" />}>
         <VaultProducts />

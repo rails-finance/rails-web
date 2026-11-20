@@ -9,7 +9,7 @@ import type { FrontPositionSits } from "./fronts";
 export const FRONTS_TITLE = "Vault fronts";
 
 export const FRONTS_PAGE = {
-  lead: "Apps that put an on-chain vault behind their product. Each row is one product and vault, cited to the page the app publishes with the day it was read.",
+  lead: "The tables below list the apps that put an on-chain vault behind their product. Each row is one product and vault, cited to the page the app publishes with the day it was read.",
   caption: (front: string) => `${front}: the vaults behind its products`,
   columns: {
     product: "Product",
