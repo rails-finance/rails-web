@@ -6,6 +6,11 @@
 //   1. H3's name and icon are plain text (no link); H5 reads Positions, Markets,
 //      Assets, About on Aave V3 and Troves, Branches, Stability Pool, Assets,
 //      About on Liquity V2, Assets current on its pages.
+//   2g-2l the roster's controls (decision 0070): from sm no search row, the
+//      Asset heading's search filtering as typed, Category and "Also used in"
+//      filtered from their headings with a one-click clear; Focus on USDC
+//      holds the page. At 375 one plain search over every text column and a
+//      chip for a URL filter.
 //   2. /ethereum/aave-v3/assets: no visible heading (an sr-only h1, as the
 //      listing), a line per asset each opening
 //      its page under Aave V3; "In Aave V3" links the reserve page (which
@@ -102,8 +107,14 @@ check(
   `${rows.length} lines`,
 );
 check(
-  '2c "In Aave V3" links the reserve page',
-  rows.every((r) => r.markets.length === 1 && r.markets[0] === `/ethereum/aave-v3/markets/${r.line.slice(2)}`),
+  '2c "In Aave V3" links a reserve page per market the token is in (Core, Prime, EtherFi)',
+  rows.every(
+    (r) =>
+      r.markets.length >= 1 &&
+      r.markets.every((h) =>
+        new RegExp(`^/ethereum/aave-v3/markets/${r.line.slice(2)}(\\?market=(prime|etherfi))?$`).test(h),
+      ),
+  ),
 );
 const usdcRow = rows.find((r) => r.line === `1:${USDC}`);
 check(
@@ -133,6 +144,145 @@ check(
   cats.length > 3 && cats.length < rows.length && cats.every((c) => c === "stablecoin"),
   `${cats.length} lines`,
 );
+
+// 2g-2l the roster's controls (decision 0070): from sm no search row, the
+// search in the Asset heading (D10); Category and "Also used in" filtered
+// from their headings (D9); no listing toolbar.
+const ctrl = await page.evaluate(() => ({
+  toolbar: document.querySelectorAll('[data-anatomy~="N1"], [data-pill-row]').length,
+  search:
+    ![...document.querySelectorAll("[data-roster-controls] input")].some((i) => i.getClientRects().length > 0) &&
+    !!document.querySelector("thead [data-heading-search='asset'] [data-heading-search-open]"),
+  heading: document
+    .querySelector("thead [data-heading-filter='category'] [data-heading-filter-button]")
+    ?.textContent.trim(),
+}));
+check(
+  "2g no search row, the Asset heading's search, no listing toolbar; the heading reads the chosen category",
+  ctrl.toolbar === 0 && ctrl.search && ctrl.heading === "Category: Stablecoin",
+  JSON.stringify(ctrl),
+);
+const aHead = page.locator("thead [data-heading-filter='category']");
+await aHead.locator("[data-heading-filter-clear]").click();
+await page.waitForTimeout(300);
+const all2 = await page.$$eval("tr[data-asset-line]", (rs) => rs.length);
+check(
+  "2h one click clears the category",
+  all2 === rows.length && !new URL(page.url()).searchParams.has("cat"),
+  `${all2}`,
+);
+await aHead.locator("[data-heading-filter-button]").click();
+await page.click("[data-heading-filter-menu='category'] [data-heading-filter-option='governance']");
+await page.waitForTimeout(300);
+const gov = await page.$$eval("tr[data-asset-line]", (rs) => rs.map((r) => r.getAttribute("data-asset-category")));
+check(
+  '2i a choice from the heading: "Governance", ?cat=governance, governance lines alone',
+  ((await aHead.locator("[data-heading-filter-button]").textContent()) ?? "").trim() === "Category: Governance" &&
+    new URL(page.url()).searchParams.get("cat") === "governance" &&
+    gov.length > 0 &&
+    gov.every((c) => c === "governance"),
+  `${gov.length}`,
+);
+const aSearch = page.locator("thead [data-heading-search='asset']");
+await aSearch.locator("[data-heading-search-open]").click();
+await aSearch.locator("[data-heading-search-input]").fill("aave");
+await page.waitForTimeout(300);
+const aaveOnly = await page.$$eval("tr[data-asset-line] [data-asset-name]", (ns) =>
+  ns.map((x) => x.textContent.trim()),
+);
+const aLive = ((await page.locator("[data-roster-live]").textContent()) ?? "").trim();
+check(
+  "2j the Asset heading's search filters as it is typed, labelled Asset, the live line counting",
+  (await aSearch.locator("[data-heading-search-input]").getAttribute("aria-label")) === "Asset" &&
+    aaveOnly.length >= 1 &&
+    aaveOnly.every((x) => /aave/i.test(x)) &&
+    aLive === `${aaveOnly.length} ${aaveOnly.length === 1 ? "asset" : "assets"} shown`,
+  `${aaveOnly.join(" ")} · ${aLive}`,
+);
+await page.keyboard.press("Escape");
+await aHead.locator("[data-heading-filter-clear]").click();
+await page.waitForTimeout(300);
+// "Also used in" from its heading: the other explorers, by count; a choice
+// keeps what that explorer also uses, ?also=<id>.
+const alsoHead = page.locator("thead [data-heading-filter='also']");
+await alsoHead.locator("[data-heading-filter-button]").click();
+const alsoOpts = await page.$$eval("[data-heading-filter-menu='also'] [role=menuitemradio]", (as) =>
+  as.map((a) => [a.getAttribute("data-heading-filter-option"), a.textContent.trim()]),
+);
+const pick = alsoOpts[1];
+await page.click(`[data-heading-filter-menu='also'] [data-heading-filter-option='${pick?.[0]}']`);
+await page.waitForTimeout(300);
+const alsoLines = await page.$$eval("tr[data-asset-line]", (rs) =>
+  rs.map((r) =>
+    [...r.querySelectorAll("[data-asset-also] [data-asset-chip]")].map((c) => c.getAttribute("data-asset-chip")),
+  ),
+);
+const expected = Number(/(\d+)$/.exec(pick?.[1] ?? "")?.[1]);
+check(
+  `2l "Also used in" from its heading: ${pick?.[1]}, ?also=${pick?.[0]}, only lines it also uses`,
+  alsoOpts.length > 2 &&
+    new URL(page.url()).searchParams.get("also") === pick?.[0] &&
+    alsoLines.length > 0 &&
+    // Its count is the lines it keeps; a line draws four marks then "+N", so
+    // the explorer is read off the lines whose marks show it.
+    alsoLines.length === expected &&
+    alsoLines.filter((cs) => cs.length < 4).every((cs) => cs.includes(pick?.[0])) &&
+    (await alsoHead.locator("[data-heading-filter-clear]").count()) === 1,
+  `${alsoLines.length} lines, menu ${alsoOpts
+    .map(([, t]) => t)
+    .slice(0, 4)
+    .join(" | ")}`,
+);
+
+// 2m a category the protocol's assets hold none of (a stale ?cat=) stays
+// chosen: Liquity V2 has no governance asset.
+await go(page, "/ethereum/liquity-v2/assets?cat=governance");
+await page.waitForSelector('[data-asset-table="protocol"]', { timeout: 120_000 });
+const sHead = page.locator("thead [data-heading-filter='category']");
+const sText = ((await sHead.locator("[data-heading-filter-button]").textContent()) ?? "").trim();
+const sNone = await page.locator("[data-asset-none]").count();
+await sHead.locator("[data-heading-filter-clear]").click();
+await page.waitForTimeout(300);
+const sFocus = await page.evaluate(() => document.activeElement?.hasAttribute("data-heading-filter-button"));
+check(
+  '2m ?cat=governance on Liquity V2 (none there): the heading shows "Governance" chosen, "No asset matches."; × clears it, focus on the button',
+  sText === "Category: Governance" && sNone === 1 && sFocus && !new URL(page.url()).searchParams.has("cat"),
+  `${sText} · ${sNone} · ${sFocus}`,
+);
+
+// 2k the Focus's asset scope still holds the page: a view of USDC alone.
+const fctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await fctx.addInitScript((usdc) => {
+  localStorage.setItem(
+    "rails-focus-views",
+    JSON.stringify({
+      views: [
+        {
+          id: "v786a",
+          assets: [{ chain: 1, token: usdc, symbol: "USDC", builtOn: false }],
+          chains: [],
+          savedAt: Date.now(),
+        },
+      ],
+      active: "v786a",
+    }),
+  );
+}, USDC);
+const fpage = await fctx.newPage();
+fpage.on("pageerror", (e) => errors.push(`${fpage.url()}: ${e.message}`));
+await fpage.goto(`${BASE}/ethereum/aave-v3/assets`, { waitUntil: "networkidle", timeout: 300_000 });
+await fpage
+  .waitForSelector("[data-asset-table][data-scope-ready], [data-scope-ready] [data-asset-table]", { timeout: 60_000 })
+  .catch(() => {});
+const fLines = await fpage.$$eval("tr[data-asset-line]", (rs) =>
+  rs.filter((r) => r.getClientRects().length > 0).map((r) => r.getAttribute("data-asset-line")),
+);
+check(
+  "2k with Focus on USDC, Aave V3's Assets holds USDC (and what is built on it) alone",
+  fLines.length >= 1 && fLines.length < rows.length && fLines.includes(`1:${USDC}`),
+  `${fLines.length} of ${rows.length}`,
+);
+await fctx.close();
 
 // 3. Liquity V2's Assets
 await go(page, "/ethereum/liquity-v2/assets");
@@ -253,6 +403,30 @@ const phoneLines = await phone.$$eval(
   (ls) => ls.filter((l) => l.getBoundingClientRect().height > 0).length,
 );
 check("7b each line reads as a card", phoneLines > 10, `${phoneLines}`);
+// One plain search over every text column; no heading filters; a URL filter as a chip.
+const pFilters = await phone.$$eval(
+  "[data-heading-filter-button], [data-heading-search-open]",
+  (bs) => bs.filter((b) => b.getClientRects().length > 0).length,
+);
+await phone.locator("[data-roster-controls] input").fill("morpho");
+await phone.waitForTimeout(400);
+const morphoLines = await phone.$$eval("tr[data-asset-line]", (rs) => rs.length);
+check(
+  '7b2 at 375 no heading filters; the one search reads explorer names too ("morpho")',
+  pFilters === 0 && morphoLines > 3 && morphoLines < phoneLines,
+  `${pFilters} filters, ${morphoLines} of ${phoneLines}`,
+);
+await go(phone, "/ethereum/aave-v3/assets?cat=stablecoin");
+await phone.waitForSelector('[data-asset-table="protocol"]', { timeout: 120_000 });
+const pchip = phone.locator("[data-heading-filter-chip='category']");
+const pchipText = ((await pchip.textContent().catch(() => "")) ?? "").replace(/\s+/g, " ").trim();
+await pchip.locator("[data-heading-filter-clear]").click();
+await phone.waitForTimeout(400);
+check(
+  "7b3 at 375 ?cat=stablecoin shows a chip; its × clears it",
+  pchipText === "Category: Stablecoin" && !new URL(phone.url()).searchParams.has("cat"),
+  pchipText,
+);
 await shot(phone, "aave-assets-375");
 await go(phone, `/ethereum/aave-v3/assets/${USDC}`);
 await shot(phone, "aave-usdc-375");

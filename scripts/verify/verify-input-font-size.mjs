@@ -13,7 +13,7 @@ const BASE = process.env.BASE ?? "http://localhost:3000";
 const PAGES = [
   ["/ethereum/liquity-v2", "listing toolbar field, its filter panels, the feedback modal"],
   ["/ethereum/yearn/vaults", "vault roster search"],
-  ["/assets", "asset explorer select"],
+  ["/ethereum/aave-v3/assets", "protocol assets search"],
 ];
 
 let failures = 0;

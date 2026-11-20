@@ -62,7 +62,9 @@ export interface ChainPrice {
 export interface AssetPriceRow extends ChainPrice {
   token: string;
   symbol: string;
-  href: string;
+  /** The way to the token's page (`assetHref`); null on the route's answer
+   *  where no explorer has a page for it (ui-jobs 786). */
+  href: string | null;
   /** Every (chain, token) the page answers for: its token on each chain. */
   chains: number[];
   /** The price unit: a USD figure on every row today. */
@@ -148,6 +150,10 @@ export interface AssetPriceList {
    *  token an explorer lists that the roster does not price), for the icon
    *  popover's link; on the route's answer only. */
   unpriced?: string[];
+  /** The `chain:token` of each token an explorer has a page for under it
+   *  (decision 0069): the links the popover and the rows may draw; on the
+   *  route's answer only. */
+  paged?: string[];
 }
 
 const escapeRe = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
