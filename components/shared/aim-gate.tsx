@@ -147,17 +147,18 @@ export function FocusSourceGate({
 
 const BY_SLUG = new Map(Object.values(CHAINS).map((c) => [c.slug, c.id as number]));
 
-/** What a route belongs to: its explorer and chain; an asset page's chain and
- *  token (`/assets/<chain>/<address>`); else its first segment's chain. */
+/** What a route belongs to: its explorer and chain, and on an asset's page
+ *  under it (`/<chain>/<slug>/assets/<address>`, decision 0069) the token;
+ *  else its first segment's chain. */
 function routeOf(
   pathname: string | null,
 ): { chain: number; explorer: ReturnType<typeof protocolForPathname>; token: string | null } | null {
-  const entry = protocolForPathname(pathname);
-  if (entry) return { chain: entry.chainId, explorer: entry, token: null };
   const seg = pathname?.split("/") ?? [];
-  if (seg[1] === "assets" && seg[2] && /^0x[0-9a-f]{40}$/i.test(seg[3] ?? "")) {
-    const chain = BY_SLUG.get(seg[2]);
-    return chain != null ? { chain, explorer: undefined, token: seg[3].toLowerCase() } : null;
+  const entry = protocolForPathname(pathname);
+  if (entry) {
+    const at = seg.indexOf("assets", 3);
+    const token = at > 0 && /^0x[0-9a-f]{40}$/i.test(seg[at + 1] ?? "") ? seg[at + 1].toLowerCase() : null;
+    return { chain: entry.chainId, explorer: entry, token };
   }
   const chain = seg[1] ? BY_SLUG.get(seg[1]) : undefined;
   return chain != null ? { chain, explorer: undefined, token: null } : null;

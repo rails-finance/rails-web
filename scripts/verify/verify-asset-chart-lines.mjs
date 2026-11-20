@@ -2,11 +2,12 @@
 // (rails-ops TO-DO-ui-jobs 234; reference/asset-key-map.md, "Colour and the
 // legend"), and of TradingView's attribution in the footers.
 //
-//   L1 colours: on ETH on Ethereum read from Liquity V2's WETH branch, every
+//   L1 colours: on WETH under Liquity V2 (decision 0069: an asset's page sits
+//      under a protocol and reads from its side), every
 //      line is drawn in a style (colour and dash) of its own, the main line in
 //      blue at 2 px and the others at 1 px; each legend key's stroke is its
 //      line's colour, and so is each spread row's key.
-//   L2 the style follows the key: the page without `via` (another main line)
+//   L2 the style follows the key: WETH under Aave V3 (another main line)
 //      draws every line that is thin on both in the same colour and dash.
 //   L3 hide/show: a thin line's row pressed hides it in both panes
 //      (`visible: false`, the row marked hidden, aria-pressed false), "Show all
@@ -14,8 +15,8 @@
 //   L4 highlight: a row hovered lights its line (alpha 1, a pixel wider) and
 //      dims the others; the chart hovered over its lines lights one of them
 //      and its legend row, and names it over the spread pane.
-//   L5 attribution: the NOTICE and its link in the footer of /, /assets and an
-//      asset page, and no TradingView logo in the asset chart.
+//   L5 attribution: the NOTICE and its link in the footer of /, a protocol's
+//      Assets page and an asset page, and no TradingView logo in the asset chart.
 //   L6 every page here, at 1440 and at 390 with touch, light and dark: no
 //      horizontal overflow, no console error.
 //
@@ -26,13 +27,16 @@ import { chromium } from "playwright";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 const NAV = { waitUntil: "domcontentloaded", timeout: 180000 };
-const ETH = "/assets/ethereum/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-const ETH_VIA = `${ETH}?via=liquity:WETH`;
+const WETH = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
+// WETH from Liquity V2's side, and from Aave V3's (another main line).
+const ETH_VIA = `/ethereum/liquity-v2/assets/${WETH}`;
+const ETH = `/ethereum/aave-v3/assets/${WETH}`;
 const PAGES = [
   ETH_VIA,
-  "/assets/base/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  "/assets/base/0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452?via=aave-v3-base",
-  "/assets/ethereum/0xc18360217d8f7ab5e7c516566761ea12ce7f9d72",
+  "/base/aave-v3/assets/0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+  "/base/aave-v3/assets/0xc1cba3fcea344f92d9239c08c0568f6f2f0ee452",
+  // The resolver opens it under the first explorer that lists it.
+  "/api/asset-page/ethereum/0xc18360217d8f7ab5e7c516566761ea12ce7f9d72",
 ];
 const NOTICE = "TradingView Lightweight Charts™ Copyright (с) 2025 TradingView, Inc.";
 const NOTICE_URL = "https://www.tradingview.com/";
@@ -225,9 +229,9 @@ try {
         check(label === hit, "L4 the lit line is named over the spread pane", `${label}`);
       }
     }
-    await layoutCheck(page, "ETH via liquity:WETH 1440 light", errors);
+    await layoutCheck(page, "WETH under Liquity V2 1440 light", errors);
 
-    // L2 the same keys without via.
+    // L2 the same keys from Aave V3's side.
     await page.goto(BASE + ETH, NAV);
     const d3 = await drawn(page);
     const main3 = (await legend(page))[0].id;
@@ -247,7 +251,7 @@ try {
       extraHTTPHeaders: bypassHeaders(),
     });
     const page = await ctx.newPage();
-    for (const path of ["/", "/assets", ETH_VIA]) {
+    for (const path of ["/", "/ethereum/aave-v3/assets", ETH_VIA]) {
       await page.goto(BASE + path, NAV);
       const f = await page
         .waitForSelector("footer [data-lw-attribution]", { timeout: 120000 })

@@ -1,5 +1,6 @@
-// The asset explorer at /assets (rails-ops reference/asset-key-map.md, "The
-// asset explorer"): one card per asset, its Prices-list figures, its chains,
+// The asset cards (rails-ops reference/asset-key-map.md, "The asset
+// explorer"; since decision 0069 read by each protocol's Assets pages and the
+// asset-page resolver): one card per asset, its Prices-list figures, its chains,
 // the Rails explorers that list it (lib/api/asset-explorer-chips.ts) and the
 // tokens it wraps or is wrapped as.
 //
@@ -19,7 +20,7 @@
 import type { ChipUse } from "@/lib/shared/asset-uses";
 import { assetHref, type LinkKind, type RosterLinkRef } from "@/lib/shared/asset-roster";
 import type { AssetPriceList, AssetPriceRow, ChainPrice } from "@/lib/shared/asset-prices";
-import { ASSET_CATEGORY_ORDER, assetCategory, type AssetCategory } from "@/lib/shared/asset-categories";
+import { assetCategory, type AssetCategory } from "@/lib/shared/asset-categories";
 
 /** A one-for-one wrapper (WETH, WBTC, cbBTC, tBTC, FBTC, BTC.b, USDbC):
  *  "own" gives it a card of its own beside its underlying's, linked both ways;
@@ -271,69 +272,4 @@ export function assetCards(
       c.short = `${t.slice(0, 6)}…${t.slice(-4)}`;
     }
   return cards;
-}
-
-export type CardSort = "read" | "flagged" | "symbol" | "change" | "explorers";
-
-export const CARD_SORTS: readonly { value: CardSort; label: string }[] = [
-  { value: "read", label: "Most read" },
-  { value: "flagged", label: "Flagged first" },
-  { value: "symbol", label: "Symbol" },
-  { value: "change", label: "30-day change" },
-  { value: "explorers", label: "Explorers" },
-];
-
-/** The assets in a sort: the most read (protocol series on the page; an
- *  asset with no price after, by its explorers), flagged ones first (the
- *  Prices list's order), by symbol, by the 30-day change (none last) or by
- *  how many explorers list it. `dir` "asc" flips the order. */
-export function sortCards(cards: readonly AssetCard[], sort: CardSort, dir: "asc" | "desc" = "desc"): AssetCard[] {
-  const read = (a: AssetCard, b: AssetCard) =>
-    Number(b.row != null) - Number(a.row != null) ||
-    (b.row?.readers ?? 0) - (a.row?.readers ?? 0) ||
-    b.chips.length - a.chips.length ||
-    a.symbol.localeCompare(b.symbol);
-  const out = [...cards];
-  if (sort === "symbol") out.sort((a, b) => a.symbol.localeCompare(b.symbol, "en-US", { sensitivity: "base" }));
-  else if (sort === "flagged")
-    out.sort((a, b) => Number(b.row?.flag != null) - Number(a.row?.flag != null) || read(a, b));
-  else if (sort === "change") {
-    out.sort((a, b) => {
-      const x = a.row?.change ?? null;
-      const y = b.row?.change ?? null;
-      if (x == null || y == null) return x == null ? (y == null ? read(a, b) : 1) : -1;
-      return y - x || read(a, b);
-    });
-  } else if (sort === "explorers") out.sort((a, b) => b.chips.length - a.chips.length || read(a, b));
-  else out.sort(read);
-  // Symbol reads A to Z first; the rest most first.
-  const flip = sort === "symbol" ? dir === "desc" : dir === "asc";
-  return flip ? out.reverse() : out;
-}
-
-export interface ExplorerState {
-  cats: AssetCategory[];
-  chains: number[];
-  explorers: string[];
-  /** "in" or "out" of the reader's focus; [] is both. */
-  focus: string[];
-  sort: CardSort;
-  dir: "asc" | "desc";
-}
-
-/** The state a URL's params name; unknown values fall back to the defaults. */
-export function explorerState(sp: Record<string, string | string[] | undefined>): ExplorerState {
-  const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : sp[k]) as string | undefined;
-  const list = (k: string) => (one(k) ?? "").split(",").filter(Boolean);
-  const sort = one("sort");
-  return {
-    cats: list("cat").filter((c): c is AssetCategory => ASSET_CATEGORY_ORDER.includes(c as AssetCategory)),
-    chains: list("chain")
-      .map(Number)
-      .filter((n) => Number.isInteger(n) && n > 0),
-    explorers: list("explorer"),
-    focus: list("focus").filter((f) => f === "in" || f === "out"),
-    sort: CARD_SORTS.some((s) => s.value === sort) ? (sort as CardSort) : "read",
-    dir: one("dir") === "asc" ? "asc" : "desc",
-  };
 }

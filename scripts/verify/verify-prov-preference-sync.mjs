@@ -141,7 +141,7 @@ check(
 // Off the switch's routes (ui-jobs 625, 651; Miles 13 Nov 2026): the switch
 // reads the saved choice and toggles it there as anywhere, nothing is
 // pickable, and the header draws no inspector indicator.
-const OFF_LIST = "/assets";
+const OFF_LIST = "/protocols";
 await page.evaluate((k) => localStorage.setItem(k, "1"), KEY);
 await page.goto(`${BASE}${OFF_LIST}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.waitForTimeout(3000);

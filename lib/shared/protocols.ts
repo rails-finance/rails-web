@@ -1594,6 +1594,31 @@ export function positionNounPlural(session: SessionProtocol): string {
   return noun.endsWith("s") ? noun : `${noun}s`;
 }
 
+/** One of an explorer's sections, as its menu (H5) and its /protocols line
+ *  name them (ui-jobs 786). */
+export interface ExplorerSection {
+  kind: "overview" | "listing" | "subPage" | "info";
+  href: string;
+  name: string;
+  /** The sub-page, on a "subPage" section. */
+  sub?: SubPageEntry;
+}
+
+/** An explorer's sections in menu order: a front-door explorer's front door
+ *  ("Overview"; the Arbitrum position-first ones), the position listing named
+ *  by the positions' noun (none on a vault-native explorer, decision 0027 call
+ *  2), each roster sub-page, then About. The one list H5 and /protocols read. */
+export function explorerSections(entry: ProtocolEntry): ExplorerSection[] {
+  return [
+    ...(entry.frontDoor ? [{ kind: "overview" as const, href: entry.href, name: "Overview" }] : []),
+    ...(entry.positionListing !== false
+      ? [{ kind: "listing" as const, href: entry.listingHref, name: positionNounPlural(entry.session) }]
+      : []),
+    ...entry.subPages.map((sub) => ({ kind: "subPage" as const, href: sub.href, name: sub.tab, sub })),
+    { kind: "info" as const, href: entry.infoHref, name: "About" },
+  ];
+}
+
 /** The explorer's name for a TEXT-ONLY surface — a tab title, an aria-label,
  *  a sentence — where the chain mark cannot go. On screen the chain is a mark
  *  beside the label (ChainMark), never a suffix on the name; where only words

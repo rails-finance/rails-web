@@ -117,9 +117,12 @@ export function chainOfSlug(slug: string): number | null {
   return hit ? hit.id : null;
 }
 
-/** The asset page's path: chain + token address. */
+/** The way to a token's page from a link the app draws (decision 0069,
+ *  ui-jobs 786): the resolver, which opens the token's page under the
+ *  explorer named by `?via=` where it lists the token, else under the first
+ *  explorer that does (app/api/asset-page/[chain]/[token]/route.ts). */
 export function assetHref(chain: number, token: string): string {
-  return `/assets/${chainSlug(chain) ?? chain}/${token.toLowerCase()}`;
+  return `/api/asset-page/${chainSlug(chain) ?? chain}/${token.toLowerCase()}`;
 }
 
 /** A protocol's name without its market or ilk: "Maker ETH-A" and "Maker

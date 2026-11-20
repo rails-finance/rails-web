@@ -184,18 +184,6 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
         </nav>
       )}
       <ScopeNote scoped={roster} noun={["explorer", "explorers"]} className="mt-3" />
-      {/* The cross-indexes under the chooser, plain links with no lead-in
-          (decision 0068 point 7). Vaults joins at its launch (ui-jobs 775). */}
-      <nav aria-label="Indexes" className="-mx-2 mt-6 flex flex-col items-start" data-chooser-indexes="">
-        <Link
-          href="/assets"
-          onClick={onNavigate}
-          className={`inline-flex min-h-11 items-center rounded-sm px-2 ${INDEX_LINK}`}
-          data-chooser-index="assets"
-        >
-          Assets
-        </Link>
-      </nav>
     </div>
   );
 }

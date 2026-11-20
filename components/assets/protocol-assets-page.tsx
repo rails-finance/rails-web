@@ -103,6 +103,7 @@ export async function ProtocolAssetsPage({ id, searchParams }: { id: string; sea
   const [data, sp, boldRead] = await Promise.all([read(), searchParams, loadBoldPriceWithin()]);
   const cat = (Array.isArray(sp.cat) ? sp.cat[0] : sp.cat) ?? "";
   const initialCats = cat.split(",").filter((c) => (ASSET_CATEGORY_ORDER as readonly string[]).includes(c));
+  const also = (Array.isArray(sp.also) ? sp.also[0] : sp.also) ?? null;
   const where = CHAINS[e.chainId].name;
   return (
     <div className="min-h-screen">
@@ -130,6 +131,7 @@ export async function ProtocolAssetsPage({ id, searchParams }: { id: string; sea
               protocol={e.label}
               chain={e.chainId}
               initialCats={initialCats}
+              initialAlso={also && /^[a-z0-9-]{1,40}$/.test(also) ? also : null}
               boldRead={boldRead ?? null}
             />
           </>
@@ -208,10 +210,7 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
           category={card.category ?? assetCategory(card.symbol)}
           row={null}
           figure={unpriced?.figure ?? card.figure}
-          chips={card.chips}
-          chains={card.chains}
           relations={relationsFor(opened)}
-          back={null}
           note={null}
           aside={aside}
           chainLabel={false}
@@ -235,10 +234,7 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
         category={card.category}
         row={head?.row ?? null}
         figure={null}
-        chips={card.chips}
-        chains={card.chains}
         relations={relationsFor(page)}
-        back={null}
         note={null}
         aside={aside}
         chainLabel={false}

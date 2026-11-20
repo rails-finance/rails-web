@@ -21,6 +21,7 @@
 // The head is one read (`/api/at-block/aave-v4/reserve`); a token the spoke lists
 // from two hubs needs `?hub=`, and without it the page asks which.
 
+import { assetPageFrom } from "@/lib/shared/asset-via-links";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Prov } from "@/components/shared/provenance";
@@ -232,8 +233,8 @@ function reserveHead(d: V4Deployment, sp: V4Spoke, l: V4Line, f: V4ReserveFigure
     {
       item: "asset",
       title: names.symbol,
-      subtitle: `${names.symbol} on ${chain.name}, across Rails`,
-      href: `/assets/${chain.slug}/${l.underlying}`,
+      subtitle: "Its price and the other explorers that use it",
+      href: assetPageFrom(chain.id, l.underlying, d.root),
       internal: true,
     },
   ];

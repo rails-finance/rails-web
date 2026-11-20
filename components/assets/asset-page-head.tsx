@@ -1,21 +1,22 @@
-// The asset page's heading and top band (rails-ops reference/app-anatomy.md,
-// A1): the asset's mark, symbol and chain as the h1 with its category, then
-// one band of the explorer card's parts (A5.4): the price row (A5.1), or on a
-// page without a price the card's figure and why, and the explorers that read
-// it, a group per chain; under the band, what it wraps and what wraps it as
-// one muted line. The chain sections (A2) follow on the page.
+// An asset page's heading and top band under a protocol (rails-ops
+// reference/app-anatomy.md, A1, A7; decision 0069): the asset's mark and symbol
+// as the h1 with its category, then one band: the price row (A5.1), or on a
+// page without a price the card's figure and why, beside the asset's use in
+// the protocol and the other explorers using it (`aside`, A7.1 and A7.2);
+// under the band, what it wraps and what wraps it as one muted line. The
+// chain section (A2) follows on the page.
 
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AssetPriceRow } from "@/components/assets/asset-price-row";
-import { CategoryBadge, ExplorerChip, FigureRow } from "@/components/assets/asset-explorer";
+import { CategoryBadge, FigureRow } from "@/components/assets/asset-explorer";
 import { ChainLabel } from "@/components/shared/rail-header";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { CopyFact } from "@/components/shared/event-page-aside";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { ChainProvider } from "@/lib/shared/chain-context";
 import { chainName, NATIVE, shortAddress } from "@/lib/shared/asset-roster";
-import { PRICELESS_WHY, type AssetChip, type CardChain, type CardFigure } from "@/lib/shared/asset-explorer";
+import { PRICELESS_WHY, type CardFigure } from "@/lib/shared/asset-explorer";
 import type { AssetCategory } from "@/lib/shared/asset-categories";
 import type { AssetPriceRow as Row } from "@/lib/shared/asset-prices";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
@@ -33,16 +34,13 @@ export function AssetPageHead({
   category,
   row,
   figure,
-  chips,
-  chains,
   relations,
-  back,
   note,
   livePrice,
   aside,
   chainLabel = true,
 }: {
-  /** The chain the page opens on: the h1's glyph and the first group of chips. */
+  /** The asset's chain: the explorer's. */
   chain: number;
   token: string;
   symbol: string;
@@ -50,32 +48,21 @@ export function AssetPageHead({
   /** The price row; null on a page without a stored price. */
   row: Row | null;
   figure: CardFigure | null;
-  chips: AssetChip[];
-  /** The card's chains, each with its asset page. */
-  chains: CardChain[];
   relations: RelationGroup[];
-  back: { href: string; label: string } | null;
   /** A1.2, with `via` on a chain the page has no chart on. */
   note: ReactNode;
   /** On a page without a stored price, a price Rails reads live (BOLD's from
    *  the Curve BOLD/USDC pool, A1.7), in the no-price line's place. It draws
    *  the card's figure too, inside its receipts scope. */
   livePrice?: ReactNode;
-  /** Under a protocol (decision 0069, A7): the band's right half in Read by's
-   *  place, the asset's use in the protocol and the others using it. */
-  aside?: ReactNode;
+  /** The band's right half (decision 0069, A7): the asset's use in the
+   *  protocol and the other explorers using it. */
+  aside: ReactNode;
   /** The chain's label after the h1; under a protocol its heading names the chain. */
   chainLabel?: boolean;
 }) {
   return (
     <header className="mb-2" data-skel-section="page-header" data-anatomy="A1">
-      {back && (
-        <p className="mb-2 text-sm" data-anatomy="A1.1">
-          <Link href={back.href} className="link-muted hover:underline" data-asset-back={back.href}>
-            {back.label}
-          </Link>
-        </p>
-      )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="flex min-w-0 items-center gap-2 text-2xl font-semibold text-foreground">
           <ChainProvider chainId={chain as ChainId}>
@@ -106,7 +93,7 @@ export function AssetPageHead({
           )}
           {token.toLowerCase() !== NATIVE && <ContractLine chain={chain} token={token} />}
         </div>
-        {aside ?? <ReadBy chain={chain} token={token} symbol={symbol} chips={chips} chains={chains} />}
+        {aside}
       </div>
       {relations.length > 0 && <RelationLine chain={chain} groups={relations} />}
       {note}
@@ -132,97 +119,6 @@ function ContractLine({ chain, token }: { chain: number; token: string }) {
       </a>
       <CopyFact value={address} label="Copy contract address" name="contract" />
     </p>
-  );
-}
-
-/** The explorers that read the asset , a group per chain under its glyph
- *  and name where they span chains, the page's chain first; a group on another
- *  chain's page names that page. */
-function ReadBy({
-  chain,
-  token,
-  symbol,
-  chips,
-  chains,
-}: {
-  chain: number;
-  token: string;
-  symbol: string;
-  chips: AssetChip[];
-  chains: CardChain[];
-}) {
-  const order = [...new Set([chain, ...chips.map((c) => c.chain)])].filter((c) => chips.some((x) => x.chain === c));
-  const many = order.length > 1;
-  return (
-    <section
-      className="min-w-0 md:border-l md:border-rb-200 md:pl-6 dark:md:border-rb-700"
-      aria-labelledby="asset-read-by"
-      data-anatomy="A1.5"
-    >
-      <h2 id="asset-read-by" className="mb-2 text-sm text-rb-500">
-        Read by
-      </h2>
-      {chips.length === 0 ? (
-        <p className="text-sm text-rb-500">No Rails explorer lists it.</p>
-      ) : (
-        <div className="space-y-2.5" data-asset-chips="">
-          {order.map((c) => {
-            const page = chains.find((x) => x.chain === c);
-            const other = page?.href && page.token !== token.toLowerCase() ? page.href : null;
-            return (
-              <div key={c} data-asset-chip-chain={c}>
-                {many && (
-                  <p className="mb-1 flex items-center gap-1.5 text-xs text-rb-500">
-                    <ChainGlyph chainId={c as ChainId} className="h-3.5 w-3.5" />
-                    {other ? (
-                      <Link href={other} className="link-muted hover:underline" title={`${symbol} on ${chainName(c)}`}>
-                        {chainName(c)}
-                      </Link>
-                    ) : (
-                      chainName(c)
-                    )}
-                  </p>
-                )}
-                <ul className="flex flex-wrap gap-1">
-                  {chips
-                    .filter((ch) => ch.chain === c)
-                    .map((ch) => (
-                      <li key={ch.explorer}>
-                        <ExplorerChip chip={ch} symbol={symbol} chainMark={false} />
-                      </li>
-                    ))}
-                </ul>
-                <UseLines chips={chips.filter((ch) => ch.chain === c && ch.uses?.length)} />
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
-
-/** Under a group's chips, a muted line per explorer that names what the
- *  token is to it, each use a link to the explorer's page for it: "Liquity
- *  V2: Trove debt, Stability Pools, sBOLD", "Pendle: PT-sBOLD-4FEB2027". */
-function UseLines({ chips }: { chips: AssetChip[] }) {
-  if (chips.length === 0) return null;
-  return (
-    <ul className="mt-1.5 space-y-0.5 text-xs text-rb-500" data-asset-uses="" data-anatomy="A1.8">
-      {chips.map((ch) => (
-        <li key={ch.explorer} data-asset-use={ch.explorer}>
-          {ch.label}:{" "}
-          {ch.uses!.map((u, i) => (
-            <span key={u.href}>
-              {i > 0 && ", "}
-              <Link href={u.href} className="font-medium text-foreground underline-offset-2 hover:underline">
-                {u.label}
-              </Link>
-            </span>
-          ))}
-        </li>
-      ))}
-    </ul>
   );
 }
 
