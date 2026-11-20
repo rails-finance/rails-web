@@ -1,7 +1,7 @@
 "use client";
 
 // The asset explorer's body (rails-ops reference/asset-key-map.md, "The asset
-// explorer"; anatomy A5): the h1 with its (i) drawer, the listings' toolbar
+// explorer"; anatomy A5): the h1 with its lead under it, the listings' toolbar
 // (search, Category, Chain, Explorer and, under Focus, Focus; the sort), then
 // one table row per asset (A5.4) in the house table (D1, stacked below sm).
 // The selection lives in the URL (`?cat=`, `?chain=`, `?explorer=`,
@@ -21,17 +21,16 @@
 
 import Link from "next/link";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, memo, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { BoldCardPrice, BoldReadContext, holdsBold } from "@/components/assets/bold-live-price";
 import type { BoldPriceRead } from "@/lib/liquity-v2/bold-price";
 import { asOfMark, asOfWords, flagWords, fmtRowPrice } from "@/components/assets/asset-price-row";
 import { PriceUnitMark } from "@/components/assets/price-unit-mark";
 import { fmtChange, PriceSparkline } from "@/components/assets/price-sparkline";
 import { formatCompactTitled } from "@/lib/shared/format-compact";
-import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
+import { hasProtocolGlyph, ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { InfoDisclosureTrigger } from "@/components/shared/info-disclosure";
 import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
 import {
@@ -49,7 +48,9 @@ import {
 import { ASSET_CATEGORY_LABELS, ASSET_CATEGORY_ORDER, type AssetCategory } from "@/lib/shared/asset-categories";
 import {
   CARD_SORTS,
+  cardLines,
   sortCards,
+  type CardLine,
   type AssetCard,
   type AssetChip,
   type CardFigure,
@@ -58,7 +59,8 @@ import {
   PRICELESS_WHY,
 } from "@/lib/shared/asset-explorer";
 import { chainName } from "@/lib/shared/asset-roster";
-import type { ChainId } from "@/lib/shared/chains";
+import { CHAINS, type ChainId, type ChainMeta } from "@/lib/shared/chains";
+import { ChainProvider } from "@/lib/shared/chain-context";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
 import { useScopedRows } from "@/components/shared/asset-scope-note";
 import { assetKey } from "@/lib/shared/asset-family";
@@ -71,10 +73,16 @@ import {
   type AssetPick,
 } from "@/lib/shared/asset-scope";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
-import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
+import { INDEX_FIRST_COL, INPLACE_TEXT, MARK_TILE, MARK_TILE_LINK } from "@/lib/shared/ui-grammar";
 
 const CATEGORY_NOTE = "Rails’ classification of the asset";
+/** The chains' order: a group's lines run in it, as /protocols' do. */
+const CHAIN_ORDER = (Object.values(CHAINS) as ChainMeta[]).map((c) => c.id as number);
 const n = (v: number) => v.toLocaleString("en-US");
+
+/** The assets drawn before "Show all" (ui-jobs 781): whole groups, never an
+ *  asset's lines split. */
+const SHOWN_FIRST = 60;
 
 /** "Focus on these N" takes this many assets at most. */
 const FOCUS_ON_MAX = 50;
@@ -110,15 +118,17 @@ export function AssetExplorer({
   cards: AssetCard[];
   initial: ExplorerState;
   initialSearch: string;
-  /** The (i) drawer's body: what the list is and the day its prices read. */
+  /** The lead under the h1: what the list is and the day its prices read. */
   about: ReactNode;
   /** BOLD's Curve BOLD/USDC read for its row (A5.12, ui-jobs 746b); null
    *  where it failed. */
   boldRead?: BoldPriceRead | null;
 }) {
   const scope = useAssetScope();
-  const [introOpen, setIntroOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // The first SHOWN_FIRST assets draw until "Show all"; a filter, a search or
+  // a sort change goes back to them. Not in the URL (ui-jobs 781).
+  const [showAll, setShowAll] = useState(false);
   const [filters, setFiltersState] = useState<Omit<Filters, "q">>({
     cats: initial.cats,
     chains: initial.chains.map(String),
@@ -216,6 +226,7 @@ export function AssetExplorer({
 
   const state: Filters = { q: query, ...filters };
   const onToolbar = (next: Filters) => {
+    setShowAll(false);
     if (next.q !== query) setQuery(next.q);
     const { q: _q, ...rest } = next; // eslint-disable-line @typescript-eslint/no-unused-vars
     setFiltersState(rest);
@@ -223,6 +234,7 @@ export function AssetExplorer({
   };
 
   const setSort = (sortBy: CardSort, sortOrder: DataTableDir) => {
+    setShowAll(false);
     const next = { ...filters, sortBy, sortOrder };
     setFiltersState(next);
     writeUrl(next);
@@ -327,22 +339,42 @@ export function AssetExplorer({
     return dims;
   }, [cards, scope.on, inFocus]);
 
-  const passesFor = (s: Filters) => {
+  /** A card's lines that pass (ui-jobs 781, as /protocols' lines): the
+   *  category and Focus keep or drop the asset; the chain and the explorer
+   *  keep their lines; the search keeps every line on the symbol or the
+   *  category, else the lines whose address matches. */
+  // Each card's lines, built once per list, so a search keeps the same line
+  // objects and the memoised figures (LineFigures) do not draw again.
+  const allLines = useMemo(() => new Map(cards.map((c) => [c.id, cardLines(c, CHAIN_ORDER)])), [cards]);
+  const linesFor = (s: Filters) => {
     const want = s.q.trim().toLowerCase();
-    return (c: AssetCard) =>
-      (s.cats.length === 0 || s.cats.includes(c.category)) &&
-      (s.chains.length === 0 || c.chains.some((x) => s.chains.includes(String(x.chain)))) &&
-      (s.explorers.length === 0 || c.chips.some((ch) => s.explorers.includes(ch.explorer))) &&
-      (!scope.on || s.focus.length === 0 || s.focus.includes(inFocus(c) ? "in" : "out")) &&
-      (want === "" ||
+    return (c: AssetCard): CardLine[] => {
+      if (s.cats.length > 0 && !s.cats.includes(c.category)) return [];
+      if (scope.on && s.focus.length > 0 && !s.focus.includes(inFocus(c) ? "in" : "out")) return [];
+      const lines = (allLines.get(c.id) ?? []).filter(
+        (l) =>
+          (s.chains.length === 0 || s.chains.includes(String(l.chain))) &&
+          (s.explorers.length === 0 || l.chips.some((ch) => s.explorers.includes(ch.explorer))),
+      );
+      if (
+        want === "" ||
         c.symbol.toLowerCase().includes(want) ||
-        c.chains.some((x) => x.token.toLowerCase().includes(want)) ||
-        ASSET_CATEGORY_LABELS[c.category].toLowerCase().includes(want));
+        ASSET_CATEGORY_LABELS[c.category].toLowerCase().includes(want)
+      )
+        return lines;
+      return lines.filter((l) => l.token.toLowerCase().includes(want));
+    };
   };
-  const shown = useMemo(
-    () => sortCards(cards.filter(passesFor(state)), filters.sortBy as CardSort, filters.sortOrder),
+  const passesFor = (s: Filters) => (c: AssetCard) => linesFor(s)(c).length > 0;
+  const shownLines = useMemo(
+    () =>
+      sortCards(cards.filter(passesFor(state)), filters.sortBy as CardSort, filters.sortOrder).map((c) => ({
+        card: c,
+        lines: linesFor(state)(c),
+      })),
     [cards, query, filters, scope.on, inFocus], // eslint-disable-line react-hooks/exhaustive-deps
   );
+  const shown = shownLines.map((x) => x.card);
   const filtering =
     query.trim() !== "" ||
     filters.cats.length + filters.chains.length + filters.explorers.length + (scope.on ? filters.focus.length : 0) > 0;
@@ -369,21 +401,9 @@ export function AssetExplorer({
     <BoldReadContext.Provider value={boldRead}>
       <div>
         <header className="mb-4" data-anatomy="A5">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-foreground">Assets</h1>
-            <InfoDisclosureTrigger
-              open={introOpen}
-              onToggle={() => setIntroOpen((o) => !o)}
-              label="about this list"
-              ariaControls="asset-explorer-intro"
-            />
-          </div>
-          <div
-            id="asset-explorer-intro"
-            data-intro-drawer
-            hidden={!introOpen}
-            className="mt-2 max-w-3xl rounded-xl bg-raised px-3 py-3 text-[12px] leading-relaxed text-rb-500"
-          >
+          <h1 className="text-2xl font-semibold text-foreground">Assets</h1>
+          {/* What the list is, as body text under the h1 (Miles, 20 Nov 2026; ui-jobs 781). */}
+          <div className="mt-2 max-w-3xl text-sm leading-relaxed text-rb-500" data-asset-explorer-lead="">
             {about}
           </div>
         </header>
@@ -472,7 +492,7 @@ export function AssetExplorer({
               <DataTableHead>
                 {headerFor("Asset")}
                 {headerFor("Category")}
-                {headerFor("Chains")}
+                {headerFor("Chain")}
                 {headerFor("Price", "right")}
                 {headerFor("30 days", "right")}
                 {headerFor("Change", "right")}
@@ -480,20 +500,38 @@ export function AssetExplorer({
                 <DataTableHeader label={<span className="sr-only">Actions</span>} data-col-head="menu" />
               </DataTableHead>
               <DataTableBody>
-                {shown.map((c) => (
-                  <AssetRow
-                    key={c.id}
-                    card={c}
-                    focusOn={scope.on}
-                    marked={manage}
-                    inFocus={inFocus(c)}
-                    picked={picked(c).length > 0}
-                    onAdd={() => add(c)}
-                    onRemove={() => remove(c)}
-                  />
+                {(showAll ? shownLines : shownLines.slice(0, SHOWN_FIRST)).map(({ card: c, lines }) => (
+                  <Fragment key={c.id}>
+                    {lines.map((l, i) => (
+                      <AssetRow
+                        key={`${l.chain}:${l.token}`}
+                        card={c}
+                        line={l}
+                        first={i === 0}
+                        focusOn={scope.on}
+                        marked={manage}
+                        inFocus={inFocus(c)}
+                        picked={picked(c).length > 0}
+                        onAdd={() => add(c)}
+                        onRemove={() => remove(c)}
+                      />
+                    ))}
+                  </Fragment>
                 ))}
               </DataTableBody>
             </DataTable>
+          )}
+          {!showAll && shownLines.length > SHOWN_FIRST && (
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                className={`inline-flex min-h-11 items-center px-3 text-sm font-semibold ${INPLACE_TEXT}`}
+                data-asset-show-all={shownLines.length}
+              >
+                Show all {n(shownLines.length)}
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -501,9 +539,16 @@ export function AssetExplorer({
   );
 }
 
-/** One asset as a table row (A5.4): the whole row opens its page. */
+/** One asset's line on one chain (A5.4; ui-jobs 781), in its asset's group as
+ *  /protocols' lines are: the whole line opens the asset's page on that chain.
+ *  The group's first line shown carries the mark, symbol, category and the
+ *  row's ⋮; a later line leaves them blank and continues the group
+ *  (`data-dt-cont`, its hairline above dashed). Price, 30 days, Change and
+ *  Listed by are that chain's. */
 function AssetRow({
   card: c,
+  line: l,
+  first,
   focusOn,
   marked,
   inFocus,
@@ -512,6 +557,8 @@ function AssetRow({
   onRemove,
 }: {
   card: AssetCard;
+  line: CardLine;
+  first: boolean;
   focusOn: boolean;
   /** "Add assets" shows every row, so the ones in focus carry the pill;
    *  held to the focus, every row is in it and none does. */
@@ -521,13 +568,10 @@ function AssetRow({
   onAdd: () => void;
   onRemove: () => void;
 }) {
-  const href = c.row?.href ?? c.chains.find((x) => x.href)?.href ?? null;
-  const row = c.row;
-  const flag = row?.flag ? flagWords(row.flag) : null;
-  const boldRead = useContext(BoldReadContext);
-  const token = c.chains[0]?.token ?? "";
+  const href = l.href;
+  const onChain = `${c.symbol} on ${chainName(l.chain)}`;
   const name = (
-    <span className="min-w-0 truncate text-sm font-semibold" title={c.symbol}>
+    <span className="min-w-0 truncate text-sm font-semibold" title={c.symbol} data-asset-name="">
       {c.symbol}
     </span>
   );
@@ -535,24 +579,38 @@ function AssetRow({
     <DataTableRow
       href={href ?? undefined}
       data-asset-card={c.id}
+      data-asset-line={`${l.chain}:${l.token}`}
       data-asset-category={c.category}
       data-asset-in-focus={focusOn ? (inFocus ? (picked ? "picked" : "built-on") : "out") : undefined}
+      data-dt-cont={first ? undefined : ""}
       data-anatomy="A5.4"
     >
-      <DataTableCell rowHeader valign="middle" className="sm:w-full sm:max-w-0 sm:min-w-[160px]">
+      <DataTableCell rowHeader valign="middle" className={INDEX_FIRST_COL}>
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="shrink-0" data-prov-exempt>
-            <TokenChipIcon symbol={c.symbol} address={token} size={28} filterable={false} untitled />
-          </span>
+          {first ? (
+            <span className="shrink-0" data-prov-exempt>
+              <ChainProvider chainId={l.chain as ChainId}>
+                <TokenChipIcon symbol={c.symbol} address={l.token} size={28} filterable={false} untitled />
+              </ChainProvider>
+            </span>
+          ) : (
+            <span className="h-7 w-7 shrink-0 max-sm:hidden" aria-hidden />
+          )}
+          {/* The line's one link: the symbol on the group's first line, else
+              the asset on this chain for a screen reader alone. */}
           {href ? (
-            <DataTableRowLink href={href} className="flex min-w-0 items-baseline gap-1.5">
+            <DataTableRowLink
+              href={href}
+              aria-label={onChain}
+              className={`flex min-w-0 items-baseline gap-1.5 ${first ? "" : "sr-only"}`}
+            >
               {name}
             </DataTableRowLink>
-          ) : (
+          ) : first ? (
             name
-          )}
-          {c.short && <span className="shrink-0 font-mono text-[11px] text-rb-500">{c.short}</span>}
-          {marked && inFocus && (
+          ) : null}
+          {first && c.short && <span className="shrink-0 font-mono text-[11px] text-rb-500">{c.short}</span>}
+          {first && marked && inFocus && (
             <span
               className={`${DATA_TABLE_PILL} shrink-0 px-1.5 py-0.5 text-[11px]`}
               title={picked ? "In your focus" : "In your focus through what it is built on"}
@@ -562,114 +620,190 @@ function AssetRow({
               In focus
             </span>
           )}
-        </div>
-      </DataTableCell>
-      <DataTableCell label="Category" valign="middle" className="whitespace-nowrap">
-        <span
-          className="text-sm text-foreground"
-          title={CATEGORY_NOTE}
-          data-asset-category-badge={c.category}
-          data-anatomy="A5.8"
-        >
-          {ASSET_CATEGORY_LABELS[c.category]}
-        </span>
-      </DataTableCell>
-      <DataTableCell label="Chains" valign="middle" className="whitespace-nowrap">
-        <span className="flex items-center gap-1.5" data-asset-card-chains="">
-          {c.chains.map((x) =>
-            x.href ? (
-              <Link
-                key={`${x.chain}:${x.token}`}
-                href={x.href}
-                title={`${c.symbol} on ${chainName(x.chain)}`}
-                aria-label={`${c.symbol} on ${chainName(x.chain)}`}
-                className="text-rb-500 hover:text-foreground"
-              >
-                <ChainGlyph id={x.chain as ChainId} className="h-3.5 w-3.5" />
-              </Link>
-            ) : (
-              <span
-                key={`${x.chain}:${x.token}`}
-                title={`${c.symbol} on ${chainName(x.chain)}`}
-                className="text-rb-500"
-              >
-                <ChainGlyph id={x.chain as ChainId} className="h-3.5 w-3.5" />
-              </span>
-            ),
+          {first && (
+            <span className="ml-auto shrink-0 pr-8 text-xs text-rb-500 sm:hidden" aria-hidden>
+              {ASSET_CATEGORY_LABELS[c.category]}
+            </span>
           )}
+        </div>
+        {/* Below sm: the chain's compact row in the asset's card. */}
+        <PhoneLine line={l} symbol={c.symbol} first={first} />
+      </DataTableCell>
+      {/* A later line's Category is blank; below sm the card's head names it. */}
+      <DataTableCell data-dt-stack-hidden="" valign="middle" className="whitespace-nowrap">
+        {first && (
+          <span
+            className="text-sm text-foreground"
+            title={CATEGORY_NOTE}
+            data-asset-category-badge={c.category}
+            data-anatomy="A5.8"
+          >
+            {ASSET_CATEGORY_LABELS[c.category]}
+          </span>
+        )}
+      </DataTableCell>
+      <DataTableCell data-dt-stack-hidden="" valign="middle" className="whitespace-nowrap">
+        {/* The chain's mark on Listed by's tile; the line is the link. */}
+        <span className="flex items-center" data-asset-card-chains="">
+          <span role="img" aria-label={chainName(l.chain)} title={onChain} className={`${MARK_TILE} text-rb-500`}>
+            <ChainGlyph id={l.chain as ChainId} className="h-3.5 w-3.5" />
+          </span>
         </span>
       </DataTableCell>
-      <DataTableCell label="Price" align="right" valign="middle" className="tabular-nums sm:whitespace-nowrap">
-        {row && row.price != null ? (
+      <LineFigures line={l} symbol={c.symbol} figure={first ? c.figure : null} />
+      {/* The row's ⋮ (D7): the Focus entry, on the group's first line; on a
+          card it sits at the top right. */}
+      <DataTableCell valign="middle" className="dt-row-menu w-px whitespace-nowrap" data-col="menu">
+        {first && (
+          <AssetRowMenu inFocus={inFocus} picked={picked} symbol={c.symbol} onAdd={onAdd} onRemove={onRemove} />
+        )}
+      </DataTableCell>
+    </DataTableRow>
+  );
+}
+
+/** A line's figures and explorers (Price, 30 days, Change, Listed by),
+ *  memoised: the lines are built once per list (allLines), so a keystroke in
+ *  the search does not draw them again (ui-jobs 781). */
+const LineFigures = memo(function LineFigures({
+  line: l,
+  symbol,
+  figure,
+}: {
+  line: CardLine;
+  symbol: string;
+  /** The priceless figure, on the group's first line. */
+  figure: CardFigure | null;
+}) {
+  const price = l.price;
+  const flag = l.main && l.row?.flag ? flagWords(l.row.flag) : null;
+  const boldRead = useContext(BoldReadContext);
+  const onChain = `${symbol} on ${chainName(l.chain)}`;
+  return (
+    <>
+      <DataTableCell
+        data-dt-stack-hidden=""
+        align="right"
+        valign="middle"
+        className="tabular-nums sm:whitespace-nowrap"
+      >
+        {price && price.price != null && l.row ? (
           // On a phone's stacked row the flag may wrap under the price rather
           // than run over the 30-day line beside it.
           <span
             className="inline-flex flex-wrap items-center justify-end gap-1 sm:flex-nowrap"
-            data-asset-price-row={`${row.chain}:${row.token}`}
+            data-asset-price-row={`${l.chain}:${l.token}`}
             data-anatomy="A5.1"
           >
-            <PriceUnitMark unit={row.unit} size={14} />
-            <span className="font-semibold text-foreground">{fmtRowPrice(row.price)}</span>
-            {row.asOf && (
+            <PriceUnitMark unit={l.row.unit} size={14} />
+            <span className="font-semibold text-foreground">{fmtRowPrice(price.price)}</span>
+            {price.asOf && (
               <span
                 className="ml-1 text-[11px] text-rb-500"
-                title={`The stored round in force ${asOfWords(row.asOf)}`}
-                data-asset-price-as-of={row.asOf.block}
+                title={`The stored round in force ${asOfWords(price.asOf)}`}
+                data-asset-price-as-of={price.asOf.block}
                 data-anatomy="A5.3"
               >
-                {asOfMark(row.asOf)}
+                {asOfMark(price.asOf)}
               </span>
             )}
             {flag && (
               <span
                 className="ml-1.5 rounded border border-[var(--caution)] px-1 text-[11px] leading-4 text-[var(--caution)]"
                 title={flag.text}
-                data-asset-price-flag={row.flag?.gap ? "gap" : "fixed"}
+                data-asset-price-flag={l.row.flag?.gap ? "gap" : "fixed"}
                 data-anatomy="A5.2"
               >
                 {flag.mark}
               </span>
             )}
           </span>
-        ) : boldRead !== undefined && holdsBold(c.chains) ? (
+        ) : boldRead !== undefined && holdsBold([{ chain: l.chain, token: l.token }]) ? (
           <BoldCardPrice read={boldRead} />
-        ) : c.figure ? (
-          <FigureRow figure={c.figure} />
+        ) : figure ? (
+          <FigureRow figure={figure} />
         ) : (
           <span className="text-xs text-rb-500" title={PRICELESS_WHY} data-asset-priceless="" data-anatomy="A5.10">
             No price
           </span>
         )}
       </DataTableCell>
-      <DataTableCell label="30 days" align="right" valign="middle">
-        {row ? (
-          <PriceSparkline points={row.spark} label={`${c.symbol} over 30 days`} className="ml-auto h-7 w-24" />
+      <DataTableCell data-dt-stack-hidden="" align="right" valign="middle">
+        {price && price.spark.length ? (
+          <PriceSparkline points={price.spark} label={`${onChain} over 30 days`} className="ml-auto h-7 w-24" />
         ) : (
           <None />
         )}
       </DataTableCell>
-      <DataTableCell label="Change" align="right" valign="middle" className="whitespace-nowrap tabular-nums">
-        {row?.change != null ? (
+      <DataTableCell data-dt-stack-hidden="" align="right" valign="middle" className="whitespace-nowrap tabular-nums">
+        {price?.change != null ? (
           <span
-            className={`text-xs ${row.change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-            data-asset-price-change={row.change}
+            className={`text-xs ${price.change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+            data-asset-price-change={price.change}
           >
-            {fmtChange(row.change)}
+            {fmtChange(price.change)}
           </span>
         ) : (
           <None />
         )}
       </DataTableCell>
-      <DataTableCell label="Listed by" valign="middle" className="whitespace-nowrap">
-        <ExplorerMarks card={c} />
+      <DataTableCell data-dt-stack-hidden="" valign="middle" className="whitespace-nowrap sm:w-full">
+        <ExplorerMarks symbol={symbol} chips={l.chips} />
       </DataTableCell>
-      {/* The row's ⋮ (D7): the Focus entry; on a card it sits at the top right. */}
-      <DataTableCell valign="middle" className="dt-row-menu w-px whitespace-nowrap" data-col="menu">
-        <AssetRowMenu inFocus={inFocus} picked={picked} symbol={c.symbol} onAdd={onAdd} onRemove={onRemove} />
-      </DataTableCell>
-    </DataTableRow>
+    </>
   );
-}
+});
+
+/** A line below sm (ui-jobs 781): the group reads as one card, its head once
+ *  and a compact row per chain: the chain's mark and name, the price and its
+ *  change, a small 30-day line, and the explorers that list it there (nothing
+ *  where none does). The table's cells are not drawn below sm. Memoised as
+ *  LineFigures is. */
+const PhoneLine = memo(function PhoneLine({
+  line: l,
+  symbol,
+  first,
+}: {
+  line: CardLine;
+  symbol: string;
+  first: boolean;
+}) {
+  const price = l.price;
+  return (
+    <div className={`flex min-w-0 items-center gap-1.5 sm:hidden ${first ? "mt-2" : ""}`} data-phone-line="">
+      <span className={`${MARK_TILE} text-rb-500`} aria-hidden>
+        <ChainGlyph id={l.chain as ChainId} className="h-3.5 w-3.5" />
+      </span>
+      <span className="w-16 shrink-0 truncate text-sm text-foreground">{chainName(l.chain)}</span>
+      <span className="min-w-0 shrink truncate text-sm font-semibold text-foreground tabular-nums">
+        {price?.price != null && l.row ? (
+          fmtRowPrice(price.price)
+        ) : (
+          <span className="text-xs font-normal text-rb-500">No price</span>
+        )}
+      </span>
+      {price?.change != null && (
+        <span
+          className={`shrink-0 text-xs tabular-nums ${price.change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+        >
+          {fmtChange(price.change)}
+        </span>
+      )}
+      {price && price.spark.length > 0 && (
+        <PriceSparkline
+          points={price.spark}
+          label={`${symbol} on ${chainName(l.chain)} over 30 days`}
+          className="h-5 w-10 shrink-0"
+        />
+      )}
+      {l.chips.length > 0 && (
+        <span className="ml-auto shrink-0">
+          <ExplorerMarks symbol={symbol} chips={l.chips} shown={2} />
+        </span>
+      )}
+    </div>
+  );
+});
 
 const None = () => (
   <span className="text-sm text-rb-500">
@@ -678,26 +812,37 @@ const None = () => (
   </span>
 );
 
-/** The explorers that list the asset: up to four marks, each linking where
- *  its chip links (A5.9), then "+N"; their names in each mark's title. */
-function ExplorerMarks({ card: c }: { card: AssetCard }) {
-  if (!c.chips.length) return <span className="text-xs text-rb-500">None</span>;
-  const many = c.chains.length > 1;
-  const more = c.chips.length - MARKS_SHOWN;
+/** The explorers that list the asset on the line's chain: up to four marks,
+ *  each linking where its chip links (A5.9), then "+N"; their names in each
+ *  mark's title. */
+function ExplorerMarks({
+  symbol,
+  chips,
+  shown = MARKS_SHOWN,
+}: {
+  symbol: string;
+  chips: AssetChip[];
+  /** The marks drawn before "+N" (two on a phone's compact row). */
+  shown?: number;
+}) {
+  if (!chips.length) return <span className="text-xs text-rb-500">None</span>;
+  const more = chips.length - shown;
   return (
-    <span className="flex items-center gap-1" data-asset-chips={c.chips.length}>
-      {c.chips.slice(0, MARKS_SHOWN).map((ch) => (
+    <span className="flex items-center gap-1" data-asset-chips={chips.length}>
+      {chips.slice(0, shown).map((ch) => (
         <Link
           key={ch.explorer}
           href={ch.href}
-          title={`${c.symbol} on ${ch.label}${many ? `, ${chainName(ch.chain)}` : ""}`}
-          aria-label={`${c.symbol} on ${ch.label}, ${chainName(ch.chain)}`}
-          className="inline-flex size-6 items-center justify-center rounded bg-[var(--surface-hover)] hover:bg-[var(--surface-active)]"
+          title={`${symbol} on ${ch.label}`}
+          aria-label={`${symbol} on ${ch.label}, ${chainName(ch.chain)}`}
+          className={`${MARK_TILE} ${MARK_TILE_LINK}`}
           data-asset-chip={ch.explorer}
           data-asset-chip-link={ch.link}
           data-anatomy="A5.9"
         >
-          {ch.token ? (
+          {/* A vault no explorer deploys draws its token's icon, unless its
+              mark has a monochrome glyph (sBOLD's, ui-jobs 781). */}
+          {ch.token && !hasProtocolGlyph(ch.explorer) ? (
             <TokenChipIcon symbol={ch.token.symbol} address={ch.token.address} size={14} filterable={false} untitled />
           ) : (
             <ProtocolIcon id={ch.explorer} className="h-3.5 w-3.5" />
@@ -707,8 +852,8 @@ function ExplorerMarks({ card: c }: { card: AssetCard }) {
       {more > 0 && (
         <span
           className="pl-0.5 text-xs text-rb-500 tabular-nums"
-          title={c.chips
-            .slice(MARKS_SHOWN)
+          title={chips
+            .slice(shown)
             .map((ch) => ch.label)
             .join(", ")}
         >
@@ -819,7 +964,7 @@ export function ExplorerChip({ chip: ch, symbol, chainMark }: { chip: AssetChip;
       data-asset-chip-link={ch.link}
       data-anatomy="A5.9"
     >
-      {ch.token ? (
+      {ch.token && !hasProtocolGlyph(ch.explorer) ? (
         <TokenChipIcon symbol={ch.token.symbol} address={ch.token.address} size={12} filterable={false} untitled />
       ) : (
         <ProtocolIcon id={ch.explorer} className="h-3 w-3 shrink-0" />

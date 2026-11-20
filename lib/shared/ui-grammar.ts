@@ -154,6 +154,26 @@ export const RESET_LINK = "text-xs font-semibold text-teal-600 hover:text-teal-5
  * somewhere", not "resets". The app-wide rule: any link that opens a page is
  * blue (and a clickable card gets a blue hover border instead).
  */
+/**
+ * A small mark in a row: a protocol's, a chain's or a token's, each in its
+ * own shape on a 24px rounded square (/assets's Listed by, A5.9; /protocols'
+ * Chains and Assets, E8.1). Fixed and unshrinking, so every mark in a list
+ * draws at one size whatever its source image (ui-jobs 781). The mark inside
+ * is 14px. A tile that links adds MARK_TILE_LINK.
+ */
+export const MARK_TILE =
+  "inline-flex size-6 shrink-0 items-center justify-center overflow-hidden rounded bg-[var(--surface-hover)]";
+/** A mark (or a group of marks) that links: a blue outline on hover, the
+ *  focus ring for the keyboard. One class for /protocols' Assets group and
+ *  /assets's Listed by marks, so they match. A chain's mark in a linked row
+ *  is no link: the row is (ui-jobs 781). */
+export const MARK_LINK = "transition-shadow hover:ring-1 hover:ring-blue-500 focus-ring";
+export const MARK_TILE_LINK = `hover:bg-[var(--surface-active)] ${MARK_LINK}`;
+
+/** The first column of a cross-index table (/assets's asset, /protocols'
+ *  protocol) at one width, so the two tables line up (ui-jobs 781). */
+export const INDEX_FIRST_COL = "sm:w-64 sm:min-w-64 sm:max-w-64";
+
 export const PAGE_LINK =
   "text-xs font-semibold text-blue-600 dark:text-[var(--text-link)] hover:underline cursor-pointer";
 

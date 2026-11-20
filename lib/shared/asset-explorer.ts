@@ -18,7 +18,7 @@
 
 import type { ChipUse } from "@/lib/shared/asset-uses";
 import { assetHref, type LinkKind, type RosterLinkRef } from "@/lib/shared/asset-roster";
-import type { AssetPriceList, AssetPriceRow } from "@/lib/shared/asset-prices";
+import type { AssetPriceList, AssetPriceRow, ChainPrice } from "@/lib/shared/asset-prices";
 import { ASSET_CATEGORY_ORDER, assetCategory, type AssetCategory } from "@/lib/shared/asset-categories";
 
 /** A one-for-one wrapper (WETH, WBTC, cbBTC, tBTC, FBTC, BTC.b, USDbC):
@@ -106,6 +106,49 @@ export interface AssetCard {
   wrapped: CardLink[];
   /** With WRAPPER_CARDS "merged": the wrappers whose cards this one took. */
   takes: string[];
+  /** The Prices-list rows of the same symbol's pages on other chains, merged
+   *  into this card: each chain's line reads its price from them (ui-jobs 781). */
+  others?: AssetPriceRow[];
+}
+
+/** One chain of a card, as its line on /assets (A5.4; ui-jobs 781): the
+ *  asset's page on that chain, its price on that chain where a stored line
+ *  prices it, and the explorers that list it there. */
+export interface CardLine {
+  chain: number;
+  token: string;
+  href: string | null;
+  /** The chain's main line: the page row's own where `main`, else the row's
+   *  line on this chain (`elsewhere`). */
+  price: ChainPrice | null;
+  /** The page row the price comes from (its unit, its flag). */
+  row: AssetPriceRow | null;
+  /** The line is the row's own chain: its flag shows here. */
+  main: boolean;
+  chips: AssetChip[];
+}
+
+/** A card's lines, one per chain, in `order` (the chains' order). */
+export function cardLines(c: AssetCard, order: readonly number[]): CardLine[] {
+  const rows = [c.row, ...(c.others ?? [])].filter((r): r is AssetPriceRow => r != null);
+  const at = (chain: number) => {
+    for (const r of rows) {
+      if (r.chain === chain) return { price: r as ChainPrice, row: r, main: true };
+      const e = r.elsewhere.find((x) => x.chain === chain);
+      if (e) return { price: e, row: r, main: false };
+    }
+    return { price: null, row: null, main: false };
+  };
+  const rank = (chain: number) => (order.indexOf(chain) < 0 ? order.length : order.indexOf(chain));
+  return [...c.chains]
+    .sort((a, b) => rank(a.chain) - rank(b.chain))
+    .map((x) => ({
+      chain: x.chain,
+      token: x.token,
+      href: x.href,
+      ...at(x.chain),
+      chips: c.chips.filter((ch) => ch.chain === x.chain),
+    }));
 }
 
 const link = (r: RosterLinkRef): CardLink => ({
@@ -162,6 +205,8 @@ export function assetCards(
       // The wrappers the other chain's row names ("also USDbC") join this card's row.
       const more = (c.row?.also ?? []).filter((a) => !into.row?.also?.some((x) => x.symbol === a.symbol));
       if (into.row && more.length) into.row = { ...into.row, also: [...(into.row.also ?? []), ...more] };
+      // Its row prices its chains' lines.
+      if (c.row) into.others = [...(into.others ?? []), c.row];
       continue;
     }
     bySymbol.set(c.symbol, [...same, c]);

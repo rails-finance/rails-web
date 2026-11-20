@@ -752,16 +752,17 @@ check(
 );
 await page.locator(`${CHOOSER} [role='tab'][aria-label='Ethereum']`).click();
 // Aave vaults is not among Ethereum's eight most used (explorer-rank.json),
-// so its row is behind "View all".
+// so its row is behind "View all", which opens /protocols on Ethereum (ui-jobs 781).
 await page.locator(`${CHOOSER} [data-chooser-view-all]`).click();
+await page.waitForSelector("[data-protocol-row]", { timeout: 60_000 }).catch(() => {});
 const aaveVaultsRow = await page
-  .locator(`${CHOOSER} a[href='/ethereum/aave']`)
+  .locator("[data-protocol-row] a[data-protocol-hub][href='/ethereum/aave']")
   .evaluateAll((els) => els.map((e) => (e.textContent ?? "").replace(/\s+/g, " ").trim()));
 // Aave's vault layer launched on 20 Oct 2026 (ui-jobs 412; `unlaunched` left
 // its entry in lib/shared/protocols.ts), so the switcher's Ethereum column
 // carries it as an ordinary row, "Aave vaults".
 check(
-  "11b …and Aave's vault layer is a switcher row, launched",
+  "11b …and Aave's vault layer is an Ethereum explorer, launched, on the chooser's View all",
   aaveVaultsRow.length === 1 && /^Aave vaults/.test(aaveVaultsRow[0]),
   JSON.stringify(aaveVaultsRow),
 );

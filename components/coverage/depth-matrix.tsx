@@ -198,6 +198,15 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
   const headerOpen = (key: DepthKey) => open?.kind === "header" && open.key === key;
   const rows = coverageRows(comingSoon, chainId);
 
+  // `#<id>` (a /protocols row's Coverage link, ui-jobs 781) names the matrix's
+  // row; below lg the matrix is hidden, so the explorer's card takes the scroll.
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    const row = id ? document.getElementById(id) : null;
+    if (!row || row.offsetParent != null) return;
+    document.querySelector(`[data-coverage-card="${CSS.escape(id)}"]`)?.scrollIntoView();
+  }, []);
+
   // Escape closes whatever is open — a cell popover OR the essay drawer.
   useEffect(() => {
     if (!open) return;
@@ -367,7 +376,8 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
               // <tbody> and <tr> is silently reparented by the HTML table
               // parser, which hydrates as a mismatch.
               <Fragment key={p.id}>
-                <DataTableRow href={p.href}>
+                {/* `#<id>` lands here: /protocols links each explorer's row (ui-jobs 781). */}
+                <DataTableRow href={p.href} id={p.id} className="scroll-mt-24">
                   <DataTableLeadCell plain protocol={p.id} protocolName={p.label} chain={chainId} />
                   <DataTableCell rowHeader>
                     {/* The name is the row's one link (D4); the desc and the
