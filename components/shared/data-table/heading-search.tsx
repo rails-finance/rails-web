@@ -12,7 +12,7 @@
 // Below sm a stacked table (D6) draws no heading; the page draws one plain
 // search in its control row instead.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 
 export interface HeadingSearchProps {
@@ -33,6 +33,8 @@ export function HeadingSearch({ label, value, onChange, name, slash = true }: He
   const [editing, setEditing] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
+  const wrap = useRef<HTMLSpanElement>(null);
+  const stateId = useId();
 
   useEffect(() => {
     if (editing) input.current?.focus();
@@ -64,7 +66,7 @@ export function HeadingSearch({ label, value, onChange, name, slash = true }: He
 
   if (editing)
     return (
-      <span className="inline-flex items-center gap-1" data-heading-search={name} data-anatomy="D10">
+      <span ref={wrap} className="inline-flex items-center gap-1" data-heading-search={name} data-anatomy="D10">
         <Search className="size-3.5 shrink-0 text-rb-500" aria-hidden />
         <input
           ref={input}
@@ -77,7 +79,10 @@ export function HeadingSearch({ label, value, onChange, name, slash = true }: He
               clear();
             }
           }}
-          onBlur={() => setEditing(false)}
+          // Focus moving to the × keeps the input, so Tab reaches it.
+          onBlur={(e) => {
+            if (!wrap.current?.contains(e.relatedTarget as Node | null)) setEditing(false);
+          }}
           aria-label={label}
           placeholder={label}
           className="w-36 min-w-0 rounded-sm border-b border-rb-300 bg-transparent py-0.5 text-xs font-semibold text-foreground outline-none placeholder:font-normal placeholder:text-rb-400 focus:border-blue-500 dark:border-rb-600 [&::-webkit-search-cancel-button]:hidden"
@@ -89,6 +94,9 @@ export function HeadingSearch({ label, value, onChange, name, slash = true }: He
           // Before the input's blur, so the press lands.
           onMouseDown={(e) => e.preventDefault()}
           onClick={clear}
+          onBlur={(e) => {
+            if (!wrap.current?.contains(e.relatedTarget as Node | null)) setEditing(false);
+          }}
           className={`${BUTTON} p-0.5`}
           data-heading-search-clear=""
         >
@@ -99,46 +107,45 @@ export function HeadingSearch({ label, value, onChange, name, slash = true }: He
 
   return (
     <span className="inline-flex items-center gap-1" data-heading-search={name} data-anatomy="D10">
-      {value ? (
-        <>
-          <button
-            ref={opener}
-            type="button"
-            onClick={() => setEditing(true)}
-            aria-label={`${label} search: ${value}. Edit it`}
-            className={`${BUTTON} gap-1 font-semibold text-foreground`}
-            data-heading-search-open=""
-          >
+      {/* One button named by the column ("Protocol"; with a query, "Protocol:
+          aave"), what it does in its description. */}
+      <button
+        ref={opener}
+        type="button"
+        onClick={() => setEditing(true)}
+        aria-describedby={stateId}
+        aria-keyshortcuts={slash ? "/" : undefined}
+        className={`${BUTTON} gap-1 ${value ? "font-semibold text-foreground" : ""}`}
+        data-heading-search-open=""
+      >
+        {value ? (
+          <>
             <Search className="size-3.5 shrink-0 text-rb-500" aria-hidden />
+            <span className="sr-only">{label}: </span>
             <span className="max-w-32 truncate" data-heading-search-query="">
               {value}
             </span>
-          </button>
-          <button
-            type="button"
-            aria-label={`Clear the ${label.toLowerCase()} search`}
-            onClick={clear}
-            className={`${BUTTON} p-0.5`}
-            data-heading-search-clear=""
-          >
-            <X className="size-3.5" aria-hidden />
-          </button>
-        </>
-      ) : (
-        <>
-          <span>{label}</span>
-          <button
-            ref={opener}
-            type="button"
-            onClick={() => setEditing(true)}
-            aria-label={`Search ${label.toLowerCase()}s`}
-            aria-keyshortcuts={slash ? "/" : undefined}
-            className={`${BUTTON} p-0.5`}
-            data-heading-search-open=""
-          >
-            <Search className="size-3.5" aria-hidden />
-          </button>
-        </>
+          </>
+        ) : (
+          <>
+            {label}
+            <Search className="size-3.5 shrink-0" aria-hidden />
+          </>
+        )}
+      </button>
+      <span id={stateId} className="sr-only">
+        {value ? "Searched. Press to edit the search." : "Press to search this column."}
+      </span>
+      {value && (
+        <button
+          type="button"
+          aria-label={`Clear the ${label.toLowerCase()} search`}
+          onClick={clear}
+          className={`${BUTTON} p-0.5`}
+          data-heading-search-clear=""
+        >
+          <X className="size-3.5" aria-hidden />
+        </button>
       )}
     </span>
   );

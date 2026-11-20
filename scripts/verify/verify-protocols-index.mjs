@@ -157,10 +157,18 @@ check(
   uni != null && uni.assets === "any" && uni.assetsHref === null && uni.about === "/ethereum/uniswap-v3/info",
   `${uni?.assets} ${uni?.about}`,
 );
-const heads = await page.$$eval("[data-protocol-table] thead th", (ths) => ths.map((t) => t.textContent.trim()));
+// The headings as seen: sr-only text (a control's description, About's
+// name) left out.
+const heads = await page.$$eval("[data-protocol-table] thead th", (ths) =>
+  ths.map((t) => {
+    const c = t.cloneNode(true);
+    c.querySelectorAll(".sr-only").forEach((x) => x.remove());
+    return c.textContent.trim();
+  }),
+);
 check(
-  "2d the columns: Protocol, Category, Sections, Assets, About",
-  heads.join("|") === "Protocol|Category|Sections|Assets|About",
+  "2d the columns seen: Protocol, Category, Sections, Assets, and a last one named About for a screen reader alone",
+  heads.join("|") === "Protocol|Category|Sections|Assets|",
   heads.join("|"),
 );
 const withAssets = eth.filter((l) => l.assetsHref);
@@ -176,6 +184,24 @@ check(
   `${withAssets.length} linked; wrong ${marksWrong.map((l) => `${l.id} ${l.marks}/${l.assets}+${l.more}`).join(" ")}`,
 );
 const dash = eth.filter((l) => l.assets === "none");
+// 2g the reserve and market pages' asset link (ui-jobs 786), in the
+// reserve's ⋮ menu, goes through the resolver read from that explorer's
+// side, and no link names /assets/.
+await go(page, `/ethereum/aave-v3/markets/${USDC}`);
+// The link sits in the reserve's ⋮ menu (its title the symbol).
+await page.click('button[aria-label="USDC reserve menu"]', { timeout: 120_000 });
+const assetLink = await page
+  .waitForSelector(`a[href^="/api/asset-page/ethereum/${USDC}"]`, { timeout: 120_000 })
+  .then((a) => a.getAttribute("href"))
+  .catch(() => null);
+const stalePaths = await page.$$eval('a[href^="/assets/"], a[href="/assets"]', (as) => as.length);
+check(
+  "2g a reserve page's asset link opens the resolver from Aave V3's side; no link names /assets",
+  assetLink === `/api/asset-page/ethereum/${USDC}?via=aave-v3` && stalePaths === 0,
+  `${assetLink} · ${stalePaths}`,
+);
+await go(page, "/protocols");
+await page.waitForSelector("tr[data-protocol-line]");
 check(
   "2f an explorer with no Assets page: a muted dash, no link",
   dash.length > 0 && dash.every((l) => l.assetsHref === null && l.about),
@@ -311,10 +337,11 @@ await page.waitForTimeout(300);
 const lending = await page.$$eval("tr[data-protocol-line]", (rs) =>
   rs.map((r) => r.getAttribute("data-protocol-type")),
 );
-const chosenText = ((await head.textContent()) ?? "").trim();
+// The button's name: the column, then the choice (its sr-only prefix).
+const chosenText = ((await btn.textContent()) ?? "").trim();
 check(
   '4g choosing Lending: the heading reads "Lending" with a clear, the URL ?type=lending, the lines lending',
-  chosenText === "Lending" &&
+  chosenText === "Category: Lending" &&
     (await head.locator("[data-heading-filter-clear]").count()) === 1 &&
     new URL(page.url()).searchParams.get("type") === "lending" &&
     lending.length > 0 &&
@@ -330,6 +357,73 @@ check(
     !new URL(page.url()).searchParams.has("type") &&
     (await btn.textContent())?.trim() === "Category",
   `${cleared} lines`,
+);
+
+// 4i a category the tab holds no more stays chosen and clearable: one on
+// Ethereum that Base has none of, asked for on Base.
+await go(page, "/protocols");
+await page.waitForSelector("tr[data-protocol-line]");
+const ethTypes = await page.$$eval("tr[data-protocol-line]", (rs) =>
+  rs.map((r) => r.getAttribute("data-protocol-type")),
+);
+await go(page, "/protocols?chain=8453");
+await page.waitForSelector("tr[data-protocol-line]");
+const baseTypes = new Set(
+  await page.$$eval("tr[data-protocol-line]", (rs) => rs.map((r) => r.getAttribute("data-protocol-type"))),
+);
+const stale = ethTypes.find((t) => !baseTypes.has(t));
+await go(page, `/protocols?chain=8453&type=${stale}`);
+await page.waitForSelector("[data-protocol-table]");
+const staleHead = page.locator("thead [data-heading-filter='category']");
+const staleText = ((await staleHead.locator("[data-heading-filter-button]").textContent()) ?? "").trim();
+const staleNone = await page.locator("[data-protocol-none]").count();
+await staleHead.locator("[data-heading-filter-button]").click();
+const staleItem = (
+  (await page.locator(`[data-heading-filter-menu='category'] [data-heading-filter-option='${stale}']`).textContent()) ??
+  ""
+).trim();
+await page.keyboard.press("Escape");
+await staleHead.locator("[data-heading-filter-clear]").click();
+await page.waitForTimeout(300);
+const staleFocus = await page.evaluate(() => document.activeElement?.hasAttribute("data-heading-filter-button"));
+const staleAfter = await page.$$eval("tr[data-protocol-line]", (rs) => rs.length);
+check(
+  `4i ?type=${stale} on Base (none there): the heading shows it chosen, "No protocol matches.", the menu lists it at 0; × clears it, focus on the button`,
+  staleText.endsWith(staleText.replace(/^.*: /, "")) &&
+    staleText.length > 0 &&
+    staleText !== "Category" &&
+    staleNone === 1 &&
+    /0$/.test(staleItem) &&
+    staleFocus &&
+    staleAfter === base.length,
+  `${staleText} · ${staleItem} · focus ${staleFocus} · ${staleAfter}`,
+);
+// 4j the tabs: one tab stop, the arrows move the choice and the focus.
+await go(page, "/protocols");
+await page.waitForSelector("tr[data-protocol-line]");
+const stops = await page.$$eval("[data-protocol-tab]", (ts) =>
+  ts.map((t) => [t.getAttribute("tabindex"), t.getAttribute("aria-controls")]),
+);
+await page.focus('[data-protocol-tab="1"]');
+await page.keyboard.press("ArrowRight");
+await page.waitForTimeout(300);
+const moved = await page.evaluate(() => [
+  document.activeElement?.getAttribute("data-protocol-tab"),
+  document.activeElement?.getAttribute("aria-selected"),
+]);
+const panel = stops[0]?.[1]
+  ? await page
+      .locator(`#${stops[0][1].replace(/:/g, "\\:")}`)
+      .getAttribute("role")
+      .catch(() => null)
+  : null;
+check(
+  "4j the chain tabs: one tab stop, aria-controls the panel, ArrowRight moves the choice and the focus",
+  stops.filter(([t]) => t === "0").length === 1 &&
+    panel === "tabpanel" &&
+    moved[0] === String(tabs[1].id) &&
+    moved[1] === "true",
+  `${JSON.stringify(stops.map(([t]) => t))} · ${moved.join(" ")} · ${panel}`,
 );
 
 // 5 the wallet panel

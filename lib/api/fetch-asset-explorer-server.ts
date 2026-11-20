@@ -34,6 +34,12 @@ async function buildCards(readerIp?: string | null) {
   return { list, cards: assetCards({ ...list, rows }, links, chips, listed, new Map(figures)) };
 }
 
+/** The Prices list and the cards from one build (the list route answers
+ *  both, ui-jobs 786). */
+export async function fetchAssetPricesAndCards(readerIp?: string | null) {
+  return buildCards(readerIp);
+}
+
 export async function fetchAssetExplorerServer(readerIp?: string | null): Promise<AssetExplorerData> {
   const { list, cards } = await buildCards(readerIp);
   return { cards, day: list.day, rounds: list.rows.some((r) => r.asOf) };

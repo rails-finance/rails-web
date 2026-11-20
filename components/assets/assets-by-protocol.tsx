@@ -33,6 +33,7 @@ import { BoldReadContext } from "@/components/assets/bold-live-price";
 import type { BoldPriceRead } from "@/lib/liquity-v2/bold-price";
 import { ASSET_CATEGORY_LABELS, ASSET_CATEGORY_ORDER, type AssetCategory } from "@/lib/shared/asset-categories";
 import { assetKey } from "@/lib/shared/asset-family";
+import { PROTOCOLS } from "@/lib/shared/protocols";
 import { chainName } from "@/lib/shared/asset-roster";
 import type { ProtocolAssetLine } from "@/lib/shared/assets-by-protocol";
 import type { ChainId } from "@/lib/shared/chains";
@@ -41,6 +42,8 @@ import { notifyUrlChanged } from "@/lib/shared/use-url-search-params";
 import { INDEX_FIRST_COL, INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const CATEGORY_NOTE = "Rails’ classification of the asset";
+/** An explorer's name for the "Also used in" filter, its id where none. */
+const protocolLabelOf = (id: string) => PROTOCOLS.find((p) => p.id === id)?.label ?? id;
 
 export function ProtocolAssets({
   lines: all,
@@ -97,12 +100,13 @@ export function ProtocolAssets({
   const options = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of rows) m.set(r.card.category, (m.get(r.card.category) ?? 0) + 1);
-    return ASSET_CATEGORY_ORDER.filter((c) => m.has(c)).map((c) => ({
+    // A category no asset here holds (a stale ?cat=) stays listed at 0, to clear.
+    return ASSET_CATEGORY_ORDER.filter((c) => m.has(c) || c === cat).map((c) => ({
       value: c,
       label: ASSET_CATEGORY_LABELS[c],
       count: m.get(c) ?? 0,
     }));
-  }, [rows]);
+  }, [rows, cat]);
   const setCat = (c: string | null) => {
     setCats(c ? [c] : []);
     write("cat", c);
@@ -118,10 +122,12 @@ export function ProtocolAssets({
         const had = m.get(ch.explorer);
         m.set(ch.explorer, { label: ch.label, count: (had?.count ?? 0) + 1 });
       }
+    // An explorer no asset here names (a stale ?also=) stays listed at 0, to clear.
+    if (alsoBy && !m.has(alsoBy)) m.set(alsoBy, { label: protocolLabelOf(alsoBy), count: 0 });
     return [...m.entries()]
       .map(([value, o]) => ({ value, ...o }))
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "en-US"));
-  }, [rows]);
+  }, [rows, alsoBy]);
   const setAlso = (v: string | null) => {
     setAlsoBy(v);
     write("also", v);

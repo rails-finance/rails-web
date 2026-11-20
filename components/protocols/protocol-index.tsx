@@ -14,7 +14,7 @@
 // (its asset marks, one link to its Assets page) and About. The selection lives in the URL, written in place without a reload.
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState, type KeyboardEvent } from "react";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { ScopeNote } from "@/components/shared/asset-scope-note";
@@ -95,6 +95,27 @@ export function ProtocolIndex({
     writeUrl(next);
   };
 
+  const panelId = useId();
+  /** The tablist's keys, the house pattern (info-disclosure.tsx's card tabs: a roving tabindex, the arrows) with Home and End. */
+  const onTabKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    const i = tabs.findIndex((t) => t.id === chain);
+    const to =
+      e.key === "ArrowRight"
+        ? (i + 1) % tabs.length
+        : e.key === "ArrowLeft"
+          ? (i - 1 + tabs.length) % tabs.length
+          : e.key === "Home"
+            ? 0
+            : e.key === "End"
+              ? tabs.length - 1
+              : null;
+    if (to == null) return;
+    e.preventDefault();
+    choose({ ...sel, chain: tabs[to].id });
+    const list = e.currentTarget.parentElement;
+    requestAnimationFrame(() => list?.querySelector<HTMLElement>(`[data-protocol-tab="${tabs[to].id}"]`)?.focus());
+  };
+
   const type = (sel.types[0] as ProtocolType | undefined) ?? null;
   const setType = (t: string | null) => choose({ ...sel, types: t ? [t as ProtocolType] : [] });
 
@@ -103,10 +124,14 @@ export function ProtocolIndex({
   const categories = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of onTab) m.set(r.type, (m.get(r.type) ?? 0) + 1);
-    return (Object.keys(PROTOCOL_TYPE_LABELS) as ProtocolType[])
-      .filter((t) => m.has(t))
-      .map((t) => ({ value: t, label: typeLabel(t), count: m.get(t) ?? 0 }));
-  }, [onTab]);
+    return (
+      (Object.keys(PROTOCOL_TYPE_LABELS) as ProtocolType[])
+        .filter((t) => m.has(t))
+        .map((t) => ({ value: t, label: typeLabel(t), count: m.get(t) ?? 0 }))
+        // A category chosen on another tab, or by a stale ?type=, at 0 to clear.
+        .concat(type && !m.has(type) ? [{ value: type, label: typeLabel(type), count: 0 }] : [])
+    );
+  }, [onTab, type]);
   const filter = { label: "Category", name: "category", options: categories, value: type, onChange: setType };
   // From sm the Protocol heading's search reads the name; below sm the one
   // search reads every text column (decision 0070).
@@ -144,6 +169,11 @@ export function ProtocolIndex({
                 type="button"
                 role="tab"
                 aria-selected={on}
+                aria-controls={panelId}
+                // Roving: the chosen tab is the one stop; the arrow keys,
+                // Home and End move the choice and the focus.
+                tabIndex={on ? 0 : -1}
+                onKeyDown={onTabKey}
                 onClick={() => choose({ ...sel, chain: c.id })}
                 className={`${TAB} ${on ? TAB_ON : TAB_OFF}`}
                 data-protocol-tab={c.id}
@@ -179,7 +209,7 @@ export function ProtocolIndex({
 
       <ScopeNote scoped={roster} noun={["explorer", "explorers"]} className="mb-3" />
 
-      <div {...roster.listProps} role="tabpanel" aria-label={chainName}>
+      <div {...roster.listProps} id={panelId} role="tabpanel" aria-label={chainName}>
         <DataTable
           caption={`The protocols Rails runs an explorer for on ${chainName}, with each one's category, sections, assets and About page`}
           tableClassName="min-w-[640px] text-sm"
@@ -232,8 +262,9 @@ function Sections({ row: r, named, about = false }: { row: ProtocolIndexRow; nam
 }
 
 /** The explorer's assets (E8.5): "Any token" on a DEX or trading line; a
- *  muted dash where it has no Assets page; else up to five overlapping round
- *  marks and "+N" as one link to its Assets page, every symbol in its title.
+ *  muted dash where it has no Assets page; "Assets" as a plain link to it
+ *  where the cards were not read; else up to five overlapping round marks and
+ *  "+N" as one link to its Assets page, every symbol in its title.
  *  `hooks` marks the table's copy for the verifiers. */
 function LineAssets({ row: r, named, hooks }: { row: ProtocolIndexRow; named: string; hooks: boolean }) {
   if (r.anyToken)
@@ -242,13 +273,27 @@ function LineAssets({ row: r, named, hooks }: { row: ProtocolIndexRow; named: st
         Any token
       </span>
     );
-  const assets = r.assets ?? [];
-  if (!r.assetsHref || assets.length === 0)
+  if (!r.assetsHref)
     return (
       <span className="text-sm text-rb-500" data-protocol-assets={hooks ? "none" : undefined}>
         <span aria-hidden>–</span>
         <span className="sr-only">no assets page</span>
       </span>
+    );
+  const assets = r.assets ?? [];
+  // The cards not read (or none listed): the page is there, its marks are not.
+  if (assets.length === 0)
+    return (
+      <Link
+        href={r.assetsHref}
+        prefetch={false}
+        aria-label={`${named}: assets`}
+        className={`relative z-[1] text-sm ${INLINE_LINK}`}
+        data-protocol-assets={hooks ? "unread" : undefined}
+        data-protocol-assets-link={hooks ? "" : undefined}
+      >
+        Assets
+      </Link>
     );
   const more = assets.length - ASSETS_SHOWN;
   return (

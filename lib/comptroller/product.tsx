@@ -16,6 +16,7 @@
 // paused on all of Compound V2, every Base borrow cap closed) is said once on
 // the head; a row carries only what sets it apart.
 
+import { assetPageFrom } from "@/lib/shared/asset-via-links";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ExplainBullet, ExplainGroup, ExplainSub, Fig } from "@/components/shared/explain-groups";
@@ -1200,8 +1201,8 @@ function reserveHead(x: Ctx, m: ComptrollerMarket): ProductHead {
           {
             item: "asset",
             title: m.symbol,
-            subtitle: `${m.symbol} on ${chainMeta(f.chainId).name}, across Rails`,
-            href: `/assets/${chainMeta(f.chainId).slug}/${m.underlying}`,
+            subtitle: "Its price and the other explorers that use it",
+            href: assetPageFrom(f.chainId, m.underlying, f.root),
             internal: true,
           },
         ]

@@ -49,7 +49,11 @@ export function HeadingFilter({ label, options, value, onChange, name, allLabel 
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const menuId = useId();
-  const chosen = options.find((o) => o.value === value) ?? null;
+  const stateId = useId();
+  // A value the rows hold no more (a tab switched, a stale URL) still filters
+  // them, so it is drawn as chosen and offered in the menu, at 0, to clear.
+  const listed = withChosen(options, value);
+  const chosen = listed.find((o) => o.value === value) ?? null;
 
   const place = useCallback(() => {
     const r = button.current?.getBoundingClientRect();
@@ -70,10 +74,20 @@ export function HeadingFilter({ label, options, value, onChange, name, allLabel 
       if (!button.current?.contains(t) && !menu.current?.contains(t)) close(false);
     };
     const shut = () => close(false);
+    // Escape closes it wherever focus is: the menu may not have taken focus
+    // yet (it moves in after the menu is placed), or the reader stayed on
+    // the button.
+    const esc = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      close(true);
+    };
+    document.addEventListener("keydown", esc);
     document.addEventListener("mousedown", away);
     window.addEventListener("scroll", shut, true);
     window.addEventListener("resize", shut);
     return () => {
+      document.removeEventListener("keydown", esc);
       document.removeEventListener("mousedown", away);
       window.removeEventListener("scroll", shut, true);
       window.removeEventListener("resize", shut);
@@ -117,23 +131,34 @@ export function HeadingFilter({ label, options, value, onChange, name, allLabel 
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label={
-          chosen
-            ? `${label}: ${chosen.label}. Change the ${label.toLowerCase()} filter`
-            : `Filter by ${label.toLowerCase()}`
-        }
+        aria-describedby={stateId}
         onClick={() => (open ? close(false) : setOpen(true))}
         className={`${BUTTON} ${size} ${tone}`}
         data-heading-filter-button=""
       >
-        {chosen ? chosen.label : label}
+        {/* Named by the column, the choice after it: "Category: Lending". */}
+        {chosen ? (
+          <>
+            <span className="sr-only">{label}: </span>
+            {chosen.label}
+          </>
+        ) : (
+          label
+        )}
         {!chosen && <ChevronDown className="size-3.5 shrink-0" aria-hidden />}
       </button>
+      <span id={stateId} className="sr-only">
+        {chosen ? `Filtered to ${chosen.label}. Opens a menu to change it.` : "Opens a menu to filter by it."}
+      </span>
       {chosen && (
         <button
           type="button"
           aria-label={`Clear the ${label.toLowerCase()} filter`}
-          onClick={() => onChange(null)}
+          onClick={() => {
+            onChange(null);
+            // The × goes with the choice: focus to the filter's button.
+            requestAnimationFrame(() => button.current?.focus());
+          }}
           className={`${BUTTON} p-0.5 text-rb-500 hover:text-foreground`}
           data-heading-filter-clear=""
         >
@@ -153,7 +178,7 @@ export function HeadingFilter({ label, options, value, onChange, name, allLabel 
             className="fixed z-50 min-w-48 max-w-60 rounded-lg border border-rb-200 bg-raised py-1 text-sm shadow-lg dark:border-rb-700"
             data-heading-filter-menu={name}
           >
-            {[{ value: null, label: allLabel ?? `Every ${label.toLowerCase()}`, count: null }, ...options].map((o) => {
+            {[{ value: null, label: allLabel ?? `Every ${label.toLowerCase()}`, count: null }, ...listed].map((o) => {
               const on = o.value === value;
               return (
                 <button
@@ -185,7 +210,7 @@ export function HeadingFilter({ label, options, value, onChange, name, allLabel 
  *  stacked table draws no heading (D9): "Category: Lending ×", the × clearing
  *  it. */
 export function HeadingFilterChip({ label, options, value, onChange, name }: HeadingFilterProps) {
-  const chosen = options.find((o) => o.value === value);
+  const chosen = withChosen(options, value).find((o) => o.value === value);
   if (!value) return null;
   const text = chosen?.label ?? value;
   return (
@@ -197,7 +222,16 @@ export function HeadingFilterChip({ label, options, value, onChange, name }: Hea
       <button
         type="button"
         aria-label={`Clear the ${label.toLowerCase()} filter`}
-        onClick={() => onChange(null)}
+        onClick={(e) => {
+          // Focus to the next chip's ×, else the page's search, as this chip goes.
+          const row = e.currentTarget.closest("[data-roster-controls]");
+          const next = [...(row?.querySelectorAll<HTMLElement>("[data-heading-filter-chip] button") ?? [])].find(
+            (b) => b !== e.currentTarget,
+          );
+          const search = row?.querySelector<HTMLElement>("input");
+          onChange(null);
+          requestAnimationFrame(() => (next?.isConnected ? next : search)?.focus());
+        }}
         className={`${BUTTON} min-h-9 min-w-9 justify-center text-rb-500 hover:text-foreground`}
         data-heading-filter-clear=""
       >
@@ -205,4 +239,12 @@ export function HeadingFilterChip({ label, options, value, onChange, name }: Hea
       </button>
     </span>
   );
+}
+
+/** The options with the chosen value among them: a value the rows hold no
+ *  more is listed at 0, under the label the caller gives it in `options`
+ *  elsewhere or its own value. */
+function withChosen(options: HeadingFilterOption[], value: string | null): HeadingFilterOption[] {
+  if (value == null || options.some((o) => o.value === value)) return options;
+  return [...options, { value, label: value, count: 0 }];
 }

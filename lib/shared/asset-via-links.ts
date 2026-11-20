@@ -6,7 +6,8 @@
 // (`liquity:wstETH`).
 
 import { PROTOCOLS, protocolForPathname, type ProtocolEntry } from "@/lib/shared/protocols";
-import { parseVia, type ViaExplorer } from "@/lib/shared/asset-via";
+import { parseVia, withVia, type ViaExplorer } from "@/lib/shared/asset-via";
+import { assetHref } from "@/lib/shared/asset-roster";
 import { COMPOUND_DEPLOYMENT } from "@/lib/compound/asset-catalog";
 import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
 
@@ -56,3 +57,10 @@ export function viaForPathname(pathname: string | null, search?: string | null):
 
 /** The `via` value for an explorer: its id, and its market where it names one. */
 export const viaValue = (v: ViaExplorer) => (v.market ? `${v.id}:${v.market}` : v.id);
+
+/** A token's page linked from an explorer's own page (a reserve, a market;
+ *  ui-jobs 786): the resolver (`assetHref`), read from that explorer's side,
+ *  so it opens the token under that explorer where it lists it. */
+export function assetPageFrom(chain: number, token: string, explorerHref: string): string {
+  return withVia(assetHref(chain, token), protocolForPathname(explorerHref)?.id);
+}

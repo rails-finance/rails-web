@@ -20,6 +20,7 @@
 // (lib/api/fetch-aave-reserve-reads.ts), started with the page and apart from
 // the head read; a read that fails leaves its section one muted line.
 
+import { assetPageFrom } from "@/lib/shared/asset-via-links";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -337,8 +338,8 @@ function reserveHead(
     {
       item: "asset",
       title: r.symbol,
-      subtitle: `${r.symbol} on ${chainMeta(m.chainId).name}, across Rails`,
-      href: `/assets/${chainMeta(m.chainId).slug}/${r.address}`,
+      subtitle: "Its price and the other explorers that use it",
+      href: assetPageFrom(m.chainId, r.address, m.marketHref),
       internal: true,
     },
     ...contractLinks(m, read),

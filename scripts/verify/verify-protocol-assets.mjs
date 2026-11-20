@@ -159,7 +159,7 @@ const ctrl = await page.evaluate(() => ({
 }));
 check(
   "2g no search row, the Asset heading's search, no listing toolbar; the heading reads the chosen category",
-  ctrl.toolbar === 0 && ctrl.search && ctrl.heading === "Stablecoin",
+  ctrl.toolbar === 0 && ctrl.search && ctrl.heading === "Category: Stablecoin",
   JSON.stringify(ctrl),
 );
 const aHead = page.locator("thead [data-heading-filter='category']");
@@ -177,7 +177,7 @@ await page.waitForTimeout(300);
 const gov = await page.$$eval("tr[data-asset-line]", (rs) => rs.map((r) => r.getAttribute("data-asset-category")));
 check(
   '2i a choice from the heading: "Governance", ?cat=governance, governance lines alone',
-  ((await aHead.textContent()) ?? "").trim() === "Governance" &&
+  ((await aHead.locator("[data-heading-filter-button]").textContent()) ?? "").trim() === "Category: Governance" &&
     new URL(page.url()).searchParams.get("cat") === "governance" &&
     gov.length > 0 &&
     gov.every((c) => c === "governance"),
@@ -232,6 +232,22 @@ check(
     .map(([, t]) => t)
     .slice(0, 4)
     .join(" | ")}`,
+);
+
+// 2m a category the protocol's assets hold none of (a stale ?cat=) stays
+// chosen: Liquity V2 has no governance asset.
+await go(page, "/ethereum/liquity-v2/assets?cat=governance");
+await page.waitForSelector('[data-asset-table="protocol"]', { timeout: 120_000 });
+const sHead = page.locator("thead [data-heading-filter='category']");
+const sText = ((await sHead.locator("[data-heading-filter-button]").textContent()) ?? "").trim();
+const sNone = await page.locator("[data-asset-none]").count();
+await sHead.locator("[data-heading-filter-clear]").click();
+await page.waitForTimeout(300);
+const sFocus = await page.evaluate(() => document.activeElement?.hasAttribute("data-heading-filter-button"));
+check(
+  '2m ?cat=governance on Liquity V2 (none there): the heading shows "Governance" chosen, "No asset matches."; × clears it, focus on the button',
+  sText === "Category: Governance" && sNone === 1 && sFocus && !new URL(page.url()).searchParams.has("cat"),
+  `${sText} · ${sNone} · ${sFocus}`,
 );
 
 // 2k the Focus's asset scope still holds the page: a view of USDC alone.
