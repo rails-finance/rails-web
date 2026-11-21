@@ -28,6 +28,7 @@ import {
   type PositionCardStatus,
   type PositionPanelColumns,
   type PositionPanelRow,
+  assetCountHead,
 } from "@/components/shared/position-card";
 import { formatDate, formatDateRange, formatDuration } from "@/lib/date";
 import { useMountedNow } from "@/hooks/useMountedNow";
@@ -490,6 +491,17 @@ export function useSparkCardSlots({
     // nothing was borrowed.
     const peakColl = v.peakSupplies.filter((r) => !isOther(r));
     const peaksRead = v.peakSupplies.length + v.peakBorrows.length > 0;
+    // Many reserves: their count opens the peaks, so the head holds one line.
+    const many = (reserves: SparkReserveAmount[], side: "supply" | "debt") =>
+      reserves.length > 1
+        ? assetCountHead(
+            reserves.length,
+            loadedMarks(reserves),
+            <span className="text-sm font-semibold tabular-nums text-foreground" data-spark-peak-breakdown="">
+              <PeakLines reserves={reserves} side={side} iconSize={16} />
+            </span>,
+          )
+        : {};
     heads = [
       {
         id: "peak-collateral",
@@ -500,6 +512,7 @@ export function useSparkCardSlots({
           ) : peaksRead && notCollateral != null ? (
             <PeakNone />
           ) : null,
+        ...many(peakColl, "supply"),
       },
       {
         id: "peak-debt",
@@ -510,6 +523,7 @@ export function useSparkCardSlots({
           ) : peaksRead ? (
             <PeakNone />
           ) : null,
+        ...many(v.peakBorrows, "debt"),
       },
     ];
     outcome = {

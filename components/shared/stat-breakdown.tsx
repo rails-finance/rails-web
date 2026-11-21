@@ -4,7 +4,9 @@
 // reads (C19): its figure and icon cluster are one button that opens the
 // assets in a dropdown under it (the bottom sheet on a phone), so the cell
 // holds one line whatever the count. The panel's `Stat` draws it where a row
-// carries a `breakdown` (components/shared/position-card-panel.tsx).
+// carries a `breakdown` (components/shared/position-card-panel.tsx). The
+// dropdown (`BreakdownOverlay`) is the one the headlines open too
+// (components/shared/position-card.tsx).
 
 import { useId, useRef, useState, type ReactNode } from "react";
 import { QuietTipsContext } from "@/components/shared/reveal-tip";
@@ -23,6 +25,54 @@ export interface PanelRowBreakdown {
   total?: { usd: number; info: Provenance };
   /** The overlay's body. */
   panel: ReactNode;
+}
+
+/** The C19 dropdown: anchored under its button (the bottom sheet under 640
+ *  px), headed by the side's label and, where priced, its exact total with
+ *  the receipt. Escape, a press outside or the sheet's close calls `onClose`. */
+export function BreakdownOverlay({
+  id,
+  label,
+  total,
+  anchor,
+  onClose,
+  children,
+}: {
+  id: string;
+  label: string;
+  total?: { usd: number; info: Provenance };
+  anchor: () => HTMLElement | null;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    // The overlay renders in a portal, but its events still pass through
+    // the card's React handlers: this stops them here.
+    <span className="contents" onClick={(e) => e.stopPropagation()}>
+      <AnchoredPanel
+        id={id}
+        label={total ? `${label} ${formatUsdValue(total.usd)}` : label}
+        anchor={anchor}
+        onClose={onClose}
+        fit={420}
+        drop
+        name="breakdown-panel"
+        // A donut's slices grade toward the overlay's ground.
+        surface="overlay"
+        className="[--donut-ground:var(--surface-overlay)] max-sm:[--donut-ground:var(--surface-raised)] dark:[--donut-ground:var(--color-rb-900)]"
+      >
+        <p className="mb-3 flex items-baseline gap-2 pr-8 sm:pr-0" data-breakdown-heading="">
+          <span className={OVERLAY_HEADING}>{label}</span>
+          {total && (
+            <Prov info={total.info} echo>
+              <span className="text-sm font-semibold tabular-nums text-foreground">{formatUsdValue(total.usd)}</span>
+            </Prov>
+          )}
+        </p>
+        {children}
+      </AnchoredPanel>
+    </span>
+  );
 }
 
 export function StatBreakdown({
@@ -76,33 +126,9 @@ export function StatBreakdown({
         </QuietTipsContext.Provider>
       </button>
       {open && (
-        // The overlay renders in a portal, but its events still pass through
-        // the card's React handlers: this stops them here.
-        <span className="contents" onClick={(e) => e.stopPropagation()}>
-          <AnchoredPanel
-            id={panelId}
-            label={total ? `${label} ${formatUsdValue(total.usd)}` : label}
-            anchor={() => button.current}
-            onClose={close}
-            fit={420}
-            drop
-            name="breakdown-panel"
-            surface="overlay"
-            className="[--donut-ground:var(--surface-overlay)] max-sm:[--donut-ground:var(--surface-raised)] dark:[--donut-ground:var(--color-rb-900)]"
-          >
-            <p className="mb-3 flex items-baseline gap-2 pr-8 sm:pr-0" data-breakdown-heading="">
-              <span className={OVERLAY_HEADING}>{label}</span>
-              {total && (
-                <Prov info={total.info} echo>
-                  <span className="text-sm font-semibold tabular-nums text-foreground">
-                    {formatUsdValue(total.usd)}
-                  </span>
-                </Prov>
-              )}
-            </p>
-            {panel}
-          </AnchoredPanel>
-        </span>
+        <BreakdownOverlay id={panelId} label={label} total={total} anchor={() => button.current} onClose={close}>
+          {panel}
+        </BreakdownOverlay>
       )}
     </>
   );

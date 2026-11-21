@@ -48,8 +48,10 @@ import { useContext, useId, useLayoutEffect, useRef, useState, type CSSPropertie
 import Link from "next/link";
 import { PositionCardStripSlot } from "@/components/shared/position-card-strip";
 import { PositionReadStamp } from "@/components/shared/position-read";
-import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
+import { BreakdownOverlay } from "@/components/shared/stat-breakdown";
+import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import type { AssetMark } from "@/lib/shared/asset-mark";
 import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
 import {
   PositionCardEdgeContext,
@@ -59,12 +61,7 @@ import {
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { formatUsdValue } from "@/lib/utils/format";
-import {
-  OVERLAY_HEADING,
-  POSITION_CARD_FRAME,
-  POSITION_CARD_FRAME_BOX,
-  POSITION_CARD_PAD,
-} from "@/lib/shared/ui-grammar";
+import { POSITION_CARD_FRAME, POSITION_CARD_FRAME_BOX, POSITION_CARD_PAD } from "@/lib/shared/ui-grammar";
 import {
   Prov,
   ProvInert,
@@ -165,9 +162,30 @@ export interface PositionCardHead {
    *  the icon cluster opens their breakdown in a popover (a bottom sheet on
    *  a phone), one side at a time (`asset-donut.tsx`). */
   breakdown?: AssetBreakdown;
+  /** A side of two or more unpriced assets (a closed card's peaks): on a
+   *  detail card the figure (their count) and the icon cluster are the C19
+   *  button, and it opens `panel`, the assets one line each, in the same
+   *  dropdown. A listing card draws the count and the cluster alone. Built
+   *  by `assetCountHead`. */
+  list?: { count: number; assets: AssetMark[]; panel: ReactNode };
   /** The side's USD total and its receipt: the breakdown's heading states it
    *  exact, and carries the receipt the headline (inside the button) cannot. */
   total?: { usd: number; info: Provenance };
+}
+
+/** A head's figure, icons and list for a side of `count` unpriced assets:
+ *  "10 assets" with the cluster, opening `panel` (`PositionCardHead.list`). */
+export function assetCountHead(
+  count: number,
+  assets: AssetMark[],
+  panel: ReactNode,
+): Pick<PositionCardHead, "value" | "assets" | "list"> {
+  return {
+    // A count of the lines the overlay lists, each with its receipt.
+    value: <span data-prov-exempt="">{count} assets</span>,
+    assets: <InlineAssetCluster assets={assets} />,
+    list: { count, assets, panel },
+  };
 }
 
 /** The (i) Explanation at the foot of a detail card, drawn through the
@@ -517,7 +535,7 @@ function ListingPill({ status }: { status: PositionCardStatus | null }) {
 
 /** A head's resolved tier (`PositionCardHead.tier`). */
 const tierOf = (h: PositionCardHead): "amount" | "measure" =>
-  h.tier ?? (h.assets != null || h.usd !== undefined || h.breakdown != null ? "amount" : "measure");
+  h.tier ?? (h.assets != null || h.usd !== undefined || h.breakdown != null || h.list != null ? "amount" : "measure");
 
 /** A measure's figure: a step under the headline size, in a line box of the
  *  headline's height and dropped to its baseline. */
@@ -557,7 +575,7 @@ function HeadBody({
       aria-controls={toggle.open ? toggle.panelId : undefined}
       aria-label={[
         head.total ? `${head.label} ${formatUsdValue(head.total.usd)}` : head.label,
-        head.breakdown ? `${head.breakdown.assets.length} assets` : null,
+        head.list ? `${head.list.count} assets` : head.breakdown ? `${head.breakdown.assets.length} assets` : null,
         "show breakdown",
       ]
         .filter(Boolean)
@@ -615,15 +633,16 @@ function HeadBody({
   );
 }
 
-function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolean }) {
-  // The breakdowns: the donut button opens its side's in a popover anchored
-  // to it (a bottom sheet on a phone), one side at a time; the card keeps
-  // its shape.
+/** The headlines' C19 buttons: one side open at a time, its dropdown anchored
+ *  to its button (a bottom sheet on a phone); the card keeps its shape. A side
+ *  opens where it has a breakdown of two or more assets or a list, on a
+ *  detail card. */
+function useHeadPanels(heads: PositionCardHead[], detail: boolean) {
   const [open, setOpen] = useState<string | null>(null);
   const buttons = useRef<Record<string, HTMLButtonElement | null>>({});
   const panelId = useId();
-  const sideOf = (h: PositionCardHead) => (h.id === "debt" ? "debt" : "collateral");
-  const has = (h: PositionCardHead) => detail && !!h.breakdown && h.breakdown.assets.length > 1;
+  const has = (h: PositionCardHead) =>
+    detail && ((!!h.breakdown && h.breakdown.assets.length > 1) || (!!h.list && h.list.count > 1));
   const toggleOf = (h: PositionCardHead) =>
     has(h)
       ? {
@@ -636,13 +655,38 @@ function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolea
         }
       : undefined;
   const openHead = heads.find((h) => h.id === open && has(h));
-  const close = (refocus: boolean) => {
+  const close = () => {
     const id = open;
     setOpen(null);
-    if (refocus && id) buttons.current[id]?.focus();
+    if (id) buttons.current[id]?.focus();
   };
-  const exact = formatUsdValue;
-  const title = openHead ? (openHead.total ? `${openHead.label} ${exact(openHead.total.usd)}` : openHead.label) : "";
+  const sideOf = (h: PositionCardHead) => (h.id === "debt" ? "debt" : "collateral");
+  const panel = openHead && (
+    <BreakdownOverlay
+      id={`${panelId}-${openHead.id}`}
+      label={openHead.label}
+      total={openHead.total}
+      anchor={() => buttons.current[openHead.id] ?? null}
+      onClose={close}
+    >
+      {openHead.list ? (
+        openHead.list.panel
+      ) : openHead.breakdown ? (
+        <AssetBreakdownPanel
+          key={openHead.id}
+          id={`${panelId}-${openHead.id}-body`}
+          name={openHead.label}
+          side={sideOf(openHead)}
+          breakdown={openHead.breakdown}
+        />
+      ) : null}
+    </BreakdownOverlay>
+  );
+  return { toggleOf, panel };
+}
+
+function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolean }) {
+  const { toggleOf, panel } = useHeadPanels(heads, detail);
   // Tiers apply only where the card holds an amount to stand over its measures.
   const tiered = heads.some((h) => tierOf(h) === "amount");
   return (
@@ -662,42 +706,7 @@ function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolea
           </PositionCardRow>
         ))}
       </div>
-      {openHead?.breakdown && (
-        // The overlay renders in a portal, but its events still pass through
-        // the card's React handlers: this stops them here.
-        <span className="contents" onClick={(e) => e.stopPropagation()}>
-          <AnchoredPanel
-            id={`${panelId}-${openHead.id}`}
-            label={title}
-            anchor={() => buttons.current[openHead.id] ?? null}
-            onClose={() => close(true)}
-            fit={420}
-            drop
-            name="breakdown-panel"
-            // The slices grade toward the overlay's ground.
-            surface="overlay"
-            className="[--donut-ground:var(--surface-overlay)] max-sm:[--donut-ground:var(--surface-raised)] dark:[--donut-ground:var(--color-rb-900)]"
-          >
-            <p className="mb-3 flex items-baseline gap-2 pr-8 sm:pr-0" data-breakdown-heading="">
-              <span className={OVERLAY_HEADING}>{openHead.label}</span>
-              {openHead.total && (
-                <Prov info={openHead.total.info} echo>
-                  <span className="text-sm font-semibold tabular-nums text-foreground">
-                    {exact(openHead.total.usd)}
-                  </span>
-                </Prov>
-              )}
-            </p>
-            <AssetBreakdownPanel
-              key={openHead.id}
-              id={`${panelId}-${openHead.id}-body`}
-              name={openHead.label}
-              side={sideOf(openHead)}
-              breakdown={openHead.breakdown}
-            />
-          </AnchoredPanel>
-        </span>
-      )}
+      {panel}
     </>
   );
 }
@@ -716,45 +725,49 @@ function ClosedGrid({
   detail: boolean;
 }) {
   const peaks = heads.slice(0, 2);
+  const { toggleOf, panel } = useHeadPanels(peaks, detail);
   return (
-    <div className={CLOSED_GRID} data-anatomy="C10">
-      {peaks.map((h, i) => (
+    <>
+      <div className={CLOSED_GRID} data-anatomy="C10">
+        {peaks.map((h, i) => (
+          <PositionCardRow
+            key={h.id}
+            index={i}
+            head={h.id}
+            label={h.label}
+            labelTip={detail || h.labelTipOnListing ? h.labelTip : undefined}
+            headerIcon={h.labelIcon}
+            explain={detail}
+          >
+            <HeadBody head={h} toggle={toggleOf(h)} />
+          </PositionCardRow>
+        ))}
+        {peaks.length < 2 && <div className="hidden sm:block" />}
         <PositionCardRow
-          key={h.id}
-          index={i}
-          head={h.id}
-          label={h.label}
-          labelTip={detail || h.labelTipOnListing ? h.labelTip : undefined}
-          headerIcon={h.labelIcon}
+          index={2}
+          head="outcome"
+          label="Outcome"
+          help={detail ? outcome.tip : undefined}
           explain={detail}
         >
-          <HeadBody head={h} />
+          <div className={`text-lg font-bold mt-2 ${OUTCOME_TONE[tone]}`}>{outcome.word}</div>
+          {outcome.dates?.map((d, i) => (
+            <div key={d.label ?? i} className="text-xs text-rb-500 mt-0.5">
+              {d.label ? `${d.label} ${formatDate(d.at)}` : formatDate(d.at)}
+            </div>
+          ))}
+          {outcome.footnote}
         </PositionCardRow>
-      ))}
-      {peaks.length < 2 && <div className="hidden sm:block" />}
-      <PositionCardRow
-        index={2}
-        head="outcome"
-        label="Outcome"
-        help={detail ? outcome.tip : undefined}
-        explain={detail}
-      >
-        <div className={`text-lg font-bold mt-2 ${OUTCOME_TONE[tone]}`}>{outcome.word}</div>
-        {outcome.dates?.map((d, i) => (
-          <div key={d.label ?? i} className="text-xs text-rb-500 mt-0.5">
-            {d.label ? `${d.label} ${formatDate(d.at)}` : formatDate(d.at)}
-          </div>
-        ))}
-        {outcome.footnote}
-      </PositionCardRow>
-      {outcome.extra ? (
-        <PositionCardRow index={3} head="extra" label={outcome.extra.label}>
-          {outcome.extra.value}
-        </PositionCardRow>
-      ) : (
-        <div className="hidden sm:block" />
-      )}
-    </div>
+        {outcome.extra ? (
+          <PositionCardRow index={3} head="extra" label={outcome.extra.label}>
+            {outcome.extra.value}
+          </PositionCardRow>
+        ) : (
+          <div className="hidden sm:block" />
+        )}
+      </div>
+      {panel}
+    </>
   );
 }
 

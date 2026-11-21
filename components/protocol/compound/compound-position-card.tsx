@@ -37,12 +37,13 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
+  assetCountHead,
 } from "@/components/shared/position-card";
 import type { PositionCardMetaProps } from "@/components/shared/position-card-meta";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import type { AssetBreakdown } from "@/components/shared/asset-donut";
-import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
+import { TokenAmountNotLoaded, loadedMarks } from "@/components/shared/not-loaded";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
@@ -261,6 +262,7 @@ function TracedAmount({
   amount,
   address,
   unreadAddress,
+  iconSize,
 }: {
   info: Provenance;
   symbol: string;
@@ -268,6 +270,8 @@ function TracedAmount({
   address?: string;
   /** Set to the token's address when its decimals did not load. */
   unreadAddress?: string;
+  /** The icon's size: a headline's default, 16 in an overlay. */
+  iconSize?: number;
 }) {
   return (
     <div>
@@ -275,7 +279,7 @@ function TracedAmount({
         {unreadAddress ? (
           <TokenAmountNotLoaded address={unreadAddress} label={symbol} />
         ) : (
-          <AssetAmount value={amount} symbol={symbol} address={address} />
+          <AssetAmount value={amount} symbol={symbol} address={address} iconSize={iconSize} />
         )}
       </Prov>
     </div>
@@ -447,45 +451,68 @@ export function useCompoundCardSlots({
     // A wallet that only ever lent the base posted no collateral: its peak is
     // "supply" (the Aave V4 spoke-card grammar).
     const supplyOnly = v.peak.collateral.length === 0 && v.peak.lentBase > 0;
-    const lentLine =
-      v.peak.lentBase > 0 ? (
-        <TracedAmount
-          key="lent-base"
-          info={peakBaseProv(v.base.symbol, "lend", { ...peakCoords, asset: v.base.address })}
-          symbol={v.base.symbol}
-          amount={v.peak.lentBase}
-          address={v.base.address}
-        />
-      ) : null;
-    const supplyLines: ReactNode[] = [];
-    if (supplyOnly && lentLine) supplyLines.push(lentLine);
-    for (const c of v.peak.collateral) {
-      supplyLines.push(
-        <TracedAmount
-          key={c.address}
-          info={peakCollateralProv(c.symbol, { ...peakCoords, asset: c.address })}
-          symbol={c.symbol}
-          amount={c.amount}
-          address={c.address}
-          unreadAddress={c.decimalsUnread ? c.address : undefined}
-        />,
-      );
-    }
-    // The lent base is not collateral: under its own caption.
-    if (!supplyOnly && lentLine) {
-      supplyLines.push(
-        <div key="lent-caption" className="mt-1 text-xs font-normal text-rb-500">
-          Highest supplied {v.base.symbol} (earns interest)
-        </div>,
-        lentLine,
-      );
-    }
+    const supplyLinesOf = (iconSize?: number): ReactNode[] => {
+      const lentLine =
+        v.peak.lentBase > 0 ? (
+          <TracedAmount
+            key="lent-base"
+            info={peakBaseProv(v.base.symbol, "lend", { ...peakCoords, asset: v.base.address })}
+            symbol={v.base.symbol}
+            amount={v.peak.lentBase}
+            address={v.base.address}
+            iconSize={iconSize}
+          />
+        ) : null;
+      const lines: ReactNode[] = [];
+      if (supplyOnly && lentLine) lines.push(lentLine);
+      for (const c of v.peak.collateral) {
+        lines.push(
+          <TracedAmount
+            key={c.address}
+            info={peakCollateralProv(c.symbol, { ...peakCoords, asset: c.address })}
+            symbol={c.symbol}
+            amount={c.amount}
+            address={c.address}
+            unreadAddress={c.decimalsUnread ? c.address : undefined}
+            iconSize={iconSize}
+          />,
+        );
+      }
+      // The lent base is not collateral: under its own caption.
+      if (!supplyOnly && lentLine) {
+        lines.push(
+          <div key="lent-caption" className="mt-1 text-xs font-normal text-rb-500">
+            Highest supplied {v.base.symbol} (earns interest)
+          </div>,
+          lentLine,
+        );
+      }
+      return lines;
+    };
+    const supplyLines = supplyLinesOf();
+    // The assets the lines name, in their order.
+    const supplyMarks = [
+      ...(supplyOnly && v.peak.lentBase > 0 ? [{ symbol: v.base.symbol, address: v.base.address }] : []),
+      ...loadedMarks(v.peak.collateral),
+      ...(!supplyOnly && v.peak.lentBase > 0 ? [{ symbol: v.base.symbol, address: v.base.address }] : []),
+    ];
+    const supplyCount = v.peak.collateral.length + (v.peak.lentBase > 0 ? 1 : 0);
     heads = [
       {
         id: "peak-collateral",
         label: supplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
         value: supplyLines.length > 0 ? <div className="flex flex-col gap-1">{supplyLines}</div> : null,
         sub: noPeaksNote,
+        // Many assets: their count opens the peaks, so the head holds one line.
+        ...(peaks && supplyCount > 1
+          ? assetCountHead(
+              supplyCount,
+              supplyMarks,
+              <div className="flex flex-col gap-1 text-sm font-semibold tabular-nums text-foreground">
+                {supplyLinesOf(16)}
+              </div>,
+            )
+          : {}),
       },
     ];
     if (!peaks || v.peak.borrowedBase > 0)

@@ -34,6 +34,7 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
+  assetCountHead,
 } from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
@@ -167,7 +168,16 @@ function AmountStack({ children }: { children: ReactNode }) {
 /** Per-market PEAK amounts (highest recorded), each traced to the lane's
  *  maximum (the supply balance at a row on supply, emitted accountBorrows on
  *  debt); no USD, the token amount only. */
-function PeakLines({ lines, side }: { lines: MoonwellPeakAmount[]; side: "supply" | "debt" }) {
+function PeakLines({
+  lines,
+  side,
+  iconSize,
+}: {
+  lines: MoonwellPeakAmount[];
+  side: "supply" | "debt";
+  /** The icon's size: a headline's default, 16 in an overlay. */
+  iconSize?: number;
+}) {
   const dep = useMoonwellDeployment();
   return (
     <AmountStack>
@@ -178,6 +188,7 @@ function PeakLines({ lines, side }: { lines: MoonwellPeakAmount[]; side: "supply
             symbol={r.symbol}
             address={r.address}
             exact={formatUnitsExact(r.amountRaw, r.decimals)}
+            iconSize={iconSize}
           />
         </Prov>
       ))}
@@ -351,18 +362,31 @@ export function useMoonwellCardSlots({
     // what each asset held at its height — highest recorded per-market supply +
     // debt (replayed MAX over the wallet's life, per asset; no USD).
     const noPeaksNote = !peaks ? notRecordedNote("position") : undefined;
+    // Many markets: their count opens the peaks, so the head holds one line.
+    const many = (lines: MoonwellPeakAmount[], side: "supply" | "debt") =>
+      peaks && lines.length > 1
+        ? assetCountHead(
+            lines.length,
+            lines.map((r) => ({ symbol: r.symbol, address: r.address })),
+            <span className="text-sm font-semibold tabular-nums text-foreground">
+              <PeakLines lines={lines} side={side} iconSize={16} />
+            </span>,
+          )
+        : {};
     heads = [
       {
         id: "peak-collateral",
         label: CARD_VOCAB.peakCollateral,
         value: peaks && v.peakSupplies.length > 0 ? <PeakLines lines={v.peakSupplies} side="supply" /> : null,
         sub: noPeaksNote,
+        ...many(v.peakSupplies, "supply"),
       },
       {
         id: "peak-debt",
         label: CARD_VOCAB.peakDebt,
         value: peaks && v.peakBorrows.length > 0 ? <PeakLines lines={v.peakBorrows} side="debt" /> : null,
         sub: noPeaksNote,
+        ...many(v.peakBorrows, "debt"),
       },
     ];
     outcome = {

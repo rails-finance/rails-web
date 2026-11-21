@@ -44,6 +44,7 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
+  assetCountHead,
 } from "@/components/shared/position-card";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { AssetAmount } from "@/components/shared/asset-amount";
@@ -298,7 +299,7 @@ function UsdFigure({ usd, info, form }: { usd: number; info: Provenance; form: "
 /** One market's peak amounts (highest recorded), each traced to the lane's
  *  maximum (the supply balance at a row on supply, emitted accountBorrows on
  *  debt); no USD, the token amount only. Null where nothing was recorded. */
-function peakValue(lines: CompoundV2PeakAmount[], side: "supply" | "debt"): ReactNode | null {
+function peakValue(lines: CompoundV2PeakAmount[], side: "supply" | "debt", iconSize?: number): ReactNode | null {
   if (lines.length === 0) return null;
   return (
     <div className="flex flex-col gap-1">
@@ -316,6 +317,7 @@ function peakValue(lines: CompoundV2PeakAmount[], side: "supply" | "debt"): Reac
               symbol={r.symbol}
               address={underlyingOf(r.market)}
               exact={formatUnitsExact(r.amountRaw, r.decimals)}
+              iconSize={iconSize}
             />
           </Prov>
         </div>
@@ -470,9 +472,22 @@ export function useCompoundV2CardSlots({
   // liquidated outcome appears only here: an open survivor never reaches this
   // branch, however many liquidations its counters show.
   if (ended) {
+    // Many markets: their count opens the peaks, so the head holds one line.
+    const peakHead = (id: string, label: string, lines: CompoundV2PeakAmount[], side: "supply" | "debt") => ({
+      id,
+      label,
+      value: peakValue(lines, side),
+      ...(lines.length > 1
+        ? assetCountHead(
+            lines.length,
+            lines.map(markOf),
+            <span className="text-sm font-semibold tabular-nums text-foreground">{peakValue(lines, side, 16)}</span>,
+          )
+        : {}),
+    });
     const heads: PositionCardHead[] = [
-      { id: "peak-collateral", label: CARD_VOCAB.peakCollateral, value: peakValue(v.peakSupplies, "supply") },
-      { id: "peak-debt", label: CARD_VOCAB.peakDebt, value: peakValue(v.peakBorrows, "debt") },
+      peakHead("peak-collateral", CARD_VOCAB.peakCollateral, v.peakSupplies, "supply"),
+      peakHead("peak-debt", CARD_VOCAB.peakDebt, v.peakBorrows, "debt"),
     ];
     const outcome: PositionCardOutcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",

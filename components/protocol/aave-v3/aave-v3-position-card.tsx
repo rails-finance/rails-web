@@ -34,6 +34,7 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
+  assetCountHead,
 } from "@/components/shared/position-card";
 import { Icon } from "@/components/icons/icon";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
@@ -245,9 +246,12 @@ function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
 function ReserveAmounts({
   reserves,
   receipt,
+  iconSize,
 }: {
   reserves: AaveV3ReserveAmount[];
   receipt: (r: AaveV3ReserveAmount) => Provenance;
+  /** The icon's size: a headline's default, 16 in an overlay. */
+  iconSize?: number;
 }) {
   return (
     <span className="flex flex-col gap-1">
@@ -261,6 +265,7 @@ function ReserveAmounts({
               symbol={r.symbol}
               address={r.address}
               exact={formatUnitsExact(r.amountRaw, r.decimals)}
+              iconSize={iconSize}
             />
           )}
         </Prov>
@@ -423,6 +428,16 @@ export function useAaveV3CardSlots({
       value:
         peaks && reserves.length > 0 ? <ReserveAmounts reserves={reserves} receipt={(r) => receipt(r.symbol)} /> : null,
       sub: notRecorded,
+      // Many reserves: their count opens the peaks, so the head holds one line.
+      ...(peaks && reserves.length > 1
+        ? assetCountHead(
+            reserves.length,
+            loadedMarks(reserves),
+            <span className="text-sm font-semibold tabular-nums text-foreground">
+              <ReserveAmounts reserves={reserves} receipt={(r) => receipt(r.symbol)} iconSize={16} />
+            </span>,
+          )
+        : {}),
     });
     const liquidated = v.status === "liquidated";
     const status: PositionCardStatus = liquidated

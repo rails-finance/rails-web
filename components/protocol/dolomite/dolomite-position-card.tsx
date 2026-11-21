@@ -38,6 +38,7 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
+  assetCountHead,
 } from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
@@ -175,7 +176,16 @@ function LegLines({ lines, side }: { lines: DolomiteBalanceAmount[]; side: "supp
 /** A closed card's per-market PEAK amounts (highest recorded PAR, the scaled
  *  balance, labeled so on hover), each traced; no USD (the oracle prices only
  *  the present). */
-function PeakLines({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply" | "debt" }) {
+function PeakLines({
+  lines,
+  side,
+  iconSize,
+}: {
+  lines: DolomitePeakAmount[];
+  side: "supply" | "debt";
+  /** The icon's size: a headline's default, 16 in an overlay. */
+  iconSize?: number;
+}) {
   return (
     <span className="flex flex-col gap-1">
       {lines.map((r) => (
@@ -195,6 +205,7 @@ function PeakLines({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply
                   ? formatUnitsExact(r.amountRaw, r.decimals)
                   : `${formatUnitsExact(r.amountRaw, r.decimals)} (par: multiply by the market's interest index for tokens)`
               }
+              iconSize={iconSize}
             />
           )}
         </Prov>
@@ -344,16 +355,29 @@ export function useDolomiteCardSlots({
   let heads: PositionCardHead[];
   let outcome: PositionCardOutcome | undefined;
   if (v.status !== "open") {
+    // Many markets: their count opens the peaks, so the head holds one line.
+    const many = (lines: DolomitePeakAmount[], side: "supply" | "debt") =>
+      lines.length > 1
+        ? assetCountHead(
+            lines.length,
+            loadedMarks(lines.map((r) => ({ ...r, address: r.token ?? null }))),
+            <span className="text-sm font-semibold tabular-nums text-foreground">
+              <PeakLines lines={lines} side={side} iconSize={16} />
+            </span>,
+          )
+        : {};
     heads = [
       {
         id: "peak-collateral",
         label: CARD_VOCAB.peakCollateral,
         value: v.peakSupplies.length > 0 ? <PeakLines lines={v.peakSupplies} side="supply" /> : null,
+        ...many(v.peakSupplies, "supply"),
       },
       {
         id: "peak-debt",
         label: CARD_VOCAB.peakDebt,
         value: v.peakBorrows.length > 0 ? <PeakLines lines={v.peakBorrows} side="debt" /> : null,
+        ...many(v.peakBorrows, "debt"),
       },
     ];
     outcome = {
