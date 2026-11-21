@@ -4,10 +4,11 @@
 // (`coll_decimals`: Ebisu's WBTC and LBTC are 8, every other branch 18); the
 // stablecoin side is 1e18 everywhere. RULE: every coll_* amount is scaled to
 // 1e18 where the answer is read, so lib/liquity-v2/sp-math.ts and every page
-// part reads one unit, and the chain read (lib/sources/chain/liquity-fork-sp.ts)
-// scales its collateral getters the same way, so the index-lag comparison
+// part reads one unit, and the chain read (lib/sources/chain/liquity-v2-sp.ts,
+// `loadSpDepositFromChain`) scales its collateral getters the same way, so the index-lag comparison
 // (sp-math.ts `depositNow`) compares like with like. Liquity V2's answers carry
-// no `coll_decimals` and pass through untouched.
+// no `coll_decimals` and pass through untouched. A scaled answer loses its
+// `coll_decimals`, top-level and per branch, so a second pass leaves it as it is.
 //
 // Pure: no imports, so scripts/test/liquity-fork-sp.test.mjs loads it.
 
@@ -73,5 +74,10 @@ export function scaleSpAnswer<T>(answer: T): T {
     scaleFields(a.position, ROW_COLL, top);
     if (Array.isArray(a.days)) for (const day of a.days) scaleFields(day, DAY_COLL, top);
   }
+  // Scaled once: the units are 1e18 now, and nothing is left to scale by.
+  delete a.coll_decimals;
+  if (a.branches && typeof a.branches === "object")
+    for (const entry of Object.values(a.branches as Rec))
+      if (entry && typeof entry === "object") delete (entry as Rec).coll_decimals;
   return answer;
 }

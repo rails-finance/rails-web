@@ -10,9 +10,14 @@
 // No figure here is priced. The fork listings value nothing (each row's
 // collateral is a quantity of its branch's token), so the collateral is a
 // quantity per branch, the debt a quantity of the fork's stablecoin, and the
-// deposits their own leg in the same stablecoin: debt owed and a deposit held
+// deposits a separate leg in the same stablecoin: debt owed and a deposit held
 // are never summed. A Trove the wallet passed on (formerHold, ui-jobs 715) is
 // not its holding and is left out.
+//
+// A shut-down branch whose pool the admin emptied (Ebisu, ui-jobs 608, 612)
+// keeps its Troves' recorded collateral while the pool holds 0: the leg is
+// "Recorded collateral", as the Trove card's C6.1 states it, with the
+// shutdown and "pool holds 0 <symbol>" under it.
 
 import type { HolderKindCount, HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
 import type { HolderKindPage } from "@/components/shared/holder-kinds";
@@ -20,6 +25,7 @@ import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import { formatNumber } from "@/lib/utils/format";
 import { depositsLine } from "@/lib/liquity/holder-deposits";
 import { big, units } from "@/lib/liquity-v2/sp-math";
+import { recordedShutdown, shutdownDay, withdrawalDateProv } from "@/lib/shared/liquity-family-shutdown";
 
 /** The Trove fields the strip reads; the three forks' summaries share them. */
 export interface ForkStripTrove {
@@ -41,18 +47,23 @@ export interface ForkStripOpts {
   wallet?: string;
   /** Each branch's collateral token address, for the icons. */
   collAddress?: (collateralType: string) => string | undefined;
+  /** The fork holds more Troves than the one read returned (`read` of them):
+   *  the wallet's may be more than the rows, so no totals are stated. */
+  trovesPartial?: { read: number };
 }
 
 const plural = (n: number, one: string, many: string): string => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
 const LEG_TIP = {
   collateral: "As of each open Trove's last touch. Redistribution gains since then are left out.",
+  collateralShut:
+    "What each open Trove records as of its last touch. The branch is shut down and its pool holds 0 of this collateral since the admin withdrew it.",
   debt: "As of each open Trove's last touch. The interest and redistributed debt built up since are left out.",
   deposit: "As of each deposit's last touch. Liquidations since then have not been taken out.",
 } as const;
 
 function countsLine(c: { open: number; closed: number; liquidated: number; zombie: number }): string {
-  if (c.open === 0 && c.closed === 0 && c.liquidated === 0) return "This wallet holds no Troves.";
+  if (c.open === 0 && c.closed === 0 && c.liquidated === 0) return "This wallet holds no open Troves.";
   const head =
     c.open > 0
       ? `This wallet holds ${plural(c.open, "open Trove", "open Troves")}`
@@ -97,36 +108,60 @@ export function liquityForkHolderStrip(
   }
   const branches = [...byBranch].sort((a, b) => a[0].localeCompare(b[0]));
   const token = (c: string) => ({ symbol: c, address: o.collAddress?.(c) });
+  // The branches whose pool the admin emptied after the shutdown.
+  const emptied = branches.flatMap(([c]) => {
+    const rec = recordedShutdown(o.protocol, c);
+    return rec?.withdrawal ? [{ c, rec, w: rec.withdrawal }] : [];
+  });
+  const shut = emptied.length > 0;
+  const label = shut ? "Recorded collateral" : "Total collateral";
+  const tip = shut ? LEG_TIP.collateralShut : LEG_TIP.collateral;
+  const syms = emptied.map((e) => e.c).join(", ");
+  const one = emptied.length === 1;
+  const shutSentence = shut
+    ? ` The admin shut the ${syms} ${one ? "branch" : "branches"} down on ${shutdownDay(emptied[0].rec.shutdown.at)} and withdrew ${one ? "its pool's" : "their pools'"} collateral on ${shutdownDay(emptied[0].w.at)}; ${one ? "the pool has" : "the pools have"} held 0 ${syms} since, and the Troves still record this collateral.`
+    : "";
+  const shutNote = shut
+    ? {
+        text: `Shut down ${shutdownDay(emptied[0].rec.shutdown.at)} · ${emptied.map((e) => `pool holds 0 ${e.c}`).join(" · ")}`,
+        prov: withdrawalDateProv(o.protocol, emptied[0].c, emptied[0].rec) ?? undefined,
+      }
+    : null;
   if (branches.length === 1) {
     const [c, amount] = branches[0];
     legs.push({
       id: "collateral",
-      label: "Total collateral",
+      label,
       value: `${formatNumber(amount)} ${c}`,
       approx: false,
-      tip: LEG_TIP.collateral,
+      tip,
       figure: { amount, tokens: [token(c)], usd: null },
+      ...(shutNote ? { footnote: shutNote } : {}),
       prov: {
         kind: "chain",
         pclass: "indexed",
-        summary: `All the ${c} the wallet's open Troves hold — the sum of each Trove's collateral, from the index. The wallet holds on this branch only, so the sum is a quantity of one token. Redistribution gains since each Trove's last touch are not in it.`,
+        summary: `All the ${c} the wallet's open Troves ${shut ? "record" : "hold"} — the sum of each Trove's collateral, from the index. The wallet holds on this branch only, so the sum is a quantity of one token. Redistribution gains since each Trove's last touch are not in it.${shutSentence}`,
         via: `GET /api/${o.protocol}/troves · Σ collateral over the wallet's open rows`,
       },
     });
   } else if (branches.length > 1) {
     const parts = branches.map(([c, amount]) => ({ text: `${formatNumber(amount)} ${c}`, ...token(c) }));
+    const text = parts.map((p) => p.text).join(" · ");
     legs.push({
       id: "collateral",
-      label: "Total collateral",
-      value: parts.map((p) => p.text).join(" · "),
+      label,
+      value: text,
       approx: false,
-      tip: LEG_TIP.collateral,
-      footnote: { text: parts.map((p) => p.text).join(" · "), parts },
+      tip,
+      footnote: {
+        text: shutNote ? `${text} · ${shutNote.text}` : text,
+        parts,
+        ...(shutNote?.prov ? { prov: shutNote.prov } : {}),
+      },
       prov: {
         kind: "chain",
         pclass: "indexed",
-        summary:
-          "The wallet's open Troves' collateral, branch by branch — the sum of each Trove's collateral on its branch, from the index. The branches hold different tokens and the listing prices none, so they carry no total. Redistribution gains since each Trove's last touch are not in it.",
+        summary: `The wallet's open Troves' ${shut ? "recorded " : ""}collateral, branch by branch — the sum of each Trove's collateral on its branch, from the index. The branches hold different tokens and the listing prices none, so they carry no total. Redistribution gains since each Trove's last touch are not in it.${shutSentence}`,
         via: `GET /api/${o.protocol}/troves · Σ collateral over the wallet's open rows, per branch`,
       },
     });
@@ -176,6 +211,21 @@ export function liquityForkHolderStrip(
     });
 
   const troveLine = countsLine(counts);
+  // The fork's Troves past one read are unread: the wallet may hold more
+  // than these, so the counts stand as read and no totals are stated, as
+  // the V2 adapter withholds them past one page.
+  if (o.trovesPartial)
+    return {
+      countsLine: `${troveLine}${depositsLine(depOpen.length, depClosed)}`,
+      counts,
+      legs: [],
+      truncated: true,
+      positions: held.length + (deposits?.total ?? 0),
+      wallet: o.wallet,
+      protocol: o.protocol,
+      note: `Totals are stated where one read holds every Trove the protocol has; this read returned the first ${o.trovesPartial.read.toLocaleString("en-US")}.`,
+      ...(kinds ? { kinds } : {}),
+    };
   return {
     countsLine: `${troveLine}${depositsLine(depOpen.length, depClosed)}`,
     counts,
@@ -183,6 +233,7 @@ export function liquityForkHolderStrip(
     truncated: false,
     positions: held.length + (deposits?.total ?? 0),
     wallet: o.wallet,
+    protocol: o.protocol,
     ...(kinds ? { kinds } : {}),
   };
 }

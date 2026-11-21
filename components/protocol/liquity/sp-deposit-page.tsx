@@ -6,9 +6,9 @@
 // (app/(app)/sepolia/polaris/stability-pool/[market]/[id]/deposit-view.tsx):
 // the card, the Lifetime flows panel (lib/liquity-v2/sp-flow-timelines.ts,
 // decision 0022 as amended 17 Nov 2026), the shared timeline with "Since its
-// last touch" in its head slot. The branch pool's getters at head
-// (/api/chain/liquity-v2/stability-pool) are the card's figures and the flows'
-// pending legs; the index holds the history and the sums. A life longer than
+// last touch" in its head slot. The branch pool's getters at head (the
+// deployment's chain read, `dep.chainApi`: /api/chain/<deployment>/stability-pool)
+// are the card's figures and the flows' pending legs; the index holds the history and the sums. A life longer than
 // one read draws the newest SP_FIRST_READ rows with a boundary card, and the
 // flows read the life's day rows (/stability-pool/flows/daily). Under
 // `event/<id>` the page draws one operation on the shared event page (P4).
@@ -265,7 +265,7 @@ export function SpDepositPage({
   const sizeDims = useMemo(() => liquityV2SpSizeDims((e) => rowById.get(e.id)?.top_up_or_withdrawal, S), [rowById, S]);
   const tl = useTimelineEvents(events, {
     storageKey: `${dep.id}-sp-${branch}-${depositor}`,
-    protocolKey: "liquity-v2-sp",
+    protocolKey: `${dep.id}-sp`,
     olderCount,
     size: sizeDims,
   });
@@ -387,7 +387,7 @@ export function SpDepositPage({
               <DetailBodySkeleton />
             ) : pinnedUnread ? null : (
               <ChainTruthTimeline
-                persistKeyPrefix="liquity-v2-sp"
+                persistKeyPrefix={`${dep.id}-sp`}
                 closed={!open}
                 tl={tl}
                 boundary={boundary}
@@ -463,7 +463,7 @@ export function SpDepositPage({
  *  head and can be withdrawn (rails-ops TO-DO-stability-pool-deposits §3.2). */
 function ShutdownLine({ dep, symbol, state }: { dep: SpDeployment; symbol: string; state: BranchShutdownState }) {
   const terms = liquityFamilyTerms(dep.id);
-  const day = <Prov info={shutdownDateProv(dep.id, symbol, state)}>{shutdownDay(state.at)}</Prov>;
+  const day = <Prov info={shutdownDateProv(dep.id, symbol, state, { trove: false })}>{shutdownDay(state.at)}</Prov>;
   const w = state.record?.withdrawal;
   const wProv = state.record ? withdrawalDateProv(dep.id, symbol, state.record) : null;
   let line: ReactNode;

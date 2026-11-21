@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const depositor = normalizeDepositor(request.nextUrl.searchParams.get("wallet"));
   if (!pool || !depositor) {
     return NextResponse.json(
-      { error: "collateralType (a Basedollar branch) and wallet (an address) are required" },
+      { error: "collateralType (one of Basedollar's branches) and wallet (an address) are required" },
       { status: 400 },
     );
   }

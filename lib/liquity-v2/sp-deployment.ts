@@ -3,9 +3,7 @@
 // shared pages, cards and receipts read (rails-ops
 // TO-DO-stability-pool-deposits.md §3). A fork's deposit routes answer in
 // Liquity V2's shape (rails-server routes/liquityForkStabilityPool.ts), so a
-// page differs only by what this record names: the chain, the paths, the
-// stablecoin, the branches with their pools and feeds, and whether the
-// per-liquidation route exists. Client-safe: catalogs only.
+// page differs only by what this record names. Client-safe: catalogs only.
 //
 // The pool addresses are rails-server's config/liquity-fork-branches.ts
 // (LIQUITY_FORK_STABILITY_POOLS), the stanzas Sieve captures.

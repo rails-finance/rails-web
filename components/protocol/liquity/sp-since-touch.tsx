@@ -12,6 +12,8 @@
 // shape (sp-sheet.ts): the figures the last touch wrote, what the window
 // added, and the total the next touch starts from, every figure receipted.
 // Where the feed did not answer, the row names the window and values nothing.
+// On a fork the row states the move in its stablecoin alone, the yield less
+// the burn, and values nothing (no price lane for USDaf, BD or ebUSD yet).
 
 import type { ReactNode } from "react";
 import { NoteRowShell } from "@/components/shared/note-row-shell";
@@ -134,6 +136,23 @@ export function LiquityV2DepositSinceTouchRow({
         }
       : null;
 
+  // A fork's stablecoin has no price lane yet (Miles, 21 Nov 2026): its row
+  // states the move in the stablecoin alone, the yield less the burn, and
+  // values no collateral. Liquity V2 keeps the change in USD.
+  const v2 = dep.id === "liquity-v2";
+  const stableNet = gain - burned;
+  const stableNetProv: Provenance = {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `Change in ${S} since the last touch — the ${S} yield pending, getDepositorYieldGainWithPending(depositor), less the ${S} burned, deposits(depositor) − getCompoundedBoldDeposit(depositor), ${atHead}. The ${c} paid in is not valued: no price is read for ${S}. The depositor did nothing inside this window.`,
+    formula: "yield − burned",
+    inputs: [
+      { label: `${S} yield since last touch`, value: exactUnits(gain), kind: "chain", pclass: "state" },
+      { label: `${S} burned since last touch`, value: exactUnits(burned), kind: "chain-derived", pclass: "state" },
+    ],
+  };
+  const signedStable = `${stableNet < ZERO ? "−" : "+"}${fmt(stableNet)} ${S}`;
+
   const before = now + gain;
   const beforeProv: Provenance = {
     kind: "chain-derived",
@@ -226,39 +245,55 @@ export function LiquityV2DepositSinceTouchRow({
       },
     ],
     panels: [],
-    note:
-      price != null && collValueProv && netProv && collValue != null && net != null ? (
-        <>
-          {paidIn > ZERO ? (
-            <>
-              At the branch price feed, {c} is{" "}
-              <Prov info={spFeedProv(c, priceStale, dep)} value={String(price)}>
-                {usd(price)}
-              </Prov>
-              , so the {c} paid in is{" "}
-              <Prov info={collValueProv} value={String(collValue)}>
-                {usd(collValue)}
-              </Prov>
-              .
-            </>
-          ) : (
-            <>No liquidation has paid the deposit {c}.</>
-          )}{" "}
-          With the yield, less the burn, {S} counted at $1, the deposit has moved{" "}
-          <Prov info={netProv} value={String(net)}>
-            {signedUsd(net)}
-          </Prov>{" "}
-          {sinceWords(sinceOpen)}. The next touch writes these figures.
-        </>
-      ) : (
-        "The next touch writes these figures."
-      ),
+    note: !v2 ? (
+      <>
+        {paidIn > ZERO ? (
+          <>
+            Liquidations have paid in {fmt(paidIn)} {c}, not valued here.
+          </>
+        ) : (
+          <>No liquidation has paid the deposit {c}.</>
+        )}{" "}
+        With the yield, less the burn, the deposit has moved{" "}
+        <Prov info={stableNetProv} value={exactUnits(stableNet)}>
+          {signedStable}
+        </Prov>{" "}
+        {sinceWords(sinceOpen)}. The next touch writes these figures.
+      </>
+    ) : price != null && collValueProv && netProv && collValue != null && net != null ? (
+      <>
+        {paidIn > ZERO ? (
+          <>
+            At the branch price feed, {c} is{" "}
+            <Prov info={spFeedProv(c, priceStale, dep)} value={String(price)}>
+              {usd(price)}
+            </Prov>
+            , so the {c} paid in is{" "}
+            <Prov info={collValueProv} value={String(collValue)}>
+              {usd(collValue)}
+            </Prov>
+            .
+          </>
+        ) : (
+          <>No liquidation has paid the deposit {c}.</>
+        )}{" "}
+        With the yield, less the burn, {S} counted at $1, the deposit has moved{" "}
+        <Prov info={netProv} value={String(net)}>
+          {signedUsd(net)}
+        </Prov>{" "}
+        {sinceWords(sinceOpen)}. The next touch writes these figures.
+      </>
+    ) : (
+      "The next touch writes these figures."
+    ),
   };
 
   return (
     <NoteRowShell
       icon="live-window"
-      label={net != null ? `${since}: ${signedUsd(net)} change in USD` : since}
+      label={
+        !v2 ? `${since}: ${signedStable} change` : net != null ? `${since}: ${signedUsd(net)} change in USD` : since
+      }
       marker={{ attr: "data-live-window", value: "liquity-v2-sp-since-touch" }}
       header={
         <>
@@ -271,7 +306,16 @@ export function LiquityV2DepositSinceTouchRow({
               </>
             )}
           </span>
-          {net != null && netProv && (
+          {!v2 && (
+            <>
+              <span className="text-xs text-rb-500">change in {S}</span>
+              {/* An ECHO of the receipt in the sheet's note. */}
+              <Prov echo info={stableNetProv} value={exactUnits(stableNet)}>
+                <span className="text-sm font-semibold text-foreground tabular-nums">{signedStable}</span>
+              </Prov>
+            </>
+          )}
+          {v2 && net != null && netProv && (
             <>
               <span className="text-xs text-rb-500">change in USD</span>
               {/* An ECHO of the receipt in the sheet's note: one fact, stated

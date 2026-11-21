@@ -44,7 +44,7 @@ export function useForkHolderView(fork: LiquityForkDeployment, q: string) {
     const narrowed = [filters.status, filters.branches, filters.debt, filters.coll, filters.tx].some(
       (v) => (v?.length ?? 0) > 0,
     );
-    // The deposits' read has answered; a failed one leaves them unsaid.
+    // The deposits' read has answered; a failed one leaves them out.
     if (narrowed || deposits === undefined) return null;
     const w = search.kind === "address" ? search.address : "";
     const troves = items.map((t) => ({ ...t, formerHold: formerHoldFor(t, w) }));

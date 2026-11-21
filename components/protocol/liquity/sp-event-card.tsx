@@ -292,7 +292,7 @@ export function LiquityV2DepositEventCard({
   const slots: EventCardSlots = {
     event: {
       id: row.event_key,
-      family: "liquity-v2-sp",
+      family: `${dep.id}-sp`,
       txHash: row.tx_hash,
       blockNumber: Number(row.block_number),
       timestamp: Number(row.block_timestamp),

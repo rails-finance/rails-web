@@ -79,6 +79,26 @@ test("a listing scales each row by its branch; a timeline by its top-level decim
   assert.equal(v2.rows[0].stash_raw, "5");
 });
 
+test("a second pass leaves a scaled answer as it is", () => {
+  const once = scaleSpAnswer({
+    coll_decimals: 8,
+    rows: [{ coll_gain_since: "3" }],
+    position: { stash_raw: "1" },
+    branches: { WBTC: { open: 1, closed: 0, coll_decimals: 8 } },
+  });
+  const twice = scaleSpAnswer(structuredClone(once));
+  assert.deepEqual(twice, once);
+  assert.equal(twice.rows[0].coll_gain_since, "30000000000");
+  assert.equal(twice.position.stash_raw, "10000000000");
+  assert.equal("coll_decimals" in twice, false);
+  assert.equal("coll_decimals" in twice.branches.WBTC, false);
+  const list = scaleSpAnswer({
+    branches: { WBTC: { open: 1, closed: 0, coll_decimals: 8 } },
+    rows: [{ collateral_type: "WBTC", stash_raw: "5" }],
+  });
+  assert.equal(scaleSpAnswer(list).rows[0].stash_raw, "50000000000");
+});
+
 test("the index and the chain, both scaled, agree: the index-lag line stays away", () => {
   const position = {
     deposited_raw: "100",
@@ -152,11 +172,35 @@ test("a Trove the wallet moved on is not counted; collateral across branches has
   assert.equal(s.positions, 2);
 });
 
-test("deposits alone: the strip says the wallet holds no Troves", () => {
+test("deposits alone: the strip says the wallet holds no open Troves, and links its wallet page", () => {
   const s = liquityForkHolderStrip([], { rows: [deposit("open", 5)], total: 1 }, OPTS);
-  assert.equal(s.countsLine, "This wallet holds no Troves. It has 1 Stability Pool deposit.");
+  assert.equal(s.countsLine, "This wallet holds no open Troves. It has 1 Stability Pool deposit.");
   assert.deepEqual(
     s.legs.map((l) => l.id),
     ["deposit"],
   );
+});
+
+test("an Ebisu Trove on an emptied branch: recorded collateral, the shutdown and the pool at 0", () => {
+  const s = liquityForkHolderStrip([trove("open", "stcUSD", 14404.93, 10804.25)], undefined, OPTS);
+  const coll = s.legs[0];
+  assert.equal(coll.label, "Recorded collateral");
+  assert.equal(coll.footnote.text, "Shut down 20 Aug 2026 · pool holds 0 stcUSD");
+  assert.match(coll.prov.summary, /record/);
+  assert.match(coll.prov.summary, /held 0 stcUSD since/);
+  assert.match(coll.tip, /pool holds 0/);
+  // A live branch elsewhere keeps "Total collateral".
+  const live = liquityForkHolderStrip([trove("open", "WETH", 1, 10)], undefined, { ...OPTS, protocol: "basedollar" });
+  assert.equal(live.legs[0].label, "Total collateral");
+  assert.equal(live.legs[0].footnote, undefined);
+});
+
+test("a Trove read short of the fork's total states the counts and no totals", () => {
+  const s = liquityForkHolderStrip([trove("open", "WBTC", 1, 10)], undefined, {
+    ...OPTS,
+    trovesPartial: { read: 500 },
+  });
+  assert.equal(s.truncated, true);
+  assert.deepEqual(s.legs, []);
+  assert.match(s.note, /first 500/);
 });

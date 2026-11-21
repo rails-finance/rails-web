@@ -6,14 +6,14 @@
 
 import { useMemo } from "react";
 import { HolderStrip } from "@/components/shared/holder-strip";
-import type { HolderKindPage } from "@/components/shared/holder-kinds";
 import { SpDepositListing, type SpDepositListingProps } from "./sp-deposit-listing";
 import {
   FORK_HOLDERS,
   forkCollAddress,
   forkDepositListingCard,
   forkTroveKind,
-  type ForkTroveRow,
+  FORK_TROVE_READ,
+  type ForkTrovesPage,
 } from "@/lib/liquity-fork/holder-kinds";
 import { liquityForkHolderStrip } from "@/lib/liquity-fork/holder-strip";
 import type { LiquityForkDeployment } from "@/lib/liquity-fork/explorer";
@@ -28,20 +28,22 @@ export function ForkSpListing({ fork, ...props }: SpDepositListingProps & { fork
       title={`${dep.name} Stability Pool deposits`}
       renderCard={renderCard}
       otherKinds={otherKinds}
-      // The strip waits for the wallet's Troves; a failed read leaves it unsaid.
+      // The strip waits for the wallet's Troves; a failed read leaves it out.
       strip={(items, total, f, reads) => {
         const troves = reads.trove;
         if (!troves || troves === "failed") return null;
+        const t = troves as ForkTrovesPage;
         return (
           <HolderStrip
             {...liquityForkHolderStrip(
-              (troves as HolderKindPage<ForkTroveRow>).rows,
+              t.rows,
               { rows: items, total },
               {
                 protocol: dep.id,
                 stable: dep.stable.symbol,
                 wallet: f.q.trim(),
                 collAddress: forkCollAddress(dep),
+                ...(t.partial ? { trovesPartial: { read: FORK_TROVE_READ } } : {}),
               },
             )}
           />

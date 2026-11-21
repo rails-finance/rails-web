@@ -62,19 +62,26 @@ export interface ForkTroveRow {
 /** One fork: its deposit pages' deployment and how its Troves read and draw. */
 export interface ForkHolderSpec {
   dep: SpDeployment;
-  /** Every Trove, with its former holders. */
-  fetchTroves: (signal?: AbortSignal) => Promise<ForkTroveRow[]>;
+  /** Every Trove up to FORK_TROVE_READ, with its former holders, and the
+   *  route's total. */
+  fetchTroves: (signal?: AbortSignal) => Promise<{ rows: ForkTroveRow[]; total: number }>;
   /** The Trove's listing card; `formerHold` marks one the searched wallet passed on. */
   troveCard: (t: ForkTroveRow, formerHold: ForkTroveRow["formerHold"]) => ReactNode;
   troveHref: (t: ForkTroveRow) => string;
 }
 
-const ALL = { sortBy: "debt", sortOrder: "desc", limit: 500, former: true } as const;
+/** The most Troves one read returns (the fork listings' own read). */
+export const FORK_TROVE_READ = 500;
+const ALL = { sortBy: "debt", sortOrder: "desc", limit: FORK_TROVE_READ, former: true } as const;
+const page = (r: { data: ForkTroveRow[]; pagination: { total: number } }) => ({
+  rows: r.data,
+  total: r.pagination.total,
+});
 
 export const FORK_HOLDERS: Record<LiquityForkDeployment, ForkHolderSpec> = {
   ebisu: {
     dep: EBISU_SP,
-    fetchTroves: (signal) => fetchEbisuTroves({ ...ALL, signal }).then((r) => r.data),
+    fetchTroves: (signal) => fetchEbisuTroves({ ...ALL, signal }).then(page),
     troveCard: (t, formerHold) => {
       const s = t as unknown as EbisuTroveSummary;
       return <EbisuPositionCard v={{ ...ebisuView(s), formerHold: formerHold ?? null }} compact />;
@@ -83,7 +90,7 @@ export const FORK_HOLDERS: Record<LiquityForkDeployment, ForkHolderSpec> = {
   },
   asymmetry: {
     dep: ASYMMETRY_SP,
-    fetchTroves: (signal) => fetchAsymmetryTroves({ ...ALL, signal }).then((r) => r.data),
+    fetchTroves: (signal) => fetchAsymmetryTroves({ ...ALL, signal }).then(page),
     troveCard: (t, formerHold) => {
       const s = t as unknown as AsymmetryTroveSummary;
       return <AsymmetryPositionCard v={{ ...asymmetryView(s), formerHold: formerHold ?? null }} compact />;
@@ -92,7 +99,7 @@ export const FORK_HOLDERS: Record<LiquityForkDeployment, ForkHolderSpec> = {
   },
   basedollar: {
     dep: BASEDOLLAR_SP,
-    fetchTroves: (signal) => fetchBasedollarTroves({ ...ALL, signal }).then((r) => r.data),
+    fetchTroves: (signal) => fetchBasedollarTroves({ ...ALL, signal }).then(page),
     troveCard: (t, formerHold) => {
       const s = t as unknown as BasedollarTroveSummary;
       return <BasedollarPositionCard v={{ ...basedollarView(s), formerHold: formerHold ?? null }} compact />;
@@ -116,6 +123,16 @@ export function walletTroves(rows: ForkTroveRow[], wallet: string): ForkTroveRow
     .sort((a, b) => b.lastActivityAt - a.lastActivityAt);
 }
 
+/** One read of a fork's Troves kept to the wallet's. `partial`: the fork
+ *  holds more Troves than the read returned, so the wallet's may be missing
+ *  some, and the strip states no totals (lib/liquity-fork/holder-strip.ts). */
+export interface ForkTrovesPage {
+  rows: ForkTroveRow[];
+  total: number;
+  passedOn: number;
+  partial: boolean;
+}
+
 /** The Troves kind of a fork, for its Stability Pool listing. */
 export const forkTroveKind = (fork: LiquityForkDeployment) => {
   const f = FORK_HOLDERS[fork];
@@ -124,9 +141,14 @@ export const forkTroveKind = (fork: LiquityForkDeployment) => {
     heading: "Troves",
     listingPath: f.dep.basePath,
     read: (wallet, signal) =>
-      f.fetchTroves(signal).then((all) => {
-        const rows = walletTroves(all, wallet);
-        return { rows, total: rows.length, passedOn: rows.filter((t) => t.formerHold).length };
+      f.fetchTroves(signal).then((all): ForkTrovesPage => {
+        const rows = walletTroves(all.rows, wallet);
+        return {
+          rows,
+          total: rows.length,
+          passedOn: rows.filter((t) => t.formerHold).length,
+          partial: all.total > all.rows.length,
+        };
       }),
     renderCard: (t) => f.troveCard(t, t.formerHold),
     hrefFor: f.troveHref,

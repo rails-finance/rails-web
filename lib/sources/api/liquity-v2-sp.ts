@@ -48,7 +48,8 @@ export interface LiquityV2DepositListResponse<B extends string = LiquityV2SpBran
   served_thru_block: string | null;
   rows: LiquityV2DepositRow<B>[];
   pagination: { total: number; limit: number; offset: number };
-  /** A fork's entries carry `coll_decimals`, the unit of its coll_* amounts. */
+  /** A fork's entries carry `coll_decimals` on the wire, the unit of its coll_* amounts;
+   *  `readLiquityV2Sp` removes it once it has scaled them to 1e18. */
   branches: Record<B, { open: number; closed: number; coll_decimals?: number }>;
 }
 
