@@ -50,7 +50,7 @@ import { createPortal } from "react-dom";
 import { Check, ChevronLeft, ChevronRight, ListFilter, Minus, X } from "lucide-react";
 import { CTRL_GHOST, CTRL_OFF, RESET_LINK } from "@/lib/shared/ui-grammar";
 import { PILL_ICON_BUTTON } from "@/components/shared/filter-bar/filter-pill";
-import { PRIMARY_BUTTON } from "@/components/shared/filter-bar/pill-editor";
+import { PRIMARY_BUTTON, usePhone } from "@/components/shared/filter-bar/pill-editor";
 import { activeGroupCount, groupDimensions } from "@/components/shared/filter-bar/pill-model";
 import {
   type FilterDimension,
@@ -83,6 +83,10 @@ export interface FilterSheetProps<F> {
   /** The noun for a draft, where the selection names it ("open positions"
    *  while Status rests on Open). Without it, `count.noun`. */
   nounFor?: (draft: F) => string;
+  /** The element under the toolbar's row that the filters open in from sm
+   *  (ui-jobs 801): a panel in the page, above the results. Without it the
+   *  sheet opens at the right edge from sm. */
+  slot?: HTMLElement | null;
 }
 
 /** Wait after a draft edit before counting it, so a run of taps costs one read. */
@@ -137,9 +141,15 @@ export function FilterSheet<F>({
   countPending,
   countFor,
   nounFor,
+  slot,
 }: FilterSheetProps<F>) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const phone = usePhone();
+  const inline = slot != null && phone === false;
+  // The open sheet's own close, so a second press on the button leaves
+  // through the sheet's history entries.
+  const requestClose = useRef<(() => void) | null>(null);
   // The badge counts what the pills show set: groups off their default.
   const active = activeGroupCount(groupDimensions(dimensions, filters), filters);
 
@@ -149,12 +159,16 @@ export function FilterSheet<F>({
         ref={buttonRef}
         type="button"
         onClick={() => {
+          if (open) {
+            requestClose.current?.();
+            return;
+          }
           // The sheet's history entry, at the same URL (no query change, so
           // Copy link and the listing do not see it).
           window.history.pushState({ [SHEET_STATE]: "list" }, "");
           setOpen(true);
         }}
-        className={`${PILL_ICON_BUTTON} relative`}
+        className={`${PILL_ICON_BUTTON} relative ${open && inline ? "border-teal-600! dark:border-teal-400!" : ""}`}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={active > 0 ? `Filters, ${active} active` : "Filters"}
@@ -185,6 +199,9 @@ export function FilterSheet<F>({
           countPending={countPending}
           countFor={countFor}
           nounFor={nounFor}
+          inline={inline}
+          slot={slot}
+          requestCloseRef={requestClose}
           onClose={() => {
             setOpen(false);
             buttonRef.current?.focus();
@@ -203,8 +220,14 @@ function Sheet<F>({
   countPending,
   countFor,
   nounFor,
+  inline,
+  slot,
+  requestCloseRef,
   onClose,
 }: {
+  inline: boolean;
+  slot?: HTMLElement | null;
+  requestCloseRef: MutableRefObject<(() => void) | null>;
   dimensions: FilterDimension<F>[];
   applied: F;
   onApply: (next: F) => void;
@@ -353,6 +376,10 @@ function Sheet<F>({
 
   const closeSheetRef = useRef(() => closeSheet());
   closeSheetRef.current = () => closeSheet();
+  requestCloseRef.current = closeSheetRef.current;
+  // In the page (from sm, in the toolbar's slot) the filters are no modal:
+  // the page scrolls and Tab moves on through it. Read once, as it opens.
+  const modal = useRef(!inline).current;
 
   // Escape closes; Tab cycles inside the sheet; the page does not scroll.
   useEffect(() => {
@@ -362,7 +389,7 @@ function Sheet<F>({
         closeSheetRef.current();
         return;
       }
-      if (e.key !== "Tab" || !panelRef.current) return;
+      if (!modal || e.key !== "Tab" || !panelRef.current) return;
       const els = [...panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
       if (els.length === 0) return;
       const first = els[0];
@@ -378,12 +405,12 @@ function Sheet<F>({
     };
     document.addEventListener("keydown", onKeyDown);
     const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (modal) document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = prev;
+      if (modal) document.body.style.overflow = prev;
     };
-  }, []);
+  }, [modal]);
 
   const anyActive = dims.some((d) => isDimensionActive(d, filters));
   const clearAll = () => {
@@ -457,6 +484,12 @@ function Sheet<F>({
   const inSection = (d: FilterDimension<F>) => SECTION_GROUPS.includes(d.group ?? d.label);
   const sectioned = dims.filter(inSection);
   const section = sectioned.length > 1 ? sectioned : [];
+  const plain = dims.filter((d) => !section.includes(d));
+  const sizeDims = section.filter((d) => (d.group ?? d.label) === SECTION_GROUPS[0]);
+  // In the page: the Size ranges in the middle column, the section's other
+  // dimensions in the last.
+  const sectionA = sizeDims.length > 0 && sizeDims.length < section.length ? sizeDims : section;
+  const sectionB = section.filter((d) => !sectionA.includes(d));
   const listItems = dims.flatMap((dim) => {
     if (!section.includes(dim)) return [dimRow(dim)];
     if (dim !== section[0]) return [];
@@ -471,6 +504,101 @@ function Sheet<F>({
   const title = openDim ? openDim.label : "Filters";
 
   if (typeof document === "undefined") return null;
+
+  const resetOpenDim = openDim && isDimensionActive(openDim, filters) && (
+    <button type="button" onClick={() => onChange(resetDim(openDim, filters))} className={`${RESET_LINK} px-3 py-2`}>
+      Reset
+    </button>
+  );
+  const showButton = (cls: string) => (
+    <button
+      type="button"
+      onClick={apply}
+      className={`${cls} text-sm ${PRIMARY_BUTTON}`}
+      aria-busy={pending || undefined}
+      data-filter-sheet-show={shown ?? ""}
+    >
+      <span aria-live="polite" className={`tabular-nums transition-opacity ${pending ? "opacity-60" : ""}`}>
+        {showLabel}
+      </span>
+    </button>
+  );
+
+  if (inline && slot) {
+    const sectionHead = <h3 className="pb-1 text-xs font-semibold text-rb-500 dark:text-rb-400/75">{SECTION_TITLE}</h3>;
+    const columns = section.length === 0 ? "lg:grid-cols-2" : "lg:grid-cols-3";
+    return createPortal(
+      <div
+        ref={panelRef}
+        role="region"
+        aria-labelledby="filter-sheet-title"
+        className="mt-3 rounded-2xl bg-raised p-6 text-foreground dark:bg-rb-900 [&_.overlay-search]:bg-raised! dark:[&_.overlay-search]:bg-rb-900!"
+        data-filter-sheet="inline"
+        data-anatomy="N1.8"
+      >
+        <h2 id="filter-sheet-title" className="pb-4 text-base font-semibold" data-anatomy="N1.8.2">
+          Filters
+        </h2>
+        <div className={`grid gap-x-8 gap-y-4 ${columns} lg:divide-x lg:divide-rb-200 dark:lg:divide-rb-800`}>
+          <div className="min-w-0">
+            {openDim ? (
+              <>
+                <div className="flex h-12 items-center gap-1 border-b border-rb-200 dark:border-rb-800">
+                  <button
+                    type="button"
+                    onClick={leaveSub}
+                    className={`${CTRL_GHOST} ${CTRL_OFF} size-10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    aria-label="Back to filters"
+                    data-filter-sheet-back=""
+                  >
+                    <ChevronLeft className="w-5 h-5" aria-hidden="true" />
+                  </button>
+                  <h3 className="flex-1 truncate text-sm font-semibold">{openDim.label}</h3>
+                  {resetOpenDim}
+                </div>
+                <div className="-mx-4 max-h-80 overflow-y-auto overscroll-contain">
+                  <DimensionView dim={openDim} filters={filters} onChange={onChange} onPicked={leaveSub} />
+                </div>
+              </>
+            ) : (
+              <ul>{plain.map(dimRow)}</ul>
+            )}
+          </div>
+          {section.length > 0 && (
+            <div className="min-w-0 lg:pl-8" data-filter-sheet-section="" data-anatomy="N1.8.10">
+              {sectionHead}
+              <ul>{sectionA.map(dimRow)}</ul>
+            </div>
+          )}
+          <div className="flex min-w-0 flex-col lg:pl-8">
+            {sectionB.length > 0 && (
+              <>
+                {/* The heading's line, kept so the two columns' rows start level. */}
+                <div className="invisible max-lg:hidden" aria-hidden="true">
+                  {sectionHead}
+                </div>
+                <ul>{sectionB.map(dimRow)}</ul>
+              </>
+            )}
+            <div className="mt-auto flex items-center justify-end gap-4 pt-6" data-anatomy="N1.8.8">
+              {anyActive && (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className={`${RESET_LINK} px-3 py-2`}
+                  data-filter-sheet-clear=""
+                >
+                  Reset
+                </button>
+              )}
+              {showButton("h-11 px-6")}
+            </div>
+          </div>
+        </div>
+      </div>,
+      slot,
+    );
+  }
 
   return createPortal(
     <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col justify-end sm:flex-row">
@@ -509,15 +637,7 @@ function Sheet<F>({
           <h2 id="filter-sheet-title" className="flex-1 truncate text-base font-semibold">
             {title}
           </h2>
-          {openDim && isDimensionActive(openDim, filters) && (
-            <button
-              type="button"
-              onClick={() => onChange(resetDim(openDim, filters))}
-              className={`${RESET_LINK} px-3 py-2`}
-            >
-              Reset
-            </button>
-          )}
+          {resetOpenDim}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -544,17 +664,7 @@ function Sheet<F>({
           >
             Reset
           </button>
-          <button
-            type="button"
-            onClick={apply}
-            className={`flex-1 h-12 text-sm ${PRIMARY_BUTTON}`}
-            aria-busy={pending || undefined}
-            data-filter-sheet-show={shown ?? ""}
-          >
-            <span aria-live="polite" className={`tabular-nums transition-opacity ${pending ? "opacity-60" : ""}`}>
-              {showLabel}
-            </span>
-          </button>
+          {showButton("flex-1 h-12")}
         </div>
       </div>
     </div>,

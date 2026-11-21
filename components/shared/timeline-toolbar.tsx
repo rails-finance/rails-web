@@ -17,7 +17,7 @@
 // `CopyViewLink` in `provenance-info-tabs.tsx`.
 
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
@@ -602,6 +602,8 @@ export function TimelineToolbar({
   // window on the site — it carries the most JS, so it is the last thing to come
   // alive (measured 1.8s at 4× CPU on slow 4G).
   const hydrated = useHydrated();
+  // Where the filters open from sm: under the row, above the events.
+  const [sheetSlot, setSheetSlot] = useState<HTMLDivElement | null>(null);
 
   // The axes as the listings' pills (ui-jobs 735); see timeline-filter-bar.tsx.
   const model = timelineFilterModel(tl);
@@ -739,7 +741,7 @@ export function TimelineToolbar({
               data-pill-row=""
               data-anatomy="N1.2"
             >
-              <TimelineFilterSheet model={model} count={draftBase} countFor={countFor} />
+              <TimelineFilterSheet model={model} count={draftBase} countFor={countFor} slot={sheetSlot} />
               <TimelineAxisPills model={model} count={draftBase} countFor={countFor} />
               {tl.datesAxis && !filterActive && (
                 <button
@@ -800,6 +802,7 @@ export function TimelineToolbar({
             )}
             <span className="min-w-0 sm:ml-auto">{countNode}</span>
           </div>
+          <div ref={setSheetSlot} className="basis-full empty:hidden" data-filter-sheet-slot="" />
         </div>
       )}
 

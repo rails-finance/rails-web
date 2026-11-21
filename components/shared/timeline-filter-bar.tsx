@@ -127,10 +127,13 @@ export function TimelineFilterSheet({
   model,
   count,
   countFor,
+  slot,
 }: {
   model: TimelineFilterModel;
   count?: { total: number; noun: string };
   countFor?: DraftCount;
+  /** Where the filters open from sm (FilterSheet `slot`). */
+  slot?: HTMLElement | null;
 }) {
   if (model.dimensions.length === 0) return null;
   return (
@@ -140,6 +143,7 @@ export function TimelineFilterSheet({
       onChange={model.onChange}
       count={count}
       countFor={countFor}
+      slot={slot}
     />
   );
 }

@@ -150,6 +150,8 @@ export function ListToolbar<F extends BaseListFilters>({
   const active = activeGroupCount(groups, filters);
 
   const [openPill, setOpenPill] = useState<string | null>(null);
+  // Where the filters open from sm: under the row, above the results.
+  const [sheetSlot, setSheetSlot] = useState<HTMLDivElement | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   useFlip(rowRef, ordered.map((p) => p.name).join("|"));
 
@@ -224,6 +226,7 @@ export function ListToolbar<F extends BaseListFilters>({
               countPending={countPending}
               countFor={countFor}
               nounFor={nounFor}
+              slot={sheetSlot}
             />
             {chipsLead != null && <div className="flex shrink-0 items-center">{chipsLead}</div>}
             {ordered.map((pill) => (
@@ -295,6 +298,7 @@ export function ListToolbar<F extends BaseListFilters>({
           )}
         </div>
       </div>
+      <div ref={setSheetSlot} data-filter-sheet-slot="" />
     </div>
   );
 }
