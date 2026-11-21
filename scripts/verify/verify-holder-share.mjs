@@ -53,7 +53,7 @@ import { chromium } from "playwright";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { openListingSearch } from "./lib/listing-toolbar.mjs";
+import { openListingSearch, setFilterViaSheet } from "./lib/listing-toolbar.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -590,7 +590,9 @@ const SPARK_EVERY_STATUS = "?status=open,closed,liquidated";
   info("F3 fixtures (Spark)", `${openTotal} open of ${everyTotal} positions in all`);
 
   const page = await openListing(context, `${BASE}/ethereum/spark`);
-  await page.getByRole("button", { name: "Remove Status: Open" }).first().click();
+  // Status rests on Open, a default pill with no ×: every status is ticked
+  // in the Filters panel.
+  await setFilterViaSheet(page, "status", ["open", "closed", "liquidated"]);
   await page.waitForTimeout(3500);
   const cleared = await page.evaluate(() => location.search);
   check(
