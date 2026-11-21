@@ -889,6 +889,9 @@ function StatusToggle({ chains, view, prices }: { chains: ChainId[]; view: Statu
   );
 }
 
+/** Past this age, in seconds, the copy on screen is stale and the board stops judging rows against the clock. */
+const STALE_COPY_S = 120;
+
 export function StatusBoard({ source, view }: { source: StatusSource; view: StatusView }) {
   const router = useRouter();
   const asOf = Date.parse(source.data.asOf) / 1000;
@@ -898,11 +901,25 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
     setNow(Date.now() / 1000);
     const tick = setInterval(() => setNow(Date.now() / 1000), 30_000);
     const refresh = setInterval(() => router.refresh(), 60_000);
+    // A tab brought back or a laptop woken: fetch at once, and move the clock.
+    const back = () => {
+      if (document.visibilityState === "hidden") return;
+      setNow(Date.now() / 1000);
+      router.refresh();
+    };
+    document.addEventListener("visibilitychange", back);
+    window.addEventListener("focus", back);
     return () => {
       clearInterval(tick);
       clearInterval(refresh);
+      document.removeEventListener("visibilitychange", back);
+      window.removeEventListener("focus", back);
     };
   }, [router]);
+  // A copy older than STALE_COPY_S is not judged against the clock: rows are
+  // measured as of the copy's last moment of trust, until fresh data arrives.
+  const staleCopy = now - asOf > STALE_COPY_S;
+  const judged = staleCopy ? asOf + STALE_COPY_S : now;
 
   const cells =
     source.route === "status"
@@ -925,7 +942,7 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
     .map((c) => {
       const entry = rosterFor(c.key, c.chain);
       const name = entry?.label ?? (c.fill ? c.fill.label.split(" · ")[0] : c.key);
-      return { cell: c, name, markId: entry?.id ?? c.key, view: cellView(c, now, allowance, asOf) };
+      return { cell: c, name, markId: entry?.id ?? c.key, view: cellView(c, judged, allowance, asOf) };
     });
   const byName = (a: Line, b: Line) => a.name.localeCompare(b.name, "en-US");
   const cmp: Record<SortKey, (a: Line, b: Line) => number> = {
@@ -944,11 +961,16 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
 
   return (
     <div className="mt-10">
+      {staleCopy && (
+        <p className="mb-4 text-xs text-rb-500" role="status" data-anatomy="Y6">
+          This view is {ageWords(now - asOf)} old; refreshing.
+        </p>
+      )}
       <div className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0" data-anatomy="Y4">
         <StatusToggle chains={chains} view={view} prices={Boolean(prices)} />
       </div>
       {pricesOpen && prices ? (
-        <PricesView prices={prices} now={now} />
+        <PricesView prices={prices} now={judged} />
       ) : pricesOpen ? (
         <p className="text-sm text-rb-500">The index server does not report prices yet.</p>
       ) : lines.length > 0 ? (
@@ -1006,7 +1028,7 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
             </DataTableHead>
             <DataTableBody>
               {lines.map((l) => (
-                <Row key={`${l.cell.key}-${l.cell.chain}`} line={l} now={now} asOf={asOf} allowance={allowance} />
+                <Row key={`${l.cell.key}-${l.cell.chain}`} line={l} now={judged} asOf={asOf} allowance={allowance} />
               ))}
             </DataTableBody>
           </DataTable>
