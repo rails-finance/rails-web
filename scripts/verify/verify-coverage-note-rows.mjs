@@ -12,7 +12,8 @@
  * the full essay as a push-down row. In `<thead>` each column heading is one
  * word (`CAPABILITIES[].word`), the house heading tip (`data-heading-tip`):
  * a press opens the full name over `CAPABILITIES[].detail`, sentence-cased
- * (ui-jobs 796). The page has no key; every cell's title names its state.
+ * (ui-jobs 796). The page has no key: every cell's title names its state,
+ * and a clock cell opens a popover with its state and reason.
  * Below lg, the definitions live one tap away instead: each
  * included-capability pill on a mobile card is its own trigger, opening a
  * bottom sheet with that capability's `detail` (capability-sheet.tsx) — see
@@ -421,13 +422,36 @@ async function desktop(theme) {
   );
   assert((await table.locator("thead svg").count()) === 0, "no ⓘ mark in the column headings");
 
+  // A clock cell opens the house popover with its state and reason, and
+  // carries no browser title (Miles, 21 Nov 2026).
+  const awaitingCells = table.locator("td[data-cell-state='awaiting']");
+  const awaitingCount = await awaitingCells.count();
+  assert(awaitingCount > 0, `awaiting cells on /coverage/ethereum (${awaitingCount})`);
+  const awaitingShape = await awaitingCells.evaluateAll((tds) =>
+    tds.every((td) => !td.title && td.querySelectorAll("button[aria-controls^='coverage-cell-']").length === 1),
+  );
+  assert(awaitingShape, "every awaiting cell is one popover trigger with no title");
+  const firstAwaiting = awaitingCells.first();
+  await firstAwaiting.locator("button").click();
+  await page.waitForTimeout(150);
+  const awaitingNote = firstAwaiting.locator("[role=tooltip]");
+  assert(await awaitingNote.isVisible(), "an awaiting cell's popover opens");
+  assert(
+    /^Awaiting the first on-chain instance: \S/.test(await awaitingNote.innerText()),
+    "the awaiting popover names the state, then the reason",
+  );
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(100);
+  assert(!(await awaitingNote.isVisible()), "Escape closed the awaiting popover");
+
   // Every disclosure trigger controls a cell popover (`coverage-cell-`) or the
   // name-level essay (`coverage-details-`) — the id families are disjoint, so
   // this also proves no trigger controls an unaccounted shape.
   const allTriggers = table.locator("button[aria-controls^='coverage-']");
   assert(
-    (await allTriggers.count()) === VIEWS_TRIGGER_COUNT + WHY_CELL_TRIGGER_COUNT + NAME_TRIGGER_IDS.length,
-    "every disclosure trigger is one of the three known shapes",
+    (await allTriggers.count()) ===
+      VIEWS_TRIGGER_COUNT + WHY_CELL_TRIGGER_COUNT + awaitingCount + NAME_TRIGGER_IDS.length,
+    "every disclosure trigger is one of the four known shapes",
   );
 
   // No key and no lead line (ui-jobs 796): every capability cell's title
@@ -436,13 +460,12 @@ async function desktop(theme) {
   assert(!/not yet built|awaiting the first on-chain instance/i.test(bodyText), "no key above the matrix");
   assert(!/Details of the protocols we cover/.test(bodyText), "no lead line under the title");
   const cellTitles = await markRows.evaluateAll((trs) =>
-    trs.flatMap((tr) => [...tr.querySelectorAll("td:not([data-anatomy~='D5'])")].map((td) => td.title)),
+    trs.flatMap((tr) =>
+      [...tr.querySelectorAll("td:not([data-anatomy~='D5']):not([data-cell-state='awaiting'])")].map((td) => td.title),
+    ),
   );
   assert(
-    cellTitles.length > 0 &&
-      cellTitles.every((t) =>
-        /^(Included|Not yet built|Awaiting the first on-chain instance|The protocol can't provide it)/.test(t),
-      ),
+    cellTitles.length > 0 && cellTitles.every((t) => /^(Included|Not yet built|The protocol can't provide it)/.test(t)),
     `every capability cell's title names its state (${cellTitles.length} cells)`,
   );
 

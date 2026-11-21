@@ -43,6 +43,11 @@ function isWhyCell(cell: DepthCell): cell is { why: string } {
   return typeof cell === "object" && "why" in cell;
 }
 
+/** Narrows a cell to the "built, awaiting the first on-chain instance" shape. */
+function isAwaitingCell(cell: DepthCell): cell is { awaiting: string } {
+  return typeof cell === "object" && "awaiting" in cell;
+}
+
 /** Tick / not-yet dash / awaiting clock / can't — the desktop matrix's cell
  *  renderer, for the marks that are NOT triggers (a plain "not yet", the
  *  awaiting clock, or a ⊘ with no structural note to open). The interactive
@@ -372,11 +377,18 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
                     // ⊘ "can't provide it": an info mark on the cell opens a
                     // popover with THIS column's own `why` — never the shared
                     // essay, so two ⊘ cells in the same row show different text.
-                    if (isWhyCell(cell)) {
+                    // A clock cell opens the same popover with its state and
+                    // reason (Miles, 21 Nov 2026): the house tooltip, where a
+                    // title would show the browser's.
+                    if (isWhyCell(cell) || isAwaitingCell(cell)) {
+                      const why = isWhyCell(cell);
                       const isOpen = cellOpen(p.id, cap.key);
                       const popoverId = `coverage-cell-${p.id}-${cap.key}`;
+                      const subject = why
+                        ? `why ${explorerName(p)} can't provide ${cap.label}`
+                        : `why ${explorerName(p)}'s ${cap.label} is awaiting its first instance`;
                       return (
-                        <DataTableCell key={cap.key} title={cellTitle(cell)}>
+                        <DataTableCell key={cap.key} title={why ? cellTitle(cell) : undefined} data-cell-state={why ? "why" : "awaiting"}>
                           <div className="flex justify-center">
                             <span id={wrapId} className="relative inline-flex">
                             <button
@@ -384,20 +396,26 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
                               onClick={() => setOpen(isOpen ? null : { kind: "cell", id: p.id, key: cap.key })}
                               aria-expanded={isOpen}
                               aria-controls={popoverId}
-                              aria-label={
-                                isOpen
-                                  ? `Hide why ${explorerName(p)} can't provide ${cap.label}`
-                                  : `Show why ${explorerName(p)} can't provide ${cap.label}`
-                              }
+                              aria-label={isOpen ? `Hide ${subject}` : `Show ${subject}`}
                               className={`gap-0.5 ${TRIGGER_CLASS}`}
                             >
-                              <Ban className="h-4 w-4" aria-hidden="true" />
+                              {why ? (
+                                <Ban className="h-4 w-4" aria-hidden="true" />
+                              ) : (
+                                <Clock className="h-4 w-4 text-rb-400" aria-hidden="true" />
+                              )}
                               <Info
                                 className={`h-3 w-3 transition-colors ${isOpen ? "text-foreground dark:text-rb-200" : ""}`}
                                 aria-hidden="true"
                               />
                             </button>
-                            <CellNote id={popoverId} text={cell.why} open={isOpen} clampRight={clampRight} up={up} />
+                            <CellNote
+                              id={popoverId}
+                              text={why ? cell.why : `Awaiting the first on-chain instance: ${cell.awaiting}`}
+                              open={isOpen}
+                              clampRight={clampRight}
+                              up={up}
+                            />
                           </span>
                           </div>
                         </DataTableCell>
