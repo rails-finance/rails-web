@@ -34,8 +34,6 @@ import { loadFluidPositionFromChain } from "@/lib/sources/chain/fluid-position";
 import { chainClient } from "@/lib/sources/chain/rpc";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { branchMcr } from "@/lib/liquity/event-safety";
-import { LIQUITY_V2_BRANCHES, DEBT_SYMBOL as LIQUITY_V2_DEBT } from "@/lib/liquity/asset-catalog";
-import type { LiquityForkBranchConfig } from "@/lib/sources/chain/liquity-fork-position";
 import { walletBranchShutdowns } from "./branch-shutdown";
 import { shutDownTrove } from "@/lib/wallet/trove-shutdown";
 import type { TroveSummary } from "@/types/api/trove";
@@ -395,19 +393,19 @@ export const liquityV2: FamilyModule = {
     if (open.length === 0) return { positions: open, reads: 0 };
     const rowOf = (p: WalletPosition) => (p.card as { row: TroveSummary }).row;
     // Each open Trove's branch shutdown beside the prices (ui-jobs 802).
-    const branches = LIQUITY_V2_BRANCHES as Record<string, LiquityForkBranchConfig>;
     const [prices, shutdowns] = await Promise.all([
       liquityPrices(signal),
       walletBranchShutdowns(
-        { protocol: "liquity-v2", debtSymbol: LIQUITY_V2_DEBT, branches, chainId: MAINNET_CHAIN_ID },
-        (c) => branches[c.toLowerCase()],
+        "liquity-v2",
         open.map((p) => rowOf(p).collateralType),
       ),
     ]);
-    const shut = (p: WalletPosition) => shutDownTrove(p, shutdowns.get(rowOf(p).collateralType));
-    if (!prices) return { reads: 2, positions: open.map((p) => shut({ ...p, headRead: "failed" })) };
+    const shut = (p: WalletPosition) => shutDownTrove(p, shutdowns.states.get(rowOf(p).collateralType));
+    // The price route's read, and the shutdown read where the cache did not answer.
+    const reads = 1 + shutdowns.reads;
+    if (!prices) return { reads, positions: open.map((p) => shut({ ...p, headRead: "failed" })) };
     return {
-      reads: 2,
+      reads,
       positions: open.map((p): WalletPosition => {
         const t = rowOf(p);
         const price = priceOf(t.collateralType, prices);

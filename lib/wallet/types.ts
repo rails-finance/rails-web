@@ -151,9 +151,12 @@ export interface WalletPosition {
   /** An Aave V3 Base account the chain has not been read for yet (open
    *  point 8): shown with a "not read" mark, outside the tiles and the sort. */
   notRead?: boolean;
-  /** A Liquity-family Trove's branch shutdown (ui-jobs 802): the catalog's
-   *  record with the head's live read (lib/wallet/trove-shutdown.ts). Null
-   *  where the branch reads live or unknown; absent where no head read ran. */
+  /** A Liquity-family Trove's or Stability Pool deposit's branch shutdown
+   *  (ui-jobs 802): the catalog's record with the live read, from a Trove's
+   *  head read or a deposit's shaping (lib/wallet/families/branch-shutdown.ts).
+   *  Null where the branch reads live or unknown; absent where that read did
+   *  not run (a Trove head that failed or timed out), and the card takes the
+   *  catalog's record alone (`walletBranchState`). */
   shutdown?: BranchShutdownState | null;
   headRead: HeadRead;
   readAtBlock?: number;

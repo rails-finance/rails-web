@@ -34,6 +34,7 @@ import {
   type SpDeployment,
 } from "@/lib/liquity-v2/sp-deployment";
 import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
+import { shutdownDateProv } from "@/lib/shared/liquity-family-shutdown";
 import {
   big,
   exactUnits,
@@ -60,9 +61,10 @@ export interface LiquityV2DepositCardProps {
   dep?: SpDeployment;
   /** The branch's shutdown (ui-jobs 612): an open deposit reads "Shut down". */
   shutdown?: BranchShutdownState | null;
-  /** A listing card states the record's withdrawal of the branch's collateral
-   *  under its collateral gain (the wallet page, ui-jobs 802). */
-  withdrawalLine?: boolean;
+  /** The wallet page's listing card (ui-jobs 802): "Shut down" carries the
+   *  shutdown date's receipt, and a record's withdrawal of the branch's
+   *  collateral stands under the collateral gain. */
+  onWallet?: boolean;
   surface?: "listing" | "detail";
   lifetime?: DepositLifetime | null;
   /** The chain read at head. */
@@ -116,7 +118,7 @@ export function liquityV2DepositSlots({
   row,
   dep = LIQUITY_V2_SP,
   shutdown = null,
-  withdrawalLine = false,
+  onWallet = false,
   surface = "detail",
   lifetime,
   now,
@@ -144,7 +146,12 @@ export function liquityV2DepositSlots({
   const status = closed
     ? { word: "Closed", tone: "muted" as const }
     : shutdown
-      ? { word: "Shut down", tone: "caution" as const, anatomy: "C6.1" }
+      ? {
+          word: "Shut down",
+          tone: "caution" as const,
+          anatomy: "C6.1",
+          ...(onWallet && !detail ? { prov: shutdownDateProv(dep.id, b, shutdown, { trove: false }) } : {}),
+        }
       : null;
   const stash = big(row.stash_raw);
 
@@ -204,7 +211,7 @@ export function liquityV2DepositSlots({
           </Prov>
         ),
         assets: icon(b, branch.collateralAddr, big(row.coll_gain_raw)),
-        ...(withdrawalLine && !closed && shutdown?.record?.withdrawal
+        ...(onWallet && !closed && shutdown?.record?.withdrawal
           ? { sub: <WithdrawalWords dep={dep} branch={b} /> }
           : {}),
       },

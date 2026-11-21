@@ -145,7 +145,7 @@ import type {
 } from "./types";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { branchShutdownState, type BranchShutdownState } from "@/lib/liquity-fork/shutdown";
-import { recordedShutdown, withdrawalDateProv } from "@/lib/shared/liquity-family-shutdown";
+import { recordedShutdown, shutdownDateProv, withdrawalDateProv } from "@/lib/shared/liquity-family-shutdown";
 import { SAME_TX_CLOSE_WORD, sameTxCloseProv } from "@/lib/liquity-v2/same-tx-close";
 
 // The shared card renders inside Link-wrapped rows on
@@ -755,7 +755,14 @@ export function useLiquityCardSlots({
           ? { word: SAME_TX_CLOSE_WORD, tone: "muted", anatomy: "C6.2·liquity", prov: sameTxCloseProv(ct, v.id) }
           : { word: "Closed", tone: "muted" }
         : shut
-          ? { word: "Shut down", tone: "caution", anatomy: "C6.1" }
+          ? {
+              word: "Shut down",
+              tone: "caution",
+              anatomy: "C6.1",
+              // On the wallet the word carries the shutdown date's receipt,
+              // a disagreement with the live read stated as the page states it.
+              ...(handedShut ? { prov: shutdownDateProv(protocol, ct, shut) } : {}),
+            }
           : zombie
             ? { word: terms.dormant, tone: "muted" }
             : null;
