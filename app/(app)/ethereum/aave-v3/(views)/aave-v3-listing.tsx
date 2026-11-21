@@ -49,6 +49,10 @@ export function AaveV3Listing({ initialItems, initialTotal, initialKey, initialS
             data: r.rows,
             total: r.total,
           })),
+        // A draft's total, one row asked (the editors' "Show N" and the
+        // Status segments' counts, ui-jobs 805).
+        countDraft: (filters) =>
+          fetchAaveV3Positions({ ...aaveV3FiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then((r) => r.total),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}
