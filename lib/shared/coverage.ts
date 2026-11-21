@@ -1763,6 +1763,8 @@ export function coverageRows(comingSoon: ComingSoonEntry[], chainId: ChainId): C
  * block above; do not invent capabilities a view doesn't offer.
  *
  * Invariant: an entry exists here iff that protocol's `views` cell is `true`.
+ * Liquity V1's and V2's also name their second kind of position page, the
+ * Stability Pool deposit, and the menu entry that reaches it.
  * The three Arbitrum explorers' markets sub-pages (2026-10-20) are the
  * newest.
  */
@@ -1770,7 +1772,7 @@ export const VIEW_NOTES: Record<string, string> = {
   frankencoin:
     "The oracle-free system's balance sheet: ZCHF supply, the reserve's two accounts read as the contract's identity, the Leadrate, and the challenge-auction enforcement record.",
   liquity:
-    "The branches side by side: the span of rates borrowers set on each, and redemption exposure as debt-in-front.",
+    "The branches side by side: the span of rates borrowers set on each, and redemption exposure as debt-in-front. One more kind of position has pages: Stability Pool deposits (Stability Pool).",
   "aave-v4": "The hubs compared side by side.",
   "aave-v4-base": "The Equities hub, read live: the Mag7 spoke's eight reserves, sizes, caps and oracle prices.",
   "ipor-fusion":
@@ -1833,7 +1835,7 @@ export const VIEW_NOTES: Record<string, string> = {
   dolomite:
     "Every market's margin ladder: a multiplicative premium over the 117.65% base, including the LST/ETH override.",
   "liquity-v1":
-    "The system's state: TCR against the recovery line, the Stability Pool's depth against system debt, the shared base rate, and how deep the redemption queue is. The queue is the Trove listing sorted by ratio, and the view links there.",
+    "The system's state: TCR against the recovery line, the Stability Pool's depth against system debt, the shared base rate, and how deep the redemption queue is. The queue is the Trove listing sorted by ratio, and the view links there. One more kind of position has pages: Stability Pool deposits (Stability Pool).",
   ebisu:
     "The branches side by side: each one's oracle price, size, TCR and rate span, and a link per branch into the listing sorted by rate, which is that branch's redemption queue.",
   asymmetry:
