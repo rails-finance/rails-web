@@ -60,7 +60,7 @@ test("deposits are counted beside the Troves and summed in BOLD on their own leg
   const s = liquityV2HolderStrip(troves, 2, prices, 20, 0, "0xw", deposits);
   assert.equal(
     s.countsLine,
-    "This wallet holds 1 open trove and has closed 1. It has 2 Stability Pool deposits and has closed 1.",
+    "This wallet holds 1 open Trove and has closed 1. It has 2 Stability Pool deposits and has closed 1.",
   );
   assert.deepEqual(s.kinds, [{ id: "deposit", noun: ["deposit", "deposits"], open: 2, closed: 1 }]);
   assert.equal(s.positions, 5);
@@ -72,7 +72,7 @@ test("deposits are counted beside the Troves and summed in BOLD on their own leg
 
 test("without deposits the strip is as before", () => {
   const s = liquityV2HolderStrip(troves, 2, prices, 20, 0, "0xw");
-  assert.equal(s.countsLine, "This wallet holds 1 open trove and has closed 1.");
+  assert.equal(s.countsLine, "This wallet holds 1 open Trove and has closed 1.");
   assert.equal(s.kinds, undefined);
   assert.equal(s.positions, 2);
 });
@@ -90,7 +90,7 @@ test("Troves past one page: the count, then the deposits by status", () => {
   const many = Array.from({ length: 20 }, (_, i) => trove(String(i), "open", 1, 1));
   const s = liquityV2HolderStrip(many, 25, prices, 20, 0, "0xw", deposits);
   assert.equal(s.truncated, true);
-  assert.equal(s.countsLine, "This wallet holds 25 troves. It has 2 Stability Pool deposits and has closed 1.");
+  assert.equal(s.countsLine, "This wallet holds 25 Troves. It has 2 Stability Pool deposits and has closed 1.");
 });
 
 test("a wallet with no Troves keeps the static card", () => {

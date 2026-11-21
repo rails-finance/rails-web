@@ -46,10 +46,10 @@ const collToken = (collateralType: string) => ({
 
 /** What each leg leaves out, in a sentence or two. */
 const LEG_TIP = {
-  collateral: "As of each open trove's last touch. Redistribution gains since then are left out.",
+  collateral: "As of each open Trove's last touch. Redistribution gains since then are left out.",
   collateralValued:
-    "The open troves' collateral as of each one's last touch, each branch's amount at that branch's price, summed. Redistribution gains since then are left out.",
-  debt: "As of each open trove's last touch. The interest and redistributed debt built up since are left out.",
+    "The open Troves' collateral as of each one's last touch, each branch's amount at that branch's price, summed. Redistribution gains since then are left out.",
+  debt: "As of each open Trove's last touch. The interest and redistributed debt built up since are left out.",
 } as const;
 
 const DEPOSIT_TIP = "As of each deposit's last touch. Liquidations since then have not been taken out.";
@@ -68,21 +68,21 @@ function holderDebtProv(): Provenance {
     pclass: "indexed",
     verify: {
       kind: "recompute",
-      text: "Add the entire debt of each open trove the wallet holds — every one of them is on the page under this strip.",
+      text: "Add the entire debt of each open Trove the wallet holds — every one of them is on the page under this strip.",
     },
     summary:
-      "All the BOLD the wallet's open troves owe — the sum of each trove's entire debt (recorded principal plus the interest accrued to its last touch), from the index. Every branch borrows the same token, so the sum is a quantity of it. The interest and redistributed debt built up since each trove's last touch are not in it.",
+      "All the BOLD the wallet's open Troves owe — the sum of each Trove's entire debt (recorded principal plus the interest accrued to its last touch), from the index. Every branch borrows the same token, so the sum is a quantity of it. The interest and redistributed debt built up since each Trove's last touch are not in it.",
     via: "GET /api/troves?ownerAddress=… · Σ entire debt over the open rows",
-    formula: "Σ debt over the wallet's open troves",
+    formula: "Σ debt over the wallet's open Troves",
     inputs: [
-      { label: "debt", kind: "chain", pclass: "indexed", note: "each open trove's entire debt, from the index" },
+      { label: "debt", kind: "chain", pclass: "indexed", note: "each open Trove's entire debt, from the index" },
     ],
   };
 }
 
 const ORACLE_VIA = "GET /api/oracle/liquity-v2";
 const collAmountNote = (ct: string) =>
-  `Σ collateral of the wallet's open troves on the ${ct} branch, each as of its last touch`;
+  `Σ collateral of the wallet's open Troves on the ${ct} branch, each as of its last touch`;
 
 const priceFor = (collateralType: string, prices: OraclePricesData): number | null =>
   prices[collateralType.toLowerCase() as keyof OraclePricesData] ?? null;
@@ -92,8 +92,8 @@ function countsLine(counts: { open: number; closed: number; liquidated: number; 
   const spread = counts.open > 1 && branches === counts.open ? ", one on each branch" : "";
   const head =
     counts.open > 0
-      ? `This wallet holds ${plural(counts.open, "open trove", "open troves")}${spread}`
-      : "This wallet holds no open troves";
+      ? `This wallet holds ${plural(counts.open, "open Trove", "open Troves")}${spread}`
+      : "This wallet holds no open Troves";
   const zombie =
     counts.zombie > 0
       ? `, ${counts.zombie === 1 ? "1 of them below the floor" : `${counts.zombie.toLocaleString("en-US")} of them below the floor`}`
@@ -146,7 +146,7 @@ export function liquityV2HolderStrip(
     // sum over them is a statement about the wallet. State the count it does
     // hold, and say why the rest is absent.
     return {
-      countsLine: `This wallet holds ${plural(held, "trove", "troves")}.${depositsLine(depOpen.length, depClosed)}`,
+      countsLine: `This wallet holds ${plural(held, "Trove", "Troves")}.${depositsLine(depOpen.length, depClosed)}`,
       counts: { open: 0, closed: 0, liquidated: 0 },
       legs: [],
       truncated: true,
@@ -201,7 +201,7 @@ export function liquityV2HolderStrip(
       prov: {
         kind: "chain",
         pclass: "indexed",
-        summary: `All the ${collateralType} the wallet's open troves hold — the sum of each trove's collateral, from the index. The wallet holds on this branch only, so the sum is a quantity of one token and nothing was converted to reach it. Redistribution gains since each trove's last touch are not in it.`,
+        summary: `All the ${collateralType} the wallet's open Troves hold — the sum of each Trove's collateral, from the index. The wallet holds on this branch only, so the sum is a quantity of one token and nothing was converted to reach it. Redistribution gains since each Trove's last touch are not in it.`,
         contract: tmContract(collateralType),
         via: "GET /api/troves?ownerAddress=… · Σ collateral over the open rows",
       },
@@ -253,7 +253,7 @@ export function liquityV2HolderStrip(
           kind: "chain",
           pclass: "indexed",
           summary:
-            "The wallet's open troves' collateral, branch by branch — the sum of each trove's collateral on its branch, from the index. A branch's price is missing, so the branches carry no total in dollars. Redistribution gains since each trove's last touch are not in it.",
+            "The wallet's open Troves' collateral, branch by branch — the sum of each Trove's collateral on its branch, from the index. A branch's price is missing, so the branches carry no total in dollars. Redistribution gains since each Trove's last touch are not in it.",
           via: "GET /api/troves?ownerAddress=… · Σ collateral over the open rows, per branch",
         },
       });
@@ -269,7 +269,7 @@ export function liquityV2HolderStrip(
         {
           token: "BOLD",
           amount: debt,
-          amountNote: "Σ entire debt of the wallet's open troves, each as of its last touch",
+          amountNote: "Σ entire debt of the wallet's open Troves, each as of its last touch",
           price: 1,
           face: true,
           priceNote: "BOLD's $1 face: the protocol redeems 1 BOLD for $1 of collateral",

@@ -110,7 +110,7 @@ test("Liquity V2: the same truncation on the answer's total", () => {
   ];
   const s = liquityV2HolderStrip(page, 25, prices, 20, 10);
   assert.equal(s.truncated, true);
-  assert.equal(s.countsLine, "This wallet holds 15 troves.");
+  assert.equal(s.countsLine, "This wallet holds 15 Troves.");
   const whole = liquityV2HolderStrip([trove("1"), trove("2", true)], 2, prices, 20, 1);
   assert.equal(whole.truncated, false);
   assert.equal(whole.counts.open, 1);

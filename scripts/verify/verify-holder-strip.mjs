@@ -425,7 +425,7 @@ info(
     await page.close();
   } else {
     const said = {
-      open: Number(/holds ([\d,]+) open troves?/.exec(strip.counts)?.[1]?.replace(/,/g, "") ?? NaN),
+      open: Number(/holds ([\d,]+) open Troves?/.exec(strip.counts)?.[1]?.replace(/,/g, "") ?? NaN),
       closed: Number(/has closed ([\d,]+)/.exec(strip.counts)?.[1]?.replace(/,/g, "") ?? 0),
       liquidated: Number(/([\d,]+) (?:was|were) liquidated/.exec(strip.counts)?.[1]?.replace(/,/g, "") ?? 0),
     };
@@ -523,7 +523,7 @@ const linkOf = (page) =>
   const strip = await readStrip(page);
   check(
     "V11. one open trove and one closed: the counts and the link, no totals",
-    strip != null && Object.keys(strip.legs).length === 0 && /1 open trove and has closed 1/.test(strip.counts),
+    strip != null && Object.keys(strip.legs).length === 0 && /1 open Trove and has closed 1/.test(strip.counts),
     JSON.stringify(strip),
   );
   const href = await linkOf(page);
