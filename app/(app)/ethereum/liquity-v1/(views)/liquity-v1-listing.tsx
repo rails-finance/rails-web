@@ -16,9 +16,11 @@ import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain
 import { HolderStrip } from "@/components/shared/holder-strip";
 import { HolderKinds, useHolderKinds, type HolderKindPage } from "@/components/shared/holder-kinds";
 import type { LiquityV1DepositRow } from "@/lib/sources/api/liquity-v1-sp";
+import type { LiquityV1StakeRow } from "@/lib/sources/api/liquity-v1-staking";
 import { liquityV1HolderStrip } from "@/lib/liquity-v1/holder-strip";
 import {
   LIQUITY_V1_DEPOSITS,
+  LIQUITY_V1_STAKES,
   liquityV1TroveCard,
   liquityV1TroveHref,
   liquityV1TroveKey,
@@ -39,21 +41,23 @@ export interface LiquityV1ListingProps {
   initialSearch?: string;
 }
 
-const OTHER_KINDS = [LIQUITY_V1_DEPOSITS];
+const OTHER_KINDS = [LIQUITY_V1_DEPOSITS, LIQUITY_V1_STAKES];
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
 export function LiquityV1Listing({ initialItems, initialTotal, initialKey, initialSearch }: LiquityV1ListingProps) {
   // A wallet search rests on every status (liquityV1ListDefaults).
   const q = readListQuery(useUrlSearchParams(initialSearch ?? ""));
   const defaults = liquityV1ListDefaults(q);
-  // The wallet's deposit, under the rows and counted in the strip (§1b).
+  // The wallet's deposit and stake, under the rows and counted in the strip
+  // (§1b, §6).
   const { wallet, reads } = useHolderKinds(OTHER_KINDS, q);
   const deposits = reads[LIQUITY_V1_DEPOSITS.id];
+  const stakes = reads[LIQUITY_V1_STAKES.id];
 
   // The strip states the wallet, so it mounts only where the page is the
   // wallet's whole set of Troves: the search names an address and no pill
-  // narrows the rows. It waits for the deposit's read; a failed one leaves
-  // the deposit unsaid.
+  // narrows the rows. It waits for the deposit's and the stake's reads; a
+  // failed one leaves its kind unsaid.
   const holderStrip = (items: LiquityV1PositionSummary[], total: number, f: LiquityV1ListFilters) =>
     ADDRESS.test(f.q.trim()) &&
     f.status.length === 0 &&
@@ -62,13 +66,15 @@ export function LiquityV1Listing({ initialItems, initialTotal, initialKey, initi
     !f.debt.length &&
     !f.coll.length &&
     !f.tx.length &&
-    deposits !== undefined ? (
+    deposits !== undefined &&
+    stakes !== undefined ? (
       <HolderStrip
         {...liquityV1HolderStrip(
           { rows: items, total },
           deposits === "failed" ? undefined : (deposits as HolderKindPage<LiquityV1DepositRow>),
           LIQUITY_V1_ITEMS_PER_PAGE,
           f.q.trim(),
+          stakes === "failed" ? undefined : (stakes as HolderKindPage<LiquityV1StakeRow>),
         )}
       />
     ) : null;

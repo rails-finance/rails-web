@@ -1,11 +1,16 @@
 // Liquity V1's position kinds for a wallet search (components/shared/holder-kinds.tsx):
-// Troves and the Stability Pool deposit, each read from its listing route.
+// Troves, the Stability Pool deposit and the LQTY stake, each read from its
+// listing route.
 // Each listing draws its own kind's cards with these renders and passes the
 // other kind to the shared sections.
 
 import { holderKind } from "@/components/shared/holder-kinds";
 import { LiquityV1PositionCard, viewFromSummary } from "@/components/protocol/liquity-v1/liquity-v1-position-card";
 import { LiquityV1DepositCard } from "@/components/protocol/liquity/v1-sp-deposit-card";
+import { LiquityV1StakeCard } from "@/components/protocol/liquity/v1-staking-card";
+import type { LiquityV1StakeRow } from "@/lib/sources/api/liquity-v1-staking";
+import { fetchStakePage, ST_LIST_DEFAULTS } from "./staking-listing";
+import { liquityV1StakeHref, LIQUITY_V1_STAKING_PATH } from "./staking-routes";
 import { fetchLiquityV1Positions } from "@/lib/api/fetch-liquity-v1-positions";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
 import type { LiquityV1DepositRow } from "@/lib/sources/api/liquity-v1-sp";
@@ -55,4 +60,18 @@ export const LIQUITY_V1_DEPOSITS = holderKind<LiquityV1DepositRow>({
   renderCard: liquityV1DepositListingCard,
   hrefFor: (r) => liquityV1DepositHref(r.depositor),
   keyFor: (r) => r.depositor,
+});
+
+export const liquityV1StakeListingCard = (r: LiquityV1StakeRow) => <LiquityV1StakeCard row={r} surface="listing" />;
+
+export const LIQUITY_V1_STAKES = holderKind<LiquityV1StakeRow>({
+  id: "stake",
+  heading: "LQTY stakes",
+  listingPath: LIQUITY_V1_STAKING_PATH,
+  // An address names a staker, so the page is every status, newest first.
+  read: (wallet, signal) =>
+    fetchStakePage({ ...ST_LIST_DEFAULTS, q: wallet }, 1, { signal }).then((r) => ({ rows: r.data, total: r.total })),
+  renderCard: liquityV1StakeListingCard,
+  hrefFor: (r) => liquityV1StakeHref(r.staker),
+  keyFor: (r) => r.staker,
 });
