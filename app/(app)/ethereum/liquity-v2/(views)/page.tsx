@@ -10,7 +10,7 @@
 // next/navigation's useSearchParams onto the driver's useUrlSearchParams — retires
 // the hidden-duplicate-subtree hydration risk the old bespoke body carried.
 // A search by a whole address or an ENS name redirects to the wallet page
-// (lib/wallet/wallet-search-redirect.ts, ui-jobs 738).
+// before this renders (proxy.ts, ui-jobs 738).
 
 import { LiquityV2Listing } from "./liquity-v2-listing";
 import { fetchTroves } from "@/lib/api/fetch-troves";
@@ -21,7 +21,6 @@ import {
 } from "@/lib/liquity-v2/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { redirectWalletSearch } from "@/lib/wallet/wallet-search-redirect";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -38,7 +37,6 @@ export const metadata = listingMetadata({
 async function LiquityV2ListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = liquityV2ListDimensions();
   const sp = toURLSearchParams(await searchParams);
-  redirectWalletSearch(sp, "liquity-v2");
   const { filters, page } = ssrDecode(dims, sp, LIQUITY_V2_LIST_DEFAULTS);
 
   const initial = await ssrInitial({
