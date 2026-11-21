@@ -82,17 +82,24 @@ export function walletFamiliesLine(): string {
   return [...byChain].map(([chain, names]) => `${list(names)} ${where[chain]}`).join("; ");
 }
 
-/** A listing read that did not answer: its module's part of the answer says so. */
-interface ListingFailure {
+/** A listing read that did not answer, or answered part of the wallet: its
+ *  module's part of the answer says so, and no total stands while it does. */
+export interface ListingFailure {
   module: FamilyModule;
+  /** What could not be read, for the page's line ("Liquity V1 Troves"). */
+  what: string;
   error: string;
 }
 
 type Summary = WalletSummaryAnswer & { listingFailed: ListingFailure[] };
 
 /** How many of a wallet's rows one listing read takes: a wallet holds one
- *  Liquity V1 deposit and at most one Liquity V2 deposit per branch. */
-const LISTING_LIMIT = "100";
+ *  Liquity V1 deposit and at most one Liquity V2 deposit per branch. A read
+ *  whose total is past it counts as failed. */
+const LISTING_LIMIT = 100;
+/** Each listing read's own wait, inside the page's budget, so a slow route
+ *  leaves the head reads their time and a hung one fails alone. */
+export const LISTING_BUDGET_MS = 4000;
 
 /**
  * The rows wallet_positions does not hold yet, read from the protocol
@@ -100,45 +107,57 @@ const LISTING_LIMIT = "100";
  * deposit, and Liquity V2's deposits (ui-jobs 794). Every status, newest
  * first. A read that fails leaves its rows out and names its module.
  */
-async function readListingRows(
+export async function readListingRows(
   address: string,
   signal: AbortSignal,
   readerIp?: string,
+  budgetMs = LISTING_BUDGET_MS,
 ): Promise<{ rows: WalletSummaryRow[]; failed: ListingFailure[] }> {
   const base = process.env.RAILS_API_URL?.replace(/\/$/, "") ?? "";
   const hop = routeBoxHop(base, readerIp);
-  const list = { wallet: address, sortBy: "recent", sortOrder: "desc", limit: LISTING_LIMIT, offset: "0" };
-  const reads: { module: FamilyModule; read: () => Promise<WalletSummaryRow[]> }[] = [
+  const list = { wallet: address, sortBy: "recent", sortOrder: "desc", limit: String(LISTING_LIMIT), offset: "0" };
+  type Page = { rows: WalletSummaryRow[]; total: number };
+  const reads: { module: FamilyModule; what: string; read: (signal: AbortSignal) => Promise<Page> }[] = [
     {
       module: liquityV1,
-      read: async () =>
-        (
-          answerBody(await readLiquityV1Positions(new URLSearchParams(list), hop, signal), "Liquity V1 Troves") as {
-            data: LiquityV1PositionSummary[];
-          }
-        ).data.map((t) => liquityV1TroveSummaryRow(t, address)),
+      what: "Liquity V1 Troves",
+      read: async (signal) => {
+        const body = answerBody(
+          await readLiquityV1Positions(new URLSearchParams(list), hop, signal),
+          "Liquity V1 Troves",
+        ) as { data: LiquityV1PositionSummary[]; pagination: { total: number } };
+        return { rows: body.data.map((t) => liquityV1TroveSummaryRow(t, address)), total: body.pagination.total };
+      },
     },
     {
       module: liquityV1Deposits,
-      read: async () =>
-        (await readLiquityV1Sp<LiquityV1DepositListResponse>("stability-pool", list, { ...hop, signal })).rows.map(
-          (r) => liquityV1DepositSummaryRow(r, address),
-        ),
+      what: "Liquity V1 Stability Pool deposits",
+      read: async (signal) => {
+        const r = await readLiquityV1Sp<LiquityV1DepositListResponse>("stability-pool", list, { ...hop, signal });
+        return { rows: r.rows.map((d) => liquityV1DepositSummaryRow(d, address)), total: r.pagination.total };
+      },
     },
     {
       module: liquityV2Deposits,
-      read: async () =>
-        (await readLiquityV2Sp<LiquityV2DepositListResponse>("stability-pool", list, { ...hop, signal })).rows.map(
-          (r) => liquityV2DepositSummaryRow(r, address),
-        ),
+      what: "Liquity V2 Stability Pool deposits",
+      read: async (signal) => {
+        const r = await readLiquityV2Sp<LiquityV2DepositListResponse>("stability-pool", list, { ...hop, signal });
+        return { rows: r.rows.map((d) => liquityV2DepositSummaryRow(d, address)), total: r.pagination.total };
+      },
     },
   ];
-  const settled = await Promise.allSettled(reads.map((r) => r.read()));
+  const settled = await Promise.allSettled(
+    reads.map(async (r) => {
+      const page = await withBudget(budgetMs, (own) => r.read(AbortSignal.any([signal, own])));
+      if (page.total > page.rows.length) throw new Error(`answered ${page.rows.length} of ${page.total} rows`);
+      return page.rows;
+    }),
+  );
   const rows: WalletSummaryRow[] = [];
   const failed: ListingFailure[] = [];
   settled.forEach((s, i) => {
     if (s.status === "fulfilled") rows.push(...s.value);
-    else failed.push({ module: reads[i].module, error: publicErrorMessage(s.reason) });
+    else failed.push({ module: reads[i].module, what: reads[i].what, error: publicErrorMessage(s.reason) });
   });
   return { rows, failed };
 }
@@ -148,9 +167,11 @@ async function readListingRows(
  * reads for the kinds the summary table does not hold (readListingRows).
  * Decision 0050 departure; ui-jobs 795 moves it into wallet_positions. Both
  * the page's read and the counts read come through here, so the menu, the
- * pills and the sections count the same rows.
+ * pills and the sections take the same rows. Until readListingRows goes,
+ * rows 795 adds to the summary route must be deduplicated against these on
+ * (family, positionId).
  */
-async function readSummary(address: string, signal: AbortSignal, readerIp?: string): Promise<Summary> {
+export async function readSummary(address: string, signal: AbortSignal, readerIp?: string): Promise<Summary> {
   const listing = readListingRows(address, signal, readerIp);
   const base = process.env.RAILS_API_URL?.replace(/\/$/, "");
   if (!base) throw new Error("RAILS_API_URL is not set");
@@ -309,8 +330,8 @@ export async function readWalletUncached(
     }
   });
   // A listing read that did not answer: its module's part says so.
-  for (const { module: f, error } of summary.listingFailed) {
-    if (opts.protocol && f.summaryFamily !== opts.protocol) continue;
+  const failed = summary.listingFailed.filter((x) => !opts.protocol || x.module.summaryFamily === opts.protocol);
+  for (const { module: f, what, error } of failed) {
     families.push({
       id: f.id,
       name: f.name,
@@ -321,6 +342,7 @@ export async function readWalletUncached(
       ms: serverMs,
       reads: 0,
       error,
+      unanswered: { family: f.summaryFamily, what },
     });
   }
   return {
@@ -333,6 +355,7 @@ export async function readWalletUncached(
     ms: Date.now() - t0,
     protocol: opts.protocol,
     held,
+    ...(failed.length ? { partial: failed.map((x) => x.what) } : {}),
   };
 }
 
@@ -346,9 +369,9 @@ export function readWallet(address: string, readerIp?: string, opts: { protocol?
   if (hit && Date.now() - hit.at < WALLET_CACHE_MS) return hit.read;
   const read = readWalletUncached(address.toLowerCase(), readerIp, opts);
   cache.set(key, { at: Date.now(), read });
-  // A failed summary read is not kept.
+  // A failed summary read, or one missing a listing read, is not kept.
   void read.then((r) => {
-    if (r.error) cache.delete(key);
+    if (r.error || r.partial) cache.delete(key);
   });
   if (cache.size > 500) {
     for (const [k, v] of cache) if (Date.now() - v.at >= WALLET_CACHE_MS) cache.delete(k);
@@ -431,11 +454,12 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
       chains: [...new Set(positions.map((p) => p.chain))],
       readAt: Math.floor(Date.now() / 1000),
       ms: Date.now() - t0,
+      ...(summary.listingFailed.length ? { partial: summary.listingFailed.map((x) => x.what) } : {}),
     };
   })();
   countsCache.set(key, { at: Date.now(), read });
   void read.then((r) => {
-    if (r.error) countsCache.delete(key);
+    if (r.error || r.partial) countsCache.delete(key);
   });
   if (countsCache.size > 500) {
     for (const [k, v] of countsCache) if (Date.now() - v.at >= WALLET_CACHE_MS) countsCache.delete(k);

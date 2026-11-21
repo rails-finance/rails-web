@@ -11,6 +11,7 @@
 // the block. A field a family cannot fill stays undefined.
 
 import type { ChainId } from "@/lib/shared/chains";
+import type { ProvClass } from "@/components/shared/provenance";
 import type { AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
 import type { CompoundPositionSummary } from "@/lib/sources/api/compound-positions";
 import type { MorphoPositionSummary } from "@/lib/sources/api/morpho-positions";
@@ -113,6 +114,10 @@ export interface WalletPosition {
    *  negative past it; undefined where the family cannot state it. A sort
    *  key: it ranks the cards and is never displayed (decision 0041). */
   buffer?: number;
+  /** The class of the dollars' source on the receipts: the oracle unless set
+   *  (a deposit's compounded amount, read from the pool at $1 face, is
+   *  "state"). */
+  usdClass?: ProvClass;
   /** The family's own risk figure, for the tile. */
   riskFigure?: { value: string; label: string };
   /** The family's own verdict that the position can be liquidated now
@@ -152,6 +157,9 @@ export interface WalletFamilyRead {
   /** Chain reads made for its open positions (multicalls or reader calls). */
   reads: number;
   error?: string;
+  /** A listing read that did not answer (read-wallet.ts, readListingRows):
+   *  the protocol's slug and what it would have read ("Liquity V1 Troves"). */
+  unanswered?: { family: string; what: string };
 }
 
 /** The answer of /api/chain/wallet/<address>. */
@@ -174,4 +182,7 @@ export interface WalletRead {
   /** Every protocol the summary rows name, with its row count, for the
    *  Protocol pill: a narrowed read still offers the others. */
   held: { slug: string; name: string; positions: number }[];
+  /** The listing reads that did not answer, by what they read: the answer
+   *  is part of the wallet, states no wallet total and is not kept. */
+  partial?: string[];
 }

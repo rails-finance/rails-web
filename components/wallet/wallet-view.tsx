@@ -53,6 +53,7 @@ import {
   walletNet,
   walletSections,
   walletTotal,
+  andList,
   type WalletSection,
   type WalletTotal,
 } from "@/lib/wallet/wallet-sections";
@@ -97,9 +98,18 @@ const across = (t: WalletTotal | null) => (t?.figure ? `across ${plural(t.of, "p
 
 /** The wallet's totals (W2): each figure the sum of the protocol sections'
  *  figures below it, with its receipt. */
-function Totals({ sections, filtered }: { sections: WalletSection[]; filtered: boolean }) {
-  const coll = walletTotal(sections, "collateral");
-  const debt = walletTotal(sections, "debt");
+function Totals({
+  sections,
+  filtered,
+  unanswered,
+}: {
+  sections: WalletSection[];
+  filtered: boolean;
+  /** What the listing reads that did not answer read. */
+  unanswered: string[];
+}) {
+  const coll = walletTotal(sections, "collateral", unanswered);
+  const debt = walletTotal(sections, "debt", unanswered);
   const net = walletNet(coll, debt);
   // Each reason a total is absent, said once under the row.
   const gaps = [...new Set([coll?.gap, debt?.gap].filter((g): g is string => g != null))];
@@ -310,11 +320,16 @@ export function WalletView({
     closed: scoped.rows.filter((p) => p.status !== "open" && p.status !== "moved").length,
   };
   // The bands state a protocol's whole holding: drawn while no pill narrows it.
-  const sections = walletSections(all, { bands: !filtered });
+  // The listing reads that did not answer (read-wallet.ts, readListingRows).
+  const unanswered = read.families.flatMap((r) => (r.unanswered ? [r.unanswered] : []));
+  const missing = unanswered.map((u) => u.what);
+  const sections = walletSections(all, { bands: !filtered, unanswered });
   const open = sections.flatMap((s) => s.open);
   const scope = useAssetScope();
   // Under Focus, only the families on a chain in focus.
-  const unread = read.families.filter((r) => r.headRead === "failed" && (!focused || scope.chainOk(r.chain)));
+  const unread = read.families.filter(
+    (r) => r.headRead === "failed" && !r.unanswered && (!focused || scope.chainOk(r.chain)),
+  );
   const stamps = open.map((p) => p.readAt).filter((t): t is number => t != null);
   const oldest = stamps.length ? Math.min(...stamps) : undefined;
   const registry = useReceiptRegistry();
@@ -435,7 +450,11 @@ export function WalletView({
             {body(
               <>
                 <section className="flex max-w-xl flex-col gap-3" data-wallet-empty="">
-                  {chosen ? (
+                  {missing.length > 0 ? (
+                    <p className="text-sm text-foreground/80" data-wallet-unanswered="">
+                      {andList(missing)} could not be read.
+                    </p>
+                  ) : chosen ? (
                     <p className="text-sm text-foreground/80" data-wallet-reads="">
                       Rails holds no {chosen.name} position for this wallet.
                     </p>
@@ -467,7 +486,7 @@ export function WalletView({
             {filterBar}
             {body(
               <>
-                {open.length > 0 && <Totals sections={sections} filtered={filtered} />}
+                {open.length > 0 && <Totals sections={sections} filtered={filtered} unanswered={missing} />}
                 {sections.map((s) => (
                   <Section key={s.slug} s={s} />
                 ))}
@@ -483,6 +502,11 @@ export function WalletView({
           <ArbitrumNote address={address} />
         )}
 
+        {missing.length > 0 && all.length > 0 && (
+          <p className="text-xs text-rb-500" data-wallet-unanswered="">
+            {andList(missing)} could not be read.
+          </p>
+        )}
         {unread.length > 0 && (
           <p className="text-xs text-rb-500" data-wallet-unread={unread.map((r) => r.id).join(",")}>
             Not read at head: {unread.map(familyChain).join(", ")}. Their cards show the stored figures.

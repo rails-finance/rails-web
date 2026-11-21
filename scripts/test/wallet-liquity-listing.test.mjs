@@ -32,7 +32,7 @@ register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 const rows = await import("../../lib/wallet/listing-summary-rows.ts");
 const { kindOfRow } = await import("../../lib/wallet/wallet-filters.ts");
 const { takesRow } = await import("../../lib/wallet/families/module.ts");
-const { walletSections } = await import("../../lib/wallet/wallet-sections.ts");
+const { walletSections, walletTotal } = await import("../../lib/wallet/wallet-sections.ts");
 
 const W = "0x2291f52bddc937b5b840d15e551e1da8c80c2b3c";
 const E18 = "000000000000000000";
@@ -186,4 +186,60 @@ test("Liquity V2 Troves and a deposit: the Troves' collateral plus the deposit",
   assert.ok(s.band.legs.some((l) => l.id === "deposit"));
   assert.equal(s.collateral.usd, 6300);
   assert.equal(s.debt.usd, 1000);
+});
+
+test("a listing read that did not answer: no section total, no wallet total, said once each", () => {
+  const prices = { weth: 3000, wsteth: 3600, reth: 3400 };
+  const trove = { id: "1", collateralType: "WETH", status: "open", collateral: { amount: 2 }, debt: { current: 1000 } };
+  const unanswered = [{ family: "liquity-v2", what: "Liquity V2 Stability Pool deposits" }];
+  const sections = walletSections(
+    [
+      pos("liquity-v2", { kind: "liquity-v2", row: trove, prices }, { collateralUsd: 6000, debtUsd: 1000 }),
+      pos("aave-v3", { kind: "aave-v3", row: { status: "open" } }, { collateralUsd: 50, debtUsd: 10, buffer: 0.5 }),
+    ],
+    { bands: true, unanswered },
+  );
+  const v2 = sections.find((x) => x.slug === "liquity-v2");
+  assert.equal(v2.collateral, undefined);
+  assert.equal(v2.debt, undefined);
+  assert.deepEqual(v2.band.legs, []);
+  assert.equal(v2.band.note, "Liquity V2 Stability Pool deposits could not be read, so the section states no total.");
+  // The Aave section keeps its own figure.
+  assert.equal(sections.find((x) => x.slug === "aave-v3").collateral.usd, 50);
+  const total = walletTotal(sections, "collateral", ["Liquity V2 Stability Pool deposits"]);
+  assert.equal(total.figure, undefined);
+  assert.equal(total.gap, "No wallet total: Liquity V2 Stability Pool deposits could not be read");
+});
+
+test("a failed read of a protocol with no section still leaves no wallet total", () => {
+  const sections = walletSections(
+    [pos("aave-v3", { kind: "aave-v3", row: { status: "open" } }, { collateralUsd: 50, debtUsd: 10, buffer: 0.5 })],
+    { bands: true, unanswered: [{ family: "liquity-v1", what: "Liquity V1 Troves" }] },
+  );
+  assert.equal(sections[0].collateral.usd, 50);
+  const total = walletTotal(sections, "debt", ["Liquity V1 Troves"]);
+  assert.equal(total.figure, undefined);
+  assert.equal(total.gap, "No wallet total: Liquity V1 Troves could not be read");
+});
+
+test("receipts name each row's source: a deposit at $1 face is state, not oracle", () => {
+  const [s] = walletSections(
+    [
+      pos(
+        "liquity-v2",
+        { kind: "liquity-v2-deposit", row: deposit("open", 300, "WETH") },
+        { kind: "deposits", collateralUsd: 300, debtUsd: 0, usdClass: "state", usdSource: "BOLD's $1 face" },
+      ),
+    ],
+    { bands: true },
+  );
+  assert.equal(s.collateral.prov.pclass, undefined);
+  assert.equal(s.collateral.prov.inputs[0].pclass, "state");
+  assert.equal(
+    s.collateral.prov.summary,
+    "The wallet's Liquity V2 deposits in USD — its open deposit's dollars, at the source named on its row, to the cent.",
+  );
+  const total = walletTotal([s], "collateral");
+  assert.equal(total.figure.prov.pclass, undefined);
+  assert.match(total.figure.prov.summary, /each at the sources its receipt names/);
 });

@@ -120,7 +120,7 @@ export function liquityV2DepositSlots({
         labelTip: "As of the deposit's last touch. Liquidations since then have not been taken out.",
         labelTipOnListing: true,
         value: closed ? null : (
-          <Prov info={spSumProv("recorded", b)}>
+          <Prov info={spSumProv("recorded", b, "listing")}>
             <RawFigure raw={recorded} symbol={BOLD} approx />
           </Prov>
         ),
@@ -130,7 +130,7 @@ export function liquityV2DepositSlots({
         id: "coll-paid",
         label: `${b} paid in`,
         value: (
-          <Prov info={spSumProv("collGain", b)}>
+          <Prov info={spSumProv("collGain", b, "listing")}>
             <RawFigure raw={big(row.coll_gain_raw)} symbol={b} />
           </Prov>
         ),
@@ -140,7 +140,7 @@ export function liquityV2DepositSlots({
         id: "yield",
         label: "BOLD yield",
         value: (
-          <Prov info={spSumProv("yieldGain", b)}>
+          <Prov info={spSumProv("yieldGain", b, "listing")}>
             <RawFigure raw={big(row.yield_gain_raw)} symbol={BOLD} />
           </Prov>
         ),

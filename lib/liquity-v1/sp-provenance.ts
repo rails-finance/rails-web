@@ -105,13 +105,15 @@ const SUM = {
     "Front end — the FrontEndTagSet the pool emitted when the deposit's current life opened: the front end that takes its kickback share of the deposit's LQTY.",
 } as const;
 
-export function spSumProv(what: keyof typeof SUM): Provenance {
+/** An index sum: the deposit page reads it from the timeline route, a
+ *  listing row from the listing route. */
+export function spSumProv(what: keyof typeof SUM, surface: "detail" | "listing" = "detail"): Provenance {
   return {
     kind: "derived",
     pclass: "indexed",
     summary: SUM[what],
     contract: POOL,
-    via: `${INDEX_VIA} · position`,
+    via: surface === "detail" ? `${INDEX_VIA} · position` : "GET /api/liquity-v1/stability-pool?wallet=… · row",
   };
 }
 

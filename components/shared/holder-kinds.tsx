@@ -120,8 +120,9 @@ export function HolderKinds({
           <h2 className="mb-3 text-lg font-semibold">
             {k.heading}
             {/* The positions the wallet holds, as the strip counts them:
-                those it passed on are left out. */}
-            <span className="ml-2 font-normal text-rb-500 tabular-nums">
+                those it passed on are left out. A count, no figure: exempt
+                from the receipts sweep where a page has one. */}
+            <span className="ml-2 font-normal text-rb-500 tabular-nums" data-prov-exempt="">
               {(page.total - (page.passedOn ?? 0)).toLocaleString("en-US")}
             </span>
           </h2>

@@ -116,13 +116,22 @@ const SUM: Record<string, (c: string) => string> = {
     `${c} stashed — the ${c} paid in at touches less what they sent, replayed from the first operation: the pool's stashedColl(depositor) after the last touch.`,
 };
 
-export function spSumProv(what: keyof typeof SUM, branch: SpBranch): Provenance {
+/** An index sum: the deposit page reads it from the timeline route, a
+ *  listing row from the listing route. */
+export function spSumProv(
+  what: keyof typeof SUM,
+  branch: SpBranch,
+  surface: "detail" | "listing" = "detail",
+): Provenance {
   return {
     kind: "derived",
     pclass: "indexed",
     summary: SUM[what](branch),
     contract: pool(branch),
-    via: "GET /api/liquity-v2/stability-pool/timeline · position",
+    via:
+      surface === "detail"
+        ? "GET /api/liquity-v2/stability-pool/timeline · position"
+        : "GET /api/liquity-v2/stability-pool?wallet=… · row",
   };
 }
 
