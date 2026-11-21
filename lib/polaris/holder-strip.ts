@@ -254,6 +254,7 @@ export function polarisHolderStrip(
       truncated: true,
       positions: held + other.positions,
       wallet,
+      protocol: "polaris",
       note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} positions; this one holds ${held.toLocaleString("en-US")}.`,
     };
   }
@@ -440,6 +441,7 @@ export function polarisHolderStrip(
     truncated: false,
     positions: held + other.positions,
     wallet,
+    protocol: "polaris",
     ...kinds,
   };
 }

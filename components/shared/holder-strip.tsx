@@ -44,6 +44,7 @@ import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { formatUsdValue } from "@/lib/utils/format";
 import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import Link from "next/link";
+import { walletPageHref } from "@/lib/wallet/wallet-filters";
 import { Fragment } from "react";
 
 /** One summed unit the wallet holds — a collateral, a debt. */
@@ -123,8 +124,13 @@ export interface HolderStripProps {
    *  and the share card names each kind in its status word. */
   kinds?: HolderKindCount[];
   /** The wallet the search names: the band links its wallet page,
-   *  "Everything this wallet holds" (ui-jobs 737). */
+   *  "Everything this wallet holds" (ui-jobs 737), where that page reads
+   *  `protocol`. */
   wallet?: string;
+  /** The explorer slug the band states ("liquity-v2"). The wallet link is
+   *  drawn only for a protocol the /wallet page reads (`WALLET_PROTOCOLS`):
+   *  a page that leaves the protocol out would answer the link with nothing. */
+  protocol?: string;
 }
 
 /** RevealTip's bubble is sized for a number (nowrap, tabular figures); a
@@ -205,6 +211,7 @@ export function HolderStrip({
   truncated,
   note,
   wallet,
+  protocol,
   positions,
   kinds,
   scoped = false,
@@ -217,8 +224,9 @@ export function HolderStrip({
   const Scope = scoped ? Fragment : ProvUnscoped;
   const open = counts.open + (kinds ?? []).reduce((n, k) => n + k.open, 0);
   const totals = !truncated && legs.length > 0 && (positions == null || open >= 2);
+  const walletHref = walletPageHref(protocol, wallet);
   // The wallet page's sections pass no counts sentence: their cards are under it.
-  if (!countsLine && !totals && !note && !wallet) return null;
+  if (!countsLine && !totals && !note && !walletHref) return null;
   return (
     // A BAND, not a card: the raised rounded surface belongs to a position, and
     // this states something about several of them. A rule under it separates it
@@ -291,9 +299,9 @@ export function HolderStrip({
         )}
         {/* The listing search is the wallet within this protocol; the wallet
             page is the wallet everywhere. */}
-        {wallet && (
+        {walletHref && (
           <Link
-            href={`/wallet/${encodeURIComponent(wallet)}`}
+            href={walletHref}
             className={`mt-2 text-sm ${FOOT_LINK}`}
             data-holder-wallet-link=""
             data-anatomy="N7.2"
