@@ -183,6 +183,9 @@ export interface LiquityV2DepositStretch {
 
 export interface LiquityV2DepositLiquidationsResponse<B extends string = LiquityV2SpBranch> {
   collateral_type: B;
+  /** Ebisu: the block at which the admin withdrew the pool's collateral
+   *  (26,238,016, 21 Oct 2026); absent elsewhere. */
+  coll_withdrawn_at_block?: string;
   depositor: string;
   served_thru_block: string;
   units: { bold: string; coll: string; price: string };
