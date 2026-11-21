@@ -44,6 +44,9 @@ export interface WalletCounts {
   readAt: number;
   ms: number;
   error?: string;
+  /** The listing reads that did not answer, by what they read: the counts
+   *  are part of the wallet and are not kept. */
+  partial?: string[];
 }
 
 /** A page path for comparison: decoded, lowercase, no trailing slash, and an

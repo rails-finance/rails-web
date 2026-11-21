@@ -29,7 +29,14 @@ import { positionName } from "@/lib/shared/position-name";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { liquityV2DepositHref, LIQUITY_V2_SP_PATH } from "@/lib/liquity-v2/sp-routes";
-import { big, exactUnits, poolShare, type DepositLifetime, type DepositNow } from "@/lib/liquity-v2/sp-math";
+import {
+  big,
+  exactUnits,
+  listingDeposit,
+  poolShare,
+  type DepositLifetime,
+  type DepositNow,
+} from "@/lib/liquity-v2/sp-math";
 import { spLiveProv, spPendingLossProv, spPoolShareProv, spSumProv } from "@/lib/liquity-v2/sp-provenance";
 import { pctText } from "@/lib/shared/vault-amount-text";
 import { TINY_AMOUNT_FLOOR_TEXT } from "@/lib/utils/format";
@@ -47,7 +54,11 @@ export interface LiquityV2DepositCardProps {
   surface?: "listing" | "detail";
   lifetime?: DepositLifetime | null;
   /** The chain read at head. */
+  /** The chain read at head. On a listing surface (the wallet page), the
+   *  Deposit now headline states it in place of the last touch's figure. */
   now?: DepositNow | null;
+  /** The block the wallet page read `now` at, for its receipts. */
+  nowBlock?: number;
   /** The chain read is in flight. */
   pending?: boolean;
   /** The pool's getTotalBoldDeposits() and the block of the read `now` came from. */
@@ -86,11 +97,15 @@ function DepositMenuRows({ row }: { row: LiquityV2DepositRow }) {
   );
 }
 
+const pendingCollTip = (b: string) =>
+  `What a claiming touch sends the depositor in ${b}: the ${b} liquidations have paid the deposit since its last touch, and what earlier touches stashed.`;
+
 export function liquityV2DepositSlots({
   row,
   surface = "detail",
   lifetime,
   now,
+  nowBlock,
   pending = false,
   pool,
   indexBehind = false,
@@ -113,25 +128,69 @@ export function liquityV2DepositSlots({
 
   if (!detail) {
     const recorded = big(row.deposit_raw);
+    // The wallet page hands the head read: the deposit now and the
+    // collateral it is owed. A listing states the last touch's figure.
+    const shown = listingDeposit(row.deposit_raw, closed ? null : now);
+    const head = shown.at === "head" ? now! : null;
+    const wallet = nowBlock != null ? { block: nowBlock } : undefined;
     const heads: PositionCardHead[] = [
-      {
-        id: "deposit",
-        label: "Deposit",
-        labelTip: "As of the deposit's last touch. Liquidations since then have not been taken out.",
-        labelTipOnListing: true,
-        value: closed ? null : <RawFigure raw={recorded} symbol={BOLD} approx />,
-        assets: closed ? undefined : tokenIcon(BOLD, boldAddr, recorded),
-      },
+      head
+        ? {
+            id: "deposit",
+            label: "Deposit now",
+            value: (
+              <Prov info={spLiveProv("compounded", b, wallet)}>
+                <RawFigure raw={shown.raw} symbol={BOLD} />
+              </Prov>
+            ),
+            assets: tokenIcon(BOLD, boldAddr, head.now),
+          }
+        : {
+            id: "deposit",
+            label: "Deposit",
+            labelTip: "As of the deposit's last touch. Liquidations since then have not been taken out.",
+            labelTipOnListing: true,
+            value: closed ? null : (
+              <Prov info={spSumProv("recorded", b, "listing")}>
+                <RawFigure raw={recorded} symbol={BOLD} approx />
+              </Prov>
+            ),
+            assets: closed ? undefined : tokenIcon(BOLD, boldAddr, recorded),
+          },
+      ...(head
+        ? [
+            {
+              id: "pending-coll",
+              label: `Pending ${b}`,
+              labelTip: pendingCollTip(b),
+              labelTipOnListing: true,
+              value: (
+                <Prov info={spLiveProv("pendingColl", b, wallet)}>
+                  <RawFigure raw={head.pendingColl} symbol={b} />
+                </Prov>
+              ),
+              assets: tokenIcon(b, branch.collateralAddr, head.pendingColl),
+            },
+          ]
+        : []),
       {
         id: "coll-paid",
         label: `${b} paid in`,
-        value: <RawFigure raw={big(row.coll_gain_raw)} symbol={b} />,
+        value: (
+          <Prov info={spSumProv("collGain", b, "listing")}>
+            <RawFigure raw={big(row.coll_gain_raw)} symbol={b} />
+          </Prov>
+        ),
         assets: tokenIcon(b, branch.collateralAddr, big(row.coll_gain_raw)),
       },
       {
         id: "yield",
         label: "BOLD yield",
-        value: <RawFigure raw={big(row.yield_gain_raw)} symbol={BOLD} />,
+        value: (
+          <Prov info={spSumProv("yieldGain", b, "listing")}>
+            <RawFigure raw={big(row.yield_gain_raw)} symbol={BOLD} />
+          </Prov>
+        ),
         assets: tokenIcon(BOLD, boldAddr, big(row.yield_gain_raw)),
       },
     ];
@@ -234,7 +293,7 @@ export function liquityV2DepositSlots({
     {
       id: "pending-coll",
       label: `Pending ${b}`,
-      labelTip: `What a claiming touch sends the depositor in ${b}: the ${b} liquidations have paid the deposit since its last touch, and what earlier touches stashed.`,
+      labelTip: pendingCollTip(b),
       value: now ? (
         <Prov info={spLiveProv("pendingColl", b)}>
           <RawFigure raw={now.pendingColl} symbol={b} />

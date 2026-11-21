@@ -8,6 +8,7 @@ import { LIQUITY_V1_ADDRESSES } from "./asset-catalog";
 
 const VIA = "GET /api/chain/liquity-v1/stability-pool";
 const INDEX_VIA = "GET /api/liquity-v1/stability-pool/timeline";
+const WALLET_VIA = "GET /api/chain/wallet/<address>";
 
 const POOL = { name: "Liquity V1 StabilityPool", address: LIQUITY_V1_ADDRESSES.STABILITY_POOL };
 const FEED = { name: "Liquity V1 PriceFeed", address: LIQUITY_V1_ADDRESSES.PRICE_FEED };
@@ -40,7 +41,9 @@ const GETTER: Record<"compounded" | "ethGain" | "lqtyGain" | "frontEnd", { metho
   },
 };
 
-export function spLiveProv(what: keyof typeof GETTER): Provenance {
+/** A pool getter at head. `wallet`: read by the wallet page's route at
+ *  that block. */
+export function spLiveProv(what: keyof typeof GETTER, wallet?: { block: number }): Provenance {
   const g = GETTER[what];
   return {
     kind: "chain",
@@ -48,7 +51,9 @@ export function spLiveProv(what: keyof typeof GETTER): Provenance {
     verify: ask(g.method),
     summary: g.summary,
     contract: POOL,
-    via: `${VIA} · ${g.method} @ head`,
+    via: wallet
+      ? `${WALLET_VIA} · ${g.method} @ block ${wallet.block.toLocaleString("en-US")}`
+      : `${VIA} · ${g.method} @ head`,
   };
 }
 
@@ -105,13 +110,15 @@ const SUM = {
     "Front end — the FrontEndTagSet the pool emitted when the deposit's current life opened: the front end that takes its kickback share of the deposit's LQTY.",
 } as const;
 
-export function spSumProv(what: keyof typeof SUM): Provenance {
+/** An index sum: the deposit page reads it from the timeline route, a
+ *  listing row from the listing route. */
+export function spSumProv(what: keyof typeof SUM, surface: "detail" | "listing" = "detail"): Provenance {
   return {
     kind: "derived",
     pclass: "indexed",
     summary: SUM[what],
     contract: POOL,
-    via: `${INDEX_VIA} · position`,
+    via: surface === "detail" ? `${INDEX_VIA} · position` : "GET /api/liquity-v1/stability-pool?wallet=… · row",
   };
 }
 

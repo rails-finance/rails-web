@@ -3,9 +3,15 @@
 // shaping in lib/wallet/families/ shares. SERVER-ONLY by use: the route and
 // the page read through lib/wallet/read-wallet.ts.
 
+import type { WalletKind } from "./wallet-filters";
+
 export interface WalletSummaryRow {
   chain: "ethereum" | "base" | "arbitrum";
   family: string;
+  /** Set on a row the wallet read shapes from a protocol listing
+   *  (lib/wallet/listing-summary-rows.ts): a deposit beside the protocol's
+   *  Troves goes to its own module. */
+  kind?: WalletKind;
   positionId: string;
   owner: string;
   market: string | null;

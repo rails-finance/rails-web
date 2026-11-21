@@ -107,7 +107,8 @@ export function readWalletSummary(address: string): Promise<WalletSummary> {
         const c = (await r.json().catch(() => null)) as WalletCounts | null;
         if (!r.ok || !c || c.error) throw new Error(c?.error ?? `summary answered ${r.status}`);
         const summary = fromCounts(c, Date.now());
-        keep(summary);
+        // Part of the wallet (a listing read did not answer) is not kept.
+        if (!c.partial) keep(summary);
         return summary;
       })
       .finally(() => inFlight.delete(key));

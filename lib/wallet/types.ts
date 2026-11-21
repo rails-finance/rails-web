@@ -11,6 +11,7 @@
 // the block. A field a family cannot fill stays undefined.
 
 import type { ChainId } from "@/lib/shared/chains";
+import type { ProvClass } from "@/components/shared/provenance";
 import type { AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
 import type { CompoundPositionSummary } from "@/lib/sources/api/compound-positions";
 import type { MorphoPositionSummary } from "@/lib/sources/api/morpho-positions";
@@ -18,6 +19,12 @@ import type { SparkPositionSummary } from "@/lib/sources/api/spark-positions";
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
 import type { MakerVaultSummary } from "@/lib/sources/api/makerdao-vaults";
 import type { TroveSummary } from "@/types/api/trove";
+import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
+import type { LiquityV1DepositRow } from "@/lib/sources/api/liquity-v1-sp";
+import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
+import type { LiquityV1DepositChain } from "@/lib/api/fetch-liquity-v1-sp-chain";
+import type { LiquityV2DepositChain } from "@/lib/api/fetch-liquity-v2-sp-chain";
+import type { UsdPart } from "@/lib/wallet/deposit-claim";
 import type { EbisuTroveSummary } from "@/lib/sources/api/ebisu-troves";
 import type { AsymmetryTroveSummary } from "@/lib/sources/api/asymmetry-troves";
 import type { BasedollarTroveSummary } from "@/lib/sources/api/basedollar-troves";
@@ -47,6 +54,11 @@ export type WalletCard =
   | { kind: "fluid"; row: FluidPositionSummary }
   | { kind: "makerdao"; row: MakerVaultSummary }
   | { kind: "liquity-v2"; row: TroveSummary; prices: OraclePricesData | null }
+  /** `head`: the deposit's head read on the wallet page, which its card
+   *  shows in place of the last touch's figure. */
+  | { kind: "liquity-v2-deposit"; row: LiquityV2DepositRow; head?: LiquityV2DepositChain }
+  | { kind: "liquity-v1"; row: LiquityV1PositionSummary }
+  | { kind: "liquity-v1-deposit"; row: LiquityV1DepositRow; head?: LiquityV1DepositChain }
   | { kind: "ebisu"; row: EbisuTroveSummary }
   | { kind: "asymmetry"; row: AsymmetryTroveSummary }
   | { kind: "basedollar"; row: BasedollarTroveSummary };
@@ -107,6 +119,13 @@ export interface WalletPosition {
    *  negative past it; undefined where the family cannot state it. A sort
    *  key: it ranks the cards and is never displayed (decision 0041). */
   buffer?: number;
+  /** The class of the dollars' source on the receipts: the oracle unless set
+   *  (a deposit's compounded amount, read from the pool at $1 face, is
+   *  "state"). */
+  usdClass?: ProvClass;
+  /** The dollars' legs where they come from more than one source (a
+   *  deposit's $1 face and its gain at a price feed): each a receipt row. */
+  usdParts?: UsdPart[];
   /** The family's own risk figure, for the tile. */
   riskFigure?: { value: string; label: string };
   /** The family's own verdict that the position can be liquidated now
@@ -146,6 +165,9 @@ export interface WalletFamilyRead {
   /** Chain reads made for its open positions (multicalls or reader calls). */
   reads: number;
   error?: string;
+  /** A listing read that did not answer (read-wallet.ts, readListingRows):
+   *  the protocol's slug and what it would have read ("Liquity V1 Troves"). */
+  unanswered?: { family: string; what: string };
 }
 
 /** The answer of /api/chain/wallet/<address>. */
@@ -168,4 +190,7 @@ export interface WalletRead {
   /** Every protocol the summary rows name, with its row count, for the
    *  Protocol pill: a narrowed read still offers the others. */
   held: { slug: string; name: string; positions: number }[];
+  /** The listing reads that did not answer, by what they read: the answer
+   *  is part of the wallet, states no wallet total and is not kept. */
+  partial?: string[];
 }

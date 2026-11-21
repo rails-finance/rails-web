@@ -125,6 +125,15 @@ export function depositNowFromChain(chain: DepositChainFigures): DepositNow {
   };
 }
 
+/** A listing card's Deposit headline: the head read where one is handed (the
+ *  wallet page), else the deposit recorded at the last touch, approximate. */
+export function listingDeposit(
+  recordedRaw: string,
+  now: DepositNow | null | undefined,
+): { raw: bigint; approx: boolean; at: "head" | "last-touch" } {
+  return now ? { raw: now.now, approx: false, at: "head" } : { raw: big(recordedRaw), approx: true, at: "last-touch" };
+}
+
 /** The same figures laid over the index, or null where the chain has seen a
  *  touch the index has not (its recorded deposit differs), so the two would
  *  not add up. */

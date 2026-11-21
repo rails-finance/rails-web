@@ -35,8 +35,17 @@ export interface FamilyModule {
   /** The summary rows this module takes: wallet_positions' (chain, family). */
   summaryChain: WalletSummaryRow["chain"];
   summaryFamily: string;
+  /** "deposits" for a module taking a protocol's deposit rows beside its
+   *  Trove module (the rows' `kind`). */
+  summaryKind?: "deposits";
   shape(rows: WalletSummaryRow[]): Promise<WalletPosition[]>;
   /** Absent where the family's figures are the stored ones (Arbitrum). */
   /** `apiMs`: how long to wait for rails-server's route before the chain (walletApiWait). */
   head?(open: WalletPosition[], address: string, signal: AbortSignal, apiMs: number): Promise<HeadResult>;
 }
+
+/** Whether a summary row is the module's: its chain, family and kind. */
+export const takesRow = (f: FamilyModule, r: WalletSummaryRow): boolean =>
+  r.chain === f.summaryChain &&
+  r.family === f.summaryFamily &&
+  (r.kind === "deposits") === (f.summaryKind === "deposits");

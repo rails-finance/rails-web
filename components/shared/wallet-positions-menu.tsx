@@ -58,7 +58,7 @@ function readCounts(address: string): Promise<WalletCounts | null> {
       .catch(() => null);
     reads.set(address, read);
     void read.then((c) => {
-      if (!c) reads.delete(address);
+      if (!c || c.partial) reads.delete(address);
     });
   }
   return read;
