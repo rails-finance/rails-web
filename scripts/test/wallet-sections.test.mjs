@@ -286,24 +286,23 @@ test("a Trove on an emptied branch: no ratio, buffer, rate or collateral dollars
   assert.equal(walletTotal([s], "collateral").gap, "No wallet total: Ebisu states no dollars");
 });
 
-test("one live and one emptied branch: the live Troves' collateral stays, each branch is named once", () => {
+test("one live and one emptied branch: no collateral total, the emptied branch named once", () => {
   const shut = (c) => shutDownTrove(forkTrove("ebisu", "stcUSD", c), ebisuState("stcUSD"));
   const live = shutDownTrove(forkTrove("ebisu", "WBTC", 5000), null);
   const [s] = walletSections([shut(10), shut(20), live], { bands: true });
-  assert.equal(s.collateral.usd, 5000);
+  // A section total covers every open position or none.
+  assert.equal(s.collateral, undefined);
+  assert.equal(s.debt.usd, 300);
   assert.deepEqual(
     s.band.legs.map((l) => [l.id, l.label]),
     [
-      ["collateral", "Total collateral"],
       ["recorded-collateral", "Recorded collateral"],
       ["debt", "Total debt"],
     ],
   );
-  assert.equal(s.band.legs[1].value, "30 stcUSD");
-  assert.equal(s.band.note, "Total collateral leaves out the stcUSD Troves' recorded collateral.");
-  // With only the emptied branch, its name stands once in the no-total note.
-  const [only] = walletSections([shut(10), shut(20)], { bands: true });
-  assert.equal(only.band.note, "No collateral total: the stcUSD Troves' recorded collateral states no dollars.");
+  assert.equal(s.band.legs[0].value, "30 stcUSD");
+  assert.equal(s.band.note, "No collateral total: the stcUSD Troves' recorded collateral states no dollars.");
+  assert.equal(walletTotal([s], "collateral").gap, "No wallet total: Ebisu states no dollars");
 });
 
 test("several emptied branches: each takes its own record's dates and receipt, the tip in the plural", () => {

@@ -16,10 +16,10 @@
 // total.
 //
 // An open Trove on a branch whose pool the admin emptied after its shutdown
-// (lib/wallet/trove-shutdown.ts; ui-jobs 802) states no collateral dollars: it
-// leaves the section's collateral total, which sums the other open positions,
-// and the band carries its collateral as "Recorded collateral" in its token,
-// the note naming it once per branch. A Trove on a shut-down branch states no
+// (lib/wallet/trove-shutdown.ts; ui-jobs 802) states no collateral dollars, so
+// its section states no collateral total, as with an unpriced deposit; the
+// band carries its collateral as "Recorded collateral" in its token, and the
+// note names it once per branch. A Trove on a shut-down branch states no
 // buffer, so the risk sort and "Closest to liquidation" leave it out.
 
 import type { HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
@@ -435,12 +435,14 @@ export function walletSections(
     // The emptied Troves' recorded collateral, after the dollar total.
     const recordedNames = shutNames(emptied);
     if (emptied.length > 0) {
+      // A section total covers every open position or none (Miles, 18 Nov
+      // 2026): with an emptied branch's Trove the section states no
+      // collateral total, as with an unpriced deposit.
+      collateral = undefined;
       const dep = SP_DEPLOYMENTS[slug as SpDeploymentId];
       const leg = recordedCollateralLeg(slug, emptied, dep ? (c) => spPool(dep, c)?.collateralAddr : undefined);
-      if (leg) {
-        const at = band.legs.findIndex((l) => l.id === "collateral") + 1;
-        band = { ...band, legs: [...band.legs.slice(0, at), leg, ...band.legs.slice(at)] };
-      }
+      const rest = band.legs.filter((l) => l.id !== "collateral");
+      band = { ...band, legs: [...(leg ? [leg] : []), ...rest] };
     }
     // The section's heading and cards state the counts; the band carries
     // no sentence repeating them (Miles, 18 Nov 2026).
@@ -478,8 +480,6 @@ export function walletSections(
           ? `${andList(names)} ${names.length === 1 ? "states" : "state"} no dollars`
           : `an open position's ${missing} states no dollars`;
       band = { ...band, note: `No ${missing} total: ${named}.` };
-    } else if (collateral != null && recordedNames.length > 0) {
-      band = { ...band, note: `Total collateral leaves out ${andList(recordedNames)}.` };
     }
     if (!opts.bands) band = { ...band, positions: 0 };
     sections.push({
