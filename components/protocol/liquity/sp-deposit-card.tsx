@@ -47,6 +47,7 @@ import { pctText } from "@/lib/shared/vault-amount-text";
 import { TINY_AMOUNT_FLOOR_TEXT } from "@/lib/utils/format";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import { RawFigure, tokenIcon } from "./sp-parts";
+import { WithdrawalWords } from "./sp-liquidations";
 
 const NOUN = "Deposit";
 const ZERO = BigInt(0);
@@ -59,6 +60,9 @@ export interface LiquityV2DepositCardProps {
   dep?: SpDeployment;
   /** The branch's shutdown (ui-jobs 612): an open deposit reads "Shut down". */
   shutdown?: BranchShutdownState | null;
+  /** A listing card states the record's withdrawal of the branch's collateral
+   *  under its collateral gain (the wallet page, ui-jobs 802). */
+  withdrawalLine?: boolean;
   surface?: "listing" | "detail";
   lifetime?: DepositLifetime | null;
   /** The chain read at head. */
@@ -112,6 +116,7 @@ export function liquityV2DepositSlots({
   row,
   dep = LIQUITY_V2_SP,
   shutdown = null,
+  withdrawalLine = false,
   surface = "detail",
   lifetime,
   now,
@@ -199,6 +204,9 @@ export function liquityV2DepositSlots({
           </Prov>
         ),
         assets: icon(b, branch.collateralAddr, big(row.coll_gain_raw)),
+        ...(withdrawalLine && !closed && shutdown?.record?.withdrawal
+          ? { sub: <WithdrawalWords dep={dep} branch={b} /> }
+          : {}),
       },
       {
         id: "yield",

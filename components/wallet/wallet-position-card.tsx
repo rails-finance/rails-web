@@ -8,7 +8,10 @@
 // the OPEN pill, and keeps AT RISK; under the card, the read's freshness (H6's
 // form). Nothing inside the card changes, except that a Stability Pool
 // deposit's card states its head read (the deposit now, the collateral owed)
-// where the read answered.
+// where the read answered, a Trove's card takes its branch's shutdown from the
+// head read (no ratio; an emptied pool's "pool holds 0"), and a fork deposit
+// on an emptied branch states the withdrawal under its collateral gain
+// (ui-jobs 802).
 
 import Link from "next/link";
 import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
@@ -31,7 +34,7 @@ import { FluidPositionCard, viewFromSummary as fluidView } from "@/components/pr
 import { MakerVaultCard, viewFromSummary as makerView } from "@/components/protocol/makerdao/makerdao-vault-card";
 import { LiquityPositionCard, viewFromForkSummary } from "@/components/protocol/liquity-family/liquity-position-card";
 import { liquityV2TroveCard } from "@/lib/liquity-v2/listing-cards";
-import { forkDepositListingCard } from "@/lib/liquity-fork/deposit-card";
+import { forkDepositWalletCard } from "@/lib/liquity-fork/deposit-card";
 import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
 import {
   LiquityV1PositionCard,
@@ -50,7 +53,7 @@ import type { WalletCard, WalletPosition } from "@/lib/wallet/types";
 
 const BASE_LANE: CompoundCardLane = { chainId: BASE_CHAIN_ID, source: "sweep" };
 
-function FamilyCard({ card }: { card: WalletCard }) {
+function FamilyCard({ card, shutdown }: { card: WalletCard; shutdown: WalletPosition["shutdown"] }) {
   switch (card.kind) {
     case "aave-v3":
       return card.lane === "base" ? (
@@ -100,7 +103,7 @@ function FamilyCard({ card }: { card: WalletCard }) {
     case "makerdao":
       return <MakerVaultCard v={makerView(card.row)} surface="listing" />;
     case "liquity-v2":
-      return liquityV2TroveCard(card.row, card.prices);
+      return liquityV2TroveCard(card.row, card.prices, shutdown);
     case "liquity-v2-deposit":
       return (
         <LiquityV2DepositCard
@@ -145,10 +148,11 @@ function FamilyCard({ card }: { card: WalletCard }) {
           surface="listing"
           v={viewFromForkSummary(card.kind, card.row)}
           compact
+          shutdown={shutdown}
         />
       );
     case "fork-deposit":
-      return forkDepositListingCard(SP_DEPLOYMENTS[card.fork])(card.row);
+      return forkDepositWalletCard(SP_DEPLOYMENTS[card.fork])(card.row);
   }
 }
 
@@ -196,7 +200,7 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
           data-anatomy="N2"
           aria-label={`${p.familyName} on ${chain}${p.market ? `, ${p.market}` : ""}`}
         >
-          <FamilyCard card={p.card} />
+          <FamilyCard card={p.card} shutdown={p.shutdown} />
         </Link>
       </PositionCardEdgeContext.Provider>
     </div>

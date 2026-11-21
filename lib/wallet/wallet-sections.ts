@@ -14,6 +14,13 @@
 // section's figures. While a protocol's listing read did not answer
 // (read-wallet.ts, readListingRows), its section and the wallet state no
 // total.
+//
+// An open Trove on a branch whose pool the admin emptied after its shutdown
+// (lib/wallet/trove-shutdown.ts; ui-jobs 802) states no collateral dollars: its
+// section states no collateral total and names it, as for an unpriced
+// deposit, and the band carries its collateral as "Recorded collateral" in its
+// token. A Trove on a shut-down branch states no buffer, so the risk sort and
+// "Closest to liquidation" leave it out.
 
 import type { HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
@@ -28,6 +35,8 @@ import { scaled } from "@/lib/wallet/summary-row";
 import { formatUsdValue } from "@/lib/utils/format";
 import { walletProtocol } from "@/lib/wallet/wallet-filters";
 import type { WalletPosition } from "@/lib/wallet/types";
+import { onEmptiedBranch, recordedCollateralLeg } from "@/lib/wallet/trove-shutdown";
+import { SP_DEPLOYMENTS, spPool, type SpDeploymentId } from "@/lib/liquity-v2/sp-deployment";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
 
@@ -404,6 +413,15 @@ export function walletSections(
         positions: mine.filter((p) => p.status !== "moved").length,
       };
     }
+    // A Trove on an emptied branch: no collateral dollars, its recorded
+    // collateral the band's collateral leg.
+    const emptied = open.filter(onEmptiedBranch);
+    if (emptied.length > 0) {
+      collateral = undefined;
+      const dep = SP_DEPLOYMENTS[slug as SpDeploymentId];
+      const leg = recordedCollateralLeg(slug, emptied, dep ? (c) => spPool(dep, c)?.collateralAddr : undefined);
+      band = { ...band, legs: [...(leg ? [leg] : []), ...band.legs.filter((l) => l.id !== "collateral")] };
+    }
     // The section's heading and cards state the counts; the band carries
     // no sentence repeating them (Miles, 18 Nov 2026).
     band = { ...band, countsLine: "" };
@@ -426,10 +444,20 @@ export function walletSections(
       const missing = collateral == null ? "collateral" : "debt";
       const field = missing === "collateral" ? "collateralUsd" : "debtUsd";
       const lacking = open.filter((p) => !stated(p, field) && !(field === "debtUsd" && owesNothingUnread(p)));
-      // Unpriced deposits are named (a fork's deposit states no dollars).
+      // Unpriced deposits are named (a fork's deposit states no dollars), and
+      // a Trove's recorded collateral on an emptied branch.
+      const nameOf = (p: WalletPosition) =>
+        !p.market
+          ? null
+          : p.kind === "deposits"
+            ? `the ${p.market} deposit`
+            : onEmptiedBranch(p)
+              ? `the ${p.market}'s recorded collateral`
+              : null;
+      const names = lacking.map(nameOf);
       const named =
-        lacking.length > 0 && lacking.every((p) => p.kind === "deposits" && p.market)
-          ? `${andList(lacking.map((p) => `the ${p.market} deposit`))} ${lacking.length === 1 ? "states" : "state"} no dollars`
+        lacking.length > 0 && names.every((x) => x != null)
+          ? `${andList(names as string[])} ${lacking.length === 1 ? "states" : "state"} no dollars`
           : `an open position's ${missing} states no dollars`;
       band = { ...band, note: `No ${missing} total: ${named}.` };
     }
@@ -456,6 +484,17 @@ export function walletSections(
     if (tier(a) === 1) return (b.collateral?.usd ?? -1) - (a.collateral?.usd ?? -1);
     return closedAt(b.closed[0]) - closedAt(a.closed[0]);
   });
+}
+
+/** The "Closest to liquidation" tile's position (W2): the smallest buffer
+ *  any section ranks that states its risk figure. A Trove on a shut-down
+ *  branch states neither (lib/wallet/trove-shutdown.ts), so it is never the
+ *  one; undefined where no position states one. */
+export function closestToLiquidation(sections: WalletSection[]): WalletPosition | undefined {
+  return sections
+    .flatMap((s) => s.ranked)
+    .filter((p) => p.buffer != null && p.riskFigure)
+    .sort(byRisk)[0];
 }
 
 /** One total over the sections: each section's figure as its band states it,

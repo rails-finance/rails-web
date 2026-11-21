@@ -224,3 +224,94 @@ test("an ETH-quoted Comet's head dollars convert through the read's WETH price",
     borrowed: 0,
   });
 });
+
+// ── a Trove on a shut-down branch (ui-jobs 802) ─────────────────────────────
+const { shutDownTrove, recordedCollateralLeg } = await import("../../lib/wallet/trove-shutdown.ts");
+const { closestToLiquidation } = await import("../../lib/wallet/wallet-sections.ts");
+const { branchShutdownState } = await import("../../lib/liquity-fork/shutdown.ts");
+const { recordedShutdown } = await import("../../lib/shared/liquity-family-shutdown.ts");
+
+const forkTrove = (family, collateralType, collateral, extra = {}) =>
+  pos(family, {
+    market: `${collateralType} Trove`,
+    card: { kind: family, row: { collateralType, collateral } },
+    collateralUsd: collateral,
+    debtUsd: 100,
+    buffer: 0.2,
+    riskFigure: { value: "146.1% CR", label: "liquidates below 120%" },
+    liquidatable: false,
+    debtRate: 0.048,
+    ...extra,
+  });
+const ebisuState = (c) => branchShutdownState(recordedShutdown("ebisu", c), null);
+
+test("a Trove on an emptied branch: no ratio, buffer, rate or collateral dollars; the band's Recorded collateral", () => {
+  const t = shutDownTrove(forkTrove("ebisu", "stcUSD", 14404.93), ebisuState("stcUSD"));
+  assert.equal(t.buffer, undefined);
+  assert.equal(t.riskFigure, undefined);
+  assert.equal(t.liquidatable, undefined);
+  assert.equal(t.debtRate, undefined);
+  assert.equal(t.collateralUsd, undefined);
+  assert.equal(t.debtUsd, 100);
+  const dep = pos("ebisu", { kind: "deposits", market: "sUSDe Stability Pool", headRead: "none", usdOwnOracle: false });
+  const [s] = walletSections([t, dep], { bands: true });
+  assert.equal(s.collateral, undefined);
+  assert.equal(s.debt.usd, 100);
+  const coll = s.band.legs.find((l) => l.id === "collateral");
+  assert.equal(coll.label, "Recorded collateral");
+  assert.equal(coll.value, "14,404.93 stcUSD");
+  assert.equal(coll.footnote.text, "Shut down 20 Aug 2026 · pool holds 0 stcUSD");
+  assert.match(coll.footnote.prov.summary, /Collateral withdrawal/);
+  assert.match(coll.prov.summary, /held 0 stcUSD since/);
+  assert.equal(
+    s.band.note,
+    "No collateral total: the stcUSD Trove's recorded collateral and the sUSDe Stability Pool deposit state no dollars.",
+  );
+  assert.equal(walletTotal([s], "collateral").gap, "No wallet total: Ebisu states no dollars");
+});
+
+test("Closest to liquidation leaves out a Trove on a shut-down branch, and is absent where every Trove is", () => {
+  const shut = shutDownTrove(forkTrove("ebisu", "stcUSD", 14404.93), ebisuState("stcUSD"));
+  assert.equal(closestToLiquidation(walletSections([shut], { bands: true })), undefined);
+  const live = forkTrove("basedollar", "WETH", 5000, { buffer: 0.4, riskFigure: { value: "200.0% CR", label: "x" } });
+  const s = walletSections([shut, live], { bands: true });
+  assert.equal(closestToLiquidation(s).positionId, live.positionId);
+});
+
+test("a live branch's Trove is unchanged", () => {
+  const live = forkTrove("basedollar", "WETH", 5000);
+  const state = branchShutdownState(recordedShutdown("basedollar", "WETH"), null);
+  assert.equal(state, null);
+  assert.equal(shutDownTrove(live, state), live);
+  const v2 = forkTrove("liquity-v2", "WETH", 5000, {
+    card: { kind: "liquity-v2", row: { collateralType: "WETH", collateral: { amount: 2 } } },
+  });
+  assert.equal(shutDownTrove(v2, branchShutdownState(recordedShutdown("liquity-v2", "WETH"), null)), v2);
+  const [s] = walletSections([live, forkTrove("basedollar", "cbBTC", 300)], { bands: true });
+  assert.deepEqual(
+    s.band.legs.map((l) => [l.id, l.label]),
+    [
+      ["collateral", "Total collateral"],
+      ["debt", "Total debt"],
+    ],
+  );
+  assert.equal(s.collateral.usd, 5300);
+  assert.equal(recordedCollateralLeg("basedollar", s.open), null);
+});
+
+test("a live read alone shuts a branch with no record; its collateral dollars stand", () => {
+  const live = {
+    shutDown: true,
+    at: 1_790_000_000,
+    raw: "1790000000",
+    source: { contract: "TroveManager", address: "0x0", call: "TroveManager.shutdownTime()", block: 1 },
+  };
+  const t = shutDownTrove(forkTrove("liquity-v2", "WETH", 5000), branchShutdownState(null, live));
+  assert.equal(t.buffer, undefined);
+  assert.equal(t.collateralUsd, 5000);
+  const [s] = walletSections([t, forkTrove("liquity-v2", "WETH", 10)], { bands: false });
+  assert.equal(
+    s.band.legs.find((l) => l.label === "Recorded collateral"),
+    undefined,
+  );
+});

@@ -1,6 +1,7 @@
 // A Liquity V2 fork's Stability Pool deposit card as its deposit listing draws
 // it, with a shut-down branch's state from the catalog's record. The wallet
-// page's fork sections draw the same card (components/wallet/wallet-position-card.tsx).
+// page's fork sections draw the same card with the record's withdrawal line
+// (components/wallet/wallet-position-card.tsx).
 
 import { LiquityV2DepositCard } from "@/components/protocol/liquity/sp-deposit-card";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
@@ -16,4 +17,16 @@ const recordedBranchShutdown = (dep: SpDeployment, collateralType: string) =>
 /** A fork deposit's listing card. */
 export const forkDepositListingCard = (dep: SpDeployment) => (r: LiquityV2DepositRow<string>) => (
   <LiquityV2DepositCard row={r} surface="listing" dep={dep} shutdown={recordedBranchShutdown(dep, r.collateral_type)} />
+);
+
+/** The wallet page's: the listing card, with the record's withdrawal of the
+ *  branch's collateral under its collateral gain (ui-jobs 802). */
+export const forkDepositWalletCard = (dep: SpDeployment) => (r: LiquityV2DepositRow<string>) => (
+  <LiquityV2DepositCard
+    row={r}
+    surface="listing"
+    dep={dep}
+    shutdown={recordedBranchShutdown(dep, r.collateral_type)}
+    withdrawalLine
+  />
 );

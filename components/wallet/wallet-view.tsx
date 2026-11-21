@@ -53,7 +53,7 @@ import type { CowWalletEntry } from "@/lib/cow/types";
 import type { WalletFamilyRead, WalletRead } from "@/lib/wallet/types";
 import { WALLET_COUNTS_SCOPE } from "@/lib/wallet/summary-counts";
 import {
-  byRisk,
+  closestToLiquidation,
   DUST_USD,
   unreadAtHead,
   walletNet,
@@ -125,10 +125,7 @@ function Totals({
   const rated = owing.filter((p) => p.debtRate != null);
   const ratedUsd = rated.reduce((s, p) => s + p.debtUsd!, 0);
   const rate = ratedUsd > 0 ? rated.reduce((s, p) => s + p.debtUsd! * p.debtRate!, 0) / ratedUsd : null;
-  const closest = sections
-    .flatMap((s) => s.ranked)
-    .filter((p) => p.buffer != null && p.riskFigure)
-    .sort(byRisk)[0];
+  const closest = closestToLiquidation(sections);
   return (
     <section aria-label="Totals" data-wallet-tiles="" data-anatomy="W2">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
