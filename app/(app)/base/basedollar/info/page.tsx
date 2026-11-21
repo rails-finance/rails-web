@@ -8,6 +8,7 @@ import Link from "next/link";
 import { ProtocolInfoPage, GlossaryLink, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { forkSpInfoView } from "@/lib/liquity-fork/sp-info-view";
 import { fmtLtv } from "@/lib/liquity/ltv";
 
 export const metadata = infoMetadata("basedollar");
@@ -151,6 +152,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
       </p>
     ),
   },
+  forkSpInfoView("basedollar"),
 ];
 
 export default function InfoPage() {
