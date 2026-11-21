@@ -157,13 +157,15 @@ async function readStrip(page) {
   });
 }
 
-/** Open a listing URL and wait for its rows + its one price side-fetch. */
+/** Open a listing URL and wait for its rows + its one price side-fetch; a
+ *  Liquity V2 wallet search redirects to the wallet page (ui-jobs 738), whose
+ *  view is waited for in their place. */
 async function openListing(context, url, { route } = {}) {
   const page = await context.newPage();
   if (route) await page.route(route.url, route.handler);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page
-    .locator('[data-skel-section="listing-row"]')
+    .locator('[data-skel-section="listing-row"], [data-wallet-view]')
     .first()
     .waitFor({ state: "visible", timeout: 120000 })
     .catch(() => {});
@@ -488,10 +490,69 @@ const V2_BAND = '[data-wallet-section="liquity-v2"] [data-holder-strip]';
   }
 }
 
+// ── ui-jobs 737 on the wallet page: one Trove, one open plus one closed ─────
+// The wallet page reads its rows server-side, so no page.route reaches them:
+// the shapes are wallets the index holds, picked at run time, each with no
+// Stability Pool deposit (a deposit counts in the band).
+async function pickV2Shape(want) {
+  const open = await api("/api/troves?status=active&limit=100");
+  const owners = [...new Set((open.data ?? []).map((t) => t.owner).filter(Boolean))];
+  for (const owner of owners) {
+    const held = (await api(`/api/troves?ownerAddress=${owner}&limit=5`)).data ?? [];
+    if (!want(held)) continue;
+    const deposits = await api(`/api/liquity-v2/stability-pool?wallet=${owner}&limit=1`).catch(() => null);
+    if ((deposits?.pagination?.total ?? 1) === 0) return owner;
+  }
+  return null;
+}
+const walletBand = async (wallet) => {
+  const page = await openListing(context, `${BASE}/wallet/${wallet}?protocol=liquity-v2`);
+  await page
+    .locator('[data-wallet-section="liquity-v2"]')
+    .first()
+    .waitFor({ timeout: 60000 })
+    .catch(() => {});
+  const strip = await readStrip(page);
+  const link = await page.locator("[data-holder-strip] [data-holder-wallet-link]").count();
+  await page.close();
+  return { strip, link };
+};
+{
+  const one = await pickV2Shape((rows) => rows.length === 1 && rows[0].status === "open");
+  if (!one) info("V10", "no wallet on the first page of open Troves holds one Trove and nothing else");
+  else {
+    const { strip } = await walletBand(one);
+    check("V10. a wallet holding one Trove draws no band (its card says it all)", strip === null, one);
+  }
+}
+{
+  const pair = await pickV2Shape(
+    (rows) =>
+      rows.length === 2 &&
+      rows.filter((t) => t.status === "open").length === 1 &&
+      rows.some((t) => t.status === "closed"),
+  );
+  if (!pair) info("V11", "no wallet on the first page of open Troves holds one open and one closed Trove alone");
+  else {
+    // Totals need two open positions; the section's heading and cards state
+    // the counts, so a band with neither draws nothing.
+    const { strip, link } = await walletBand(pair);
+    check(
+      "V11. one open Trove and one closed: no totals, so no band on the wallet page",
+      strip === null,
+      `${pair} ${JSON.stringify(strip)}`,
+    );
+    check("V12. …and no wallet link: the page is the wallet's (N7.2)", link === 0, `${link} link(s)`);
+  }
+}
+
 // ── typed search, and a wallet holding nothing ─────────────────────────────
 {
   const page = await openListing(context, `${BASE}/ethereum/liquity-v2`);
-  await searchWallet(page, "Address, ENS, or ID", V2_WALLET);
+  const box = page.getByPlaceholder("Address, ENS, or ID");
+  await box.click();
+  await box.fill(V2_WALLET);
+  await page.waitForURL((u) => u.pathname.startsWith("/wallet/"), { timeout: 60000 }).catch(() => {});
   const landed = new URL(page.url());
   check(
     "V8. a wallet typed into the listing's search opens the wallet page, Liquity V2 chosen",

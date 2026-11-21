@@ -53,6 +53,13 @@ export const walletProtocol = (slug: string | null | undefined): WalletProtocol 
 export const walletPageHref = (protocol: string | undefined, wallet: string | undefined): string | null =>
   wallet && walletProtocol(protocol) ? `/wallet/${encodeURIComponent(wallet)}` : null;
 
+/** A wallet address, as the wallet page takes it. */
+export const WALLET_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+
+/** An ENS name the wallet page resolves: no space, ending ".eth", seven
+ *  characters or more. A listing search sends only these to the wallet page. */
+export const isWalletEnsName = (v: string): boolean => /^[^\s]+\.eth$/i.test(v) && v.length >= 7;
+
 /** The families whose listings send a wallet search to the wallet page
  *  (ui-jobs 738): their Trove and Stability Pool listings. The session id of
  *  each explorer is its slug here. */
@@ -68,11 +75,8 @@ export const walletProtocolHref = (wallet: string, protocol: string): string =>
  *  searches itself. */
 export function walletSearchHref(protocol: string | undefined, q: string | null | undefined): string | null {
   if (!protocol || !WALLET_SEARCH_FAMILIES.has(protocol)) return null;
-  // As the listing search reads a wallet (lib/shared/listing-search.ts).
   const v = (q ?? "").trim();
-  return /^0x[a-fA-F0-9]{40}$/.test(v) || (v.toLowerCase().endsWith(".eth") && v.length > 4)
-    ? walletProtocolHref(v, protocol)
-    : null;
+  return WALLET_ADDRESS.test(v) || isWalletEnsName(v) ? walletProtocolHref(v, protocol) : null;
 }
 
 /** Fields that name a market's figures or a count, never the account's debt. */

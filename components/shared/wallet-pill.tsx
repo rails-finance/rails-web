@@ -151,7 +151,14 @@ function WalletPillInner({
         router.push(href);
       }}
       aria-label={
-        vault ? `Open vault ${label}` : hrefOverride && hrefLabel ? hrefLabel : `Filter positions by wallet ${label}`
+        vault
+          ? `Open vault ${label}`
+          : hrefOverride && hrefLabel
+            ? hrefLabel
+            : // A link to the wallet page (ui-jobs 738): the Liquity V2 family's pills.
+              href?.startsWith("/wallet/")
+              ? `Open wallet ${label}`
+              : `Filter positions by wallet ${label}`
       }
       // Structural hook for the identity itself, so a check can find the
       // label and ask whether it resolved without keying on the typeface

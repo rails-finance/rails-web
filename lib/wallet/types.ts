@@ -173,7 +173,9 @@ export interface WalletFamilyRead {
   error?: string;
   /** A listing read that did not answer (read-wallet.ts, readListingRows):
    *  the protocol's slug and what it would have read ("Liquity V1 Troves"). */
-  unanswered?: { family: string; what: string };
+  /** `total: false` where the read cannot hold a position the wallet total
+   *  needs: a fork's deposit read for a wallet holding nothing on that fork. */
+  unanswered?: { family: string; what: string; total?: false };
 }
 
 /** The answer of /api/chain/wallet/<address>. */

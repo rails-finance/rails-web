@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { WalletHeading } from "@/components/shared/wallet-heading";
 import { WalletMenu } from "@/components/shared/wallet-menu";
-import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
+import { PROFILE_CLEARANCE, WALLET_HEADING_NAME } from "@/lib/shared/ui-grammar";
 
 export function WalletHeader({
   address,
@@ -15,7 +15,9 @@ export function WalletHeader({
   lines,
   end,
 }: {
-  address: string;
+  /** Null for a name that resolves to no address: the heading is the name,
+   *  with no address menu. */
+  address: string | null;
   ensName: string | null;
   lines?: ReactNode;
   end?: ReactNode;
@@ -33,7 +35,13 @@ export function WalletHeader({
         className="mt-6"
         // The address menu a position page draws (ui-jobs 430): Copy the
         // address and Bookmark it; no View wallet on the wallet view.
-        title={<WalletMenu wallet={address} ensName={ensName} heading view={false} />}
+        title={
+          address ? (
+            <WalletMenu wallet={address} ensName={ensName} heading view={false} />
+          ) : (
+            <h1 className={`${WALLET_HEADING_NAME} min-w-0 truncate`}>{ensName}</h1>
+          )
+        }
         lines={lines}
         end={end}
       />

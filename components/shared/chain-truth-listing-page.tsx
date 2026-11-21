@@ -20,6 +20,7 @@
 import { listingSearchNote } from "@/lib/shared/listing-search";
 import { useRouter } from "next/navigation";
 import { walletSearchHref } from "@/lib/wallet/wallet-filters";
+import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChainTruthListing, ListingUnavailable } from "@/components/shared/chain-truth-listing";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -411,6 +412,8 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
       // A wallet named in the search opens the wallet page.
       const wallet = walletSearchHref(walletSearch, next.q);
       if (wallet) {
+        // The wallet page reads for up to its 8 s budget: the bar says so.
+        startNavigationProgress(wallet);
         router.push(wallet);
         return;
       }

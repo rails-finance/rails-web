@@ -106,6 +106,9 @@ export function walletFamiliesLine(): string {
  *  module's part of the answer says so, and no total stands while it does. */
 export interface ListingFailure {
   module: FamilyModule;
+  /** The read stops the wallet total only where the wallet holds a position
+   *  on the module's family (the forks' deposit reads). */
+  heldOnly?: boolean;
   /** What could not be read, for the page's line ("Liquity V1 Troves"). */
   what: string;
   error: string;
@@ -138,7 +141,12 @@ export async function readListingRows(
   const hop = routeBoxHop(base, readerIp);
   const list = { wallet: address, sortBy: "recent", sortOrder: "desc", limit: String(LISTING_LIMIT), offset: "0" };
   type Page = { rows: WalletSummaryRow[]; total: number };
-  const reads: { module: FamilyModule; what: string; read: (signal: AbortSignal) => Promise<Page> }[] = [
+  const reads: {
+    module: FamilyModule;
+    what: string;
+    heldOnly?: boolean;
+    read: (signal: AbortSignal) => Promise<Page>;
+  }[] = [
     {
       module: liquityV1,
       what: "Liquity V1 Troves",
@@ -180,6 +188,7 @@ export async function readListingRows(
       return {
         module,
         what: `${dep.name} Stability Pool deposits`,
+        heldOnly: true,
         read: async (signal: AbortSignal) => {
           const r = await readLiquityV2Sp<LiquityV2DepositListResponse<string>>("stability-pool", list, {
             ...hop,
@@ -202,7 +211,13 @@ export async function readListingRows(
   const failed: ListingFailure[] = [];
   settled.forEach((s, i) => {
     if (s.status === "fulfilled") rows.push(...s.value);
-    else failed.push({ module: reads[i].module, what: reads[i].what, error: publicErrorMessage(s.reason) });
+    else
+      failed.push({
+        module: reads[i].module,
+        what: reads[i].what,
+        heldOnly: reads[i].heldOnly,
+        error: publicErrorMessage(s.reason),
+      });
   });
   return { rows, failed };
 }
@@ -376,7 +391,9 @@ export async function readWalletUncached(
   });
   // A listing read that did not answer: its module's part says so.
   const failed = summary.listingFailed.filter((x) => !opts.protocol || x.module.summaryFamily === opts.protocol);
-  for (const { module: f, what, error } of failed) {
+  for (const { module: f, what, error, heldOnly } of failed) {
+    // A fork's deposit read stops the total only for a wallet holding on that fork.
+    const total = heldOnly && !held.some((h) => h.slug === f.summaryFamily) ? { total: false as const } : {};
     families.push({
       id: f.id,
       name: f.name,
@@ -387,7 +404,7 @@ export async function readWalletUncached(
       ms: serverMs,
       reads: 0,
       error,
-      unanswered: { family: f.summaryFamily, what },
+      unanswered: { family: f.summaryFamily, what, ...total },
     });
   }
   return {

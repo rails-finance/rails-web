@@ -4,7 +4,8 @@
 // lib/wallet/read-wallet.ts). It spans chains, so it sits under no chain and
 // no explorer rail.
 // `[address]` is a 0x address or an ENS name; a name, or an address in mixed
-// case, redirects to the lower-cased address. `?from=<path>` is the explorer
+// case, redirects to the lower-cased address, and a name that resolves to no
+// address draws a page saying so. `?from=<path>` is the explorer
 // page the reader came from (the wallet menu adds it): the empty state links
 // back to that explorer's listing.
 // `?protocol=<slug>` reads that protocol alone (ui-jobs 738), and is where a
@@ -13,9 +14,16 @@
 
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { WalletView } from "@/components/wallet/wallet-view";
+import { WalletUnresolved, WalletView } from "@/components/wallet/wallet-view";
 import { readWallet, walletFamiliesLine } from "@/lib/wallet/read-wallet";
-import { parseKinds, parseStatus, walletProtocol, walletProtocolHref } from "@/lib/wallet/wallet-filters";
+import {
+  isWalletEnsName,
+  parseKinds,
+  parseStatus,
+  WALLET_ADDRESS as ADDRESS,
+  walletProtocol,
+  walletProtocolHref,
+} from "@/lib/wallet/wallet-filters";
 import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { explorerName, protocolForPathname } from "@/lib/shared/protocols";
 import { holderListingMetadata } from "@/lib/shared/page-metadata";
@@ -26,9 +34,6 @@ import { readCowWalletEntry } from "@/lib/sources/api/cow";
 export const dynamic = "force-dynamic";
 // The read's budget (8 s) sits under it.
 export const maxDuration = 30;
-
-const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
-const ENS = /^[^\s]+\.eth$/i;
 
 interface Props {
   params: Promise<{ address: string }>;
@@ -43,7 +48,10 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const subject = decodeURIComponent(address);
   // Liquity V2 chosen: the holder's card its listing search unfurled as before
   // the search moved here (/api/share/liquity-v2-wallet).
-  if (walletProtocol(toURLSearchParams(await searchParams).get("protocol"))?.slug === "liquity-v2") {
+  if (
+    ADDRESS.test(subject) &&
+    walletProtocol(toURLSearchParams(await searchParams).get("protocol"))?.slug === "liquity-v2"
+  ) {
     const q = encodeURIComponent(subject.toLowerCase());
     return {
       ...holderListingMetadata({
@@ -70,17 +78,17 @@ export default async function WalletPage({ params, searchParams }: Props) {
   // A redirect keeps the query as it came.
   const keep = sp.size ? `?${sp.toString()}` : "";
   const typed = decodeURIComponent(raw).trim();
-  if (ENS.test(typed) && typed.length >= 7) {
+  // Only an explorer's own listing is linked back to.
+  const entry = protocolForPathname(from?.split("?")[0] ?? null);
+  const back = entry ? { href: entry.href, name: explorerName(entry) } : null;
+  if (isWalletEnsName(typed)) {
     const resolved = await resolveEnsAddress(typed.toLowerCase());
-    if (!resolved || !ADDRESS.test(resolved)) notFound();
+    if (!resolved || !ADDRESS.test(resolved)) return <WalletUnresolved name={typed.toLowerCase()} back={back} />;
     redirect(`/wallet/${resolved.toLowerCase()}${keep}`);
   }
   if (!ADDRESS.test(typed)) notFound();
   const address = typed.toLowerCase();
   if (address !== typed) redirect(`/wallet/${address}${keep}`);
-  // Only an explorer's own listing is linked back to.
-  const entry = protocolForPathname(from?.split("?")[0] ?? null);
-  const back = entry ? { href: entry.href, name: explorerName(entry) } : null;
 
   const ip = await readerIpFromHeaders();
   const protocol = walletProtocol(sp.get("protocol"))?.slug;

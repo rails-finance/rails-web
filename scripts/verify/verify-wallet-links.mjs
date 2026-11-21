@@ -44,7 +44,9 @@ const ROW = 'a[class~="group/listing-row"]';
 // (A second alternative, `Filter troves by owner`, was carried here long after
 // the last component emitting it was retired; a dead selector alternative
 // cannot fail, so it was only ever noise.)
-const FILTER_BTN = 'button[aria-label^="Filter positions by wallet"]';
+// A Liquity V2 family pill opens the wallet page and reads "Open wallet …"
+// (ui-jobs 738).
+const FILTER_BTN = 'button[aria-label^="Filter positions by wallet"], button[aria-label^="Open wallet"]';
 // On a position page the owner's wallet is its address menu (ui-jobs 271,
 // `components/shared/wallet-menu.tsx`), whose "View wallet" row opens the
 // wallet view, `/wallet/<address>` (rails-ops decision 0051). For those

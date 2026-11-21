@@ -277,6 +277,34 @@ function Trades({ address, cow }: { address: string; cow: Promise<CowWalletEntry
 
 const familyChain = (r: WalletFamilyRead) => `${r.name} on ${chainMeta(r.chain).name}`;
 
+/** An ENS name that resolves to no address: the page's heading names it and
+ *  the empty state's body says so, with the lookup to try another. */
+export function WalletUnresolved({ name, back }: { name: string; back: { href: string; name: string } | null }) {
+  return (
+    <div className="flex flex-col gap-7 py-8" data-wallet-unresolved={name}>
+      <WalletHeader address={null} ensName={name} />
+      <section className="flex max-w-xl flex-col gap-3" data-wallet-empty="">
+        <p className="text-sm text-foreground/80" data-wallet-reads="">
+          {name} resolves to no address, so there is no wallet to read.
+        </p>
+        {back && (
+          <p className="text-sm">
+            <Link
+              href={back.href}
+              className="text-foreground underline underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
+              data-wallet-back=""
+            >
+              Back to {back.name}
+            </Link>
+          </p>
+        )}
+        <WalletLookup positionHref={(w) => `/wallet/${w}`} placeholder="Wallet address or ENS name" />
+        <StartHereLine />
+      </section>
+    </div>
+  );
+}
+
 export function WalletView({
   address,
   ensName,
@@ -330,6 +358,8 @@ export function WalletView({
   // The listing reads that did not answer (read-wallet.ts, readListingRows).
   const unanswered = read.families.flatMap((r) => (r.unanswered ? [r.unanswered] : []));
   const missing = unanswered.map((u) => u.what);
+  // The reads that stop the wallet total (`total: false` stops none).
+  const blocking = unanswered.filter((u) => u.total !== false).map((u) => u.what);
   const sections = walletSections(all, { bands: !filtered, unanswered });
   const open = sections.flatMap((s) => s.open);
   const scope = useAssetScope();
@@ -497,7 +527,7 @@ export function WalletView({
             {filterBar}
             {body(
               <>
-                {open.length > 0 && <Totals sections={sections} filtered={filtered} unanswered={missing} />}
+                {open.length > 0 && <Totals sections={sections} filtered={filtered} unanswered={blocking} />}
                 {sections.map((s) => (
                   <Section key={s.slug} s={s} />
                 ))}

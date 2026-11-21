@@ -98,7 +98,9 @@ globalThis.fetch = async (input, init = {}) => {
     });
   }
   if (url.pathname === "/api/ebisu/stability-pool")
-    return json({ rows: ebisuSp, pagination: { total: ebisuSp.length } });
+    return ebisuSp === "fail"
+      ? json({ error: "down" }, 500)
+      : json({ rows: ebisuSp, pagination: { total: ebisuSp.length } });
   if (url.pathname === "/api/asymmetry/stability-pool" || url.pathname === "/api/basedollar/stability-pool")
     return json({ rows: [], pagination: { total: 0 } });
   return json({ error: `no stub for ${url.pathname}` }, 404);
@@ -139,6 +141,17 @@ test("a fork's deposits read from its deposit listing, under the fork's slug", a
   assert.equal(fork.positionId, `WBTC:${W}`);
   assert.equal(fork.href, `/ethereum/ebisu/stability-pool/WBTC/${W}`);
   assert.equal(fork.collateral.symbol, "ebUSD");
+});
+
+test("a fork's failed deposit read is marked to stop only a wallet holding on that fork", async () => {
+  v2sp = "ok";
+  ebisuSp = "fail";
+  const r = await readListingRows(W, signal());
+  ebisuSp = [];
+  assert.deepEqual(
+    r.failed.map((f) => [f.what, f.heldOnly]),
+    [["Ebisu Stability Pool deposits", true]],
+  );
 });
 
 test("a listing that fails is named; the others' rows stand", async () => {

@@ -561,7 +561,10 @@ async function statedTotal(page) {
 }
 {
   const page = await openListing(context, `${BASE}/ethereum/liquity-v2`);
-  await searchWallet(page, V2_WALLET);
+  const box = page.locator('[data-skel-section="listing-toolbar"] input').first();
+  await box.click();
+  await box.fill(V2_WALLET);
+  await page.waitForURL((u) => u.pathname.startsWith("/wallet/"), { timeout: 60000 }).catch(() => {});
   const at = await page.evaluate(() => location.pathname + location.search);
   check(
     "F2. Liquity V2: a wallet search opens /wallet/<wallet>?protocol=liquity-v2",
