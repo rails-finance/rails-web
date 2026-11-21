@@ -13,12 +13,14 @@
 // reference/liquity-v2-stability-pool-deposits.md: yield_gain_claimed is BOLD,
 // and coll_gain_claimed includes the stash from earlier touches.
 
+import { scaleSpAnswer } from "@/lib/liquity-v2/sp-decimals";
+
 /** The branch collateral as the routes key it. */
 export type LiquityV2SpBranch = "WETH" | "wstETH" | "rETH";
 
 /** One deposit: the carry with its newest head row over it. */
-export interface LiquityV2DepositRow {
-  collateral_type: LiquityV2SpBranch;
+export interface LiquityV2DepositRow<B extends string = LiquityV2SpBranch> {
+  collateral_type: B;
   depositor: string;
   /** open while the recorded deposit is above zero. */
   status: "open" | "closed";
@@ -42,16 +44,18 @@ export interface LiquityV2DepositRow {
   tx_count: number;
 }
 
-export interface LiquityV2DepositListResponse {
+export interface LiquityV2DepositListResponse<B extends string = LiquityV2SpBranch> {
   served_thru_block: string | null;
-  rows: LiquityV2DepositRow[];
+  rows: LiquityV2DepositRow<B>[];
   pagination: { total: number; limit: number; offset: number };
-  branches: Record<LiquityV2SpBranch, { open: number; closed: number }>;
+  /** A fork's entries carry `coll_decimals` on the wire, the unit of its coll_* amounts;
+   *  `readLiquityV2Sp` removes it once it has scaled them to 1e18. */
+  branches: Record<B, { open: number; closed: number; coll_decimals?: number }>;
 }
 
 /** One DepositOperation, with the replay through it. */
-export interface LiquityV2DepositEventRow {
-  collateral_type: LiquityV2SpBranch;
+export interface LiquityV2DepositEventRow<B extends string = LiquityV2SpBranch> {
+  collateral_type: B;
   depositor: string;
   event_key: string;
   /** 0 provideToSP · 1 withdrawFromSP · 2 claimAllCollGains. */
@@ -89,14 +93,14 @@ export interface LiquityV2DepositEventRow {
   coll_claimed_to_here: string;
 }
 
-export interface LiquityV2DepositTimelineResponse {
-  collateral_type: LiquityV2SpBranch;
+export interface LiquityV2DepositTimelineResponse<B extends string = LiquityV2SpBranch> {
+  collateral_type: B;
   depositor: string;
   served_thru_block: string | null;
   totalEvents: number;
   pagination: { limit: number; offset: number; order: "asc" | "desc" };
-  rows: LiquityV2DepositEventRow[];
-  position: LiquityV2DepositRow | null;
+  rows: LiquityV2DepositEventRow<B>[];
+  position: LiquityV2DepositRow<B> | null;
 }
 
 /** A deposit's day: the running sums after its last operation (each a raw
@@ -123,8 +127,8 @@ export interface LiquityV2DepositDay {
   stash: string;
 }
 
-export interface LiquityV2DepositDaysResponse {
-  collateral_type: LiquityV2SpBranch;
+export interface LiquityV2DepositDaysResponse<B extends string = LiquityV2SpBranch> {
+  collateral_type: B;
   depositor: string;
   served_thru_block: string | null;
   days: LiquityV2DepositDay[];
@@ -177,8 +181,8 @@ export interface LiquityV2DepositStretch {
   reconciles: boolean | null;
 }
 
-export interface LiquityV2DepositLiquidationsResponse {
-  collateral_type: LiquityV2SpBranch;
+export interface LiquityV2DepositLiquidationsResponse<B extends string = LiquityV2SpBranch> {
+  collateral_type: B;
   depositor: string;
   served_thru_block: string;
   units: { bold: string; coll: string; price: string };
@@ -228,14 +232,17 @@ export class LiquityV2SpHttpError extends Error {
 }
 
 /** One read of a route: through the proxy from the browser (`baseUrl`
- *  absent), or the box from a server render (`boxHop()`'s base and headers). */
+ *  absent), or the box from a server render (`boxHop()`'s base and headers).
+ *  `api` is the deployment's prefix (lib/liquity-v2/sp-deployment.ts), Liquity
+ *  V2's by default; a fork's collateral amounts come back in 1e18
+ *  (lib/liquity-v2/sp-decimals.ts). */
 export async function readLiquityV2Sp<T>(
   route: LiquityV2SpRoute,
   params: Record<string, string | undefined>,
-  opts: { baseUrl?: string; headers?: HeadersInit; signal?: AbortSignal } = {},
+  opts: { baseUrl?: string; headers?: HeadersInit; signal?: AbortSignal; api?: string } = {},
 ): Promise<T> {
-  const url = `${opts.baseUrl ?? ""}/api/liquity-v2/${route}?${liquityV2SpQuery(route, params)}`;
+  const url = `${opts.baseUrl ?? ""}${opts.api ?? "/api/liquity-v2"}/${route}?${liquityV2SpQuery(route, params)}`;
   const res = await fetch(url, { cache: "no-store", headers: opts.headers, signal: opts.signal });
   if (!res.ok) throw new LiquityV2SpHttpError(res.status, res.statusText);
-  return (await res.json()) as T;
+  return scaleSpAnswer((await res.json()) as T);
 }

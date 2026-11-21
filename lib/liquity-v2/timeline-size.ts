@@ -62,12 +62,16 @@ function boldUnits(raw: string | undefined): number | null {
 
 /** "Deposited (BOLD)" on a Stability Pool deposit's timeline: the touch's
  *  top-up or withdrawal, unsigned. `topUpOf` reads it off the row by event. */
-export function liquityV2SpSizeDims(topUpOf: (e: BaseActivityEvent) => string | undefined): TimelineSizeDim[] {
+export function liquityV2SpSizeDims(
+  topUpOf: (e: BaseActivityEvent) => string | undefined,
+  /** The pool's stablecoin: a fork's USDaf, BD or ebUSD. */
+  stable = "BOLD",
+): TimelineSizeDim[] {
   return [
     {
       side: "deposit",
       word: "Deposited",
-      unit: "BOLD",
+      unit: stable,
       top: DEBT_TOP,
       figure: (e) => {
         const v = boldUnits(topUpOf(e));

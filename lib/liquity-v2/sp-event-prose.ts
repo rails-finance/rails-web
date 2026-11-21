@@ -53,27 +53,28 @@ export function spEventLabel(r: SpProseRow): string {
   return "Touched";
 }
 
-/** The row's sentences, each one fact, never none. `coll` is the branch's collateral. */
-export function spEventSentences(r: SpProseRow, coll: string): string[] {
+/** The row's sentences, each one fact, never none. `coll` is the branch's
+ *  collateral, `stable` the pool's stablecoin (a fork's USDaf, BD, ebUSD). */
+export function spEventSentences(r: SpProseRow, coll: string, stable = "BOLD"): string[] {
   const out: string[] = [];
   const change = big(r.top_up_or_withdrawal);
-  if (change > ZERO) out.push(`The depositor deposited ${amt(change, "BOLD")}.`);
-  if (change < ZERO) out.push(`The depositor withdrew ${amt(-change, "BOLD")}.`);
+  if (change > ZERO) out.push(`The depositor deposited ${amt(change, stable)}.`);
+  if (change < ZERO) out.push(`The depositor withdrew ${amt(-change, stable)}.`);
   if (r.tx_from && r.tx_from.toLowerCase() !== r.depositor.toLowerCase()) out.push(spSenderSentence(r.tx_from));
   const loss = big(r.deposit_loss);
   if (loss > ZERO)
     out.push(
-      `Liquidations since the previous touch had burned ${amt(loss, "BOLD")} of the deposit; this touch wrote it.`,
+      `Liquidations since the previous touch had burned ${amt(loss, stable)} of the deposit; this touch wrote it.`,
     );
   const gain = big(r.yield_gain_since);
   const claimed = big(r.yield_gain_claimed);
   if (gain > ZERO)
     out.push(
       claimed === gain
-        ? `The branch's interest paid ${amt(gain, "BOLD")} of yield, all claimed.`
+        ? `The branch's interest paid ${amt(gain, stable)} of yield, all claimed.`
         : claimed > ZERO
-          ? `The branch's interest paid ${amt(gain, "BOLD")} of yield and ${amt(claimed, "BOLD")} was claimed; the rest stays in the deposit.`
-          : `The branch's interest paid ${amt(gain, "BOLD")} of yield, kept in the deposit.`,
+          ? `The branch's interest paid ${amt(gain, stable)} of yield and ${amt(claimed, stable)} was claimed; the rest stays in the deposit.`
+          : `The branch's interest paid ${amt(gain, stable)} of yield, kept in the deposit.`,
     );
   const collIn = big(r.coll_gain_since);
   const collOut = big(r.coll_gain_claimed);

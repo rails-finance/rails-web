@@ -1,6 +1,6 @@
 "use client";
 
-// A Liquity V2 stability-pool deposit on the shared position card: one
+// A Liquity V2 (or fork) stability-pool deposit on the shared position card: one
 // (branch, depositor), as Polaris's deposit card draws one
 // (components/protocol/polaris/polaris-deposit-card.tsx).
 //
@@ -26,9 +26,14 @@ import { WalletPill } from "@/components/shared/wallet-pill";
 import { ListingTag } from "@/components/shared/listing-tag";
 import { PositionNameId } from "@/components/shared/position-name-id";
 import { positionName } from "@/lib/shared/position-name";
-import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
-import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
-import { liquityV2DepositHref, LIQUITY_V2_SP_PATH } from "@/lib/liquity-v2/sp-routes";
+import {
+  LIQUITY_V2_SP,
+  spDepositHref,
+  spPoolOf,
+  spWalletHref,
+  type SpDeployment,
+} from "@/lib/liquity-v2/sp-deployment";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 import {
   big,
   exactUnits,
@@ -44,13 +49,16 @@ import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import { RawFigure, tokenIcon } from "./sp-parts";
 
 const NOUN = "Deposit";
-const BOLD = "BOLD";
 const ZERO = BigInt(0);
 /** Where the chain has seen a touch the index has not read. */
 const INDEX_BEHIND = "the index has not yet read the newest touch";
 
 export interface LiquityV2DepositCardProps {
-  row: LiquityV2DepositRow;
+  row: LiquityV2DepositRow<string>;
+  /** The deployment: Liquity V2, or a fork (lib/liquity-v2/sp-deployment.ts). */
+  dep?: SpDeployment;
+  /** The branch's shutdown (ui-jobs 612): an open deposit reads "Shut down". */
+  shutdown?: BranchShutdownState | null;
   surface?: "listing" | "detail";
   lifetime?: DepositLifetime | null;
   /** The chain read at head. */
@@ -69,7 +77,7 @@ export interface LiquityV2DepositCardProps {
   explanation?: ReactNode;
 }
 
-function DepositMenuRows({ row }: { row: LiquityV2DepositRow }) {
+function DepositMenuRows({ row, dep }: { row: LiquityV2DepositRow<string>; dep: SpDeployment }) {
   const [copied, setCopied] = useState<string | null>(null);
   const copy = (key: string, value: string) => {
     void navigator.clipboard.writeText(value).then(() => {
@@ -90,7 +98,7 @@ function DepositMenuRows({ row }: { row: LiquityV2DepositRow }) {
         title="Link to this deposit"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
         onClick={() =>
-          copy("link", `${window.location.origin}${liquityV2DepositHref(row.collateral_type, row.depositor)}`)
+          copy("link", `${window.location.origin}${spDepositHref(dep, row.collateral_type, row.depositor)}`)
         }
       />
     </>
@@ -102,6 +110,8 @@ const pendingCollTip = (b: string) =>
 
 export function liquityV2DepositSlots({
   row,
+  dep = LIQUITY_V2_SP,
+  shutdown = null,
   surface = "detail",
   lifetime,
   now,
@@ -113,8 +123,11 @@ export function liquityV2DepositSlots({
 }: LiquityV2DepositCardProps): PositionCardSlots {
   const detail = surface === "detail";
   const b = row.collateral_type;
-  const branch = LIQUITY_V2_BRANCHES[b.toLowerCase()];
-  const boldAddr = TOKEN_ADDRESSES.BOLD;
+  const branch = spPoolOf(dep, b);
+  const BOLD = dep.stable.symbol;
+  const boldAddr = dep.stable.address;
+  const icon = (symbol: string, address: string, raw: bigint, size?: number) =>
+    tokenIcon(symbol, address, raw, size, dep.chainId);
   const closed = row.status === "closed";
   const name = positionName({ market: b, noun: NOUN, id: row.depositor });
   const counters = {
@@ -123,7 +136,11 @@ export function liquityV2DepositSlots({
     liquidationCount: null,
     ...(detail ? { order: "age-last" as const } : {}),
   };
-  const status = closed ? { word: "Closed", tone: "muted" as const } : null;
+  const status = closed
+    ? { word: "Closed", tone: "muted" as const }
+    : shutdown
+      ? { word: "Shut down", tone: "caution" as const, anatomy: "C6.1" }
+      : null;
   const stash = big(row.stash_raw);
 
   if (!detail) {
@@ -139,11 +156,11 @@ export function liquityV2DepositSlots({
             id: "deposit",
             label: "Deposit now",
             value: (
-              <Prov info={spLiveProv("compounded", b, wallet)}>
+              <Prov info={spLiveProv("compounded", b, wallet, dep)}>
                 <RawFigure raw={shown.raw} symbol={BOLD} />
               </Prov>
             ),
-            assets: tokenIcon(BOLD, boldAddr, head.now),
+            assets: icon(BOLD, boldAddr, head.now),
           }
         : {
             id: "deposit",
@@ -151,11 +168,11 @@ export function liquityV2DepositSlots({
             labelTip: "As of the deposit's last touch. Liquidations since then have not been taken out.",
             labelTipOnListing: true,
             value: closed ? null : (
-              <Prov info={spSumProv("recorded", b, "listing")}>
+              <Prov info={spSumProv("recorded", b, "listing", dep)}>
                 <RawFigure raw={recorded} symbol={BOLD} approx />
               </Prov>
             ),
-            assets: closed ? undefined : tokenIcon(BOLD, boldAddr, recorded),
+            assets: closed ? undefined : icon(BOLD, boldAddr, recorded),
           },
       ...(head
         ? [
@@ -165,11 +182,11 @@ export function liquityV2DepositSlots({
               labelTip: pendingCollTip(b),
               labelTipOnListing: true,
               value: (
-                <Prov info={spLiveProv("pendingColl", b, wallet)}>
+                <Prov info={spLiveProv("pendingColl", b, wallet, dep)}>
                   <RawFigure raw={head.pendingColl} symbol={b} />
                 </Prov>
               ),
-              assets: tokenIcon(b, branch.collateralAddr, head.pendingColl),
+              assets: icon(b, branch.collateralAddr, head.pendingColl),
             },
           ]
         : []),
@@ -177,21 +194,21 @@ export function liquityV2DepositSlots({
         id: "coll-paid",
         label: `${b} paid in`,
         value: (
-          <Prov info={spSumProv("collGain", b, "listing")}>
+          <Prov info={spSumProv("collGain", b, "listing", dep)}>
             <RawFigure raw={big(row.coll_gain_raw)} symbol={b} />
           </Prov>
         ),
-        assets: tokenIcon(b, branch.collateralAddr, big(row.coll_gain_raw)),
+        assets: icon(b, branch.collateralAddr, big(row.coll_gain_raw)),
       },
       {
         id: "yield",
-        label: "BOLD yield",
+        label: `${BOLD} yield`,
         value: (
-          <Prov info={spSumProv("yieldGain", b, "listing")}>
+          <Prov info={spSumProv("yieldGain", b, "listing", dep)}>
             <RawFigure raw={big(row.yield_gain_raw)} symbol={BOLD} />
           </Prov>
         ),
-        assets: tokenIcon(BOLD, boldAddr, big(row.yield_gain_raw)),
+        assets: icon(BOLD, boldAddr, big(row.yield_gain_raw)),
       },
     ];
     return {
@@ -202,8 +219,8 @@ export function liquityV2DepositSlots({
         <WalletPill
           wallet={row.depositor}
           ensName={null}
-          href={`${LIQUITY_V2_SP_PATH}?q=${row.depositor}`}
-          vault={sboldDepositorVault(row.depositor)}
+          href={spWalletHref(dep, row.depositor)}
+          vault={dep.id === "liquity-v2" ? sboldDepositorVault(row.depositor) : undefined}
           bookmark
         />
       ),
@@ -220,7 +237,7 @@ export function liquityV2DepositSlots({
       <PositionNameId name={name} />
     </span>
   );
-  const menu = { leading: () => <DepositMenuRows row={row} />, noun: "deposit", exports: null };
+  const menu = { leading: () => <DepositMenuRows row={row} dep={dep} />, noun: "deposit", exports: null };
   const explainer = { body: explanation ?? null };
 
   if (closed) {
@@ -229,9 +246,9 @@ export function liquityV2DepositSlots({
       {
         id: "deposited",
         label: "Deposited",
-        labelIcon: tokenIcon(BOLD, boldAddr, l?.deposited ?? ZERO, 16),
+        labelIcon: icon(BOLD, boldAddr, l?.deposited ?? ZERO, 16),
         value: l ? (
-          <Prov info={spSumProv("deposited", b)}>
+          <Prov info={spSumProv("deposited", b, "detail", dep)}>
             <span className="text-rb-500">
               <RawFigure raw={l.deposited} symbol={BOLD} />
             </span>
@@ -241,9 +258,9 @@ export function liquityV2DepositSlots({
       {
         id: "coll-paid",
         label: `${b} paid in`,
-        labelIcon: tokenIcon(b, branch.collateralAddr, l?.collGain ?? ZERO, 16),
+        labelIcon: icon(b, branch.collateralAddr, l?.collGain ?? ZERO, 16),
         value: l ? (
-          <Prov info={spSumProv("collGain", b)}>
+          <Prov info={spSumProv("collGain", b, "detail", dep)}>
             <span className="text-rb-500">
               <RawFigure raw={l.collGain} symbol={b} />
             </span>
@@ -257,9 +274,9 @@ export function liquityV2DepositSlots({
         id: "stash",
         label: `${b} unclaimed`,
         labelTip: `${b} the deposit's touches stashed and no claim has sent yet.`,
-        labelIcon: tokenIcon(b, branch.collateralAddr, stash, 16),
+        labelIcon: icon(b, branch.collateralAddr, stash, 16),
         value: (
-          <Prov info={spSumProv("stash", b)}>
+          <Prov info={spSumProv("stash", b, "detail", dep)}>
             <RawFigure raw={stash} symbol={b} />
           </Prov>
         ),
@@ -283,36 +300,36 @@ export function liquityV2DepositSlots({
       id: "deposit-now",
       label: "Deposit now",
       value: now ? (
-        <Prov info={spLiveProv("compounded", b)}>
+        <Prov info={spLiveProv("compounded", b, undefined, dep)}>
           <RawFigure raw={now.now} symbol={BOLD} />
         </Prov>
       ) : null,
       pending: now == null && pending,
-      assets: now ? tokenIcon(BOLD, boldAddr, now.now) : undefined,
+      assets: now ? icon(BOLD, boldAddr, now.now) : undefined,
     },
     {
       id: "pending-coll",
       label: `Pending ${b}`,
       labelTip: pendingCollTip(b),
       value: now ? (
-        <Prov info={spLiveProv("pendingColl", b)}>
+        <Prov info={spLiveProv("pendingColl", b, undefined, dep)}>
           <RawFigure raw={now.pendingColl} symbol={b} />
         </Prov>
       ) : null,
       pending: now == null && pending,
-      assets: now ? tokenIcon(b, branch.collateralAddr, now.pendingColl) : undefined,
+      assets: now ? icon(b, branch.collateralAddr, now.pendingColl) : undefined,
     },
     {
       id: "pending-yield",
-      label: "Pending BOLD yield",
+      label: `Pending ${BOLD} yield`,
       labelTip: "The yield the branch's interest has paid the deposit since its last touch. The next touch pays it.",
       value: now ? (
-        <Prov info={spLiveProv("yieldGain", b)}>
+        <Prov info={spLiveProv("yieldGain", b, undefined, dep)}>
           <RawFigure raw={now.pendingYield} symbol={BOLD} />
         </Prov>
       ) : null,
       pending: now == null && pending,
-      assets: now ? tokenIcon(BOLD, boldAddr, now.pendingYield) : undefined,
+      assets: now ? icon(BOLD, boldAddr, now.pendingYield) : undefined,
     },
   ];
 
@@ -327,10 +344,10 @@ export function liquityV2DepositSlots({
         : {
             id: "recorded",
             label: "At the last touch",
-            tip: "The BOLD the deposit held after its last touch.",
+            tip: `The ${BOLD} the deposit held after its last touch.`,
             asset: { symbol: BOLD, address: boldAddr },
             value: (
-              <Prov info={spSumProv("recorded", b)}>
+              <Prov info={spSumProv("recorded", b, "detail", dep)}>
                 <RawFigure raw={lifetime.recorded} symbol={BOLD} />
               </Prov>
             ),
@@ -340,10 +357,10 @@ export function liquityV2DepositSlots({
       left.push({
         id: "yield-kept",
         label: "Yield kept",
-        tip: "BOLD yield the touches did not claim. It joined the deposit.",
+        tip: `${BOLD} yield the touches did not claim. It joined the deposit.`,
         asset: { symbol: BOLD, address: boldAddr },
         value: (
-          <Prov info={spSumProv("kept", b)}>
+          <Prov info={spSumProv("kept", b, "detail", dep)}>
             <RawFigure raw={lifetime.kept} symbol={BOLD} />
           </Prov>
         ),
@@ -355,9 +372,9 @@ export function liquityV2DepositSlots({
     right.push({
       id: "pool-share",
       label: "Share of the pool",
-      tip: `The deposit's part of all the BOLD in the ${b} Stability Pool. The deposit burns this share of the BOLD the pool spends on each liquidation and receives this share of the ${b} paid for it.`,
+      tip: `The deposit's part of all the ${BOLD} in the ${b} Stability Pool. The deposit burns this share of the ${BOLD} the pool spends on each liquidation and receives this share of the ${b} paid for it.`,
       value: (
-        <Prov info={spPoolShareProv(b, exactUnits(now.now), exactUnits(pool.totalRaw), pool.block)}>
+        <Prov info={spPoolShareProv(b, exactUnits(now.now), exactUnits(pool.totalRaw), pool.block, dep)}>
           {share > 0 ? pctText(share) : `${TINY_AMOUNT_FLOOR_TEXT}%`}
         </Prov>
       ),
@@ -366,10 +383,10 @@ export function liquityV2DepositSlots({
     right.push({
       id: "burned-since",
       label: "Burned since last touch",
-      tip: `BOLD liquidations have used from the deposit since its last touch, in exchange for the ${b} pending. The next touch writes it.`,
+      tip: `${BOLD} liquidations have used from the deposit since its last touch, in exchange for the ${b} pending. The next touch writes it.`,
       asset: { symbol: BOLD, address: boldAddr },
       value: (
-        <Prov info={spPendingLossProv(b)}>
+        <Prov info={spPendingLossProv(b, dep)}>
           <RawFigure raw={now.pendingLoss} symbol={BOLD} />
         </Prov>
       ),

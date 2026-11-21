@@ -1,10 +1,10 @@
-// A Liquity V2 deposit's rows as the shared timeline's events
+// A Liquity V2 (or fork) deposit's rows as the shared timeline's events
 // (components/shared/chain-truth-timeline.tsx). The event carries what the
 // timeline reads (coordinates, kind, label); the card reads the row, which the
 // page looks up by the event's id.
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { LiquityV2DepositEventRow } from "@/lib/sources/api/liquity-v2-sp";
 import { spEventLabel } from "./sp-event-prose";
 
@@ -14,7 +14,11 @@ export const SP_FIRST_READ = 500;
  *  to it is read whole for the flows. */
 export const SP_WHOLE_LIFE_READ = 5000;
 
-export function spTimelineEvent(r: LiquityV2DepositEventRow): BaseActivityEvent {
+/** `chainId`: the deployment's chain, for the transaction link (Basedollar's is Base). */
+export function spTimelineEvent(
+  r: LiquityV2DepositEventRow<string>,
+  chainId: ChainId = MAINNET_CHAIN_ID,
+): BaseActivityEvent {
   const label = spEventLabel(r);
   return {
     id: r.event_key,
@@ -25,6 +29,6 @@ export function spTimelineEvent(r: LiquityV2DepositEventRow): BaseActivityEvent 
     actionType: label.toLowerCase().replace(/\s+/g, "-"),
     actionLabel: label,
     flows: [],
-    etherscanUrl: explorerUrl(MAINNET_CHAIN_ID, "tx", r.tx_hash),
+    etherscanUrl: explorerUrl(chainId, "tx", r.tx_hash),
   };
 }

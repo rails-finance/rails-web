@@ -506,6 +506,7 @@ const SPECS: ProtocolSpec[] = [
     desc: "A Liquity V2 fork minting USDaf across seven collateral branches: each Trove's collateral and debt read from events",
     subPages: [
       { segment: "branches", label: "Branches", tab: "Branches" },
+      { segment: "stability-pool", label: "Stability Pool deposits", tab: "Stability Pool" },
       { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },
@@ -647,6 +648,7 @@ const SPECS: ProtocolSpec[] = [
     desc: "A Liquity V2 fork on Base minting BD across five collateral branches, captured from Base: each Trove's collateral and debt read from events",
     subPages: [
       { segment: "branches", label: "Branches", tab: "Branches" },
+      { segment: "stability-pool", label: "Stability Pool deposits", tab: "Stability Pool" },
       { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },
@@ -664,6 +666,7 @@ const SPECS: ProtocolSpec[] = [
     desc: "A Liquity V2 fork that minted ebUSD across five collateral branches, shut down on 20 Aug 2026: each Trove's collateral and debt read from events",
     subPages: [
       { segment: "branches", label: "Branches", tab: "Branches" },
+      { segment: "stability-pool", label: "Stability Pool deposits", tab: "Stability Pool" },
       { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },

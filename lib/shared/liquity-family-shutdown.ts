@@ -38,8 +38,15 @@ const blockOf = (n: number) => n.toLocaleString("en-US");
 
 /** The shutdown date's receipt: the live call and its block where it answered,
  *  with the recorded transaction beside it; the disagreement where the live
- *  read says the branch is live. */
-export function shutdownDateProv(protocol: string, symbol: string, s: BranchShutdownState): Provenance {
+ *  read says the branch is live. `opts.trove` false leaves out the sentence on
+ *  a Trove's liquidation price, for a page with no Trove (a Stability Pool
+ *  deposit). */
+export function shutdownDateProv(
+  protocol: string,
+  symbol: string,
+  s: BranchShutdownState,
+  opts: { trove?: boolean } = {},
+): Provenance {
   const fam = FAMILY[protocol];
   const chainId = fam?.chainId ?? MAINNET_CHAIN_ID;
   const live = s.live;
@@ -83,7 +90,8 @@ export function shutdownDateProv(protocol: string, symbol: string, s: BranchShut
     summary = `Shutdown date — ${call} on the ${symbol} branch returns ${live?.raw} (${utc(s.at)}) at block ${blockOf(live?.source.block ?? 0)}. A branch's shutdown is permanent.`;
   }
   // The liquidation price is dropped in the shut-down state (ui-jobs 612); the receipt says why.
-  summary += ` Whether a Trove on the ${symbol} branch can still be liquidated has not been read from the chain, so no liquidation price is shown.`;
+  if (opts.trove !== false)
+    summary += ` Whether a Trove on the ${symbol} branch can still be liquidated has not been read from the chain, so no liquidation price is shown.`;
   return {
     kind: "chain",
     pclass: live?.shutDown ? "state" : "emitted",

@@ -2,7 +2,7 @@
 
 // A Liquity V1 stability-pool deposit's page, in the three sections
 // (rails-ops standards/detail-page-anatomy.md) on Liquity V2's deposit shell
-// (app/(app)/ethereum/liquity-v2/stability-pool/[collateralType]/[wallet]/deposit-view.tsx):
+// (components/protocol/liquity/sp-deposit-page.tsx):
 // the card, the Lifetime flows panel (lib/liquity-v1/sp-flow-timelines.ts,
 // decision 0022), the shared timeline with "Since its last touch" in its head
 // slot. The pool's getters at head (/api/chain/liquity-v1/stability-pool) are

@@ -1,0 +1,206 @@
+// The Liquity V2 forks: a deposit answer scaled to 1e18 where a branch is 8
+// decimals (lib/liquity-v2/sp-decimals.ts), and the fork holder strip across
+// Troves and deposits, debt never summed with a deposit (rails-ops
+// TO-DO-stability-pool-deposits §1b, §3). Imports through `@/` resolve as in
+// liquity-v1-holder-strip.test.mjs.
+// Run: npm test
+import test from "node:test";
+import assert from "node:assert/strict";
+import { register } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import path from "node:path";
+
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const ROOT = pathToFileURL(REPO + "/").href;
+const hook = `
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+const ROOT = ${JSON.stringify(ROOT)};
+export async function resolve(spec, ctx, next) {
+  let url = null;
+  if (spec.startsWith("@/")) url = ROOT + spec.slice(2);
+  else if (spec.startsWith("./") || spec.startsWith("../")) url = new URL(spec, ctx.parentURL).href;
+  if (url) {
+    if (!/\\.[a-z]+$/.test(url)) {
+      for (const ext of [".ts", ".tsx", "/index.ts"]) {
+        if (existsSync(fileURLToPath(url + ext))) { url += ext; break; }
+      }
+    }
+    return next(url, ctx);
+  }
+  return next(spec, ctx);
+}
+`;
+register("data:text/javascript," + encodeURIComponent(hook));
+
+const { toE18, priceToE18, scaleSpAnswer } = await import(ROOT + "lib/liquity-v2/sp-decimals.ts");
+const { liquityForkHolderStrip } = await import(ROOT + "lib/liquity-fork/holder-strip.ts");
+const { depositNow, depositLifetime } = await import(ROOT + "lib/liquity-v2/sp-math.ts");
+
+const E18 = "000000000000000000";
+
+test("toE18 scales an 8-decimal amount and leaves 18 and zero alone", () => {
+  assert.equal(toE18("123456789", 8), "1234567890000000000");
+  assert.equal(toE18("-5", 8), "-50000000000");
+  assert.equal(toE18("0", 8), "0");
+  assert.equal(toE18("42", 18), "42");
+  assert.equal(toE18(null, 8), null);
+});
+
+test("priceToE18 turns a 1e(36 − 8) price into 1e18", () => {
+  // $100,000 per WBTC at the PriceFeed's 1e28 scale.
+  assert.equal(priceToE18("100000" + "0".repeat(28), 8), "100000" + E18);
+  assert.equal(priceToE18("3000" + E18, 18), "3000" + E18);
+});
+
+test("a listing scales each row by its branch; a timeline by its top-level decimals", () => {
+  const list = scaleSpAnswer({
+    branches: { WBTC: { open: 1, closed: 0, coll_decimals: 8 }, weETH: { open: 1, closed: 0, coll_decimals: 18 } },
+    rows: [
+      { collateral_type: "WBTC", stash_raw: "5", coll_gain_raw: "7", coll_claimed_raw: "2", deposit_raw: "9" },
+      { collateral_type: "weETH", stash_raw: "5", coll_gain_raw: "7", coll_claimed_raw: "2", deposit_raw: "9" },
+    ],
+  });
+  assert.equal(list.rows[0].stash_raw, "50000000000");
+  assert.equal(list.rows[0].deposit_raw, "9");
+  assert.equal(list.rows[1].stash_raw, "5");
+  const tl = scaleSpAnswer({
+    coll_decimals: 8,
+    rows: [{ coll_gain_since: "3", stash_after: "0", deposit_after: "4" }],
+    position: { stash_raw: "1", coll_gain_raw: "1", coll_claimed_raw: "0", deposit_raw: "4" },
+  });
+  assert.equal(tl.rows[0].coll_gain_since, "30000000000");
+  assert.equal(tl.rows[0].deposit_after, "4");
+  assert.equal(tl.position.stash_raw, "10000000000");
+  const days = scaleSpAnswer({ coll_decimals: 8, days: [{ coll_in: "2", stash: "1", deposit: "3" }] });
+  assert.deepEqual(days.days[0], { coll_in: "20000000000", stash: "10000000000", deposit: "3" });
+  // Liquity V2's answers carry no decimals and pass untouched.
+  const v2 = scaleSpAnswer({ rows: [{ collateral_type: "WETH", stash_raw: "5" }], branches: { WETH: {} } });
+  assert.equal(v2.rows[0].stash_raw, "5");
+});
+
+test("a second pass leaves a scaled answer as it is", () => {
+  const once = scaleSpAnswer({
+    coll_decimals: 8,
+    rows: [{ coll_gain_since: "3" }],
+    position: { stash_raw: "1" },
+    branches: { WBTC: { open: 1, closed: 0, coll_decimals: 8 } },
+  });
+  const twice = scaleSpAnswer(structuredClone(once));
+  assert.deepEqual(twice, once);
+  assert.equal(twice.rows[0].coll_gain_since, "30000000000");
+  assert.equal(twice.position.stash_raw, "10000000000");
+  assert.equal("coll_decimals" in twice, false);
+  assert.equal("coll_decimals" in twice.branches.WBTC, false);
+  const list = scaleSpAnswer({
+    branches: { WBTC: { open: 1, closed: 0, coll_decimals: 8 } },
+    rows: [{ collateral_type: "WBTC", stash_raw: "5" }],
+  });
+  assert.equal(scaleSpAnswer(list).rows[0].stash_raw, "50000000000");
+});
+
+test("the index and the chain, both scaled, agree: the index-lag line stays away", () => {
+  const position = {
+    deposited_raw: "100",
+    withdrawn_raw: "0",
+    burned_raw: "0",
+    yield_gain_raw: "0",
+    yield_claimed_raw: "0",
+    coll_gain_raw: "3",
+    coll_claimed_raw: "0",
+    deposit_raw: "100",
+    stash_raw: toE18("3", 8),
+  };
+  const chain = {
+    compoundedRaw: "100",
+    recordedRaw: "100",
+    collGainRaw: "0",
+    stashRaw: toE18("3", 8),
+    yieldGainRaw: "0",
+  };
+  assert.notEqual(depositNow(depositLifetime(position), chain), null);
+});
+
+const trove = (status, collateralType, collateral, debt, extra = {}) => ({
+  status,
+  collateralType,
+  collateral,
+  debt,
+  ...extra,
+});
+const deposit = (status, amount) => ({
+  status,
+  collateral_type: "WBTC",
+  depositor: "0xw",
+  deposit_raw: status === "open" ? `${amount}${E18}` : "0",
+});
+const OPTS = { protocol: "ebisu", stable: "ebUSD", wallet: "0xw" };
+
+test("Troves and deposits: counts across kinds; debt and the deposit are two legs", () => {
+  const s = liquityForkHolderStrip(
+    [trove("open", "WBTC", 0.5, 1000), trove("closed", "WBTC", 0, 0)],
+    { rows: [deposit("open", 250), deposit("closed")], total: 2 },
+    OPTS,
+  );
+  assert.equal(
+    s.countsLine,
+    "This wallet holds 1 open Trove and has closed 1. It has 1 Stability Pool deposit and has closed 1.",
+  );
+  assert.deepEqual(
+    s.legs.map((l) => l.id),
+    ["collateral", "debt", "deposit"],
+  );
+  assert.equal(s.legs[1].value, "1,000 ebUSD");
+  assert.equal(s.legs[2].value, "250 ebUSD");
+  assert.equal(s.positions, 4);
+  assert.deepEqual(s.kinds, [{ id: "deposit", noun: ["deposit", "deposits"], open: 1, closed: 1 }]);
+});
+
+test("a Trove the wallet moved on is not counted; collateral across branches has no total", () => {
+  const s = liquityForkHolderStrip(
+    [
+      trove("open", "WBTC", 1, 10),
+      trove("open", "weETH", 2, 10),
+      trove("open", "LBTC", 9, 9, { formerHold: { movedTo: "0xo" } }),
+    ],
+    undefined,
+    OPTS,
+  );
+  assert.equal(s.counts.open, 2);
+  assert.equal(s.kinds, undefined);
+  assert.match(s.legs[0].value, /WBTC · .*weETH/);
+  assert.equal(s.positions, 2);
+});
+
+test("deposits alone: the strip says the wallet holds no open Troves, and links its wallet page", () => {
+  const s = liquityForkHolderStrip([], { rows: [deposit("open", 5)], total: 1 }, OPTS);
+  assert.equal(s.countsLine, "This wallet holds no open Troves. It has 1 Stability Pool deposit.");
+  assert.deepEqual(
+    s.legs.map((l) => l.id),
+    ["deposit"],
+  );
+});
+
+test("an Ebisu Trove on an emptied branch: recorded collateral, the shutdown and the pool at 0", () => {
+  const s = liquityForkHolderStrip([trove("open", "stcUSD", 14404.93, 10804.25)], undefined, OPTS);
+  const coll = s.legs[0];
+  assert.equal(coll.label, "Recorded collateral");
+  assert.equal(coll.footnote.text, "Shut down 20 Aug 2026 · pool holds 0 stcUSD");
+  assert.match(coll.prov.summary, /record/);
+  assert.match(coll.prov.summary, /held 0 stcUSD since/);
+  assert.match(coll.tip, /pool holds 0/);
+  // A live branch elsewhere keeps "Total collateral".
+  const live = liquityForkHolderStrip([trove("open", "WETH", 1, 10)], undefined, { ...OPTS, protocol: "basedollar" });
+  assert.equal(live.legs[0].label, "Total collateral");
+  assert.equal(live.legs[0].footnote, undefined);
+});
+
+test("a Trove read short of the fork's total states the counts and no totals", () => {
+  const s = liquityForkHolderStrip([trove("open", "WBTC", 1, 10)], undefined, {
+    ...OPTS,
+    trovesPartial: { read: 500 },
+  });
+  assert.equal(s.truncated, true);
+  assert.deepEqual(s.legs, []);
+  assert.match(s.note, /first 500/);
+});
