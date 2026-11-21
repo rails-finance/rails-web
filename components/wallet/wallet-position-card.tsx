@@ -29,6 +29,12 @@ import { FluidPositionCard, viewFromSummary as fluidView } from "@/components/pr
 import { MakerVaultCard, viewFromSummary as makerView } from "@/components/protocol/makerdao/makerdao-vault-card";
 import { LiquityPositionCard, viewFromForkSummary } from "@/components/protocol/liquity-family/liquity-position-card";
 import { viewFromTroveSummary } from "@/lib/liquity/trove-card-view";
+import {
+  LiquityV1PositionCard,
+  viewFromSummary as liquityV1View,
+} from "@/components/protocol/liquity-v1/liquity-v1-position-card";
+import { LiquityV1DepositCard } from "@/components/protocol/liquity/v1-sp-deposit-card";
+import { LiquityV2DepositCard } from "@/components/protocol/liquity/sp-deposit-card";
 import { ArbitrumReadCard, CometReadCard } from "@/components/shared/arbitrum-positions-listing";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
@@ -94,6 +100,18 @@ function FamilyCard({ card }: { card: WalletCard }) {
           compact
         />
       );
+    case "liquity-v2-deposit":
+      return <LiquityV2DepositCard row={card.row} surface="listing" />;
+    case "liquity-v1":
+      return (
+        <LiquityV1PositionCard
+          v={liquityV1View(card.row)}
+          surface="listing"
+          endedBy={card.row.closedByRedemption ? "redemption" : null}
+        />
+      );
+    case "liquity-v1-deposit":
+      return <LiquityV1DepositCard row={card.row} surface="listing" />;
     case "ebisu":
     case "asymmetry":
     case "basedollar":

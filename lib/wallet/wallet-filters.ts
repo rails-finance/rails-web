@@ -34,7 +34,8 @@ export const WALLET_PROTOCOLS: WalletProtocol[] = [
   { slug: "aave-v3", name: "Aave V3", kinds: ["loans", "deposits"], arbitrum: true },
   { slug: "compound-v3", name: "Compound V3", kinds: ["loans", "deposits"], arbitrum: true },
   { slug: "morpho", name: "Morpho Blue", kinds: ["loans", "deposits"], arbitrum: true },
-  { slug: "liquity-v2", name: "Liquity V2", kinds: ["troves"] },
+  { slug: "liquity-v2", name: "Liquity V2", kinds: ["troves", "deposits"] },
+  { slug: "liquity-v1", name: "Liquity V1", kinds: ["troves", "deposits"] },
   { slug: "makerdao", name: "MakerDAO", kinds: ["vaults"] },
   { slug: "spark", name: "SparkLend", kinds: ["loans", "deposits"] },
   { slug: "fluid", name: "Fluid", kinds: ["vaults"] },
@@ -68,13 +69,17 @@ function owedIn(v: unknown, underDebt = false, depth = 0): boolean {
   return false;
 }
 
-/** A summary row's kind: a lending account is a loan where it owes or ever
- *  owed, a deposit where it never borrowed. The row's own debt fields are
+/** A summary row's kind: the row's own where it states one; a lending
+ *  account is a loan where it owes or ever owed, a deposit where it never
+ *  borrowed. The row's own debt fields are
  *  read first; the lending families leave them empty, so their listing row
  *  (`card`) is read next. */
 export function kindOfRow(row: WalletSummaryRow): WalletKind {
+  if (row.kind) return row.kind;
   const kinds = walletProtocol(row.family)?.kinds ?? ["loans"];
   if (kinds.length === 1) return kinds[0];
+  // A Trove protocol's deposits carry their kind (listing-summary-rows.ts).
+  if (kinds.includes("troves")) return "troves";
   const owed = positive(row.debt?.amount) || positive(row.peakDebt) || positive(row.debtUsd) || owedIn(row.card);
   return owed ? "loans" : "deposits";
 }

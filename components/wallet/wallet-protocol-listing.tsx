@@ -6,7 +6,9 @@
 // wallet search (/api/troves?ownerAddress=…, the branch prices), draws the
 // listing's pills and sort after the Protocol pill (W8), and its summary is
 // the listing's holder band (N7) with its receipts open in the page's
-// inspector. Clearing or changing the Protocol pill opens that view.
+// inspector; the wallet's Stability Pool deposits follow the rows (N7.3) and
+// count in the band, as on the listing. Clearing or changing the Protocol
+// pill opens that view.
 
 import { useMemo, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -17,6 +19,9 @@ import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/prove
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { HolderStrip } from "@/components/shared/holder-strip";
+import { HolderKinds, useHolderKinds, type HolderKindPage } from "@/components/shared/holder-kinds";
+import { LIQUITY_V2_DEPOSITS } from "@/lib/liquity-v2/holder-kinds";
+import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import { useLiquityV2Prices } from "@/hooks/useLiquityV2Prices";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import { WalletHeader } from "@/components/wallet/wallet-header";
@@ -43,6 +48,7 @@ import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
 
 const PROTOCOL = "liquity-v2";
+const OTHER_KINDS = [LIQUITY_V2_DEPOSITS];
 /** The roster id, the glyph key. */
 const ROSTER_ID = PROTOCOLS.find((e) => e.chainId === MAINNET_CHAIN_ID && e.slug === PROTOCOL)?.id ?? PROTOCOL;
 
@@ -92,6 +98,9 @@ export function WalletProtocolListing({
     [],
   );
   const passedOn = useRef(initialPassedOn);
+  // The wallet's deposits, under the rows and counted in the band.
+  const { wallet, reads } = useHolderKinds(OTHER_KINDS, address);
+  const deposits = reads[LIQUITY_V2_DEPOSITS.id];
 
   const edge = (t: TroveSummary): PositionCardEdge => ({
     surface: "wallet",
@@ -118,7 +127,7 @@ export function WalletProtocolListing({
               <WalletHeader address={address} ensName={ensName} />
             </div>
           }
-          noun="troves"
+          noun="Troves"
           basePath={`/wallet/${address}`}
           defaults={WALLET_LIQUITY_V2_DEFAULTS}
           sortOptions={LIQUITY_V2_SORT_OPTIONS}
@@ -160,13 +169,23 @@ export function WalletProtocolListing({
             !filters.debt.length &&
             !filters.coll.length &&
             !filters.tx.length &&
-            prices ? (
+            prices &&
+            deposits !== undefined ? (
               <HolderStrip
                 scoped
-                {...liquityV2HolderStrip(items, total, prices, LIQUITY_V2_ITEMS_PER_PAGE, passedOn.current)}
+                {...liquityV2HolderStrip(
+                  items,
+                  total,
+                  prices,
+                  LIQUITY_V2_ITEMS_PER_PAGE,
+                  passedOn.current,
+                  undefined,
+                  deposits === "failed" ? undefined : (deposits as HolderKindPage<LiquityV2DepositRow>),
+                )}
               />
             ) : null
           }
+          renderBelow={() => <HolderKinds kinds={OTHER_KINDS} reads={reads} wallet={wallet} />}
           initialItems={initialItems}
           initialTotal={initialTotal}
           initialKey={initialKey}

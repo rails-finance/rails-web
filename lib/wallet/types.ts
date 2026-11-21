@@ -18,6 +18,9 @@ import type { SparkPositionSummary } from "@/lib/sources/api/spark-positions";
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
 import type { MakerVaultSummary } from "@/lib/sources/api/makerdao-vaults";
 import type { TroveSummary } from "@/types/api/trove";
+import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
+import type { LiquityV1DepositRow } from "@/lib/sources/api/liquity-v1-sp";
+import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import type { EbisuTroveSummary } from "@/lib/sources/api/ebisu-troves";
 import type { AsymmetryTroveSummary } from "@/lib/sources/api/asymmetry-troves";
 import type { BasedollarTroveSummary } from "@/lib/sources/api/basedollar-troves";
@@ -47,6 +50,9 @@ export type WalletCard =
   | { kind: "fluid"; row: FluidPositionSummary }
   | { kind: "makerdao"; row: MakerVaultSummary }
   | { kind: "liquity-v2"; row: TroveSummary; prices: OraclePricesData | null }
+  | { kind: "liquity-v2-deposit"; row: LiquityV2DepositRow }
+  | { kind: "liquity-v1"; row: LiquityV1PositionSummary }
+  | { kind: "liquity-v1-deposit"; row: LiquityV1DepositRow }
   | { kind: "ebisu"; row: EbisuTroveSummary }
   | { kind: "asymmetry"; row: AsymmetryTroveSummary }
   | { kind: "basedollar"; row: BasedollarTroveSummary };

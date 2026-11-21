@@ -119,19 +119,31 @@ export function liquityV2DepositSlots({
         label: "Deposit",
         labelTip: "As of the deposit's last touch. Liquidations since then have not been taken out.",
         labelTipOnListing: true,
-        value: closed ? null : <RawFigure raw={recorded} symbol={BOLD} approx />,
+        value: closed ? null : (
+          <Prov info={spSumProv("recorded", b)}>
+            <RawFigure raw={recorded} symbol={BOLD} approx />
+          </Prov>
+        ),
         assets: closed ? undefined : tokenIcon(BOLD, boldAddr, recorded),
       },
       {
         id: "coll-paid",
         label: `${b} paid in`,
-        value: <RawFigure raw={big(row.coll_gain_raw)} symbol={b} />,
+        value: (
+          <Prov info={spSumProv("collGain", b)}>
+            <RawFigure raw={big(row.coll_gain_raw)} symbol={b} />
+          </Prov>
+        ),
         assets: tokenIcon(b, branch.collateralAddr, big(row.coll_gain_raw)),
       },
       {
         id: "yield",
         label: "BOLD yield",
-        value: <RawFigure raw={big(row.yield_gain_raw)} symbol={BOLD} />,
+        value: (
+          <Prov info={spSumProv("yieldGain", b)}>
+            <RawFigure raw={big(row.yield_gain_raw)} symbol={BOLD} />
+          </Prov>
+        ),
         assets: tokenIcon(BOLD, boldAddr, big(row.yield_gain_raw)),
       },
     ];

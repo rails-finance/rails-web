@@ -111,19 +111,31 @@ export function liquityV1DepositSlots({
         label: "Deposit",
         labelTip: "As of the deposit's last touch. Liquidations since then have not been taken out.",
         labelTipOnListing: true,
-        value: closed ? null : <RawFigure raw={recorded} symbol="LUSD" approx />,
+        value: closed ? null : (
+          <Prov info={spSumProv("recorded")}>
+            <RawFigure raw={recorded} symbol="LUSD" approx />
+          </Prov>
+        ),
         assets: closed ? undefined : tokenIcon("LUSD", recorded),
       },
       {
         id: "eth-paid",
         label: "ETH paid",
-        value: <RawFigure raw={big(row.eth_gain_raw)} symbol="ETH" />,
+        value: (
+          <Prov info={spSumProv("ethGain")}>
+            <RawFigure raw={big(row.eth_gain_raw)} symbol="ETH" />
+          </Prov>
+        ),
         assets: tokenIcon("ETH", big(row.eth_gain_raw)),
       },
       {
         id: "lqty-paid",
         label: "LQTY paid",
-        value: <RawFigure raw={big(row.lqty_gain_raw)} symbol="LQTY" />,
+        value: (
+          <Prov info={spSumProv("lqtyGain")}>
+            <RawFigure raw={big(row.lqty_gain_raw)} symbol="LQTY" />
+          </Prov>
+        ),
         assets: tokenIcon("LQTY", big(row.lqty_gain_raw)),
       },
     ];

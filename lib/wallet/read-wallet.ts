@@ -10,7 +10,18 @@
 import { WALLET_FORMER_FAMILIES } from "@/lib/wallet/moved-row";
 import { walletRowStatus } from "@/lib/wallet/moved-row";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
-import { walletApiWait, type HeadResult, type FamilyModule } from "@/lib/wallet/families/module";
+import { takesRow, walletApiWait, type HeadResult, type FamilyModule } from "@/lib/wallet/families/module";
+import { liquityV1, liquityV1Deposits, liquityV2Deposits } from "@/lib/wallet/families/liquity-listing";
+import {
+  liquityV1DepositSummaryRow,
+  liquityV1TroveSummaryRow,
+  liquityV2DepositSummaryRow,
+} from "@/lib/wallet/listing-summary-rows";
+import { readLiquityV1Positions } from "@/lib/liquity-v1/proxy-reads";
+import { answerBody, routeBoxHop } from "@/lib/shared/proxy-answer";
+import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
+import { readLiquityV1Sp, type LiquityV1DepositListResponse } from "@/lib/sources/api/liquity-v1-sp";
+import { readLiquityV2Sp, type LiquityV2DepositListResponse } from "@/lib/sources/api/liquity-v2-sp";
 import { aaveV3Base, aaveV3Ethereum, spark } from "@/lib/wallet/families/aave";
 import { compoundV3Base, compoundV3Ethereum } from "@/lib/wallet/families/compound";
 import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/families/ethereum-single";
@@ -41,6 +52,9 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   morphoEthereum,
   morphoArbitrum,
   liquityV2,
+  liquityV2Deposits,
+  liquityV1,
+  liquityV1Deposits,
   makerdao,
   spark,
   fluid,
@@ -68,7 +82,76 @@ export function walletFamiliesLine(): string {
   return [...byChain].map(([chain, names]) => `${list(names)} ${where[chain]}`).join("; ");
 }
 
-async function readSummary(address: string, signal: AbortSignal, readerIp?: string): Promise<WalletSummaryAnswer> {
+/** A listing read that did not answer: its module's part of the answer says so. */
+interface ListingFailure {
+  module: FamilyModule;
+  error: string;
+}
+
+type Summary = WalletSummaryAnswer & { listingFailed: ListingFailure[] };
+
+/** How many of a wallet's rows one listing read takes: a wallet holds one
+ *  Liquity V1 deposit and at most one Liquity V2 deposit per branch. */
+const LISTING_LIMIT = "100";
+
+/**
+ * The rows wallet_positions does not hold yet, read from the protocol
+ * listings' routes for the wallet: Liquity V1's Troves, its Stability Pool
+ * deposit, and Liquity V2's deposits (ui-jobs 794). Every status, newest
+ * first. A read that fails leaves its rows out and names its module.
+ */
+async function readListingRows(
+  address: string,
+  signal: AbortSignal,
+  readerIp?: string,
+): Promise<{ rows: WalletSummaryRow[]; failed: ListingFailure[] }> {
+  const base = process.env.RAILS_API_URL?.replace(/\/$/, "") ?? "";
+  const hop = routeBoxHop(base, readerIp);
+  const list = { wallet: address, sortBy: "recent", sortOrder: "desc", limit: LISTING_LIMIT, offset: "0" };
+  const reads: { module: FamilyModule; read: () => Promise<WalletSummaryRow[]> }[] = [
+    {
+      module: liquityV1,
+      read: async () =>
+        (
+          answerBody(await readLiquityV1Positions(new URLSearchParams(list), hop, signal), "Liquity V1 Troves") as {
+            data: LiquityV1PositionSummary[];
+          }
+        ).data.map((t) => liquityV1TroveSummaryRow(t, address)),
+    },
+    {
+      module: liquityV1Deposits,
+      read: async () =>
+        (await readLiquityV1Sp<LiquityV1DepositListResponse>("stability-pool", list, { ...hop, signal })).rows.map(
+          (r) => liquityV1DepositSummaryRow(r, address),
+        ),
+    },
+    {
+      module: liquityV2Deposits,
+      read: async () =>
+        (await readLiquityV2Sp<LiquityV2DepositListResponse>("stability-pool", list, { ...hop, signal })).rows.map(
+          (r) => liquityV2DepositSummaryRow(r, address),
+        ),
+    },
+  ];
+  const settled = await Promise.allSettled(reads.map((r) => r.read()));
+  const rows: WalletSummaryRow[] = [];
+  const failed: ListingFailure[] = [];
+  settled.forEach((s, i) => {
+    if (s.status === "fulfilled") rows.push(...s.value);
+    else failed.push({ module: reads[i].module, error: publicErrorMessage(s.reason) });
+  });
+  return { rows, failed };
+}
+
+/**
+ * The wallet's rows: rails-server's summary route, and beside it the listing
+ * reads for the kinds the summary table does not hold (readListingRows).
+ * Decision 0050 departure; ui-jobs 795 moves it into wallet_positions. Both
+ * the page's read and the counts read come through here, so the menu, the
+ * pills and the sections count the same rows.
+ */
+async function readSummary(address: string, signal: AbortSignal, readerIp?: string): Promise<Summary> {
+  const listing = readListingRows(address, signal, readerIp);
   const base = process.env.RAILS_API_URL?.replace(/\/$/, "");
   if (!base) throw new Error("RAILS_API_URL is not set");
   let first: WalletSummaryAnswer | null = null;
@@ -87,7 +170,16 @@ async function readSummary(address: string, signal: AbortSignal, readerIp?: stri
     rows.push(...page.rows);
     if (rows.length >= page.total || page.rows.length < PAGE) break;
   }
-  return { ...first!, rows };
+  const extra = await listing;
+  const open = extra.rows.filter((r) => r.status === "open").length;
+  return {
+    ...first!,
+    rows: [...rows, ...extra.rows],
+    total: first!.total + extra.rows.length,
+    open: first!.open + open,
+    closed: first!.closed + extra.rows.length - open,
+    listingFailed: extra.failed,
+  };
 }
 
 function headOf(open: WalletPosition[]): HeadRead {
@@ -168,7 +260,7 @@ export async function readWalletUncached(
 ): Promise<WalletRead> {
   const t0 = Date.now();
   const deadline = t0 + WALLET_BUDGET_MS;
-  let summary: WalletSummaryAnswer;
+  let summary: Summary;
   try {
     summary = await withBudget(WALLET_BUDGET_MS, (signal) => readSummary(address, signal, readerIp));
   } catch (err) {
@@ -191,7 +283,7 @@ export async function readWalletUncached(
   const groups = reading
     .map((f) => ({
       f,
-      rows: summary.rows.filter((r) => r.chain === f.summaryChain && r.family === f.summaryFamily),
+      rows: summary.rows.filter((r) => takesRow(f, r)),
     }))
     .filter((g) => g.rows.length > 0);
   const settled = await Promise.allSettled(groups.map((g) => readFamily(g.f, g.rows, address, deadline)));
@@ -216,6 +308,21 @@ export async function readWalletUncached(
       });
     }
   });
+  // A listing read that did not answer: its module's part says so.
+  for (const { module: f, error } of summary.listingFailed) {
+    if (opts.protocol && f.summaryFamily !== opts.protocol) continue;
+    families.push({
+      id: f.id,
+      name: f.name,
+      chain: f.chain,
+      positions: 0,
+      open: 0,
+      headRead: "failed",
+      ms: serverMs,
+      reads: 0,
+      error,
+    });
+  }
   return {
     address,
     positions,
@@ -263,7 +370,7 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
   const read = (async (): Promise<WalletCounts> => {
     const t0 = Date.now();
     const empty = { address: key, positions: [], families: [], total: 0, open: 0, closed: 0, moved: 0, chains: [] };
-    let summary: WalletSummaryAnswer;
+    let summary: Summary;
     try {
       summary = await withBudget(WALLET_BUDGET_MS, (signal) => readSummary(key, signal, readerIp));
     } catch (err) {
@@ -274,7 +381,7 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
     const taken = new Set<WalletSummaryRow>();
     for (const f of WALLET_FAMILIES) {
       if (f.head) continue;
-      const rows = summary.rows.filter((r) => r.chain === f.summaryChain && r.family === f.summaryFamily);
+      const rows = summary.rows.filter((r) => takesRow(f, r));
       if (rows.length === 0) continue;
       try {
         for (const p of await f.shape(rows)) {
