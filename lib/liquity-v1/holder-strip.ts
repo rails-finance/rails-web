@@ -124,6 +124,7 @@ export function liquityV1HolderStrip(
       truncated: true,
       positions,
       wallet,
+      protocol: "liquity-v1",
       note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} Troves; this one holds ${troves.total.toLocaleString("en-US")}.`,
     };
   }
@@ -223,6 +224,7 @@ export function liquityV1HolderStrip(
     truncated: false,
     positions,
     wallet,
+    protocol: "liquity-v1",
     ...(kinds ? { kinds } : {}),
   };
 }

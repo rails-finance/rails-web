@@ -48,6 +48,13 @@ export const WALLET_PROTOCOLS: WalletProtocol[] = [
 export const walletProtocol = (slug: string | null | undefined): WalletProtocol | undefined =>
   slug ? WALLET_PROTOCOLS.find((p) => p.slug === slug) : undefined;
 
+/** The /wallet page for a wallet a listing search names, where that page
+ *  reads the protocol (`WALLET_PROTOCOLS`); null where it does not, so a
+ *  protocol it leaves out (Polaris on Sepolia, ui-jobs 691) draws no link
+ *  to an empty page. */
+export const walletPageHref = (protocol: string | undefined, wallet: string | undefined): string | null =>
+  wallet && walletProtocol(protocol) ? `/wallet/${encodeURIComponent(wallet)}` : null;
+
 /** The protocols whose wallet view is their listing, with its pills. */
 export const LISTED_ON_WALLET = new Set(["liquity-v2"]);
 

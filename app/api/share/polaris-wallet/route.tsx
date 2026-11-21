@@ -16,7 +16,10 @@
 // HTTP back into this deployment), with the requester's IP as the reader the
 // box budgets, and the market board off chain through the one-minute memo the
 // CDP share card beside it shares. A name resolves through the in-process ENS
-// cache before anything is read, and a name nobody holds reads nothing.
+// cache before anything is read, and a name nobody holds reads nothing. The
+// wallet's Stability Pool deposits and reserve loans are read as their
+// listings read them for an address (every status, one page); a failed read
+// answers the static card, as on Liquity V2's.
 // Nothing here is a second interpretation of either — `polarisHolderCardModel`
 // maps the holder strip's own adapter output.
 //
@@ -39,6 +42,13 @@ import {
 } from "@/lib/polaris/list-filter-dimensions";
 import { loadPolarisMarketsFromChain } from "@/lib/sources/chain/polaris-position";
 import { shortSubject } from "@/lib/shared/page-metadata";
+import { routeBoxHop } from "@/lib/shared/proxy-answer";
+import {
+  DEPOSIT_LIST_DEFAULTS,
+  fetchDepositPage,
+  fetchLoanPage,
+  LOAN_LIST_DEFAULTS,
+} from "@/lib/polaris/sp-loan-listing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,11 +72,19 @@ export async function GET(req: Request) {
       // The listing's own fetch params for this search — every status, the
       // page's own size — so the card reads the set the page reads.
       const params = { ...polarisFiltersToFetchParams({ ...POLARIS_LIST_DEFAULTS, q }, 1), wallet };
-      const [page, markets] = await Promise.all([
+      const hop = routeBoxHop(process.env.RAILS_API_URL ?? "", readerIp);
+      const kind = <R,>(p: Promise<{ data: R[]; total: number }>) =>
+        p.then(
+          (r) => ({ rows: r.data, total: r.total }),
+          () => null,
+        );
+      const [page, markets, deposits, loans] = await Promise.all([
         readPolarisPositionsFromBackend(params, readerIp),
         loadPolarisMarketsFromChain().catch(() => null),
+        kind(fetchDepositPage({ ...DEPOSIT_LIST_DEFAULTS, q: wallet }, 1, hop)),
+        kind(fetchLoanPage({ ...LOAN_LIST_DEFAULTS, q: wallet }, 1, hop)),
       ]);
-      if (!page.ok) return null;
+      if (!page.ok || !deposits || !loans) return null;
 
       return polarisHolderCardModel(
         page.result.data,
@@ -74,6 +92,7 @@ export async function GET(req: Request) {
         markets,
         POLARIS_ITEMS_PER_PAGE,
         ownerEns ?? shortSubject(ownerAddress ?? ""),
+        { deposits, loans },
       );
     },
   });

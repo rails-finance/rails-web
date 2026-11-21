@@ -12,7 +12,7 @@ import type { PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-po
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import type { PositionCardModel } from "@/lib/share/position-card";
 import { holderCardModel } from "@/lib/share/holder-card";
-import { polarisHolderStrip } from "@/lib/polaris/holder-strip";
+import { polarisHolderStrip, type PolarisOtherKinds } from "@/lib/polaris/holder-strip";
 import { positionNounPlural } from "@/lib/shared/protocols";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { polarisSinceLabel, signedFigure, type PolarisSinceLastTouch } from "@/lib/polaris/since-last-touch";
@@ -103,9 +103,14 @@ export function polarisHolderCardModel(
   markets: PolarisMarketsChainResponse | null,
   perPage: number,
   subject: string,
+  /** The wallet's deposits and reserve loans, counted in the status word and
+   *  given a stat where the card has room, as the strip does (§1b). The card
+   *  stays headed by the wallet's CDPs: a wallet with none keeps the static
+   *  card. */
+  others: PolarisOtherKinds = {},
 ): PositionCardModel | null {
   if (rows.length === 0 || !markets || markets.chainStale) return null;
-  return holderCardModel(polarisHolderStrip(rows, total, markets, perPage), {
+  return holderCardModel(polarisHolderStrip(rows, total, markets, perPage, 0, undefined, others), {
     session: "polaris",
     subject,
     total,

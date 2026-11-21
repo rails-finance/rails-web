@@ -152,6 +152,7 @@ export function liquityV2HolderStrip(
       truncated: true,
       positions,
       wallet,
+      protocol: "liquity-v2",
       note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} positions; this one holds ${held.toLocaleString("en-US")}.`,
     };
   }
@@ -324,6 +325,7 @@ export function liquityV2HolderStrip(
     truncated: false,
     positions,
     wallet,
+    protocol: "liquity-v2",
     ...(kinds ? { kinds } : {}),
   };
 }
