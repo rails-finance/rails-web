@@ -162,7 +162,8 @@ function Totals({
         ))
       ) : (
         <p className="mt-2 text-xs text-rb-500">
-          {filtered ? "The positions shown" : "Each protocol’s total below"}, summed in dollars at its own oracle.
+          {filtered ? "The positions shown" : "Each protocol’s total below"}, summed in dollars at the sources each
+          receipt names.
         </p>
       )}
     </section>

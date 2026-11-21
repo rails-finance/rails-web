@@ -8,7 +8,10 @@
 //                       TroveManager computes.
 //   V1 and V2 deposits  loadLiquityV1DepositFromChain and
 //                       loadLiquityV2DepositFromChain: the compounded deposit
-//                       at head, in dollars at the stablecoin's $1 face.
+//                       and the collateral owed to it at head, in dollars as
+//                       the full claim (lib/wallet/deposit-claim.ts): V1's
+//                       ETH at the PriceFeed, V2's collateral at the branch
+//                       prices the Troves use.
 
 import { loadLiquityV1PositionFromChain } from "@/lib/sources/chain/liquity-v1-position";
 import { loadLiquityV1DepositFromChain } from "@/lib/sources/chain/liquity-v1-sp";
@@ -20,6 +23,8 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, plural, scaled, storeStamp, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { FamilyModule, HeadResult } from "./module";
+import { liquityPrices, priceOf } from "./ethereum-single";
+import { depositClaim, type DepositClaim } from "@/lib/wallet/deposit-claim";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -128,14 +133,21 @@ function shapeDeposit(
   };
 }
 
-/** A deposit's figures at head: the compounded deposit at the stablecoin's face. */
-function depositAtHead(p: WalletPosition, compoundedRaw: string, block: number, symbol: string): WalletPosition {
+/** A deposit's figures at head: the full claim in dollars, and the head
+ *  read on its card. */
+function depositAtHead(
+  p: WalletPosition,
+  claim: DepositClaim,
+  block: number,
+  card: WalletPosition["card"],
+): WalletPosition {
   return {
     ...p,
-    collateralUsd: scaled(compoundedRaw, 18),
+    card,
+    collateralUsd: claim.usd,
     debtUsd: 0,
-    usdSource: `${symbol}'s $1 face`,
-    usdClass: "state",
+    usdSource: claim.parts.map((x) => x.source).join(" and "),
+    usdParts: claim.parts,
     usdOwnOracle: true,
     headRead: "read",
     readAtBlock: block,
@@ -167,7 +179,17 @@ export const liquityV1Deposits: FamilyModule = {
     return eachOpen(open, async (p) => {
       const d = (p.card as { row: LiquityV1DepositRow }).row;
       const c = await loadLiquityV1DepositFromChain(d.depositor);
-      return c.chainStale ? null : depositAtHead(p, c.compoundedRaw, c.blockNumber, "LUSD");
+      if (c.chainStale) return null;
+      const claim = depositClaim({
+        deposit: scaled(c.compoundedRaw, 18),
+        symbol: "LUSD",
+        gain: scaled(c.ethGainRaw, 18),
+        gainSymbol: "ETH",
+        price: c.priceRaw != null ? scaled(c.priceRaw, 18) : null,
+        feed: "the Liquity V1 PriceFeed",
+        unvalued: "LQTY",
+      });
+      return claim ? depositAtHead(p, claim, c.blockNumber, { kind: "liquity-v1-deposit", row: d, head: c }) : null;
     });
   },
 };
@@ -192,11 +214,23 @@ export const liquityV2Deposits: FamilyModule = {
       );
     });
   },
-  head(open) {
+  async head(open, _address, signal) {
+    // The branch prices the Troves are valued at, one read for every deposit.
+    const prices = await liquityPrices(signal).catch(() => null);
     return eachOpen(open, async (p) => {
       const d = (p.card as { row: LiquityV2DepositRow }).row;
       const c = await loadLiquityV2DepositFromChain(d.collateral_type, d.depositor);
-      return c.chainStale ? null : depositAtHead(p, c.compoundedRaw, c.blockNumber, "BOLD");
+      if (c.chainStale) return null;
+      const claim = depositClaim({
+        deposit: scaled(c.compoundedRaw, 18),
+        symbol: "BOLD",
+        // What a claiming touch sends: the gain since the last touch and the stash.
+        gain: scaled(c.collGainRaw, 18) + scaled(c.stashRaw, 18),
+        gainSymbol: d.collateral_type,
+        price: priceOf(d.collateral_type, prices),
+        feed: "the Liquity V2 price feed",
+      });
+      return claim ? depositAtHead(p, claim, c.blockNumber, { kind: "liquity-v2-deposit", row: d, head: c }) : null;
     });
   },
 };

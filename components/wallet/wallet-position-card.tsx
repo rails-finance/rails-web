@@ -6,7 +6,9 @@
 // position's page (N2). Through `PositionCardEdgeContext` the page names the
 // card's protocol and chain for its sidebar (C20), drops the wallet pill and
 // the OPEN pill, and keeps AT RISK; under the card, the read's freshness (H6's
-// form). Nothing inside the card changes.
+// form). Nothing inside the card changes, except that a Stability Pool
+// deposit's card states its head read (the deposit now, the collateral owed)
+// where the read answered.
 
 import Link from "next/link";
 import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
@@ -35,6 +37,8 @@ import {
 } from "@/components/protocol/liquity-v1/liquity-v1-position-card";
 import { LiquityV1DepositCard } from "@/components/protocol/liquity/v1-sp-deposit-card";
 import { LiquityV2DepositCard } from "@/components/protocol/liquity/sp-deposit-card";
+import { depositNowFromChain as liquityV1DepositNow } from "@/lib/liquity-v1/sp-math";
+import { depositNowFromChain as liquityV2DepositNow } from "@/lib/liquity-v2/sp-math";
 import { ArbitrumReadCard, CometReadCard } from "@/components/shared/arbitrum-positions-listing";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
@@ -101,7 +105,13 @@ function FamilyCard({ card }: { card: WalletCard }) {
         />
       );
     case "liquity-v2-deposit":
-      return <LiquityV2DepositCard row={card.row} surface="listing" />;
+      return (
+        <LiquityV2DepositCard
+          row={card.row}
+          surface="listing"
+          now={card.head ? liquityV2DepositNow(card.head) : null}
+        />
+      );
     case "liquity-v1":
       return (
         <LiquityV1PositionCard
@@ -111,7 +121,13 @@ function FamilyCard({ card }: { card: WalletCard }) {
         />
       );
     case "liquity-v1-deposit":
-      return <LiquityV1DepositCard row={card.row} surface="listing" />;
+      return (
+        <LiquityV1DepositCard
+          row={card.row}
+          surface="listing"
+          now={card.head ? liquityV1DepositNow(card.head) : null}
+        />
+      );
     case "ebisu":
     case "asymmetry":
     case "basedollar":

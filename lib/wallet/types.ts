@@ -22,6 +22,9 @@ import type { TroveSummary } from "@/types/api/trove";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
 import type { LiquityV1DepositRow } from "@/lib/sources/api/liquity-v1-sp";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
+import type { DepositChainFigures as LiquityV1DepositChainFigures } from "@/lib/liquity-v1/sp-math";
+import type { DepositChainFigures as LiquityV2DepositChainFigures } from "@/lib/liquity-v2/sp-math";
+import type { UsdPart } from "@/lib/wallet/deposit-claim";
 import type { EbisuTroveSummary } from "@/lib/sources/api/ebisu-troves";
 import type { AsymmetryTroveSummary } from "@/lib/sources/api/asymmetry-troves";
 import type { BasedollarTroveSummary } from "@/lib/sources/api/basedollar-troves";
@@ -51,9 +54,11 @@ export type WalletCard =
   | { kind: "fluid"; row: FluidPositionSummary }
   | { kind: "makerdao"; row: MakerVaultSummary }
   | { kind: "liquity-v2"; row: TroveSummary; prices: OraclePricesData | null }
-  | { kind: "liquity-v2-deposit"; row: LiquityV2DepositRow }
+  /** `head`: the deposit's head read on the wallet page, which its card
+   *  shows in place of the last touch's figure. */
+  | { kind: "liquity-v2-deposit"; row: LiquityV2DepositRow; head?: LiquityV2DepositChainFigures }
   | { kind: "liquity-v1"; row: LiquityV1PositionSummary }
-  | { kind: "liquity-v1-deposit"; row: LiquityV1DepositRow }
+  | { kind: "liquity-v1-deposit"; row: LiquityV1DepositRow; head?: LiquityV1DepositChainFigures }
   | { kind: "ebisu"; row: EbisuTroveSummary }
   | { kind: "asymmetry"; row: AsymmetryTroveSummary }
   | { kind: "basedollar"; row: BasedollarTroveSummary };
@@ -118,6 +123,9 @@ export interface WalletPosition {
    *  (a deposit's compounded amount, read from the pool at $1 face, is
    *  "state"). */
   usdClass?: ProvClass;
+  /** The dollars' legs where they come from more than one source (a
+   *  deposit's $1 face and its gain at a price feed): each a receipt row. */
+  usdParts?: UsdPart[];
   /** The family's own risk figure, for the tile. */
   riskFigure?: { value: string; label: string };
   /** The family's own verdict that the position can be liquidated now

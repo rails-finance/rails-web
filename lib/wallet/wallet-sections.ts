@@ -22,6 +22,8 @@ import { liquityV1HolderStrip } from "@/lib/liquity-v1/holder-strip";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
 import type { LiquityV1DepositRow } from "@/lib/sources/api/liquity-v1-sp";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
+import { headDepositLeg } from "@/lib/wallet/deposit-claim";
+import { scaled } from "@/lib/wallet/summary-row";
 import { formatUsdValue } from "@/lib/utils/format";
 import { walletProtocol } from "@/lib/wallet/wallet-filters";
 import type { WalletPosition } from "@/lib/wallet/types";
@@ -116,20 +118,36 @@ function sumOfCards(
   if (!open.every((p) => p.usdOwnOracle && dollarsOf(p, field) != null)) return undefined;
   const word = field === "collateralUsd" ? "collateral" : "debt";
   const deposits = field === "collateralUsd" && open.every((p) => p.kind === "deposits");
-  const rows: ProvInput[] = open.map((p) => {
+  // A position whose dollars come from more than one source (a deposit's
+  // $1 face and its gain at a price feed) is one row per source.
+  const partsOf = (p: WalletPosition) => (field === "collateralUsd" ? p.usdParts : undefined);
+  const dollars = (p: WalletPosition) =>
+    partsOf(p)?.reduce((s, x) => s + cents(x.usd ?? 0), 0) ?? cents(dollarsOf(p, field)!);
+  const rows: ProvInput[] = open.flatMap((p): ProvInput[] => {
+    const parts = partsOf(p);
+    if (parts)
+      return parts.map((x) => ({
+        label: `${positionLabel(p)} ${x.label}`,
+        value: x.usd == null ? "not valued" : formatUsdValue(cents(x.usd)),
+        kind: "chain-derived",
+        ...(x.pclass ? { pclass: x.pclass } : {}),
+        note: x.usd == null ? `the ${x.label} the deposit is owed, not valued` : `in dollars at ${x.source}`,
+      }));
     const what = field === "collateralUsd" && p.kind === "deposits" ? "deposit" : word;
-    return {
-      label: `${positionLabel(p)} ${what}`,
-      value: formatUsdValue(cents(dollarsOf(p, field)!)),
-      kind: "chain-derived",
-      pclass: p.usdClass ?? "oracle",
-      note: `the position's ${what} in dollars at ${p.usdSource ?? `${name}'s oracle`}`,
-    };
+    return [
+      {
+        label: `${positionLabel(p)} ${what}`,
+        value: formatUsdValue(cents(dollarsOf(p, field)!)),
+        kind: "chain-derived",
+        pclass: p.usdClass ?? "oracle",
+        note: `the position's ${what} in dollars at ${p.usdSource ?? `${name}'s oracle`}`,
+      },
+    ];
   });
-  const usd = cents(open.reduce((s, p) => s + cents(dollarsOf(p, field)!), 0));
+  const usd = cents(open.reduce((s, p) => s + dollars(p), 0));
   const many = open.length > 1;
   const noun = deposits ? "deposit" : "position";
-  const oracle = open.every((p) => (p.usdClass ?? "oracle") === "oracle");
+  const oracle = rows.every((r) => r.pclass === "oracle");
   return {
     usd,
     prov: {
@@ -137,12 +155,15 @@ function sumOfCards(
       ...(oracle ? { pclass: "oracle" as const } : {}),
       summary: `The wallet's ${name} ${deposits ? "deposits" : word} in USD — ${
         many
-          ? `the sum of its ${open.length} open ${noun}s' dollars, each at the source named on its row`
-          : `its open ${noun}'s dollars, at the source named on its row`
+          ? `the sum of its ${open.length} open ${noun}s' dollars, each at the ${rows.length > open.length ? "sources named on its rows" : "source named on its row"}`
+          : rows.length > 1
+            ? `its open ${noun}'s dollars, at the sources named on its rows`
+            : `its open ${noun}'s dollars, at the source named on its row`
       }, to the cent.`,
       via: "GET /api/chain/wallet/<address> · each open position's dollars",
       formula: many ? `Σ ${deposits ? "deposits" : word} over the open ${noun}s` : deposits ? "deposit" : word,
-      inputs: many ? [...rows, { label: "sum", value: formatUsdValue(usd), kind: "derived", step: true }] : rows,
+      inputs:
+        rows.length > 1 ? [...rows, { label: "sum", value: formatUsdValue(usd), kind: "derived", step: true }] : rows,
     },
   };
 }
@@ -156,6 +177,28 @@ const usdLeg = (id: string, label: string, f: SectionFigure): HolderLeg => ({
   prov: f.prov,
   figure: { tokens: [], usd: f.usd },
 });
+
+/** The band's deposit leg from the head read, where every open deposit has
+ *  one; the listing adapter's last-touch leg otherwise. */
+function withHeadDeposits(
+  band: HolderStripProps,
+  positions: WalletPosition[],
+  protocol: "V1" | "V2",
+): HolderStripProps {
+  const heads: { amount: number; block?: number }[] = [];
+  for (const p of positions) {
+    if (p.status !== "open") continue;
+    if (p.card.kind !== "liquity-v1-deposit" && p.card.kind !== "liquity-v2-deposit") continue;
+    if (!p.card.head) return band;
+    heads.push({ amount: scaled(p.card.head.compoundedRaw, 18), block: p.readAtBlock });
+  }
+  if (heads.length === 0) return band;
+  const opts =
+    protocol === "V1"
+      ? { symbol: "LUSD", getter: "getCompoundedLUSDDeposit", protocol: "Liquity V1" }
+      : { symbol: "BOLD", getter: "getCompoundedBoldDeposit", protocol: "Liquity V2" };
+  return { ...band, legs: band.legs.map((l) => (l.id === "deposit" ? headDepositLeg(l, heads, opts) : l)) };
+}
 
 /** Two section figures as one: the Troves' and the deposits'. */
 function plusFigure(
@@ -205,7 +248,7 @@ function liquityV2Section(positions: WalletPosition[]): Pick<WalletSection, "ban
   if (!prices && open) return null;
   const passedOn = rows.filter((t) => t.formerHold).length;
   // The wallet read carries every row, so the band is never a slice.
-  const band = liquityV2HolderStrip(
+  const listed = liquityV2HolderStrip(
     rows,
     rows.length,
     prices ?? ({} as OraclePricesData),
@@ -214,6 +257,7 @@ function liquityV2Section(positions: WalletPosition[]): Pick<WalletSection, "ban
     undefined,
     deposits.length ? { rows: deposits, total: deposits.length } : undefined,
   );
+  const band = withHeadDeposits(listed, positions, "V2");
   const coll = band.legs.find((l) => l.id === "collateral");
   const debt = band.legs.find((l) => l.id === "debt");
   const figure = (l: HolderLeg | undefined): SectionFigure | undefined => {
@@ -253,10 +297,14 @@ function liquityV1Band(positions: WalletPosition[]): HolderStripProps {
     if (p.card.kind === "liquity-v1") troves.push(p.card.row);
     else if (p.card.kind === "liquity-v1-deposit") deposits.push(p.card.row);
   }
-  return liquityV1HolderStrip(
-    troves.length ? { rows: troves, total: troves.length } : undefined,
-    deposits.length ? { rows: deposits, total: deposits.length } : undefined,
-    Math.max(troves.length, 1),
+  return withHeadDeposits(
+    liquityV1HolderStrip(
+      troves.length ? { rows: troves, total: troves.length } : undefined,
+      deposits.length ? { rows: deposits, total: deposits.length } : undefined,
+      Math.max(troves.length, 1),
+    ),
+    positions,
+    "V1",
   );
 }
 

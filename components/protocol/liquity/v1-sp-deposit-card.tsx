@@ -27,7 +27,15 @@ import { PositionNameId } from "@/components/shared/position-name-id";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { positionName } from "@/lib/shared/position-name";
 import { liquityV1DepositHref, LIQUITY_V1_SP_PATH } from "@/lib/liquity-v1/sp-routes";
-import { big, exactUnits, isTagged, poolShare, type DepositLifetime, type DepositNow } from "@/lib/liquity-v1/sp-math";
+import {
+  big,
+  exactUnits,
+  isTagged,
+  listingDeposit,
+  poolShare,
+  type DepositLifetime,
+  type DepositNow,
+} from "@/lib/liquity-v1/sp-math";
 import { spLiveProv, spPendingLossProv, spPoolShareProv, spSumProv } from "@/lib/liquity-v1/sp-provenance";
 import { pctText } from "@/lib/shared/vault-amount-text";
 import { TINY_AMOUNT_FLOOR_TEXT } from "@/lib/utils/format";
@@ -39,12 +47,15 @@ const MARKET = "Stability Pool";
 const ZERO = BigInt(0);
 /** Where the chain has seen a touch the index has not read. */
 const INDEX_BEHIND = "the index has not yet read the newest touch";
+const PENDING_ETH_TIP =
+  "The ETH liquidations have paid the deposit since its last touch. The next touch sends it to the depositor, or to the depositor's Trove.";
 
 export interface LiquityV1DepositCardProps {
   row: LiquityV1DepositRow;
   surface?: "listing" | "detail";
   lifetime?: DepositLifetime | null;
-  /** The chain read at head. */
+  /** The chain read at head. On a listing surface (the wallet page), the
+   *  Deposit headline states it in place of the last touch's figure. */
   now?: DepositNow | null;
   /** The chain read is in flight. */
   pending?: boolean;
@@ -105,19 +116,50 @@ export function liquityV1DepositSlots({
 
   if (!detail) {
     const recorded = big(row.deposit_raw);
+    // The wallet page hands the head read: the deposit now and the ETH it is
+    // owed. A listing states the last touch's figure.
+    const shown = listingDeposit(row.deposit_raw, closed ? null : now);
+    const head = shown.at === "head" ? now! : null;
     const heads: PositionCardHead[] = [
-      {
-        id: "deposit",
-        label: "Deposit",
-        labelTip: "As of the deposit's last touch. Liquidations since then have not been taken out.",
-        labelTipOnListing: true,
-        value: closed ? null : (
-          <Prov info={spSumProv("recorded", "listing")}>
-            <RawFigure raw={recorded} symbol="LUSD" approx />
-          </Prov>
-        ),
-        assets: closed ? undefined : tokenIcon("LUSD", recorded),
-      },
+      head
+        ? {
+            id: "deposit",
+            label: "Deposit",
+            value: (
+              <Prov info={spLiveProv("compounded")}>
+                <RawFigure raw={shown.raw} symbol="LUSD" />
+              </Prov>
+            ),
+            assets: tokenIcon("LUSD", head.now),
+          }
+        : {
+            id: "deposit",
+            label: "Deposit",
+            labelTip: "As of the deposit's last touch. Liquidations since then have not been taken out.",
+            labelTipOnListing: true,
+            value: closed ? null : (
+              <Prov info={spSumProv("recorded", "listing")}>
+                <RawFigure raw={recorded} symbol="LUSD" approx />
+              </Prov>
+            ),
+            assets: closed ? undefined : tokenIcon("LUSD", recorded),
+          },
+      ...(head
+        ? [
+            {
+              id: "pending-eth",
+              label: "Pending ETH",
+              labelTip: PENDING_ETH_TIP,
+              labelTipOnListing: true,
+              value: (
+                <Prov info={spLiveProv("ethGain")}>
+                  <RawFigure raw={head.pendingEth} symbol="ETH" />
+                </Prov>
+              ),
+              assets: tokenIcon("ETH", head.pendingEth),
+            },
+          ]
+        : []),
       {
         id: "eth-paid",
         label: "ETH paid",
@@ -249,8 +291,7 @@ export function liquityV1DepositSlots({
     {
       id: "pending-eth",
       label: "Pending ETH",
-      labelTip:
-        "The ETH liquidations have paid the deposit since its last touch. The next touch sends it to the depositor, or to the depositor's Trove.",
+      labelTip: PENDING_ETH_TIP,
       value: now ? (
         <Prov info={spLiveProv("ethGain")}>
           <RawFigure raw={now.pendingEth} symbol="ETH" />

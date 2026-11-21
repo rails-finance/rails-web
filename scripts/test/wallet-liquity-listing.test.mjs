@@ -243,3 +243,134 @@ test("receipts name each row's source: a deposit at $1 face is state, not oracle
   assert.equal(total.figure.prov.pclass, undefined);
   assert.match(total.figure.prov.summary, /each at the sources its receipt names/);
 });
+
+const { depositClaim } = await import("../../lib/wallet/deposit-claim.ts");
+const v1math = await import("../../lib/liquity-v1/sp-math.ts");
+const v2math = await import("../../lib/liquity-v2/sp-math.ts");
+
+test("V1 full claim: the deposit at $1 face plus the ETH owed at the PriceFeed; LQTY not valued", () => {
+  const c = depositClaim({
+    deposit: 1000,
+    symbol: "LUSD",
+    gain: 0.5,
+    gainSymbol: "ETH",
+    price: 3000,
+    feed: "the Liquity V1 PriceFeed",
+    unvalued: "LQTY",
+  });
+  assert.equal(c.usd, 2500);
+  assert.deepEqual(
+    c.parts.map((x) => [x.label, x.usd, x.pclass, x.source]),
+    [
+      ["deposit", 1000, "state", "LUSD's $1 face"],
+      ["ETH gain", 1500, "oracle", "the Liquity V1 PriceFeed"],
+      ["LQTY", null, undefined, "not valued"],
+    ],
+  );
+});
+
+test("V2 full claim: the deposit plus the branch collateral owed at the branch price", () => {
+  const c = depositClaim({
+    deposit: 300,
+    symbol: "BOLD",
+    gain: 0.1,
+    gainSymbol: "WETH",
+    price: 3000,
+    feed: "the Liquity V2 price feed",
+  });
+  assert.equal(c.usd, 600);
+  assert.equal(c.parts.length, 2);
+});
+
+test("a gain with no price states no claim: the head read fails (rule 743)", () => {
+  const args = { deposit: 300, symbol: "BOLD", gain: 0.1, gainSymbol: "WETH", feed: "f" };
+  assert.equal(depositClaim({ ...args, price: null }), null);
+  // No gain owed: the deposit alone is the whole claim.
+  assert.equal(depositClaim({ ...args, gain: 0, price: null }).usd, 300);
+  // A failed head read leaves the section without a total.
+  const [s] = walletSections(
+    [
+      pos(
+        "liquity-v1",
+        { kind: "liquity-v1-deposit", row: deposit("open", 5000) },
+        { kind: "deposits", headRead: "failed" },
+      ),
+    ],
+    { bands: true },
+  );
+  assert.equal(s.collateral, undefined);
+  assert.match(s.band.note, /not read at the chain head/);
+});
+
+test("the section receipt carries each leg of a claim; the band's leg is the head deposit, no ≈", () => {
+  const head = {
+    compoundedRaw: `4900${E18}`,
+    recordedRaw: `5000${E18}`,
+    frontEnd: "0x0",
+    ethGainRaw: "0",
+    lqtyGainRaw: "0",
+  };
+  const [s] = walletSections(
+    [
+      pos(
+        "liquity-v1",
+        { kind: "liquity-v1-deposit", row: deposit("open", 5000), head },
+        {
+          kind: "deposits",
+          collateralUsd: 7900,
+          debtUsd: 0,
+          readAtBlock: 26462239,
+          usdParts: [
+            { label: "deposit", usd: 4900, pclass: "state", source: "LUSD's $1 face" },
+            { label: "ETH gain", usd: 3000, pclass: "oracle", source: "the Liquity V1 PriceFeed" },
+            { label: "LQTY", usd: null, source: "not valued" },
+          ],
+        },
+      ),
+    ],
+    { bands: true },
+  );
+  assert.equal(s.collateral.usd, 7900);
+  assert.equal(s.collateral.prov.pclass, undefined);
+  assert.deepEqual(
+    s.collateral.prov.inputs.map((r) => [r.label.replace(/^p\d+ /, ""), r.value, r.pclass]),
+    [
+      ["deposit", "$4,900.00", "state"],
+      ["ETH gain", "$3,000.00", "oracle"],
+      ["LQTY", "not valued", undefined],
+      ["sum", "$7,900.00", undefined],
+    ],
+  );
+  const leg = s.band.legs.find((l) => l.id === "deposit");
+  assert.equal(leg.approx, false);
+  assert.equal(leg.figure.amount, 4900);
+  assert.match(leg.prov.summary, /getCompoundedLUSDDeposit read at block 26,462,239/);
+});
+
+test("the wallet card's Deposit headline: the head read where handed, the last touch otherwise", () => {
+  const chain = {
+    compoundedRaw: `4900${E18}`,
+    recordedRaw: `5000${E18}`,
+    frontEnd: "0x0",
+    ethGainRaw: "7",
+    lqtyGainRaw: "0",
+  };
+  const head = v1math.listingDeposit(`5000${E18}`, v1math.depositNowFromChain(chain));
+  assert.deepEqual(head, { raw: BigInt(`4900${E18}`), approx: false, at: "head" });
+  assert.deepEqual(v1math.listingDeposit(`5000${E18}`, null), {
+    raw: BigInt(`5000${E18}`),
+    approx: true,
+    at: "last-touch",
+  });
+  const v2 = {
+    compoundedRaw: `290${E18}`,
+    recordedRaw: `300${E18}`,
+    collGainRaw: "1",
+    stashRaw: "2",
+    yieldGainRaw: "0",
+  };
+  const now2 = v2math.depositNowFromChain(v2);
+  assert.equal(now2.pendingColl, BigInt(3));
+  assert.equal(v2math.listingDeposit(`300${E18}`, now2).at, "head");
+  assert.equal(v2math.listingDeposit(`300${E18}`, undefined).approx, true);
+});
