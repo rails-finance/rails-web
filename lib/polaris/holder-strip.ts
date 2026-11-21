@@ -31,7 +31,7 @@
 // THE OTHER KINDS (rails-ops TO-DO-stability-pool-deposits §1b). A wallet search
 // also reads the wallet's Stability Pool deposits and reserve loans, every
 // status, one page each (lib/polaris/holder-kinds.tsx). They are counted in the
-// sentence and the band's two-position rules, and each is its own leg: a
+// sentence and the band's two-position rules, and each is a separate leg: a
 // deposit is USDp or GOLDp in its pool, a loan's debt is WETH, and neither
 // sums with a CDP's debt. Two pools' deposits are two tokens, so they stand
 // side by side with no total. A kind past one page states its count and no leg.
@@ -72,7 +72,7 @@ const LEG_TIP = {
 
 const KIND_TIP = {
   deposit: "As of each open deposit's last touch. Liquidations since then have not been taken out.",
-  loan: "Each open loan's shares at the index the server last stored. The fee built up since is left out.",
+  loan: "As of each open loan's last touch. The fee built up since is left out.",
 } as const;
 
 /** The wallet's Stability Pool deposits and reserve loans, each every status,
@@ -147,7 +147,7 @@ function otherKinds(o: PolarisOtherKinds): {
           ? { figure: { amount: one.amount, tokens: [{ symbol: one.symbol, address: one.address }], usd: null } }
           : {}),
         prov: sumProv(
-          "The wallet's open Stability Pool deposits: each pool's sum of the deposit recorded at each one's last touch, from the index. The USDp and GOLDp pools take different tokens, so each pool is summed on its own. Liquidations since each deposit's last touch burn part of it; a deposit's page reads its pool at the latest block.",
+          "The wallet's open Stability Pool deposits: each pool's sum of the deposit recorded at each one's last touch, from the index. The USDp and GOLDp pools take different tokens, so each pool is summed separately. Liquidations since each deposit's last touch burn part of it; a deposit's page reads its pool at the latest block.",
           "GET /api/polaris/stability-pool?wallet=… · Σ deposit over the open rows, per pool",
           one
             ? { name: `Polaris ${one.symbol} StabilityPool`, address: POLARIS_MARKET_CONFIG[one.m].stabilityPool }
@@ -158,7 +158,7 @@ function otherKinds(o: PolarisOtherKinds): {
     }
   }
 
-  const loans = kind(o.loans, "loan", ["loan", "loans"], ["reserve loan", "reserve loans"]);
+  const loans = kind(o.loans, "loan", ["reserve loan", "reserve loans"], ["reserve loan", "reserve loans"]);
   if (loans) {
     const debt = units(loans.reduce((s, l) => s + big(l.debt_at_index_raw), BigInt(0)));
     if (debt > 0) {
@@ -255,7 +255,9 @@ export function polarisHolderStrip(
       positions: held + other.positions,
       wallet,
       protocol: "polaris",
-      note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} positions; this one holds ${held.toLocaleString("en-US")}.`,
+      // The other kinds are whole pages of their own: still counted.
+      ...kinds,
+      note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} positions; this wallet holds ${plural(held, "position", "positions")}.`,
     };
   }
 

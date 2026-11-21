@@ -1,6 +1,6 @@
 // The Polaris holder strip with the wallet's Stability Pool deposits and
 // reserve loans (rails-ops TO-DO-stability-pool-deposits §1b): counted across
-// kinds, each its own leg in its own token and never summed with a CDP's debt,
+// kinds, each a separate leg in its token and never summed with a CDP's debt,
 // and the share card's status word naming them. The adapter imports through
 // `@/`, resolved here as holder-strip-moved.test.mjs does.
 // Run: npm test
@@ -82,7 +82,7 @@ const loan = (id, status, weth) => ({
   debt_at_index_raw: status === "open" ? `${weth}${E18}` : "0",
 });
 
-test("deposits and loans are counted beside the CDPs, each on its own leg", () => {
+test("deposits and loans are counted beside the CDPs, each a separate leg", () => {
   const s = polarisHolderStrip([cdp("1", "open"), cdp("2", "closed")], 2, board, 20, 0, "0x1", {
     deposits: { rows: [deposit("usdp", "4", "open", 300), deposit("usdp", "5", "closed")], total: 2 },
     loans: { rows: [loan("9", "open", 2)], total: 1 },
@@ -102,7 +102,7 @@ test("deposits and loans are counted beside the CDPs, each on its own leg", () =
   );
   assert.deepEqual(s.kinds, [
     { id: "deposit", noun: ["deposit", "deposits"], open: 1, closed: 1 },
-    { id: "loan", noun: ["loan", "loans"], open: 1, closed: 0 },
+    { id: "loan", noun: ["reserve loan", "reserve loans"], open: 1, closed: 0 },
   ]);
   assert.equal(s.positions, 5);
 });
@@ -134,9 +134,29 @@ test("the share card's status word names the deposits and loans", () => {
     deposits: { rows: [deposit("usdp", "4", "open", 300)], total: 1 },
     loans: { rows: [loan("9", "closed")], total: 1 },
   });
-  assert.equal(m.status, "2 open · 1 open deposit · 1 closed loan");
+  assert.equal(m.status, "2 open · 1 open deposit · 1 closed reserve loan");
   assert.deepEqual(
     m.stats.map((x) => x.label),
     ["Total collateral", "Total debt", "Stability Pool deposit"],
   );
+});
+
+test("a wallet past one page of CDPs keeps its deposits and loans counted", () => {
+  const many = Array.from({ length: 20 }, (_, i) => cdp(String(i), "open"));
+  const others = {
+    deposits: { rows: [deposit("usdp", "4", "open", 300)], total: 1 },
+    loans: { rows: [loan("9", "closed")], total: 1 },
+  };
+  const s = polarisHolderStrip(many, 25, board, 20, 0, "0x1", others);
+  assert.equal(s.truncated, true);
+  assert.deepEqual(
+    s.kinds.map((k) => [k.id, k.open, k.closed]),
+    [
+      ["deposit", 1, 0],
+      ["loan", 0, 1],
+    ],
+  );
+  assert.equal(s.note, "Totals are stated for wallets holding up to 20 positions; this wallet holds 25 positions.");
+  const m = polarisHolderCardModel(many, 25, board, 20, "0x1…", others);
+  assert.equal(m.status, "25 Positions · 1 open deposit · 1 closed reserve loan");
 });

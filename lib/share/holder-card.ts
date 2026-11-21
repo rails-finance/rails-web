@@ -12,8 +12,8 @@
 // the card has to write into the value string — the renderer has no mark of its
 // own.
 //
-// A WALLET PAST ONE PAGE states its count and nothing else, exactly as the
-// strip does: those rows are a slice, and a total summed from a slice is the
+// A WALLET PAST ONE PAGE states its count, the other kinds' counts beside it,
+// and no stats, exactly as the strip does: those rows are a slice, and a total summed from a slice is the
 // paging trap. The strip says so in a sentence beneath; a card has no room for
 // one, so it states the count as its status word and shows no stats at all,
 // which says the same thing by having nothing to mis-read.
@@ -26,6 +26,9 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
  *  row beneath the two it left behind. A wallet with a deposit beside its
  *  Troves hands over three (a collateral, a debt, a deposit). */
 const MAX_STATS = 3;
+
+/** The searched kind's counts where only its total is a statement. */
+const NO_COUNTS = { open: 0, closed: 0, liquidated: 0 };
 
 /** The counts as a card's status word — "4 open · 2 closed · 1 liquidated",
  *  then each other kind the wallet holds ("· 1 open deposit · 2 closed
@@ -69,7 +72,11 @@ export function holderCardModel(
       session: opts.session,
       subject: opts.subject,
       headline: `${opts.plural} held by ${opts.subject}`,
-      status: `${opts.total.toLocaleString("en-US")} ${opts.plural}`,
+      // The other kinds the wallet holds still count by status: each is
+      // read whole, only the searched kind is past a page.
+      status: [`${opts.total.toLocaleString("en-US")} ${opts.plural}`, statusWord(NO_COUNTS, strip.kinds)]
+        .filter(Boolean)
+        .join(" · "),
       stats: [],
       asOf: new Date(),
     };
