@@ -1,7 +1,7 @@
 "use client";
 
 // The mobile-only home for a capability's definition. Desktop reads
-// `CAPABILITIES[].detail` from the matrix's own column-header popovers
+// `CAPABILITIES[].detail` from the matrix's column heading tips
 // (depth-matrix.tsx); the mobile card stack (coverage-page.tsx) never shows
 // that text inline, so each included-capability pill IS the trigger — tap it
 // and its definition slides up as a bottom sheet.

@@ -26,6 +26,7 @@ import {
 } from "@/components/shared/data-table/data-table";
 import { explorerName } from "@/lib/shared/protocols";
 import { HistoryTag } from "@/components/shared/history-tag";
+import { HeadingTip } from "@/components/shared/tip-label";
 import type { ChainId } from "@/lib/shared/chains";
 
 /** Popovers and tooltips open their copy with a capital, applied HERE and only
@@ -65,26 +66,25 @@ function CellMark({ cell }: { cell: DepthCell }) {
   return <Ban className="h-4 w-4 text-rb-400 inline-block" aria-label="The protocol can't provide this" />;
 }
 
-/** A plain mark's tooltip. It sits on the cell, not the mark: the row's
- *  cover (D4) lies over the mark, and a hover on the cover still shows the
- *  cell's title. */
-function cellTitle(cell: DepthCell): string | undefined {
-  if (typeof cell !== "object") return undefined;
-  if ("except" in cell) return `All but ${cell.except}`;
-  if ("awaiting" in cell) return sentenceCase(cell.awaiting);
-  return undefined;
+/** Every cell's tooltip names its state; the page has no key (ui-jobs 796).
+ *  It sits on the cell, not the mark: the row's cover (D4) lies over the
+ *  mark, and a hover on the cover still shows the cell's title. */
+function cellTitle(cell: DepthCell): string {
+  if (cell === true) return "Included";
+  if (cell === false) return "Not yet built";
+  if ("except" in cell) return `Included, all but ${cell.except}`;
+  if ("awaiting" in cell) return `Awaiting the first on-chain instance: ${cell.awaiting}`;
+  return "The protocol can't provide it";
 }
 
-/** Every capability label breaks onto exactly two stacked lines, uniformly —
- *  a deterministic split, not the browser's own width-dependent wrap (which
- *  left some headers on one line and others on two, at uneven heights).
- *  Splitting at the FIRST space rather than assuming "always two words":
- *  `CAPABILITIES` has one three-word label ("Copy for LLM"), so a bare
- *  `.split(" ")` would produce a third line for it alone. First-space keeps
- *  every label to exactly two lines regardless of word count. */
-function splitHeaderLabel(label: string): [string, string] {
-  const i = label.indexOf(" ");
-  return i === -1 ? [label, ""] : [label.slice(0, i), label.slice(i + 1)];
+/** A column heading's tip: the capability's full name over its definition. */
+function HeaderTip({ label, detail }: { label: string; detail: string }) {
+  return (
+    <>
+      <span className="block font-semibold">{label}</span>
+      <span className="mt-1 block font-normal">{sentenceCase(detail)}</span>
+    </>
+  );
 }
 
 export interface DepthMatrixProps {
@@ -97,15 +97,12 @@ export interface DepthMatrixProps {
   chainId: ChainId;
 }
 
-/** Which panel is open: the protocol-level essay under a name, a single
- *  cell's own popover (a ⊘ cell's `why`, or the views cell's `VIEW_NOTES`
- *  one-liner), or a column header's own capability definition
- *  (`CAPABILITIES[].detail`). Single-open throughout — opening any one kind
- *  closes whatever else was open. */
-type Open =
-  | { kind: "essay"; id: string }
-  | { kind: "cell"; id: string; key: DepthKey }
-  | { kind: "header"; key: DepthKey };
+/** Which panel is open: the protocol-level essay under a name, or a single
+ *  cell's popover (a ⊘ cell's `why`, or the views cell's `VIEW_NOTES`
+ *  one-liner). Single-open: opening one closes the other. The column
+ *  headings are house heading tips (`HeadingTip`), which hold their own
+ *  open state. */
+type Open = { kind: "essay"; id: string } | { kind: "cell"; id: string; key: DepthKey };
 
 /** Quiet trigger styling shared by every disclosure affordance in the matrix
  *  (the views-tick info mark, the ⊘-cell info mark, the name-level essay
@@ -139,9 +136,6 @@ function CellNote({
   open: boolean;
   clampRight: boolean;
   up?: boolean;
-  /** Widened for the header popovers — the `verification` capability's
-   *  `detail` runs to ~55 words, and the cells' default 26ch renders it very
-   *  tall. Existing cell callers are unaffected (the default is unchanged). */
   maxWidthClass?: string;
 }) {
   return (
@@ -170,20 +164,15 @@ function CellNote({
  *    protocol-level, so it belongs under the name, not pinned to any one
  *    cell — some of these protocols also carry ⊘-cell popovers of their own;
  *    the two disclosures are independent and can coexist on the same row).
- *  - **Header-anchored popover** — an info mark (ⓘ) beside each column's
- *    `label` in `<thead>` opens a popover pinned to that header, showing `cap.detail`
- *    (what the capability means). This is what replaced the standalone `<dl>`
- *    legend this section used to open with — below the matrix, the mobile
- *    card stack in `page.tsx` reaches the same `detail` text through its own
- *    per-pill bottom sheet instead (capability-sheet.tsx).
+ *  - **Heading tip** — each column heading is one word (`cap.word`), the
+ *    house heading tip (`HeadingTip`): a press opens the full name and
+ *    `cap.detail`. The mobile card stack reaches the same `detail` through
+ *    its per-pill bottom sheet (capability-sheet.tsx).
  *
- * Single-open accordion across ALL THREE grammars: a cell popover can run to
- * a sentence, the essay to a few hundred words, a header popover to another
- * sentence, and two open at once pushes matrix rows a screen apart and
- * destroys the at-a-glance comparison the table exists for. `Open` is a
- * tagged union rather than a bare id so the one piece of state can
- * distinguish "the essay for protocol X" from "the dashboard-column popover
- * for protocol X" from "the header popover for the views column".
+ * The essay and the cell popovers share one single-open state: the essay can
+ * run to a few hundred words, and two panels open at once push matrix rows a
+ * screen apart. `Open` is a tagged union so the one piece of state can tell
+ * "the essay for protocol X" from "the dashboard-column popover for X".
  *
  * Panels stay mounted and hide with the Tailwind `.hidden` class rather than
  * unmounting: the prose is the page's substantive copy and `display:none`
@@ -195,7 +184,6 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
   const [open, setOpen] = useState<Open | null>(null);
   const essayOpen = (id: string) => open?.kind === "essay" && open.id === id;
   const cellOpen = (id: string, key: DepthKey) => open?.kind === "cell" && open.id === id && open.key === key;
-  const headerOpen = (key: DepthKey) => open?.kind === "header" && open.key === key;
   const rows = coverageRows(comingSoon, chainId);
 
   // Escape closes whatever is open — a cell popover OR the essay drawer.
@@ -208,18 +196,14 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
-  // Outside pointerdown closes a cell popover OR a header popover — but not
-  // the essay drawer, which pushes layout and keeps click-toggle only (a
-  // scroll-then-click-away auto-close there would be surprising). Neither a
-  // cell nor a header note pushes layout, so click-away close is right for
-  // both. There are many cell/header wrappers and only ever one open, so the
-  // contains-check reaches for the OPEN one by id rather than a per-cell ref
-  // (the shape RevealTip uses for its one always-singular instance doesn't
-  // carry over to a table of many).
+  // Outside pointerdown closes a cell popover, but not the essay drawer,
+  // which pushes layout and keeps click-toggle only (a scroll-then-click-away
+  // auto-close there would be surprising). There are many cell wrappers and
+  // only ever one open, so the contains-check reaches for the OPEN one by id
+  // rather than a per-cell ref.
   useEffect(() => {
-    if (open?.kind !== "cell" && open?.kind !== "header") return;
-    const wrapId =
-      open.kind === "cell" ? `coverage-cell-wrap-${open.id}-${open.key}` : `coverage-header-wrap-${open.key}`;
+    if (open?.kind !== "cell") return;
+    const wrapId = `coverage-cell-wrap-${open.id}-${open.key}`;
     function onPointerDown(e: PointerEvent) {
       const wrap = document.getElementById(wrapId);
       if (wrap && !wrap.contains(e.target as Node)) setOpen(null);
@@ -241,83 +225,25 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
           filler above a self-explanatory table), kept only for the
           accessibility outline. */}
       <h2 className="sr-only">Explorer capability matrix</h2>
-      {/* Mark legend — the two kinds of gap are the point of the matrix, so
-          they're spelled out before the reader meets a cell. Centered, and
-          carrying its own top margin now that the heading above it is gone
-          (an sr-only node reserves no space). */}
-      <p className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-rb-500 mt-1 mb-5">
-        <span className="inline-flex items-center gap-1.5">
-          <Check className="h-3.5 w-3.5 text-green-500" aria-hidden="true" /> included
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <Minus className="h-3.5 w-3.5 text-rb-400" aria-hidden="true" /> not yet built
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <Clock className="h-3.5 w-3.5 text-rb-400" aria-hidden="true" /> built, awaiting the first on-chain instance
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <Ban className="h-3.5 w-3.5 text-rb-400" aria-hidden="true" /> the protocol can&apos;t provide it (open the
-          cell for the why)
-        </span>
-      </p>
       {/* table-fixed, or the browser grows the name column to fit the longest
           desc and starves the mark columns unevenly. With it the lead column
           takes its 95px, the name column 26% (18% below xl, where the
           capability labels would otherwise overrun their columns), and the
-          capability columns split the remainder equally. Every header label is forced
-          onto two lines by splitHeaderLabel (not the browser's own wrap), so
-          all seven sit at the same height and stay aligned along the row. */}
-      <DataTable label="Explorer capability matrix" tableClassName="table-fixed">
+          capability columns split the remainder equally. Each heading is one
+          word, so the row of headings sits on one line. */}
+      {/* overflow-visible: the matrix draws only from lg, where the fixed
+          table fits its frame, and a heading tip opens above the frame. */}
+      <DataTable label="Explorer capability matrix" tableClassName="table-fixed" className="overflow-visible!">
         <DataTableHead>
           <DataTableLeadHeader plain />
           <DataTableHeader label={<span className="sr-only">Explorer</span>} className="w-[18%] xl:w-[26%]" />
-          {CAPABILITIES.map((cap, capIndex) => {
-            // Same last-two-columns clamp as the cell popovers: Liquidation
-            // forensics / Protocol views open inward instead of clipping
-            // the page's right edge.
-            const clampRight = capIndex >= CAPABILITIES.length - 2;
-            const isOpen = headerOpen(cap.key);
-            const wrapId = `coverage-header-wrap-${cap.key}`;
-            const popoverId = `coverage-header-${cap.key}`;
-            const [line1, line2] = splitHeaderLabel(cap.label);
-            return (
-              <DataTableHeader key={cap.key} className="align-bottom">
-                <div className="flex justify-center">
-                  <span id={wrapId} className="relative inline-flex">
-                    <button
-                      type="button"
-                      onClick={() => setOpen(isOpen ? null : { kind: "header", key: cap.key })}
-                      aria-expanded={isOpen}
-                      aria-controls={popoverId}
-                      aria-label={isOpen ? `Hide what "${cap.label}" means` : `Show what "${cap.label}" means`}
-                      className={`gap-1 ${TRIGGER_CLASS}`}
-                    >
-                      {/* flex-col, not the browser's text wrap: two stacked
-                          lines every time, so every column matches every
-                          other column's height regardless of word count. */}
-                      <span className="flex flex-col text-xs font-medium leading-tight">
-                        <span>{line1}</span>
-                        <span>{line2}</span>
-                      </span>
-                      {/* Static info glyph — open state reads through color,
-                          not rotation (a chevron here reads as table-sort). */}
-                      <Info
-                        className={`h-3 w-3 shrink-0 transition-colors ${isOpen ? "text-foreground dark:text-rb-200" : ""}`}
-                        aria-hidden="true"
-                      />
-                    </button>
-                    <CellNote
-                      id={popoverId}
-                      text={cap.detail}
-                      open={isOpen}
-                      clampRight={clampRight}
-                      maxWidthClass="max-w-[34ch]"
-                    />
-                  </span>
-                </div>
-              </DataTableHeader>
-            );
-          })}
+          {CAPABILITIES.map((cap) => (
+            <DataTableHeader key={cap.key} className="align-bottom" data-coverage-heading={cap.key}>
+              <div className="flex justify-center">
+                <HeadingTip text={cap.word} tip={<HeaderTip label={cap.label} detail={cap.detail} />} />
+              </div>
+            </DataTableHeader>
+          ))}
         </DataTableHead>
         <DataTableBody>
           {rows.map((row, i) => {
@@ -334,7 +260,7 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
               const soon = row.entry;
               return (
                 <DataTableRow key={soon.id} href={soon.href}>
-                  <DataTableLeadCell plain protocol={soon.iconId} protocolName={soon.label} chain={chainId} />
+                  <DataTableLeadCell plain chainless protocol={soon.iconId} protocolName={soon.label} chain={chainId} />
                   <DataTableCell rowHeader>
                     <div className="flex items-center gap-2 flex-wrap">
                       <DataTableRowLink href={soon.href} className="text-sm font-semibold">
@@ -368,7 +294,7 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
               // parser, which hydrates as a mismatch.
               <Fragment key={p.id}>
                 <DataTableRow href={p.href}>
-                  <DataTableLeadCell plain protocol={p.id} protocolName={p.label} chain={chainId} />
+                  <DataTableLeadCell plain chainless protocol={p.id} protocolName={p.label} chain={chainId} />
                   <DataTableCell rowHeader>
                     {/* The name is the row's one link (D4); the desc and the
                         essay trigger sit under it, outside the link text. */}
@@ -416,7 +342,7 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
                       const isOpen = cellOpen(p.id, cap.key);
                       const popoverId = `coverage-cell-${p.id}-${cap.key}`;
                       return (
-                        <DataTableCell key={cap.key}>
+                        <DataTableCell key={cap.key} title={cellTitle(cell)}>
                           <div className="flex justify-center">
                             <span id={wrapId} className="relative inline-flex">
                             <button
@@ -450,7 +376,7 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
                       const isOpen = cellOpen(p.id, cap.key);
                       const popoverId = `coverage-cell-${p.id}-${cap.key}`;
                       return (
-                        <DataTableCell key={cap.key}>
+                        <DataTableCell key={cap.key} title={cellTitle(cell)}>
                           <div className="flex justify-center">
                             <span id={wrapId} className="relative inline-flex">
                             <button
