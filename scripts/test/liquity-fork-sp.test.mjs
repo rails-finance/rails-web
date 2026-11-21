@@ -118,3 +118,47 @@ test("the index and the chain, both scaled, agree: the index-lag line stays away
   };
   assert.notEqual(depositNow(depositLifetime(position), chain), null);
 });
+
+test("a liquidations answer: collateral to 1e18, the 1e(36 − d) price to 1e18, the value unchanged", () => {
+  // Ebisu LBTC, block 23,823,314: the wire's figures (rails-server 8536cc5c).
+  const liq = {
+    coll_gained: "53374",
+    pool_coll_sent: "5000000",
+    price: "900964683868400000000000000000000",
+    coll_gained_value: "480880000000000000000",
+    bold_lost: "1",
+    net: "0",
+  };
+  const a = scaleSpAnswer({
+    coll_decimals: 8,
+    coll_withdrawn_at_block: "26238016",
+    units: { bold: "1e18 BOLD", coll: "1e8 LBTC", price: "1e28 BOLD per LBTC" },
+    totals: { coll_gained: "53374", coll_gained_value: "1", bold_lost: "1", net: "0", liquidations: 1 },
+    stretches: [
+      {
+        to: { coll_gain_since: "53374", deposit_loss: "9" },
+        totals: { coll_gained: "53374" },
+        residual: { bold_lost: "0", coll_gained: "-2" },
+        liquidations: [{ ...liq }],
+      },
+    ],
+    since_last_touch: { to: null, totals: { coll_gained: "7" }, residual: null, liquidations: [{ ...liq }] },
+  });
+  const l = a.stretches[0].liquidations[0];
+  assert.equal(l.coll_gained, "533740000000000");
+  assert.equal(l.pool_coll_sent, "50000000000000000");
+  assert.equal(l.price, "90096468386840000000000");
+  assert.equal(l.coll_gained_value, liq.coll_gained_value);
+  // coll × price / 1e18 is the same stablecoin figure before and after.
+  assert.equal(
+    (BigInt(l.coll_gained) * BigInt(l.price)) / BigInt(10) ** BigInt(18),
+    (BigInt(liq.coll_gained) * BigInt(liq.price)) / BigInt(10) ** BigInt(18),
+  );
+  assert.equal(a.stretches[0].to.coll_gain_since, "533740000000000");
+  assert.equal(a.stretches[0].to.deposit_loss, "9");
+  assert.equal(a.stretches[0].residual.coll_gained, "-20000000000");
+  assert.equal(a.since_last_touch.totals.coll_gained, "70000000000");
+  assert.equal(a.totals.coll_gained, "533740000000000");
+  // Twice is once.
+  assert.deepEqual(scaleSpAnswer(structuredClone(a)), a);
+});

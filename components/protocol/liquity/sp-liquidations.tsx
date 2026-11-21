@@ -1,11 +1,15 @@
 "use client";
 
-// Liquity V2 — what liquidations did to a stability-pool deposit between two
+// Liquity V2 and its forks — what liquidations did to a stability-pool deposit between two
 // of its touches (rails-ops decision 0022 §3–§4; the model is
 // lib/liquity-v2/sp-liquidations.ts). Each liquidation burned a share of the
 // deposit and paid the branch collateral in its place; the table states, per
 // liquidation, the collateral gained, its value at the liquidation's block
-// price in BOLD, the BOLD burned and the net.
+// price in the pool's stablecoin (BOLD on Liquity V2), the stablecoin burned and
+// the net. The deployment (lib/liquity-v2/sp-deployment.ts) names the units,
+// the contracts and the chain; on Ebisu, where the admin withdrew the pools'
+// collateral (`coll_withdrawn_at_block`), one line beside the gains says so,
+// and a stretch closed after that block is not flagged unsettled.
 //
 // Two homes, one table: a closed stretch is a note row between its two
 // touches, on the shell Polaris's PSM gap uses
@@ -22,13 +26,12 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import type { SpineTokenRow } from "@/components/shared/spine-column";
 import { formatNumber, formatPrice } from "@/lib/utils/format";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
-import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { RATE_NOTE_T1, type SpLiquidationsNote } from "@/lib/shared/market-note";
-import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { big, exactUnits, units } from "@/lib/liquity-v2/sp-math";
-import { spLiqProv } from "@/lib/liquity-v2/sp-provenance";
-import type { SpBranch } from "@/lib/liquity-v2/sp-routes";
+import { spLiqProvFor } from "@/lib/liquity-v2/sp-provenance";
 import { spResidualClause } from "@/lib/liquity-v2/sp-liquidations";
+import { SP_DEPLOYMENTS, spPoolOf, type SpDeployment } from "@/lib/liquity-v2/sp-deployment";
+import { recordedShutdown, shutdownDay, withdrawalDateProv } from "@/lib/shared/liquity-family-shutdown";
 import type { LiquityV2DepositLiquidation, LiquityV2DepositStretch } from "@/lib/sources/api/liquity-v2-sp";
 
 const ZERO = BigInt(0);
@@ -37,17 +40,17 @@ const NEG = "text-red-600 dark:text-red-400";
 /** Rows drawn before "Show all" (Miles, 18 Nov 2026). */
 const FIRST_ROWS = 5;
 
-const WORDS = {
+const words = (S: string) => ({
   head: "Liquidations",
   net: "net",
   when: "Liquidation",
   gained: (c: string) => `${c} gained`,
   price: (c: string) => `${c} price`,
   value: "Value",
-  burned: "BOLD burned",
+  burned: `${S} burned`,
   netCol: "Net",
   total: "In all",
-  valued: "Each gain is valued at its liquidation's block price, in BOLD.",
+  valued: `Each gain is valued at its liquidation's block price, in ${S}.`,
   showAll: (n: number) => `Show all ${n.toLocaleString("en-US")}`,
   openHead: "Liquidations since last touch",
   openFoot: "Liquidations up to the",
@@ -55,15 +58,15 @@ const WORDS = {
   unsettled: (c: string, n: number, of: number) =>
     `${n.toLocaleString("en-US")} of ${of.toLocaleString("en-US")} periods between touches on the ${c} branch don't add up to the touch that closed them, so these figures aren't settled.`,
   notSettled: "Not settled: see inside",
-};
+});
 
-const TIPS = {
+const tips = (S: string) => ({
   gained: (c: string) => `The ${c} this liquidation paid the deposit.`,
-  price: (c: string) => `BOLD per ${c} at the liquidation's block.`,
-  value: (c: string) => `The ${c} gained, valued at the liquidation's block price, in BOLD.`,
-  burned: "The deposit's BOLD this liquidation used to repay debt.",
-  net: "The value less the BOLD burned, in BOLD.",
-};
+  price: (c: string) => `${S} per ${c} at the liquidation's block.`,
+  value: (c: string) => `The ${c} gained, valued at the liquidation's block price, in ${S}.`,
+  burned: `The deposit's ${S} this liquidation used to repay debt.`,
+  net: `The value less the ${S} burned, in ${S}.`,
+});
 
 const day = (ts: number) => (ts > 0 ? `${shortDate(ts)} ${shortDateYear(ts)}` : "");
 const abs = (v: bigint) => (v < ZERO ? -v : v);
@@ -75,6 +78,8 @@ const collAmt = (v: bigint) => {
   const n = units(abs(v));
   return n >= 1 || n === 0 ? formatNumber(n) : n.toLocaleString("en-US", { maximumSignificantDigits: 4 });
 };
+
+const depOf = (note: SpLiquidationsNote): SpDeployment => SP_DEPLOYMENTS[note.deployment ?? "liquity-v2"];
 
 /** The gap's dates, the shared parts said once (as the PSM gap row's). */
 function gapRange(from: number, to: number): string {
@@ -97,7 +102,9 @@ function Fig({ cell }: { cell: Cell }) {
   );
 }
 
-function rowCells(branch: SpBranch, l: LiquityV2DepositLiquidation) {
+function rowCells(dep: SpDeployment, branch: string, l: LiquityV2DepositLiquidation) {
+  const spLiqProv = spLiqProvFor(dep);
+  const S = dep.stable.symbol;
   const at = { block: l.block_number, txHash: l.tx_hash };
   const coll = big(l.coll_gained);
   const lost = big(l.bold_lost);
@@ -120,25 +127,27 @@ function rowCells(branch: SpBranch, l: LiquityV2DepositLiquidation) {
       text: amt(value),
       prov: spLiqProv.value(branch, at, exactUnits(coll), exactUnits(price)),
       value: exactUnits(value),
-      symbol: "BOLD",
+      symbol: S,
     },
     burned: {
       text: `−${amt(lost)}`,
       prov: spLiqProv.boldLost(branch, at),
       value: exactUnits(-lost),
-      symbol: "BOLD",
+      symbol: S,
     },
     net: {
       text: signedAmt(net),
       prov: spLiqProv.net(branch, at, exactUnits(value), exactUnits(lost)),
       value: exactUnits(net),
-      symbol: "BOLD",
+      symbol: S,
       tone: net < ZERO ? ("neg" as const) : undefined,
     },
   } satisfies Record<string, Cell>;
 }
 
-function totalCells(branch: SpBranch, s: LiquityV2DepositStretch) {
+function totalCells(dep: SpDeployment, branch: string, s: LiquityV2DepositStretch) {
+  const spLiqProv = spLiqProvFor(dep);
+  const S = dep.stable.symbol;
   const open = s.to == null;
   const span = open ? "since last touch" : "between the touches";
   const n = s.liquidations.length;
@@ -153,21 +162,21 @@ function totalCells(branch: SpBranch, s: LiquityV2DepositStretch) {
     },
     value: {
       text: amt(big(t.coll_gained_value)),
-      prov: spLiqProv.sum(branch, `Value ${span}`, "values in BOLD", "value in BOLD", n, open),
+      prov: spLiqProv.sum(branch, `Value ${span}`, `values in ${S}`, `value in ${S}`, n, open),
       value: exactUnits(big(t.coll_gained_value)),
-      symbol: "BOLD",
+      symbol: S,
     },
     burned: {
       text: `−${amt(big(t.bold_lost))}`,
-      prov: spLiqProv.sum(branch, `BOLD burned ${span}`, "BOLD burned", "BOLD burned", n, open),
+      prov: spLiqProv.sum(branch, `${S} burned ${span}`, `${S} burned`, `${S} burned`, n, open),
       value: exactUnits(-big(t.bold_lost)),
-      symbol: "BOLD",
+      symbol: S,
     },
     net: {
       text: signedAmt(net),
-      prov: spLiqProv.sum(branch, `Net ${span}`, "nets in BOLD", "net in BOLD", n, open),
+      prov: spLiqProv.sum(branch, `Net ${span}`, `nets in ${S}`, `net in ${S}`, n, open),
       value: exactUnits(net),
-      symbol: "BOLD",
+      symbol: S,
       tone: net < ZERO ? ("neg" as const) : undefined,
     },
   } satisfies Record<string, Cell>;
@@ -177,7 +186,9 @@ function totalCells(branch: SpBranch, s: LiquityV2DepositStretch) {
  *  under it each liquidation stands as a block of label and figure lines. */
 const GRID = "lg:grid lg:grid-cols-[minmax(10.5rem,1.4fr)_repeat(5,minmax(0,1fr))] lg:gap-x-3";
 
-function Head({ c }: { c: string }) {
+function Head({ c, S }: { c: string; S: string }) {
+  const WORDS = words(S);
+  const TIPS = tips(S);
   const th = (label: string, tip: string) => (
     <span className="text-right">
       <HeadingTip text={label} tip={tip} />
@@ -209,13 +220,15 @@ function Col({ label, cell, strong }: { label: string; cell: Cell | null; strong
 
 /** The stretch's liquidations, newest first, with their sums beneath. */
 export function SpLiquidationsTable({
+  dep,
   branch,
   stretch,
   check,
   netEcho = false,
   foot,
 }: {
-  branch: SpBranch;
+  dep: SpDeployment;
+  branch: string;
   stretch: LiquityV2DepositStretch;
   check: SpLiquidationsNote["branchCheck"];
   /** The "In all" net echoes the row's header net, which holds the receipt. */
@@ -227,8 +240,9 @@ export function SpLiquidationsTable({
   const [all, setAll] = useState(false);
   const rows = [...stretch.liquidations].reverse();
   const shown = all ? rows : rows.slice(0, FIRST_ROWS);
-  const tot = totalCells(branch, stretch);
+  const tot = totalCells(dep, branch, stretch);
   const c = branch;
+  const WORDS = words(dep.stable.symbol);
   return (
     <div className="text-sm" data-sp-liquidations="" data-anatomy="L7.2">
       {check && check.unreconciled > 0 && (
@@ -239,10 +253,10 @@ export function SpLiquidationsTable({
           {WORDS.unsettled(c, check.unreconciled, check.closedStretches)}
         </p>
       )}
-      <Head c={c} />
+      <Head c={c} S={dep.stable.symbol} />
       <div className="divide-y divide-[var(--edge-raised)]">
         {shown.map((l) => {
-          const cells = rowCells(branch, l);
+          const cells = rowCells(dep, branch, l);
           const ts = Number(l.block_timestamp);
           return (
             <div
@@ -252,7 +266,7 @@ export function SpLiquidationsTable({
             >
               <span className="flex items-baseline gap-2 whitespace-nowrap text-xs text-rb-500" data-prov-exempt="">
                 <span className="text-foreground">{day(ts)}</span>
-                <BlockRef block={Number(l.block_number)} chainId={MAINNET_CHAIN_ID} size={12} />
+                <BlockRef block={Number(l.block_number)} chainId={dep.chainId} size={12} />
               </span>
               <Col label={WORDS.gained(c)} cell={cells.gained} />
               <Col label={WORDS.price(c)} cell={cells.price} />
@@ -297,13 +311,17 @@ export function SpLiquidationsTable({
 function reconcileLine(note: SpLiquidationsNote): string {
   const s = note.stretch;
   const c = note.branch;
+  const S = note.unitLabel;
   const at = `block ${note.to.block.toLocaleString("en-US")}`;
   const touch = day(note.to.timestamp);
   if (s.reconciles)
-    return `Together they are the BOLD burned and the ${c} paid in that the touch on ${touch} wrote, at ${at}.`;
+    return `Together they are the ${S} burned and the ${c} paid in that the touch on ${touch} wrote, at ${at}.`;
   if (!s.to || !s.residual) return "";
-  const wrote = `The touch on ${touch} wrote ${amt(big(s.to.deposit_loss))} BOLD burned and ${collAmt(big(s.to.coll_gain_since))} ${c} paid in`;
-  const clause = spResidualClause(s.residual, c, { bold: amt, coll: collAmt });
+  const wrote = `The touch on ${touch} wrote ${amt(big(s.to.deposit_loss))} ${S} burned and ${collAmt(big(s.to.coll_gain_since))} ${c} paid in`;
+  // After the admin's withdrawal the touch wrote no collateral: the line on
+  // the withdrawal says why, and the residual is no fault.
+  if (afterWithdrawal(note)) return `${wrote}.`;
+  const clause = spResidualClause(s.residual, c, { bold: amt, coll: collAmt }, S);
   return clause ? `${wrote}; these liquidations ${clause}.` : `${wrote}.`;
 }
 
@@ -312,14 +330,16 @@ function reconcileLine(note: SpLiquidationsNote): string {
 function NoLiquidationLine({ note }: { note: SpLiquidationsNote }) {
   const to = note.stretch.to;
   if (!to) return null;
-  const c = note.branch as SpBranch;
+  const c = note.branch;
+  const S = note.unitLabel;
+  const spLiqProv = spLiqProvFor(depOf(note));
   const loss = big(to.deposit_loss);
   const gain = big(to.coll_gain_since);
   return (
     <>
       The touch on {day(note.to.timestamp)} wrote{" "}
-      <Prov info={spLiqProv.touchLoss(c, to.tx_hash, to.block_number)} value={exactUnits(loss)} symbol="BOLD">
-        {amt(loss)} BOLD
+      <Prov info={spLiqProv.touchLoss(c, to.tx_hash, to.block_number)} value={exactUnits(loss)} symbol={S}>
+        {amt(loss)} {S}
       </Prov>{" "}
       burned and{" "}
       <Prov info={spLiqProv.touchGain(c, to.tx_hash, to.block_number)} value={exactUnits(gain)} symbol={c}>
@@ -333,14 +353,20 @@ function NoLiquidationLine({ note }: { note: SpLiquidationsNote }) {
 /** One closed stretch's liquidations, as a row between its two touches. */
 export function LiquityV2DepositLiquidationsRow({ note }: { note: SpLiquidationsNote }) {
   const s = note.stretch;
-  const c = note.branch as SpBranch;
-  const collAddr = LIQUITY_V2_BRANCHES[c.toLowerCase()].collateralAddr;
+  const c = note.branch;
+  const dep = depOf(note);
+  const S = dep.stable.symbol;
+  const WORDS = words(S);
+  const collAddr = spPoolOf(dep, c).collateralAddr;
   const n = s.liquidations.length;
   const gained = big(s.totals.coll_gained);
   const net = big(s.totals.net);
   const range = gapRange(note.from.timestamp, note.to.timestamp);
-  const tot = totalCells(c, s);
-  const unsettled = s.reconciles === false || (note.branchCheck?.unreconciled ?? 0) > 0;
+  const tot = totalCells(dep, c, s);
+  // A stretch closed after the admin's withdrawal does not reconcile by the
+  // withdrawal's doing, and neither does the branch check it counts in.
+  const unsettled =
+    note.collWithdrawnAtBlock == null && (s.reconciles === false || (note.branchCheck?.unreconciled ?? 0) > 0);
 
   // On the spine: the collateral the liquidations paid in points into the
   // deposit, as a deposit's legs do.
@@ -352,7 +378,7 @@ export function LiquityV2DepositLiquidationsRow({ note }: { note: SpLiquidations
   return (
     <NoteRowShell
       icon="market"
-      label={`${RATE_NOTE_T1.name}, ${WORDS.head}, ${n}${n > 0 ? `, ${signedAmt(net)} BOLD ${WORDS.net}` : ""}${unsettled ? `, ${WORDS.notSettled}` : ""}, ${range}`}
+      label={`${RATE_NOTE_T1.name}, ${WORDS.head}, ${n}${n > 0 ? `, ${signedAmt(net)} ${S} ${WORDS.net}` : ""}${unsettled ? `, ${WORDS.notSettled}` : ""}, ${range}`}
       marker={{ attr: "data-market-note", value: note.id }}
       spine={{ tokens, noteGlyph: "share" }}
       header={
@@ -367,8 +393,8 @@ export function LiquityV2DepositLiquidationsRow({ note }: { note: SpLiquidations
               {/* The net alone at rest, with its receipt; the opened table
                   holds the rest, its "In all" net an echo of this one. */}
               <span className={`tabular-nums ${net < ZERO ? NEG : "text-foreground"}`} data-sp-liquidations-net="">
-                <Prov info={tot.net.prov} value={tot.net.value} symbol="BOLD">
-                  {signedAmt(net)} BOLD
+                <Prov info={tot.net.prov} value={tot.net.value} symbol={S}>
+                  {signedAmt(net)} {S}
                 </Prov>
               </span>
               <span>{WORDS.net}</span>
@@ -390,13 +416,20 @@ export function LiquityV2DepositLiquidationsRow({ note }: { note: SpLiquidations
       <div className="px-5 pb-3 pt-2" data-sp-liquidations-row="">
         {n > 0 ? (
           <SpLiquidationsTable
+            dep={dep}
             branch={c}
             stretch={s}
-            check={note.branchCheck}
+            check={note.collWithdrawnAtBlock == null ? note.branchCheck : null}
             netEcho
             foot={
               <>
                 {WORDS.valued} {reconcileLine(note)}
+                {note.withdrawalLine && (
+                  <>
+                    {" "}
+                    <WithdrawalLine dep={dep} branch={c} />
+                  </>
+                )}
               </>
             }
           />
@@ -415,17 +448,24 @@ export function LiquityV2DepositLiquidationsRow({ note }: { note: SpLiquidations
 /** The open stretch's liquidations, for the "Since its last touch" row's
  *  body. Null where none landed since the touch. */
 export function SpOpenStretchLiquidations({
+  dep,
   branch,
   stretch,
   servedThru,
   check,
+  withdrawalLine = false,
 }: {
-  branch: SpBranch;
+  dep: SpDeployment;
+  branch: string;
   stretch: LiquityV2DepositStretch;
   servedThru: string;
   check: SpLiquidationsNote["branchCheck"];
+  /** This section carries the page's one line on the admin's withdrawal. */
+  withdrawalLine?: boolean;
 }) {
   if (stretch.liquidations.length === 0) return null;
+  const WORDS = words(dep.stable.symbol);
+  const spLiqProv = spLiqProvFor(dep);
   return (
     <div className="border-t border-[var(--edge-raised)] px-5 pb-3 pt-3" data-sp-open-liquidations="">
       <div className="mb-2 flex items-center gap-1.5 text-sm text-foreground">
@@ -433,9 +473,10 @@ export function SpOpenStretchLiquidations({
         <CountChip count={stretch.liquidations.length} />
       </div>
       <SpLiquidationsTable
+        dep={dep}
         branch={branch}
         stretch={stretch}
-        check={check}
+        check={withdrawalLine ? null : check}
         foot={
           <>
             {WORDS.valued} {WORDS.openFoot}{" "}
@@ -443,9 +484,40 @@ export function SpOpenStretchLiquidations({
               {WORDS.openFootBlock}
             </Prov>
             .
+            {withdrawalLine && (
+              <>
+                {" "}
+                <WithdrawalLine dep={dep} branch={branch} />
+              </>
+            )}
           </>
         }
       />
     </div>
+  );
+}
+
+/** A stretch closed by a touch after the admin's withdrawal of the pool's
+ *  collateral. */
+function afterWithdrawal(note: SpLiquidationsNote): boolean {
+  return note.collWithdrawnAtBlock != null && note.to.block > note.collWithdrawnAtBlock;
+}
+
+/** The page's one line on the admin's withdrawal (Ebisu, ui-jobs 608, 612):
+ *  the gains above are what each liquidation paid; the pool's collateral left
+ *  at that block, so none of it is claimable now. Miles, 21 Nov 2026. */
+function WithdrawalLine({ dep, branch }: { dep: SpDeployment; branch: string }) {
+  const rec = recordedShutdown(dep.id, branch);
+  const w = rec?.withdrawal;
+  const prov = rec ? withdrawalDateProv(dep.id, branch, rec) : null;
+  if (!w || !prov) return null;
+  return (
+    <span data-sp-coll-withdrawn={w.block}>
+      The admin withdrew the pool&rsquo;s collateral at block{" "}
+      <Prov info={prov} value={String(w.block)}>
+        {w.block.toLocaleString("en-US")}
+      </Prov>{" "}
+      on {shutdownDay(w.at)}, so 0 {branch} is claimable now.
+    </span>
   );
 }

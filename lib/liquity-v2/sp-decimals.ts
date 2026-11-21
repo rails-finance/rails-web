@@ -23,6 +23,12 @@ const EVENT_COLL = [
   "coll_claimed_to_here",
 ] as const;
 const DAY_COLL = ["coll_in", "coll_claimed", "stash"] as const;
+/** The /liquidations answer's collateral amounts: a stretch's closing touch,
+ *  its totals and residual, each liquidation's gain and pool payout. The
+ *  liquidation's `price` is 1e(36 − decimals) and comes down to 1e18. */
+const STRETCH_TO_COLL = ["coll_gain_since"] as const;
+const TOTALS_COLL = ["coll_gained"] as const;
+const LIQ_COLL = ["coll_gained", "pool_coll_sent"] as const;
 
 /** A raw integer string in `decimals` units, in 1e18 units. Anything that is
  *  not a plain integer passes through. */
@@ -56,8 +62,23 @@ function branchDecimals(branches: unknown, collateralType: unknown): number | nu
   return typeof entry?.coll_decimals === "number" ? entry.coll_decimals : null;
 }
 
+function scaleStretch(st: unknown, d: number): void {
+  if (!st || typeof st !== "object") return;
+  const s = st as Rec;
+  scaleFields(s.to, STRETCH_TO_COLL, d);
+  scaleFields(s.totals, TOTALS_COLL, d);
+  scaleFields(s.residual, TOTALS_COLL, d);
+  if (Array.isArray(s.liquidations))
+    for (const l of s.liquidations as Rec[]) {
+      scaleFields(l, LIQ_COLL, d);
+      if (l && typeof l.price === "string") l.price = priceToE18(l.price, d);
+    }
+}
+
 /** Scales a deposit route's answer in place and returns it: a listing by each
- *  row's branch, a timeline or flows answer by its top-level `coll_decimals`. */
+ *  row's branch, a timeline, flows or liquidations answer by its top-level
+ *  `coll_decimals`. The liquidations answer's `units` keep the wire's words;
+ *  the page names units from the deployment record. */
 export function scaleSpAnswer<T>(answer: T): T {
   if (!answer || typeof answer !== "object") return answer;
   const a = answer as Rec;
@@ -73,6 +94,9 @@ export function scaleSpAnswer<T>(answer: T): T {
   if (top != null && top < 18) {
     scaleFields(a.position, ROW_COLL, top);
     if (Array.isArray(a.days)) for (const day of a.days) scaleFields(day, DAY_COLL, top);
+    if (Array.isArray(a.stretches)) for (const st of a.stretches) scaleStretch(st, top);
+    scaleStretch(a.since_last_touch, top);
+    scaleFields(a.totals, TOTALS_COLL, top);
   }
   // Scaled once: the units are 1e18 now, and nothing is left to scale by.
   delete a.coll_decimals;

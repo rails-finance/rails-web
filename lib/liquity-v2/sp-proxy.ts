@@ -1,6 +1,6 @@
 // The four Liquity V2 deposit proxies (app/api/liquity-v2/stability-pool,
-// /timeline, /flows/daily, /liquidations), and the forks' three
-// (app/api/<fork>/stability-pool, /timeline, /flows/daily): forward the route's allowlisted params to
+// /timeline, /flows/daily, /liquidations), and each fork's same four
+// (app/api/<fork>/stability-pool/…): forward the route's allowlisted params to
 // rails-server and pass its answer through unchanged, 404 included.
 // Server-only.
 

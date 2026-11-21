@@ -49,6 +49,7 @@
 // kind, and a third kind should have to touch only the four prose helpers at
 // the foot of this file and its own provenance module.
 
+import type { SpDeploymentId } from "@/lib/liquity-v2/sp-deployment";
 import type { BaseActivityEvent, PolarisContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import type { LiquityV2DepositStretch } from "@/lib/sources/api/liquity-v2-sp";
@@ -313,6 +314,15 @@ export interface SpLiquidationsNote extends MarketNoteBase {
    *  sum to their touch, of all closed stretches. Above zero, the figures
    *  are not stated as settled. */
   branchCheck: { unreconciled: number; closedStretches: number } | null;
+  /** The deposit's deployment (lib/liquity-v2/sp-deployment.ts); absent is
+   *  Liquity V2. `unitLabel` is its stablecoin. */
+  deployment?: SpDeploymentId;
+  /** The block at which the branch's admin withdrew the pool's collateral
+   *  (Ebisu, `coll_withdrawn_at_block`): a stretch closed after it does not
+   *  reconcile and is not flagged unsettled. */
+  collWithdrawnAtBlock?: number;
+  /** This note carries the page's one line on that withdrawal. */
+  withdrawalLine?: boolean;
 }
 
 export type MarketNote = RateStepNote | VaultTermsNote | PsmGapNote | SpLiquidationsNote;
@@ -1302,7 +1312,7 @@ const tokenAmount = (n: number): string =>
     ? n.toLocaleString("en-US", { maximumFractionDigits: 3 })
     : n.toLocaleString("en-US", { maximumSignificantDigits: 3 });
 
-/** A Liquity V2 deposit's liquidations between two touches, in one clause. */
+/** A Liquity V2 (or fork) deposit's liquidations between two touches, in one clause. */
 export function spLiquidationsSentence(note: SpLiquidationsNote): string {
   const t = note.stretch.totals;
   const n = note.stretch.liquidations.length;
@@ -1310,16 +1320,16 @@ export function spLiquidationsSentence(note: SpLiquidationsNote): string {
   if (n === 0 && to)
     return (
       `Between blocks ${formatBlock(note.from.block)} and ${formatBlock(note.to.block)}, the closing touch wrote ` +
-      `${tokenAmount(e18(to.deposit_loss))} BOLD burned and ${tokenAmount(e18(to.coll_gain_since))} ${note.branch} paid in, ` +
+      `${tokenAmount(e18(to.deposit_loss))} ${note.unitLabel} burned and ${tokenAmount(e18(to.coll_gain_since))} ${note.branch} paid in, ` +
       `and no liquidation between the two touches accounts for it`
     );
   const net = e18(t.net);
   return (
     `Between blocks ${formatBlock(note.from.block)} and ${formatBlock(note.to.block)}, ` +
-    `${n.toLocaleString("en-US")} ${n === 1 ? "liquidation" : "liquidations"} burned ${tokenAmount(e18(t.bold_lost))} BOLD ` +
+    `${n.toLocaleString("en-US")} ${n === 1 ? "liquidation" : "liquidations"} burned ${tokenAmount(e18(t.bold_lost))} ${note.unitLabel} ` +
     `of this deposit and paid it ${tokenAmount(e18(t.coll_gained))} ${note.branch}, worth ` +
-    `${tokenAmount(e18(t.coll_gained_value))} BOLD at each liquidation's block price: ` +
-    `${net < 0 ? "−" : "+"}${tokenAmount(Math.abs(net))} BOLD net`
+    `${tokenAmount(e18(t.coll_gained_value))} ${note.unitLabel} at each liquidation's block price: ` +
+    `${net < 0 ? "−" : "+"}${tokenAmount(Math.abs(net))} ${note.unitLabel} net`
   );
 }
 
