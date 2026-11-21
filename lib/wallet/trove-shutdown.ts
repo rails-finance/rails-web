@@ -72,8 +72,8 @@ export function troveCollateral(p: WalletPosition): { symbol: string; amount: nu
 
 const tipOf = (one: boolean) =>
   one
-    ? "What each open Trove records as of its last touch. The branch is shut down and its pool holds 0 of this collateral since the admin withdrew it."
-    : "What each open Trove records as of its last touch. The branches are shut down and their pools hold 0 of this collateral since the admin withdrew it.";
+    ? "What each open Trove records as of its last touch. The branch is shut down and its pool has held 0 of this collateral since the admin withdrew it."
+    : "What each open Trove records as of its last touch. The branches are shut down and their pools have held 0 of this collateral since the admin withdrew it.";
 
 /** "A", "A and B", "A, B and C". */
 const and = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
@@ -110,7 +110,7 @@ export function recordedCollateralLeg(
   }
   const sentences = [...groups.values()].map((g) => {
     const many = g.syms.length > 1;
-    return ` The admin shut the ${and(g.syms)} ${many ? "branches" : "branch"} down on ${g.shut} and withdrew ${many ? "their pools'" : "its pool's"} collateral on ${g.withdrew}; ${many ? "the pools have" : "the pool has"} held 0 ${and(g.syms)} since, and the Troves still record this collateral.`;
+    return ` The admin shut the ${and(g.syms)} ${many ? "branches" : "branch"} down on ${g.shut} and withdrew ${many ? "their pools'" : "its pool's"} collateral on ${g.withdrew}; the Troves still record it.`;
   });
   // A live read answering "live" against a record, worded as the Trove
   // page's shutdown date receipt words it.

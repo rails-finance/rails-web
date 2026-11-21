@@ -277,7 +277,8 @@ test("a Trove on an emptied branch: no ratio, buffer, rate or collateral dollars
   assert.equal(coll.value, "14,404.93 stcUSD");
   assert.equal(coll.footnote.text, "Shut down 20 Aug 2026 · pool holds 0 stcUSD");
   assert.match(coll.footnote.prov.summary, /Collateral withdrawal/);
-  assert.match(coll.prov.summary, /held 0 stcUSD since/);
+  assert.match(coll.prov.summary, /withdrew its pool's collateral on 21 Oct 2026; the Troves still record it\./);
+  assert.match(coll.tip, /has held 0 of this collateral since the admin withdrew it/);
   assert.match(coll.tip, /The branch is shut down/);
   assert.equal(
     s.band.note,
@@ -309,7 +310,7 @@ test("several emptied branches: each takes its own record's dates and receipt, t
   const a = shutDownTrove(forkTrove("ebisu", "stcUSD", 10), ebisuState("stcUSD"));
   const b = shutDownTrove(forkTrove("ebisu", "sUSDe", 20), ebisuState("sUSDe"));
   const leg = recordedCollateralLeg("ebisu", [a, b]);
-  assert.match(leg.tip, /The branches are shut down and their pools hold 0/);
+  assert.match(leg.tip, /The branches are shut down and their pools have held 0/);
   assert.match(leg.footnote.text, /Shut down 20 Aug 2026 · pool holds 0 stcUSD · pool holds 0 sUSDe$/);
   // One receipt row per branch's withdrawal.
   assert.equal(leg.footnote.prov.inputs.length, 2);
