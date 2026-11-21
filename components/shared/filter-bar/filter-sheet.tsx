@@ -91,6 +91,9 @@ export interface FilterSheetProps<F> {
    *  (ui-jobs 801): a panel in the page, above the results. Without it the
    *  sheet opens at the right edge from sm. */
   slot?: HTMLElement | null;
+  /** Told when the panel in the page opens and closes, so the toolbar can
+   *  set its other controls back while the filters hold the focus. */
+  onPanelOpenChange?: (open: boolean) => void;
 }
 
 /** Wait after a draft edit before counting it, so a run of taps costs one read. */
@@ -148,6 +151,7 @@ export function FilterSheet<F>({
   countFor,
   nounFor,
   slot,
+  onPanelOpenChange,
 }: FilterSheetProps<F>) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -156,6 +160,12 @@ export function FilterSheet<F>({
   // The open sheet's own close, so a second press on the button leaves
   // through the sheet's history entries.
   const requestClose = useRef<(() => void) | null>(null);
+  const panelOpen = open && inline;
+  const onPanelOpenChangeRef = useRef(onPanelOpenChange);
+  onPanelOpenChangeRef.current = onPanelOpenChange;
+  useEffect(() => {
+    onPanelOpenChangeRef.current?.(panelOpen);
+  }, [panelOpen]);
   // The badge counts what the pills show set: groups off their default.
   const active = activeGroupCount(groupDimensions(dimensions, filters), filters);
 

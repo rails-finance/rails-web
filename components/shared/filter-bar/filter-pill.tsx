@@ -84,7 +84,7 @@ export function FilterPill({
   if (state === "unset") return null;
   if (pinned) {
     return (
-      <div className="relative shrink-0" {...hooks}>
+      <div className={`relative shrink-0 ${PANEL_OPEN_DIM}`} {...hooks}>
         <div className={`${PILL_BASE} ${PILL_SET_TONE} gap-1.5 px-3.5 text-foreground`}>
           {label && <span className={`shrink-0 ${LABEL}`}>{label}</span>}
           <span className="min-w-0 truncate font-semibold">{value}</span>
@@ -94,7 +94,7 @@ export function FilterPill({
   }
   const removable = !locked;
   return (
-    <div className="relative shrink-0" {...hooks}>
+    <div className={`relative shrink-0 ${PANEL_OPEN_DIM}`} {...hooks}>
       <div className={`${PILL_BASE} ${PILL_SET} text-foreground`}>
         <button
           ref={buttonRef}
@@ -157,7 +157,7 @@ export function FilterPillChip({
   removeData?: Record<string, string>;
 }) {
   return (
-    <div className="relative shrink-0" {...data}>
+    <div className={`relative shrink-0 ${PANEL_OPEN_DIM}`} {...data}>
       <div className={`${PILL_BASE} ${PILL_SET} text-foreground`}>
         <button
           type="button"
@@ -191,6 +191,13 @@ export function FilterPillChip({
 export function FilterPillReserve({ name }: { name: string }) {
   return <span aria-hidden="true" className="invisible size-11 shrink-0 sm:size-10" data-pill-reserve={name} />;
 }
+
+/** While the Filters panel is open in the page (the toolbar's root carries
+ *  `data-filters-open` and the `toolbar` group), the row's other controls
+ *  stand back: dimmed and not pressable; the caller also sets `inert` on
+ *  them (ui-jobs 801). */
+export const PANEL_OPEN_DIM =
+  "transition-opacity group-data-[filters-open]/toolbar:pointer-events-none group-data-[filters-open]/toolbar:opacity-40";
 
 /** A round icon button of the toolbar row, in the neutral pill's tone: 44px
  *  on a phone, 40px from sm (the search, the Filters button, the resting

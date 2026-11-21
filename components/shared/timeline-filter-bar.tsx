@@ -38,12 +38,16 @@ export function TimelineAxisPills({
   model,
   count,
   countFor,
+  inert = false,
 }: {
+  /** True while the Filters panel is open in the page: the pills stand back. */
+  inert?: boolean;
   model: TimelineFilterModel;
   count?: { total: number; noun: string };
   countFor?: DraftCount;
 }) {
-  const [open, setOpen] = useState<string | null>(null);
+  const [openName, setOpen] = useState<string | null>(null);
+  const open = inert ? null : openName;
   const groups = groupDimensions(model.dimensions, model.filters);
   return (
     <>
@@ -60,6 +64,7 @@ export function TimelineAxisPills({
             model={model}
             count={count}
             countFor={countFor}
+            inert={inert}
           />
         );
       })}
@@ -74,7 +79,9 @@ function AxisPill({
   model,
   count,
   countFor,
+  inert,
 }: {
+  inert: boolean;
   pill: PillModel<TimelineFilters>;
   open: boolean;
   setOpen: (o: boolean) => void;
@@ -85,7 +92,7 @@ function AxisPill({
   const anchorRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   return (
-    <div ref={anchorRef} className="contents" data-timeline-axis={pill.dims[0].id}>
+    <div ref={anchorRef} className="contents" data-timeline-axis={pill.dims[0].id} inert={inert}>
       <FilterPill
         name={pill.name}
         anatomy={AXIS_ANATOMY[pill.dims[0].id as Axis]}
@@ -128,7 +135,9 @@ export function TimelineFilterSheet({
   count,
   countFor,
   slot,
+  onPanelOpenChange,
 }: {
+  onPanelOpenChange?: (open: boolean) => void;
   model: TimelineFilterModel;
   count?: { total: number; noun: string };
   countFor?: DraftCount;
@@ -144,6 +153,7 @@ export function TimelineFilterSheet({
       count={count}
       countFor={countFor}
       slot={slot}
+      onPanelOpenChange={onPanelOpenChange}
     />
   );
 }

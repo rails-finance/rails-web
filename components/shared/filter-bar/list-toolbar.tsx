@@ -25,7 +25,7 @@ import { useHydrated } from "@/hooks/useHydrated";
 import { SearchBox } from "@/components/shared/front-door-search";
 import { FilterSheet } from "@/components/shared/filter-bar/filter-sheet";
 import { Search } from "lucide-react";
-import { FilterPill, PILL_ICON_BUTTON, PILL_MUTED } from "@/components/shared/filter-bar/filter-pill";
+import { FilterPill, PANEL_OPEN_DIM, PILL_ICON_BUTTON, PILL_MUTED } from "@/components/shared/filter-bar/filter-pill";
 import { GroupEditor } from "@/components/shared/filter-bar/pill-editor";
 import { SortPill, type SortOption } from "@/components/shared/filter-bar/sort-control";
 import {
@@ -152,6 +152,13 @@ export function ListToolbar<F extends BaseListFilters>({
   const [openPill, setOpenPill] = useState<string | null>(null);
   // Where the filters open from sm: under the row, above the results.
   const [sheetSlot, setSheetSlot] = useState<HTMLDivElement | null>(null);
+  // While that panel is open it holds the focus: the row's other controls
+  // are inert and dimmed, and an open pill editor closes (ui-jobs 801).
+  const [panelOpen, setPanelOpen] = useState(false);
+  const onPanelOpenChange = (o: boolean) => {
+    setPanelOpen(o);
+    if (o) setOpenPill(null);
+  };
   const rowRef = useRef<HTMLDivElement>(null);
   useFlip(rowRef, ordered.map((p) => p.name).join("|"));
 
@@ -178,7 +185,13 @@ export function ListToolbar<F extends BaseListFilters>({
     ) : null;
 
   return (
-    <div className="mb-6 flex flex-col" data-skel-section={skel} data-anatomy="N1" {...ctrlWaking(hydrated)}>
+    <div
+      className="group/toolbar mb-6 flex flex-col"
+      data-skel-section={skel}
+      data-anatomy="N1"
+      data-filters-open={panelOpen ? "" : undefined}
+      {...ctrlWaking(hydrated)}
+    >
       <div className="flex flex-wrap items-center gap-2">
         {/* The shared search's look (H15); the listing's own behaviour: the
             query filters this explorer, family identifiers included. */}
@@ -193,7 +206,7 @@ export function ListToolbar<F extends BaseListFilters>({
             onKeyDown={onSearchKeyDown}
             onFocus={() => setSearchOpened(true)}
             onBlur={() => setSearchOpened(false)}
-            className="max-sm:basis-full sm:min-w-[220px] sm:flex-[0_1_300px]"
+            className={`max-sm:basis-full sm:min-w-[220px] sm:flex-[0_1_300px] ${PANEL_OPEN_DIM}`}
           />
         )}
         {/* Below sm one sideways-scrolling row with a fade at its right edge;
@@ -209,7 +222,8 @@ export function ListToolbar<F extends BaseListFilters>({
               <button
                 type="button"
                 onClick={openSearch}
-                className={PILL_ICON_BUTTON}
+                disabled={panelOpen}
+                className={`${PILL_ICON_BUTTON} ${PANEL_OPEN_DIM}`}
                 aria-label={searchPlaceholder}
                 title={searchPlaceholder}
                 data-search-open=""
@@ -227,8 +241,13 @@ export function ListToolbar<F extends BaseListFilters>({
               countFor={countFor}
               nounFor={nounFor}
               slot={sheetSlot}
+              onPanelOpenChange={onPanelOpenChange}
             />
-            {chipsLead != null && <div className="flex shrink-0 items-center">{chipsLead}</div>}
+            {chipsLead != null && (
+              <div className={`flex shrink-0 items-center ${PANEL_OPEN_DIM}`} inert={panelOpen}>
+                {chipsLead}
+              </div>
+            )}
             {ordered.map((pill) => (
               <PillSlot
                 key={pill.name}
@@ -240,6 +259,7 @@ export function ListToolbar<F extends BaseListFilters>({
                 count={editorCount}
                 countFor={countFor}
                 nounFor={nounFor}
+                inert={panelOpen}
               />
             ))}
             {/* Room past the last pill, so the fade never covers it. */}
@@ -253,7 +273,10 @@ export function ListToolbar<F extends BaseListFilters>({
         {/* Clear all (two or more set) after the pills; below sm, Reset at the
             left of the count's line. */}
         {active > 0 && (
-          <div className={`order-1 flex min-h-11 items-center sm:min-h-10 ${active < 2 ? "sm:hidden" : ""}`}>
+          <div
+            className={`order-1 flex min-h-11 items-center sm:min-h-10 ${active < 2 ? "sm:hidden" : ""} ${PANEL_OPEN_DIM}`}
+            inert={panelOpen}
+          >
             <button
               type="button"
               onClick={() => onChange(resetAll(groups, filters))}
@@ -271,7 +294,10 @@ export function ListToolbar<F extends BaseListFilters>({
         {/* Below sm the count gives way first: it wraps under its figure
             beside the sort, where a 343px row cannot hold all three on one
             line. */}
-        <div className="order-1 ml-auto flex min-h-11 min-w-0 items-center gap-3 sm:min-h-10 sm:shrink-0">
+        <div
+          className={`order-1 ml-auto flex min-h-11 min-w-0 items-center gap-3 sm:min-h-10 sm:shrink-0 ${PANEL_OPEN_DIM}`}
+          inert={panelOpen}
+        >
           {countLine}
           {sortOptions.length > 0 && (
             <SortPill
@@ -313,7 +339,10 @@ function PillSlot<F>({
   count,
   countFor,
   nounFor,
+  inert,
 }: {
+  /** True while the Filters panel is open in the page. */
+  inert: boolean;
   pill: PillModel<F>;
   open: boolean;
   setOpen: (open: boolean) => void;
@@ -340,7 +369,7 @@ function PillSlot<F>({
     if (at == null || at === document.body || anchorRef.current?.contains(at)) buttonRef.current?.focus();
   });
   return (
-    <div ref={anchorRef} className="contents">
+    <div ref={anchorRef} className="contents" inert={inert}>
       <FilterPill
         name={pill.name}
         state={pill.state}

@@ -38,6 +38,7 @@ import { CalendarDays } from "lucide-react";
 import {
   FilterPill,
   FilterPillReserve,
+  PANEL_OPEN_DIM,
   PILL_ICON_BUTTON,
   PILL_MUTED,
 } from "@/components/shared/filter-bar/filter-pill";
@@ -605,6 +606,8 @@ export function TimelineToolbar({
   const hydrated = useHydrated();
   // Where the filters open from sm: under the row, above the events.
   const [sheetSlot, setSheetSlot] = useState<HTMLDivElement | null>(null);
+  // While that panel is open the row's other controls stand back (ui-jobs 801).
+  const [panelOpen, setPanelOpen] = useState(false);
 
   // The axes as the listings' pills (ui-jobs 735); see timeline-filter-bar.tsx.
   const model = timelineFilterModel(tl);
@@ -735,20 +738,30 @@ export function TimelineToolbar({
         // [Clear all] and the count at the right end. Below sm the pills
         // scroll sideways behind the Filters button, and Reset and the count
         // take the line under them, at its left as the listings set it.
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <div
+          className="group/toolbar flex flex-wrap items-center gap-x-2 gap-y-1"
+          data-filters-open={panelOpen ? "" : undefined}
+        >
           <div className="relative max-sm:-mx-4 max-sm:min-w-0 max-sm:basis-[calc(100%+2rem)] sm:contents">
             <div
               className="flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:contents [&::-webkit-scrollbar]:hidden"
               data-pill-row=""
               data-anatomy="N1.2"
             >
-              <TimelineFilterSheet model={model} count={draftBase} countFor={countFor} slot={sheetSlot} />
-              <TimelineAxisPills model={model} count={draftBase} countFor={countFor} />
+              <TimelineFilterSheet
+                model={model}
+                count={draftBase}
+                countFor={countFor}
+                slot={sheetSlot}
+                onPanelOpenChange={setPanelOpen}
+              />
+              <TimelineAxisPills model={model} count={draftBase} countFor={countFor} inert={panelOpen} />
               {/* At rest the Date is a round icon button (ui-jobs 801), in the
                   pill's wrapper so its hooks stand where a pill's do. */}
               {tl.datesAxis && !filterActive && (
                 <div
-                  className="relative shrink-0"
+                  className={`relative shrink-0 ${PANEL_OPEN_DIM}`}
+                  inert={panelOpen}
                   data-filter-pill="Date"
                   data-pill-state="unset"
                   data-anatomy="N1.10 L1.7"
@@ -792,7 +805,10 @@ export function TimelineToolbar({
               aria-hidden="true"
             />
           </div>
-          <div className="flex min-h-11 min-w-0 flex-1 items-center gap-3 sm:min-h-10">
+          <div
+            className={`flex min-h-11 min-w-0 flex-1 items-center gap-3 sm:min-h-10 ${PANEL_OPEN_DIM}`}
+            inert={panelOpen}
+          >
             {/* As the listings draw it (N1.13): from sm "Clear all" once two
                 pills are set, below sm "Reset" once one is. */}
             {setCount > 0 && (
