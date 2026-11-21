@@ -205,22 +205,23 @@ export function FilterPillChip({
   );
 }
 
-/** An unset pill's place, held empty: the box "+ {name}" takes, unseen and
- *  out of the accessibility tree, so the row does not move when the pill
- *  arrives (the timeline's Date pill while its page's panel reads, ui-jobs
- *  764). */
+/** A resting icon button's place, held empty, unseen and out of the
+ *  accessibility tree, so the row does not move when the button arrives (the
+ *  timeline's Date button while its page's panel reads, ui-jobs 764). */
 export function FilterPillReserve({ name }: { name: string }) {
-  return (
-    <span aria-hidden="true" className={`${PILL_BASE} invisible gap-1.5 border pl-3 pr-3.5`} data-pill-reserve={name}>
-      <Plus className="size-3.5" />
-      {name}
-    </span>
-  );
+  return <span aria-hidden="true" className="invisible size-11 shrink-0 sm:size-10" data-pill-reserve={name} />;
 }
 
-/** The sort as one pill: "↓ Recent activity ⌄" (N1.3). */
+/** A round icon button of the toolbar row, in the neutral pill's tone: 44px
+ *  on a phone, 40px from sm (the search, the Filters button, the resting
+ *  sort and the timeline's resting Date; ui-jobs 801). */
+export const PILL_ICON_BUTTON = `${PILL_NEUTRAL} ${FOCUS} inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-colors sm:size-10`;
+
+/** The sort (N1.3): its arrow alone on the listing's resting sort, and
+ *  "↓ Collateral ⌄" on any other (ui-jobs 801). */
 export function SortPillButton({
   label,
+  named,
   order,
   spoken,
   expanded,
@@ -228,6 +229,8 @@ export function SortPillButton({
   buttonRef,
 }: {
   label: string;
+  /** False on the resting sort: the arrow stands alone. */
+  named: boolean;
   order: "asc" | "desc";
   spoken: string;
   expanded: boolean;
@@ -240,15 +243,16 @@ export function SortPillButton({
       ref={buttonRef}
       type="button"
       onClick={onOpen}
-      className={`${PILL_BASE} ${PILL_NEUTRAL} ${FOCUS} gap-1.5 px-3.5`}
+      className={named ? `${PILL_BASE} ${PILL_NEUTRAL} ${FOCUS} gap-1.5 px-3.5` : PILL_ICON_BUTTON}
       aria-haspopup="dialog"
       aria-expanded={expanded}
       aria-label={spoken}
-      data-sort-pill=""
+      title={named ? undefined : spoken}
+      data-sort-pill={named ? "named" : "arrow"}
     >
       <Arrow className="size-4" aria-hidden="true" />
-      <span>{label}</span>
-      <ChevronDown className="size-3.5 text-rb-500" aria-hidden="true" />
+      {named && <span>{label}</span>}
+      {named && <ChevronDown className="size-3.5 text-rb-500" aria-hidden="true" />}
     </button>
   );
 }

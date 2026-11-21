@@ -49,6 +49,8 @@ export function TimelineAxisPills({
     <>
       {groups.map((g) => {
         const pill = pillFor(g, model.filters);
+        // An unset axis has no pill: the Filters button reaches it.
+        if (pill.state === "unset") return null;
         return (
           <AxisPill
             key={pill.name}
@@ -120,7 +122,7 @@ function AxisPill({
   );
 }
 
-/** The Filters button and its sheet, below sm. */
+/** The Filters button and its sheet. */
 export function TimelineFilterSheet({
   model,
   count,

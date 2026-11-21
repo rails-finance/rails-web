@@ -1,13 +1,15 @@
 "use client";
 
-// ListToolbar — the shared listing-page filter strip (N1): the search, one
-// editable pill per filter group (N1.10, ui-jobs 681), the sort pill (N1.3),
-// the ⋮ (N1.7), and the count (N1.6) with Clear all. From sm one wrapping
-// row: [search] [set pills] [unset pills] [Clear all (two or more set)] and,
+// ListToolbar — the shared listing-page filter strip (N1, ui-jobs 801): the
+// search as an icon that opens into its field and stays open while it holds a
+// query, the Filters button (N1.8.1) that opens every filter, one pill per
+// filter group that is set or rests on a default (N1.10, ui-jobs 681), the
+// sort (N1.3), the ⋮ (N1.7), and the count (N1.6) with Clear all. From sm one
+// wrapping row: [search] [Filters] [pills] [Clear all (two or more set)] and,
 // right-aligned as one group that wraps together, [count] [sort] [⋮]. Below
-// sm: the search alone; one pill row that scrolls sideways and never wraps,
-// led by the Filters button (N1.8.1); then Reset at the left and the count,
-// sort and ⋮ at the right. A page passes its dimension registry and param
+// sm: the open search field alone; one row that scrolls sideways and never
+// wraps, led by the search icon and the Filters button; then Reset at the
+// left and the count, sort and ⋮ at the right. A page passes its dimension registry and param
 // object; the toolbar holds no filter state beyond which editor is open and
 // the order the pills were set in.
 
@@ -22,7 +24,8 @@ import {
 import { useHydrated } from "@/hooks/useHydrated";
 import { SearchBox } from "@/components/shared/front-door-search";
 import { FilterSheet } from "@/components/shared/filter-bar/filter-sheet";
-import { FilterPill, PILL_MUTED } from "@/components/shared/filter-bar/filter-pill";
+import { Search } from "lucide-react";
+import { FilterPill, PILL_ICON_BUTTON, PILL_MUTED } from "@/components/shared/filter-bar/filter-pill";
 import { GroupEditor } from "@/components/shared/filter-bar/pill-editor";
 import { SortPill, type SortOption } from "@/components/shared/filter-bar/sort-control";
 import {
@@ -115,10 +118,24 @@ export function ListToolbar<F extends BaseListFilters>({
   // `?find=1` (the guided way in's "Is a protocol's site down?", ui-jobs 478)
   // lands with the cursor in the search, once the field answers typing.
   const searchRef = useRef<HTMLInputElement>(null);
+  // The search is an icon until it is pressed, and a field while it has the
+  // cursor or a query (ui-jobs 801).
+  const [searchOpened, setSearchOpened] = useState(false);
+  const searchOpen = searchOpened || filters.q !== "";
+  const focusSearch = useRef(false);
+  const openSearch = () => {
+    focusSearch.current = true;
+    setSearchOpened(true);
+  };
   useEffect(() => {
     if (!hydrated) return;
-    if (new URLSearchParams(window.location.search).get("find") === "1") searchRef.current?.focus();
+    if (new URLSearchParams(window.location.search).get("find") === "1") openSearch();
   }, [hydrated]);
+  useEffect(() => {
+    if (!searchOpen || !focusSearch.current) return;
+    focusSearch.current = false;
+    searchRef.current?.focus();
+  }, [searchOpen]);
 
   const groups = groupDimensions(dimensions, filters);
   const pills = groups.map((g) => pillFor(g, filters));
@@ -128,7 +145,8 @@ export function ListToolbar<F extends BaseListFilters>({
   const setNow = fixed.filter((n) => pills.find((p) => p.name === n)!.state !== "unset");
   const appliedRef = useRef<string[]>([]);
   appliedRef.current = nextAppliedOrder(appliedRef.current, setNow);
-  const ordered = orderPills(pills, appliedRef.current);
+  // An unset group has no pill: the Filters button reaches it.
+  const ordered = orderPills(pills, appliedRef.current).filter((p) => p.state !== "unset");
   const active = activeGroupCount(groups, filters);
 
   const [openPill, setOpenPill] = useState<string | null>(null);
@@ -152,8 +170,8 @@ export function ListToolbar<F extends BaseListFilters>({
         data-result-count={count.total}
         data-prov-exempt=""
       >
-        {count.total.toLocaleString("en-US")}{" "}
-        <CountNoun noun={count.total === 1 ? count.noun.replace(/s$/, "") : count.noun} />
+        {count.total.toLocaleString("en-US")}
+        <span className="sr-only"> {count.total === 1 ? count.noun.replace(/s$/, "") : count.noun}</span>
       </span>
     ) : null;
 
@@ -162,7 +180,7 @@ export function ListToolbar<F extends BaseListFilters>({
       <div className="flex flex-wrap items-center gap-2">
         {/* The shared search's look (H15); the listing's own behaviour: the
             query filters this explorer, family identifiers included. */}
-        {search && (
+        {search && searchOpen && (
           <SearchBox
             value={filters.q}
             onChange={(q) => onChange({ ...filters, q })}
@@ -171,6 +189,8 @@ export function ListToolbar<F extends BaseListFilters>({
             anatomy="N1.1 H15"
             inputRef={searchRef}
             onKeyDown={onSearchKeyDown}
+            onFocus={() => setSearchOpened(true)}
+            onBlur={() => setSearchOpened(false)}
             className="max-sm:basis-full sm:min-w-[220px] sm:flex-[0_1_300px]"
           />
         )}
@@ -183,6 +203,19 @@ export function ListToolbar<F extends BaseListFilters>({
             data-pill-row=""
             data-anatomy="N1.2"
           >
+            {search && !searchOpen && (
+              <button
+                type="button"
+                onClick={openSearch}
+                className={PILL_ICON_BUTTON}
+                aria-label={searchPlaceholder}
+                title={searchPlaceholder}
+                data-search-open=""
+                data-anatomy="N1.1"
+              >
+                <Search className="w-[18px] h-[18px]" aria-hidden="true" />
+              </button>
+            )}
             <FilterSheet
               dimensions={dimensions}
               filters={filters}
@@ -263,19 +296,6 @@ export function ListToolbar<F extends BaseListFilters>({
         </div>
       </div>
     </div>
-  );
-}
-
-/** The count's noun; below sm its last word alone ("open positions" reads
- *  "positions"), so the count fits beside the sort. */
-function CountNoun({ noun }: { noun: string }) {
-  const cut = noun.lastIndexOf(" ");
-  if (cut < 0) return <>{noun}</>;
-  return (
-    <>
-      <span className="max-sm:hidden">{noun.slice(0, cut + 1)}</span>
-      {noun.slice(cut + 1)}
-    </>
   );
 }
 

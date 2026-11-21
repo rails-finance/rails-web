@@ -47,9 +47,9 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronLeft, ChevronRight, Minus, SlidersHorizontal } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ListFilter, Minus, X } from "lucide-react";
 import { CTRL_GHOST, CTRL_OFF, RESET_LINK } from "@/lib/shared/ui-grammar";
-import { PILL_NEUTRAL } from "@/components/shared/filter-bar/filter-pill";
+import { PILL_ICON_BUTTON } from "@/components/shared/filter-bar/filter-pill";
 import { PRIMARY_BUTTON } from "@/components/shared/filter-bar/pill-editor";
 import { activeGroupCount, groupDimensions } from "@/components/shared/filter-bar/pill-model";
 import {
@@ -101,6 +101,10 @@ const SWIPE_MS = 180;
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
+/** The groups the sheet draws together as one section, and its heading. */
+const SECTION_GROUPS = ["Size", "Transactions", "History"];
+const SECTION_TITLE = "Size and history";
+
 /** The dimension back at its default. */
 const resetDim = <F,>(dim: FilterDimension<F>, f: F): F => dim.set(f, dim.defaultValues?.(f) ?? []);
 
@@ -150,17 +154,20 @@ export function FilterSheet<F>({
           window.history.pushState({ [SHEET_STATE]: "list" }, "");
           setOpen(true);
         }}
-        className={`${PILL_NEUTRAL} sm:hidden inline-flex shrink-0 items-center h-11 gap-2 px-3.5 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+        className={`${PILL_ICON_BUTTON} relative`}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={active > 0 ? `Filters, ${active} active` : "Filters"}
+        title="Filters"
         data-filter-sheet-open=""
         data-anatomy="N1.8.1"
       >
-        <SlidersHorizontal className="w-[18px] h-[18px]" aria-hidden="true" />
+        <ListFilter className="w-[18px] h-[18px]" aria-hidden="true" />
+        {/* Below sm the set chips can scroll out of sight, so the button
+            counts them; from sm the chips beside it say it. */}
         {active > 0 && (
           <span
-            className="inline-flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-teal-700 text-white dark:bg-teal-400 dark:text-rb-900 text-xs font-bold tabular-nums"
+            className="absolute -right-1 -top-1 inline-flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-teal-700 text-white dark:bg-teal-400 dark:text-rb-900 text-xs font-bold tabular-nums sm:hidden"
             aria-hidden="true"
             data-filter-sheet-count={active}
             data-prov-exempt
@@ -399,12 +406,74 @@ function Sheet<F>({
     closeSheet(draftRef.current !== applied ? draftRef.current : undefined);
   };
 
+  // One dimension's row in the list.
+  const dimRow = (dim: FilterDimension<F>) => (
+    <li key={dim.id} className="border-b border-rb-200 dark:border-rb-800">
+      {dim.pinned?.(filters) ? (
+        // Fixed from outside (a search naming a market): its choice
+        // as plain text, with nothing to pick.
+        <div
+          className="flex w-full min-h-14 items-center gap-3 py-3"
+          data-filter-sheet-row={dim.id}
+          data-filter-sheet-pinned=""
+        >
+          <span className="text-sm">{dim.label}</span>
+          <span className="ml-auto truncate text-sm font-medium text-foreground">{currentChoice(dim, filters)}</span>
+        </div>
+      ) : isToggle(dim) ? (
+        <ToggleRow dim={dim} filters={filters} onChange={onChange} />
+      ) : isSegmented(dim) ? (
+        <SegmentRow dim={dim} filters={filters} onChange={onChange} />
+      ) : dim.cardinality === "range" ? (
+        <RangeRow
+          dim={dim}
+          filters={filters}
+          // A delayed slider write lands on the newest draft, so it
+          // never undoes an edit made in another row meanwhile.
+          onChange={(next) => onChange(dim.set(draftRef.current, dim.get(next)))}
+          flushRef={flushFor(dim.id)}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => openSub(dim.id)}
+          className="flex w-full min-h-14 items-center gap-3 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          data-filter-sheet-row={dim.id}
+          data-anatomy="N1.8.3"
+        >
+          <span className="text-sm">{dim.label}</span>
+          <span
+            className={`ml-auto truncate text-sm ${isDimensionActive(dim, filters) ? "text-foreground font-medium" : "text-rb-500"}`}
+          >
+            {currentChoice(dim, filters)}
+          </span>
+          <ChevronRight className="w-4 h-4 shrink-0 text-rb-500" aria-hidden="true" />
+        </button>
+      )}
+    </li>
+  );
+  // Size, Transactions and History as one section, where the first of them
+  // stood (ui-jobs 801); every other dimension keeps its row.
+  const inSection = (d: FilterDimension<F>) => SECTION_GROUPS.includes(d.group ?? d.label);
+  const sectioned = dims.filter(inSection);
+  const section = sectioned.length > 1 ? sectioned : [];
+  const listItems = dims.flatMap((dim) => {
+    if (!section.includes(dim)) return [dimRow(dim)];
+    if (dim !== section[0]) return [];
+    return [
+      <li key="section" data-filter-sheet-section="" data-anatomy="N1.8.10">
+        <h3 className="pt-5 pb-1 text-xs font-semibold text-rb-500 dark:text-rb-400/75">{SECTION_TITLE}</h3>
+        <ul>{section.map(dimRow)}</ul>
+      </li>,
+    ];
+  });
+
   const title = openDim ? openDim.label : "Filters";
 
   if (typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col justify-end sm:hidden">
+    <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col justify-end sm:flex-row">
       {/* The scrim: a press on it closes the sheet and drops the draft. */}
       <div className="absolute inset-0 bg-[var(--backdrop-bg)]" onClick={() => closeSheet()} aria-hidden="true" />
       <div
@@ -412,12 +481,12 @@ function Sheet<F>({
         role="dialog"
         aria-modal="true"
         aria-labelledby="filter-sheet-title"
-        className="relative flex max-h-[88vh] flex-col rounded-t-2xl bg-raised text-foreground shadow-xl dark:bg-rb-900 [&_.overlay-search]:bg-raised! dark:[&_.overlay-search]:bg-rb-900!"
+        className="relative flex max-h-[88vh] flex-col rounded-t-2xl bg-raised text-foreground shadow-xl sm:h-full sm:max-h-none sm:w-[400px] sm:rounded-none sm:rounded-l-2xl dark:bg-rb-900 [&_.overlay-search]:bg-raised! dark:[&_.overlay-search]:bg-rb-900!"
         data-filter-sheet=""
         data-anatomy="N1.8"
       >
-        <div className="flex h-5 shrink-0 items-center justify-center" aria-hidden="true">
-          <span className="h-1 w-10 rounded-full bg-rb-300 dark:bg-rb-600" />
+        <div className="flex h-5 shrink-0 items-center justify-center sm:h-2" aria-hidden="true">
+          <span className="h-1 w-10 rounded-full bg-rb-300 sm:hidden dark:bg-rb-600" />
         </div>
         <div
           className="flex h-12 shrink-0 items-center gap-1 border-b border-rb-200 dark:border-rb-700 px-2"
@@ -433,7 +502,9 @@ function Sheet<F>({
             aria-label={openDim ? "Back to filters" : "Close filters"}
             data-filter-sheet-back=""
           >
-            <ChevronLeft className="w-5 h-5" aria-hidden="true" />
+            {/* From sm the list closes on a ×; a sub-view keeps its back. */}
+            <ChevronLeft className={`w-5 h-5 ${openDim ? "" : "sm:hidden"}`} aria-hidden="true" />
+            {!openDim && <X className="w-5 h-5 max-sm:hidden" aria-hidden="true" />}
           </button>
           <h2 id="filter-sheet-title" className="flex-1 truncate text-base font-semibold">
             {title}
@@ -455,55 +526,7 @@ function Sheet<F>({
               <DimensionView dim={openDim} filters={filters} onChange={onChange} onPicked={leaveSub} />
             </SwipeBack>
           ) : (
-            <ul className="px-4">
-              {dims.map((dim) => (
-                <li key={dim.id} className="border-b border-rb-200 dark:border-rb-800">
-                  {dim.pinned?.(filters) ? (
-                    // Fixed from outside (a search naming a market): its choice
-                    // as plain text, with nothing to pick.
-                    <div
-                      className="flex w-full min-h-14 items-center gap-3 py-3"
-                      data-filter-sheet-row={dim.id}
-                      data-filter-sheet-pinned=""
-                    >
-                      <span className="text-sm">{dim.label}</span>
-                      <span className="ml-auto truncate text-sm font-medium text-foreground">
-                        {currentChoice(dim, filters)}
-                      </span>
-                    </div>
-                  ) : isToggle(dim) ? (
-                    <ToggleRow dim={dim} filters={filters} onChange={onChange} />
-                  ) : isSegmented(dim) ? (
-                    <SegmentRow dim={dim} filters={filters} onChange={onChange} />
-                  ) : dim.cardinality === "range" ? (
-                    <RangeRow
-                      dim={dim}
-                      filters={filters}
-                      // A delayed slider write lands on the newest draft, so it
-                      // never undoes an edit made in another row meanwhile.
-                      onChange={(next) => onChange(dim.set(draftRef.current, dim.get(next)))}
-                      flushRef={flushFor(dim.id)}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => openSub(dim.id)}
-                      className="flex w-full min-h-14 items-center gap-3 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                      data-filter-sheet-row={dim.id}
-                      data-anatomy="N1.8.3"
-                    >
-                      <span className="text-sm">{dim.label}</span>
-                      <span
-                        className={`ml-auto truncate text-sm ${isDimensionActive(dim, filters) ? "text-foreground font-medium" : "text-rb-500"}`}
-                      >
-                        {currentChoice(dim, filters)}
-                      </span>
-                      <ChevronRight className="w-4 h-4 shrink-0 text-rb-500" aria-hidden="true" />
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <ul className="px-4">{listItems}</ul>
           )}
         </div>
 

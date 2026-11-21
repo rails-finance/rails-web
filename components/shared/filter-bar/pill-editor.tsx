@@ -238,7 +238,8 @@ export function GroupEditor<F>({
     }
   };
 
-  // The draft's count, where counting it costs no read.
+  // The draft's count, read after a short pause so a run of edits costs a
+  // server listing one read (ui-jobs 801).
   const dirty = draft !== applied;
   const [draftCount, setDraftCount] = useState<number | null>(count?.total ?? null);
   const countForRef = useRef(countFor);
@@ -246,12 +247,17 @@ export function GroupEditor<F>({
   useEffect(() => {
     if (!dirty || !countForRef.current) return;
     let cancelled = false;
-    Promise.resolve(countForRef.current(draft)).then(
-      (n) => !cancelled && setDraftCount(n),
-      () => !cancelled && setDraftCount(null),
-    );
+    const t = window.setTimeout(() => {
+      Promise.resolve()
+        .then(() => countForRef.current!(draft))
+        .then(
+          (n) => !cancelled && setDraftCount(n),
+          () => !cancelled && setDraftCount(null),
+        );
+    }, 250);
     return () => {
       cancelled = true;
+      window.clearTimeout(t);
     };
   }, [draft, dirty]);
   const shown = dirty ? draftCount : (count?.total ?? null);

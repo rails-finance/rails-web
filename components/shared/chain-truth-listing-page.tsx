@@ -495,16 +495,15 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   );
   const viewKey = strategy.kind === "server" ? serverViewKey : memoryViewKey;
 
-  // A staged selection's count, for the pill editors' "Show {n}": only where
-  // it costs no read, the in-memory rows filtered. A server listing's editors
-  // read "Apply" (ui-jobs 681), so a staged edit costs no read.
-  const countFor =
-    strategy.kind === "memory"
-      ? (draft: F): number => {
-          const s = strategyRef.current;
-          return s.kind === "memory" ? applyListFilter(fetched, s.dimensions(fetched), draft, s.apply).length : 0;
-        }
-      : undefined;
+  // A staged selection's count, for the editors' "Show {n}" (ui-jobs 801): the
+  // in-memory rows filtered, or a server listing's total for the draft's
+  // first page, one read per settled edit (the sheet waits COUNT_DELAY_MS).
+  const countFor = (draft: F): number | Promise<number> => {
+    const s = strategyRef.current;
+    return s.kind === "memory"
+      ? applyListFilter(fetched, s.dimensions(fetched), draft, s.apply).length
+      : s.fetchPage(draft, 1).then((res) => res.total);
+  };
 
   const line = countLine?.(filters) ?? null;
   const pagination =

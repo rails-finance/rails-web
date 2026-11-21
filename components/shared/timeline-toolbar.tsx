@@ -33,7 +33,13 @@ import { lifetimeFiguresKnown } from "@/lib/shared/timeline-opening-balance";
 import { loadedDaysStatement, segmentStatement } from "@/lib/shared/timeline-segments";
 import { TimelineNavigatorPanel, type TimelineMonthReach } from "@/components/shared/timeline-navigator";
 import { useHydrated } from "@/hooks/useHydrated";
-import { FilterPill, FilterPillReserve, PILL_MUTED } from "@/components/shared/filter-bar/filter-pill";
+import { CalendarDays } from "lucide-react";
+import {
+  FilterPill,
+  FilterPillReserve,
+  PILL_ICON_BUTTON,
+  PILL_MUTED,
+} from "@/components/shared/filter-bar/filter-pill";
 import {
   clearTimelineFilters,
   draftAxesView,
@@ -735,16 +741,34 @@ export function TimelineToolbar({
             >
               <TimelineFilterSheet model={model} count={draftBase} countFor={countFor} />
               <TimelineAxisPills model={model} count={draftBase} countFor={countFor} />
-              {tl.datesAxis && (
+              {tl.datesAxis && !filterActive && (
+                <button
+                  type="button"
+                  onClick={tl.toggleHeatmap}
+                  className={PILL_ICON_BUTTON}
+                  aria-haspopup="dialog"
+                  aria-expanded={datePanelOpen}
+                  aria-label="Add Date filter"
+                  title="Date"
+                  data-filter-pill="Date"
+                  data-pill-state="unset"
+                  data-pill-open=""
+                  data-date-control=""
+                  data-anatomy="N1.10 L1.7"
+                >
+                  <CalendarDays className="w-[18px] h-[18px]" aria-hidden="true" />
+                </button>
+              )}
+              {tl.datesAxis && filterActive && (
                 <FilterPill
                   name="Date"
                   anatomy="L1.7"
                   openData={{ "data-date-control": "" }}
-                  state={filterActive ? "set" : "unset"}
+                  state="set"
                   locked={false}
                   label="Date"
                   value={dateLabel}
-                  spoken={filterActive ? `Date ${dateLabel}` : "Add Date filter"}
+                  spoken={`Date ${dateLabel}`}
                   expanded={datePanelOpen}
                   onOpen={tl.toggleHeatmap}
                   onRemove={clearDate}
