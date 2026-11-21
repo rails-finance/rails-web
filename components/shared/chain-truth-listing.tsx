@@ -126,6 +126,11 @@ export interface ChainTruthListingProps<T, F extends BaseListFilters = BaseListF
    *  replays the cards' fade without replaying it on a band that did not change.
    *  Drawn only when there are rows — a summary of nothing is nothing. */
   above?: ReactNode;
+  /** Opt-in slot under the rows and their pagination: on a listing searched
+   *  by wallet, the wallet's positions of the protocol's other kinds
+   *  (`components/shared/holder-kinds.tsx`). Drawn whatever the rows, since
+   *  a wallet can hold none of this listing's kind and some of another. */
+  below?: ReactNode;
   /** Opt-in line under the empty state, for a listing whose search can name
    *  nothing it reads (Alchemix: "Search takes a full address…"). */
   emptyNote?: ReactNode;
@@ -167,6 +172,7 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
   error,
   headerExtra,
   above,
+  below,
   emptyNote,
   protocol,
   identity,
@@ -293,15 +299,7 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
                           navigation hover border off this group. Detail pages render
                           the same cards outside any row Link, so the hover state never
                           fires there. */}
-                    <Link
-                      href={hrefFor(item)}
-                      prefetch={true}
-                      className="group/listing-row block"
-                      data-anatomy="N2"
-                      onClick={() => markNavStart(hrefFor(item))}
-                    >
-                      {renderCard(item)}
-                    </Link>
+                    <ListingRowLink href={hrefFor(item)}>{renderCard(item)}</ListingRowLink>
                   </div>
                 ))}
               </div>
@@ -325,6 +323,23 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
           )}
         </>
       )}
+      {!loading && !error && below}
     </div>
+  );
+}
+
+/** One row's link to its position: the listing's rows, and the wallet's
+ *  other kinds under them (`components/shared/holder-kinds.tsx`). */
+export function ListingRowLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      prefetch={true}
+      className="group/listing-row block"
+      data-anatomy="N2"
+      onClick={() => markNavStart(href)}
+    >
+      {children}
+    </Link>
   );
 }

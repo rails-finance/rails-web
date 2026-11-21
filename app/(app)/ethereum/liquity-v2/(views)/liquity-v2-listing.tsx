@@ -15,18 +15,26 @@
 // the shared driver + useUrlSearchParams replace them, and this now SSR-first-paints
 // like the rest of the tier.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LiquityPositionCard } from "@/components/protocol/liquity-family/liquity-position-card";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { troveWords } from "@/lib/liquity/event-templates";
-import { viewFromTroveSummary } from "@/lib/liquity/trove-card-view";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import { fetchTroves } from "@/lib/api/fetch-troves";
 import type { TroveSummary } from "@/types/api/trove";
-import type { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
 import { HolderStrip } from "@/components/shared/holder-strip";
+import { HolderKinds, useHolderKinds, type HolderKindPage } from "@/components/shared/holder-kinds";
+import {
+  LIQUITY_V2_DEPOSITS,
+  liquityV2TroveCard,
+  liquityV2TroveHref,
+  liquityV2TroveKey,
+} from "@/lib/liquity-v2/holder-kinds";
+import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
+import { readListQuery } from "@/lib/shared/list-filter";
+import { useUrlSearchParams } from "@/lib/shared/use-url-search-params";
+import { useLiquityV2Prices } from "@/hooks/useLiquityV2Prices";
 import { liquityV2HolderStrip } from "@/lib/liquity-v2/holder-strip";
 import { namesHolder, parseTroveSearch } from "@/lib/liquity-v2/search";
 import { isAllStatuses } from "@/lib/liquity-v2/listing-visibility";
@@ -52,6 +60,8 @@ export interface LiquityV2ListingProps {
   initialSearch?: string;
 }
 
+const OTHER_KINDS = [LIQUITY_V2_DEPOSITS];
+
 export function LiquityV2Listing({
   initialItems,
   initialTotal,
@@ -59,27 +69,14 @@ export function LiquityV2Listing({
   initialKey,
   initialSearch,
 }: LiquityV2ListingProps) {
-  // Oracle prices — a one-time side-fetch (USD on the open cards is an interpreted
-  // layer). When it lands the config re-renders and renderCard closes over the new
-  // value; it's outside the driver's fetch lifecycle, so it never triggers a
-  // listing refetch. Best-effort: the cards render without USD until it resolves.
-  const [prices, setPrices] = useState<OraclePricesData | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/oracle/liquity-v2");
-        if (!res.ok) return;
-        const json = (await res.json()) as OraclePricesResponse;
-        if (!cancelled && json.success && json.data) setPrices(json.data);
-      } catch {
-        /* prices are an optional enhancement — the listing still loads */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // The branch prices: USD on the open cards and the strip's totals. Outside
+  // the driver's fetch lifecycle, so its landing never refetches the listing.
+  const prices = useLiquityV2Prices();
+
+  // The wallet's Stability Pool deposits, under the rows and counted in the
+  // strip (rails-ops TO-DO-stability-pool-deposits §1b).
+  const { wallet, reads } = useHolderKinds(OTHER_KINDS, readListQuery(useUrlSearchParams(initialSearch ?? "")));
+  const deposits = reads[LIQUITY_V2_DEPOSITS.id];
 
   // The branches against their CCR (ui-jobs 747): a branch the listing is
   // narrowed to draws its Safety Mode notice above the rows. The read runs
@@ -154,7 +151,9 @@ export function LiquityV2Listing({
     !filters.hasRedemptions &&
     !filters.batchOnly &&
     !filters.individualOnly &&
-    prices ? (
+    prices &&
+    // The deposits' read has answered; a failed one leaves them unsaid.
+    deposits !== undefined ? (
       <HolderStrip
         {...liquityV2HolderStrip(
           items,
@@ -166,6 +165,7 @@ export function LiquityV2Listing({
             const { ownerAddress, ownerEns } = parseTroveSearch(filters.q);
             return ownerAddress ?? ownerEns;
           })(),
+          deposits === "failed" ? undefined : (deposits as HolderKindPage<LiquityV2DepositRow>),
         )}
       />
     ) : null;
@@ -178,11 +178,9 @@ export function LiquityV2Listing({
       defaults={LIQUITY_V2_LIST_DEFAULTS}
       sortOptions={LIQUITY_V2_SORT_OPTIONS}
       searchPlaceholder={troveWords("listing_search")}
-      renderCard={(t) => (
-        <LiquityPositionCard protocol="liquity-v2" surface="listing" v={viewFromTroveSummary(t, prices)} compact />
-      )}
-      hrefFor={(t) => `/ethereum/liquity-v2/trove/${t.collateralType}/${t.id}`}
-      keyFor={(t) => `${t.collateralType}-${t.id}`}
+      renderCard={(t) => liquityV2TroveCard(t, prices)}
+      hrefFor={liquityV2TroveHref}
+      keyFor={liquityV2TroveKey}
       strategy={serverStrategy<TroveSummary, LiquityV2ListFilters>({
         dimensions: liquityV2ListDimensions(collateralOptions),
         itemsPerPage: LIQUITY_V2_ITEMS_PER_PAGE,
@@ -202,6 +200,7 @@ export function LiquityV2Listing({
           {holderStrip(items, total, filters)}
         </>
       )}
+      renderBelow={() => <HolderKinds kinds={OTHER_KINDS} reads={reads} wallet={wallet} />}
       initialItems={initialItems}
       initialTotal={initialTotal}
       initialKey={initialKey}

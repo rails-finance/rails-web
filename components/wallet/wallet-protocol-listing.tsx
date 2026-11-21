@@ -8,7 +8,7 @@
 // the listing's holder band (N7) with its receipts open in the page's
 // inspector. Clearing or changing the Protocol pill opens that view.
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import { LiquityPositionCard } from "@/components/protocol/liquity-family/liquity-position-card";
@@ -17,6 +17,7 @@ import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/prove
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { HolderStrip } from "@/components/shared/holder-strip";
+import { useLiquityV2Prices } from "@/hooks/useLiquityV2Prices";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import { WalletHeader } from "@/components/wallet/wallet-header";
 import { fetchTroves } from "@/lib/api/fetch-troves";
@@ -39,7 +40,7 @@ import { walletHref, type WalletProtocolCount } from "@/lib/wallet/wallet-filter
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { PROTOCOLS } from "@/lib/shared/protocols";
 import type { TroveSummary } from "@/types/api/trove";
-import type { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
+import type { OraclePricesData } from "@/types/api/oracle";
 
 const PROTOCOL = "liquity-v2";
 /** The roster id, the glyph key. */
@@ -79,19 +80,7 @@ export function WalletProtocolListing({
   const registry = useReceiptRegistry();
 
   // The branch prices, the listing's one side-fetch.
-  const [prices, setPrices] = useState<OraclePricesData | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/oracle/liquity-v2")
-      .then((r) => (r.ok ? (r.json() as Promise<OraclePricesResponse>) : null))
-      .then((json) => {
-        if (!cancelled && json?.success && json.data) setPrices(json.data);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const prices = useLiquityV2Prices();
 
   const collateralOptions = useMemo<FilterOptionDef[]>(
     () =>

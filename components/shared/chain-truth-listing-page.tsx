@@ -167,6 +167,10 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
    *  page or sort change must not replay the fade on a band that did not change).
    *  Every other listing passes nothing. */
   renderAbove?: (ctx: { items: T[]; total: number; filters: F }) => ReactNode;
+  /** Opt-in slot under the rows and their pagination, given the decoded
+   *  selection: the wallet's positions of the protocol's other kinds on a
+   *  listing searched by wallet (`components/shared/holder-kinds.tsx`). */
+  renderBelow?: (filters: F) => ReactNode;
   /** A section listing's identity line (mark + word) above the h1 — for a
    *  route with no roster entry, where no RailHeader can be derived. Passed
    *  through to the presentation shell. */
@@ -225,6 +229,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   onFilters,
   headerExtra,
   renderAbove,
+  renderBelow,
   identity,
   titleHidden,
   titleAs,
@@ -552,6 +557,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
         protocol={directoryEntry}
         headerExtra={headerExtra}
         above={above}
+        below={renderBelow?.(filters)}
         emptyNote={
           (strategy.kind === "server" && strategy.search
             ? listingSearchNote(filters.q, strategy.search.takesId)

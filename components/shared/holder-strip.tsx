@@ -11,7 +11,10 @@
 // `?q=<address|ens>` URL, so it is shareable as it is.
 //
 // WHAT IT STATES, in this order: the counts by status, and one leg per unit the
-// wallet holds (a total collateral, a total debt).
+// wallet holds (a total collateral, a total debt, a deposit). Where the
+// protocol has a second position kind (rails-ops TO-DO-stability-pool-deposits
+// §1b), the counts and legs take in the wallet's positions of every kind; a
+// deposit is its own leg and never sums with a debt.
 //
 // WHAT IT NEVER STATES is a wallet-wide collateral ratio. Liquidation is per
 // position: a wallet holding one CDP at 118% and one at 400% has no single
@@ -83,6 +86,17 @@ export interface HolderLeg {
   };
 }
 
+/** One other position kind, counted. */
+export interface HolderKindCount {
+  /** Stable machine name ("deposit"). */
+  id: string;
+  /** The kind's noun, singular and plural, as the share card's status word
+   *  writes it ("deposit", "deposits"). */
+  noun: [string, string];
+  open: number;
+  closed: number;
+}
+
 export interface HolderStripProps {
   /** The counts by status, as the adapter's own sentence — "CDPs across both
    *  markets" and "troves, one on each branch" are protocol facts, not a
@@ -103,6 +117,11 @@ export interface HolderStripProps {
    *  the band draws only from two (one would repeat its card) and its totals
    *  only from two open ones (ui-jobs 737). Unset, it draws as given. */
   positions?: number;
+  /** The protocol's other position kinds the wallet holds (a Stability Pool
+   *  deposit beside its Troves), counted by status. `counts` stays the
+   *  searched kind's; the band's two-position rules count across every kind,
+   *  and the share card names each kind in its status word. */
+  kinds?: HolderKindCount[];
   /** The wallet the search names: the band links its wallet page,
    *  "Everything this wallet holds" (ui-jobs 737). */
   wallet?: string;
@@ -187,6 +206,7 @@ export function HolderStrip({
   note,
   wallet,
   positions,
+  kinds,
   scoped = false,
 }: HolderStripProps & {
   /** Drawn inside a page's receipts scope (the wallet page, ui-jobs 738):
@@ -195,7 +215,8 @@ export function HolderStrip({
 }) {
   if (positions != null && positions < 2) return null;
   const Scope = scoped ? Fragment : ProvUnscoped;
-  const totals = !truncated && legs.length > 0 && (positions == null || counts.open >= 2);
+  const open = counts.open + (kinds ?? []).reduce((n, k) => n + k.open, 0);
+  const totals = !truncated && legs.length > 0 && (positions == null || open >= 2);
   // The wallet page's sections pass no counts sentence: their cards are under it.
   if (!countsLine && !totals && !note && !wallet) return null;
   return (
@@ -215,6 +236,7 @@ export function HolderStrip({
         data-holder-open={counts.open}
         data-holder-closed={counts.closed}
         data-holder-liquidated={counts.liquidated}
+        data-holder-kinds={kinds?.map((k) => `${k.id}:${k.open}:${k.closed}`).join(" ") || undefined}
         className="mb-5 border-b border-rb-300/60 dark:border-rb-700/60 pb-4"
       >
         {countsLine && (
