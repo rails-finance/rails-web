@@ -787,6 +787,7 @@ export function TimelineToolbar({
                   anatomy="L1.7"
                   openData={{ "data-date-control": "" }}
                   state="set"
+                  inert={panelOpen}
                   locked={false}
                   label="Date"
                   value={dateLabel}

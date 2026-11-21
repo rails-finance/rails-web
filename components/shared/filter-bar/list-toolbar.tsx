@@ -9,9 +9,11 @@
 // right-aligned as one group that wraps together, [count] [sort] [⋮]. Below
 // sm: the open search field alone; one row that scrolls sideways and never
 // wraps, led by the search icon and the Filters button; then Reset at the
-// left and the count, sort and ⋮ at the right. A page passes its dimension registry and param
-// object; the toolbar holds no filter state beyond which editor is open and
-// the order the pills were set in.
+// left and the count, sort and ⋮ at the right. From sm the Filters button
+// opens its panel under the row, and while it is open the row's other
+// controls are dimmed and inert. A page passes its dimension registry and
+// param object; the toolbar holds no filter state beyond which editor is
+// open and the order the pills were set in.
 
 import {
   useEffect,

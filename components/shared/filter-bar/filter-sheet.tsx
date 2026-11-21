@@ -19,30 +19,35 @@
  * the primary button: the count the edits would give where the listing counts
  * a draft from rows it holds, else "Apply".
  *
- * Edits are staged: the sheet holds a draft of the filters, and only the
- * primary button writes it, through the same `onChange` the desktop panels
- * use (so the URL, Save listing and Copy link follow). Its count is the
- * listing's own until the draft changes, then `countFor(draft)`, which runs
- * the listing's own filtering (in memory, or the server's total). Escape and
- * the back control at the top close the sheet and drop the draft; a facet's
- * back returns to the list keeping it.
+ * Edits are staged: the sheet holds the edits made in it, by dimension, and
+ * the draft is the listing's applied filters with those edits over them, so a
+ * change made outside the sheet while it is open (a search, a type hidden
+ * from a row's ⋮) stands. Only the primary button writes the draft, through
+ * the same `onChange` the pill editors use (so the URL, Save listing and Copy
+ * link follow), and with no edit it writes nothing. Its count is the
+ * listing's until an edit is made, then `countFor(draft)`, which runs the
+ * listing's filtering (in memory, or the server's total). Escape and the back
+ * control at the top close the sheet and drop the edits; a facet's back
+ * returns to the list keeping them.
  *
  * Below sm a modal dialog: focus is held inside while it is open and returns
  * to the Filters button on close; the page behind does not scroll. The panel
  * in the page is a labelled region and holds neither.
  *
- * Browser back steps back inside the sheet (a phone's edge swipe or back
- * button fires it): opening the sheet and opening a sub-view each push a
+ * Below sm, browser back steps back inside the sheet (a phone's edge swipe or
+ * back button fires it): opening the sheet and opening a sub-view each push a
  * history entry at the same URL, marked in `history.state[SHEET_STATE]`, and
  * popstate closes the sub-view or the sheet (dropping the draft, as Escape
  * does). The sheet's own controls leave through the same entries, so none is
  * left behind, and Show writes the draft only once they are gone. A sub-view
- * also returns to the list on a swipe to the right.
+ * also returns to the list on a swipe to the right. The panel in the page
+ * pushes no history entry.
  */
 
 import {
   Fragment,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -51,10 +56,10 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronLeft, ChevronRight, ListFilter, Minus, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ListFilter, Minus } from "lucide-react";
 import { CTRL_GHOST, CTRL_OFF, RESET_LINK } from "@/lib/shared/ui-grammar";
 import { PILL_ICON_BUTTON } from "@/components/shared/filter-bar/filter-pill";
-import { PRIMARY_BUTTON, usePhone } from "@/components/shared/filter-bar/pill-editor";
+import { COUNT_DELAY_MS, PRIMARY_BUTTON, usePhone } from "@/components/shared/filter-bar/pill-editor";
 import { activeGroupCount, groupDimensions } from "@/components/shared/filter-bar/pill-model";
 import {
   type FilterDimension,
@@ -88,16 +93,12 @@ export interface FilterSheetProps<F> {
    *  while Status rests on Open). Without it, `count.noun`. */
   nounFor?: (draft: F) => string;
   /** The element under the toolbar's row that the filters open in from sm
-   *  (ui-jobs 801): a panel in the page, above the results. Without it the
-   *  sheet opens at the right edge from sm. */
+   *  (ui-jobs 801): a panel in the page, above the results. */
   slot?: HTMLElement | null;
   /** Told when the panel in the page opens and closes, so the toolbar can
    *  set its other controls back while the filters hold the focus. */
   onPanelOpenChange?: (open: boolean) => void;
 }
-
-/** Wait after a draft edit before counting it, so a run of taps costs one read. */
-const COUNT_DELAY_MS = 250;
 
 /** The `history.state` key the sheet's entries carry: "list" or "view". */
 const SHEET_STATE = "filterSheet";
@@ -117,6 +118,10 @@ const SECTION_GROUPS = ["Size", "Transactions", "History"];
 const SECTION_TITLE = "Size and history";
 /** In the page a column's last row has no rule under it. */
 const LAST_ROW_OPEN = "[&>li:last-child]:border-b-0";
+
+/** Two selections of one dimension hold the same values. */
+const sameValues = (a: string[], b: string[]) =>
+  a.length === b.length && [...a].sort().join("\u0000") === [...b].sort().join("\u0000");
 
 /** The dimension back at its default. */
 const resetDim = <F,>(dim: FilterDimension<F>, f: F): F => dim.set(f, dim.defaultValues?.(f) ?? []);
@@ -157,9 +162,16 @@ export function FilterSheet<F>({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const phone = usePhone();
   const inline = slot != null && phone === false;
-  // The open sheet's own close, so a second press on the button leaves
-  // through the sheet's history entries.
+  // The open sheet's close, so a second press on the button leaves through
+  // the sheet's history entries.
   const requestClose = useRef<(() => void) | null>(null);
+  const regionId = useId();
+  // The sheet opened as a dialog or as the panel in the page; when the width
+  // crosses sm or the slot goes while it is open, it closes.
+  const openedInline = useRef(inline);
+  useLayoutEffect(() => {
+    if (open && openedInline.current !== inline) requestClose.current?.();
+  }, [open, inline]);
   const panelOpen = open && inline;
   const onPanelOpenChangeRef = useRef(onPanelOpenChange);
   onPanelOpenChangeRef.current = onPanelOpenChange;
@@ -179,13 +191,15 @@ export function FilterSheet<F>({
             requestClose.current?.();
             return;
           }
-          // The sheet's history entry, at the same URL (no query change, so
-          // Copy link and the listing do not see it).
-          window.history.pushState({ [SHEET_STATE]: "list" }, "");
+          // Below sm the sheet's history entry, at the same URL (no query
+          // change, so Copy link and the listing do not see it).
+          openedInline.current = inline;
+          if (!inline) window.history.pushState({ [SHEET_STATE]: "list" }, "");
           setOpen(true);
         }}
         className={`${PILL_ICON_BUTTON} relative ${open && inline ? "border-teal-600! dark:border-teal-400!" : ""}`}
-        aria-haspopup="dialog"
+        aria-haspopup={inline ? undefined : "dialog"}
+        aria-controls={open && inline ? regionId : undefined}
         aria-expanded={open}
         aria-label={active > 0 ? `Filters, ${active} active` : "Filters"}
         title="Filters"
@@ -193,8 +207,8 @@ export function FilterSheet<F>({
         data-anatomy="N1.8.1"
       >
         <ListFilter className="w-[18px] h-[18px]" aria-hidden="true" />
-        {/* Below sm the set chips can scroll out of sight, so the button
-            counts them; from sm the chips beside it say it. */}
+        {/* Below sm the set pills can scroll out of sight, so the button
+            counts them; from sm the pills beside it say it. */}
         {active > 0 && (
           <span
             className="absolute -right-1 -top-1 inline-flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-teal-700 text-white dark:bg-teal-400 dark:text-rb-900 text-xs font-bold tabular-nums sm:hidden"
@@ -215,8 +229,10 @@ export function FilterSheet<F>({
           countPending={countPending}
           countFor={countFor}
           nounFor={nounFor}
-          inline={inline}
+          inline={openedInline.current}
           slot={slot}
+          regionId={regionId}
+          buttonRef={buttonRef}
           requestCloseRef={requestClose}
           onClose={() => {
             setOpen(false);
@@ -238,11 +254,16 @@ function Sheet<F>({
   nounFor,
   inline,
   slot,
+  regionId,
+  buttonRef,
   requestCloseRef,
   onClose,
 }: {
+  /** Opened as the panel in the page; fixed for the sheet's life. */
   inline: boolean;
   slot?: HTMLElement | null;
+  regionId: string;
+  buttonRef: React.RefObject<HTMLButtonElement | null>;
   requestCloseRef: MutableRefObject<(() => void) | null>;
   dimensions: FilterDimension<F>[];
   applied: F;
@@ -253,14 +274,34 @@ function Sheet<F>({
   nounFor?: (draft: F) => string;
   onClose: () => void;
 }) {
-  // The staged filters: every control in the sheet reads and writes these.
-  const [filters, setDraft] = useState<F>(applied);
-  // The newest draft, for Show after a range flush has written one this tick.
-  const draftRef = useRef<F>(applied);
+  // The edits made in the sheet, by dimension id; the draft every control
+  // reads is the applied filters with them over it, in registry order.
+  const [edits, setEdits] = useState<ReadonlyMap<string, string[]>>(() => new Map());
+  const editsRef = useRef(edits);
+  const appliedRef = useRef(applied);
+  appliedRef.current = applied;
+  const dimensionsRef = useRef(dimensions);
+  dimensionsRef.current = dimensions;
+  const compose = (base: F, e: ReadonlyMap<string, string[]>) =>
+    dimensionsRef.current.reduce((f, d) => (e.has(d.id) ? d.set(f, e.get(d.id)!) : f), base);
+  /** The newest draft, for a write that lands after this render (a range's
+   *  delayed slider move, Show after a flush). */
+  const currentDraft = () => compose(appliedRef.current, editsRef.current);
+  const filters = compose(applied, edits);
+  // A control hands back the whole filter object: every dimension it moved
+  // becomes an edit (one dimension's `set` may move another).
   const onChange = (next: F) => {
-    draftRef.current = next;
-    setDraft(next);
+    const cur = currentDraft();
+    const e = new Map(editsRef.current);
+    for (const d of dimensionsRef.current) {
+      const v = d.get(next);
+      if (!sameValues(v, d.get(cur))) e.set(d.id, v);
+    }
+    editsRef.current = e;
+    setEdits(e);
   };
+  const isDirty = (base: F, e: ReadonlyMap<string, string[]>) =>
+    dimensionsRef.current.some((d) => e.has(d.id) && !sameValues(e.get(d.id)!, d.get(base)));
   // Each range row's pending slider move, written before Show.
   const flushers = useRef(new Map<string, MutableRefObject<(() => void) | null>>());
   const flushFor = (id: string) => {
@@ -269,8 +310,10 @@ function Sheet<F>({
     return r;
   };
   const flushRanges = () => flushers.current.forEach((r) => r.current?.());
-  const dirty = filters !== applied;
+  const dirty = isDirty(applied, edits);
   const dims = dimensions.filter((d) => !d.available || d.available(filters));
+  // What the draft selects, as text: the count is read again when it changes.
+  const draftKey = `${dimensions.map((d) => d.get(filters).join(",")).join("|")}|${(filters as { q?: string }).q ?? ""}`;
 
   // The draft's count, read after a short pause; null until it lands (or
   // when the read fails, and the button then names no figure).
@@ -284,7 +327,7 @@ function Sheet<F>({
     setDraftPending(true);
     const t = window.setTimeout(() => {
       Promise.resolve()
-        .then(() => countForRef.current!(filters))
+        .then(() => countForRef.current!(currentDraft()))
         .then(
           (n) => !cancelled && setDraftCount(n),
           () => !cancelled && setDraftCount(null),
@@ -295,7 +338,8 @@ function Sheet<F>({
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [filters, dirty]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the draft by its key
+  }, [draftKey, dirty]);
 
   // The dimension whose options are open, or null for the list.
   const [openId, setOpenId] = useState<string | null>(null);
@@ -312,7 +356,8 @@ function Sheet<F>({
   // History: how many of the sheet's entries stand above the listing's (1
   // with the list showing, 2 with a sub-view), and the draft Show writes once
   // they are gone.
-  const depth = useRef(1);
+  const modal = inline === false;
+  const depth = useRef(modal ? 1 : 0);
   const pendingApply = useRef<{ draft: F } | null>(null);
   const closing = useRef(false);
   const finished = useRef(false);
@@ -339,8 +384,10 @@ function Sheet<F>({
     } else finishClose();
   };
   const openSub = (id: string) => {
-    window.history.pushState({ [SHEET_STATE]: "view" }, "");
-    depth.current = 2;
+    if (modal) {
+      window.history.pushState({ [SHEET_STATE]: "view" }, "");
+      depth.current = 2;
+    }
     setOpenId(id);
   };
   /** Back to the list, keeping the draft: through history when the sub-view
@@ -355,6 +402,7 @@ function Sheet<F>({
 
   useEffect(() => {
     const onPop = () => {
+      if (!modal) return;
       const st = sheetState();
       if (st === "list") {
         depth.current = 1;
@@ -393,14 +441,18 @@ function Sheet<F>({
   const closeSheetRef = useRef(() => closeSheet());
   closeSheetRef.current = () => closeSheet();
   requestCloseRef.current = closeSheetRef.current;
-  // In the page (from sm, in the toolbar's slot) the filters are no modal:
-  // the page scrolls and Tab moves on through it. Read once, as it opens.
-  const modal = useRef(!inline).current;
 
-  // Escape closes; Tab cycles inside the sheet; the page does not scroll.
+  // Escape closes; in the dialog Tab cycles inside it and the page does not
+  // scroll. In the page (from sm, in the toolbar's slot) the filters are no
+  // modal: the page scrolls, Tab moves on through it, and Escape is the
+  // panel's only while focus is in it, on its button or nowhere.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !e.defaultPrevented) {
+        const at = document.activeElement;
+        const ours =
+          modal || at == null || at === document.body || at === buttonRef.current || panelRef.current?.contains(at);
+        if (!ours) return;
         e.preventDefault();
         closeSheetRef.current();
         return;
@@ -426,6 +478,7 @@ function Sheet<F>({
       document.removeEventListener("keydown", onKeyDown);
       if (modal) document.body.style.overflow = prev;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reads refs only
   }, [modal]);
 
   const anyActive = dims.some((d) => isDimensionActive(d, filters));
@@ -446,7 +499,7 @@ function Sheet<F>({
       : "Apply";
   const apply = () => {
     flushRanges();
-    closeSheet(draftRef.current !== applied ? draftRef.current : undefined);
+    closeSheet(isDirty(appliedRef.current, editsRef.current) ? currentDraft() : undefined);
   };
 
   // One dimension's row in the list.
@@ -473,7 +526,7 @@ function Sheet<F>({
           filters={filters}
           // A delayed slider write lands on the newest draft, so it
           // never undoes an edit made in another row meanwhile.
-          onChange={(next) => onChange(dim.set(draftRef.current, dim.get(next)))}
+          onChange={(next) => onChange(dim.set(currentDraft(), dim.get(next)))}
           flushRef={flushFor(dim.id)}
         />
       ) : (
@@ -540,12 +593,15 @@ function Sheet<F>({
     </button>
   );
 
+  // The panel's slot can go while it closes (a timeline row unmounting).
+  if (inline && !slot) return null;
   if (inline && slot) {
     const sectionHead = <h3 className="pb-1 text-xs font-semibold text-rb-500 dark:text-rb-400/75">{SECTION_TITLE}</h3>;
     const columns = section.length === 0 ? "lg:grid-cols-2" : "lg:grid-cols-3";
     return createPortal(
       <div
         ref={panelRef}
+        id={regionId}
         role="region"
         aria-labelledby="filter-sheet-title"
         className="mt-3 rounded-2xl bg-raised p-6 text-foreground dark:bg-rb-900 [&_.overlay-search]:bg-raised! dark:[&_.overlay-search]:bg-rb-900!"
@@ -617,7 +673,7 @@ function Sheet<F>({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col justify-end sm:flex-row">
+    <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col justify-end">
       {/* The scrim: a press on it closes the sheet and drops the draft. */}
       <div className="absolute inset-0 bg-[var(--backdrop-bg)]" onClick={() => closeSheet()} aria-hidden="true" />
       <div
@@ -625,12 +681,12 @@ function Sheet<F>({
         role="dialog"
         aria-modal="true"
         aria-labelledby="filter-sheet-title"
-        className="relative flex max-h-[88vh] flex-col rounded-t-2xl bg-raised text-foreground shadow-xl sm:h-full sm:max-h-none sm:w-[400px] sm:rounded-none sm:rounded-l-2xl dark:bg-rb-900 [&_.overlay-search]:bg-raised! dark:[&_.overlay-search]:bg-rb-900!"
+        className="relative flex max-h-[88vh] flex-col rounded-t-2xl bg-raised text-foreground shadow-xl dark:bg-rb-900 [&_.overlay-search]:bg-raised! dark:[&_.overlay-search]:bg-rb-900!"
         data-filter-sheet=""
         data-anatomy="N1.8"
       >
-        <div className="flex h-5 shrink-0 items-center justify-center sm:h-2" aria-hidden="true">
-          <span className="h-1 w-10 rounded-full bg-rb-300 sm:hidden dark:bg-rb-600" />
+        <div className="flex h-5 shrink-0 items-center justify-center" aria-hidden="true">
+          <span className="h-1 w-10 rounded-full bg-rb-300 dark:bg-rb-600" />
         </div>
         <div
           className="flex h-12 shrink-0 items-center gap-1 border-b border-rb-200 dark:border-rb-700 px-2"
@@ -646,9 +702,7 @@ function Sheet<F>({
             aria-label={openDim ? "Back to filters" : "Close filters"}
             data-filter-sheet-back=""
           >
-            {/* From sm the list closes on a ×; a sub-view keeps its back. */}
-            <ChevronLeft className={`w-5 h-5 ${openDim ? "" : "sm:hidden"}`} aria-hidden="true" />
-            {!openDim && <X className="w-5 h-5 max-sm:hidden" aria-hidden="true" />}
+            <ChevronLeft className="w-5 h-5" aria-hidden="true" />
           </button>
           <h2 id="filter-sheet-title" className="flex-1 truncate text-base font-semibold">
             {title}

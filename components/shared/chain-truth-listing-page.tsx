@@ -66,6 +66,12 @@ export interface ServerStrategy<T, F extends BaseListFilters, Ext = undefined> {
   dimensions: SerializableDimension<F>[] | ((filters: F, ext: Ext) => SerializableDimension<F>[]);
   /** Map the selection + page onto a backend fetch; returns the slice + total. */
   fetchPage: (filters: F, page: number) => Promise<{ data: T[]; total: number }>;
+  /** The total a staged selection would give, for the editors' "Show {n}"
+   *  (ui-jobs 801), read with no effect on the page. Unset, the driver reads
+   *  `fetchPage(draft, 1).total`, so a `fetchPage` that writes page state (a
+   *  census line, an overlay's block, a cut) gives its own reader here, or
+   *  `false` for an "Apply" button and no read. */
+  countDraft?: ((filters: F) => Promise<number>) | false;
   itemsPerPage: number;
   /** The listing's search box reads an address, an ENS name and, where
    *  `takesId`, a position id (lib/shared/listing-search.ts): a query it cannot
@@ -496,14 +502,17 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   const viewKey = strategy.kind === "server" ? serverViewKey : memoryViewKey;
 
   // A staged selection's count, for the editors' "Show {n}" (ui-jobs 801): the
-  // in-memory rows filtered, or a server listing's total for the draft's
-  // first page, one read per settled edit (the sheet waits COUNT_DELAY_MS).
-  const countFor = (draft: F): number | Promise<number> => {
-    const s = strategyRef.current;
-    return s.kind === "memory"
-      ? applyListFilter(fetched, s.dimensions(fetched), draft, s.apply).length
-      : s.fetchPage(draft, 1).then((res) => res.total);
-  };
+  // in-memory rows filtered, or a server listing's total for the draft, one
+  // read per settled edit (the editors wait COUNT_DELAY_MS). None where the
+  // strategy rules it out (`countDraft: false`): the editors read "Apply".
+  const countFor =
+    strategy.kind === "server" && strategy.countDraft === false
+      ? undefined
+      : (draft: F): number | Promise<number> => {
+          const s = strategyRef.current;
+          if (s.kind === "memory") return applyListFilter(fetched, s.dimensions(fetched), draft, s.apply).length;
+          return s.countDraft ? s.countDraft(draft) : s.fetchPage(draft, 1).then((res) => res.total);
+        };
 
   const line = countLine?.(filters) ?? null;
   const pagination =

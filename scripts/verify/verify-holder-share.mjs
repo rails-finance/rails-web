@@ -596,7 +596,7 @@ const SPARK_EVERY_STATUS = "?status=open,closed,liquidated";
   await page.waitForTimeout(3500);
   const cleared = await page.evaluate(() => location.search);
   check(
-    "F3. Spark: clearing Status still writes an explicit `?status=` — the open-only explorers are untouched",
+    "F3. Spark: every Status ticked in the Filters panel writes an explicit `?status=` — the open-only explorers are untouched",
     cleared === SPARK_EVERY_STATUS,
     `"${cleared}"`,
   );

@@ -57,6 +57,8 @@ export interface FilterPillProps {
   /** Data hooks on the pill's main button (the timeline's Date pill keeps
    *  `data-date-control`). */
   openData?: Record<string, string>;
+  /** True while the Filters panel is open in the page: out of the Tab order. */
+  inert?: boolean;
 }
 
 export function FilterPill({
@@ -74,6 +76,7 @@ export function FilterPill({
   children,
   anatomy,
   openData,
+  inert,
 }: FilterPillProps) {
   const hooks = {
     "data-filter-pill": name,
@@ -84,7 +87,7 @@ export function FilterPill({
   if (state === "unset") return null;
   if (pinned) {
     return (
-      <div className={`relative shrink-0 ${PANEL_OPEN_DIM}`} {...hooks}>
+      <div className={`relative shrink-0 ${PANEL_OPEN_DIM}`} inert={inert} {...hooks}>
         <div className={`${PILL_BASE} ${PILL_SET_TONE} gap-1.5 px-3.5 text-foreground`}>
           {label && <span className={`shrink-0 ${LABEL}`}>{label}</span>}
           <span className="min-w-0 truncate font-semibold">{value}</span>
@@ -94,7 +97,7 @@ export function FilterPill({
   }
   const removable = !locked;
   return (
-    <div className={`relative shrink-0 ${PANEL_OPEN_DIM}`} {...hooks}>
+    <div className={`relative shrink-0 ${PANEL_OPEN_DIM}`} inert={inert} {...hooks}>
       <div className={`${PILL_BASE} ${PILL_SET} text-foreground`}>
         <button
           ref={buttonRef}

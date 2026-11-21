@@ -2,7 +2,7 @@
 // Asset, Version and Address as the listings' pills (N1.10), each editor
 // staged and applied. An axis that hides nothing draws no pill; the Filters
 // sheet reaches it (lib/listing-toolbar.mjs), and these helpers take that
-// route by themselves, so a caller reads and ticks the same rows either way.
+// route, so a caller reads and ticks the same rows either way.
 // The callers name an axis by its old menu label or its pill name. Hiding an
 // option is "keep every other one", which writes the same ?hide= the old
 // untick did.
@@ -48,7 +48,7 @@ export async function openAxis(page, label, scope = page) {
 
 /** Every row of the open editor or sheet view: key, label, count, whether it
  *  is ticked (kept), `parent` (the umbrella a leg sits under, else null) and
- *  `umbrella` (the umbrella's own row, which ticks its legs). */
+ *  `umbrella` (the umbrella's row, which ticks its legs). */
 export async function axisRows(page) {
   if (await inSheet(page)) return sheetOptionRows(page);
   return page.locator("[data-pill-option]").evaluateAll((els) =>

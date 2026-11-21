@@ -279,6 +279,12 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
           if (aimRef.current) setUnscoped(whole ? whole.pagination.total : null);
           return r ? { data: r.data, total: r.pagination.total } : { data: [], total: 0 };
         },
+        // The same selection's total, one row asked, leaving the AIM cut and
+        // the unscoped figure to the applied page.
+        countDraft: async (f) => {
+          const params = market ? morphoMarketFetchParams(f, 1, market.id) : (await aimParams(f, 1)).params;
+          return params ? (await fetchMorphoPositions({ ...params, limit: 1, offset: 0 })).pagination.total : 0;
+        },
       })}
       onFilters={setFilters}
       // A search that is exactly one market id gets that market's page, named

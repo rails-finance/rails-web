@@ -85,7 +85,7 @@ export async function leaveSheetRow(page) {
 
 /** Every option row of the open sub-view, as `axisRows` reads a pill editor:
  *  key, label, count, ticked, `parent` (the umbrella a leg sits under) and
- *  `umbrella` (the umbrella's own row). */
+ *  `umbrella` (the umbrella's row). */
 export async function sheetOptionRows(page) {
   return filterSheet(page)
     .locator("[data-filter-sheet-view] [data-filter-sheet-option]")
@@ -105,7 +105,7 @@ export async function sheetOptionRows(page) {
     );
 }
 
-/** In the open multi sub-view, tick exactly `keys` (umbrella rows left alone). */
+/** In the open multi sub-view, tick `keys` and no other (umbrella rows left alone). */
 export async function tickSheetOptions(page, keys) {
   const view = filterSheet(page).locator("[data-filter-sheet-view]").first();
   for (const o of (await sheetOptionRows(page)).filter((r) => !r.umbrella)) {
@@ -115,7 +115,7 @@ export async function tickSheetOptions(page, keys) {
 
 /**
  * Set one dimension through the Filters sheet and apply: `values` are the
- * option values to pick (a multi ticks exactly these; a single picks the
+ * option values to pick (a multi ticks these and no other; a single picks the
  * first, a switch turns on with one value and off with none, a segmented row
  * takes the value or "any"). Returns false, the sheet closed, where the
  * dimension has no row.
@@ -140,7 +140,7 @@ export async function setFilterViaSheet(page, id, values, { scope = page } = {})
       await tickSheetOptions(page, values);
       await leaveSheetRow(page);
     } else {
-      // A single pick returns to the list by itself.
+      // A single pick returns to the list.
       const opt = view.locator(`[data-filter-sheet-option="${values[0]}"]`).first();
       if ((await opt.getAttribute("aria-checked")) === "true") await leaveSheetRow(page);
       else {
