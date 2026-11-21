@@ -21,6 +21,7 @@ import { liquityV2HolderStrip } from "@/lib/liquity-v2/holder-strip";
 import { liquityV1HolderStrip } from "@/lib/liquity-v1/holder-strip";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
 import type { LiquityV1DepositRow } from "@/lib/sources/api/liquity-v1-sp";
+import type { LiquityV1StakeRow } from "@/lib/sources/api/liquity-v1-staking";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import { headDepositLeg } from "@/lib/wallet/deposit-claim";
 import { scaled } from "@/lib/wallet/summary-row";
@@ -94,10 +95,11 @@ export const unreadAtHead = (p: WalletPosition) =>
   p.notRead === true || p.headRead === "failed" || p.headRead === "stored";
 
 /** A position's dollars in one field. A missing debt counts as none only on
- *  a deposit no head read contradicts: a head read states its debt, so one
+ *  a deposit or a stake no head read contradicts: a head read states its debt, so one
  *  missing there is unpriced, not zero. */
 const dollarsOf = (p: WalletPosition, field: "collateralUsd" | "debtUsd") =>
-  p[field] ?? (field === "debtUsd" && p.kind === "deposits" && p.headRead !== "read" ? 0 : undefined);
+  p[field] ??
+  (field === "debtUsd" && (p.kind === "deposits" || p.kind === "stakes") && p.headRead !== "read" ? 0 : undefined);
 
 /** The label a receipt row gives one position: its market, or its id. */
 const positionLabel = (p: WalletPosition) =>
@@ -131,7 +133,7 @@ function sumOfCards(
         value: x.usd == null ? "not valued" : formatUsdValue(cents(x.usd)),
         kind: "chain-derived",
         ...(x.pclass ? { pclass: x.pclass } : {}),
-        note: x.usd == null ? `the ${x.label} the deposit is owed, not valued` : `in dollars at ${x.source}`,
+        note: x.usd == null ? `the ${x.label}, not valued: no price is read for it` : `in dollars at ${x.source}`,
       }));
     const what = field === "collateralUsd" && p.kind === "deposits" ? "deposit" : word;
     return [
@@ -288,20 +290,24 @@ function liquityV2Section(positions: WalletPosition[]): Pick<WalletSection, "ban
   };
 }
 
-/** Liquity V1's band from its Trove and deposit rows; its figures are its
- *  open cards' dollars at head, as every other protocol's. */
+/** Liquity V1's band from its Trove, deposit and stake rows; its figures are
+ *  its open cards' dollars at head, as every other protocol's. */
 function liquityV1Band(positions: WalletPosition[]): HolderStripProps {
   const troves: LiquityV1PositionSummary[] = [];
   const deposits: LiquityV1DepositRow[] = [];
+  const stakes: LiquityV1StakeRow[] = [];
   for (const p of positions) {
     if (p.card.kind === "liquity-v1") troves.push(p.card.row);
     else if (p.card.kind === "liquity-v1-deposit") deposits.push(p.card.row);
+    else if (p.card.kind === "liquity-v1-stake") stakes.push(p.card.row);
   }
   return withHeadDeposits(
     liquityV1HolderStrip(
       troves.length ? { rows: troves, total: troves.length } : undefined,
       deposits.length ? { rows: deposits, total: deposits.length } : undefined,
       Math.max(troves.length, 1),
+      undefined,
+      stakes.length ? { rows: stakes, total: stakes.length } : undefined,
     ),
     positions,
     "V1",

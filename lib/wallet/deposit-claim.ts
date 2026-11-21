@@ -4,7 +4,9 @@
 // Troves use, both from the head read. Liquity V1's LQTY is not valued. A
 // gain with no price states no dollars, so the position's head read fails
 // (rule 743) rather than pricing half the claim. The band's deposit leg on
-// the wallet page is the head-read deposit. Pure and client-safe.
+// the wallet page is the head-read deposit. An LQTY stake's dollars are its
+// fees pending the same way, the LQTY staked not valued (Miles, "claim
+// only"). Pure and client-safe.
 
 import type { HolderLeg } from "@/components/shared/holder-strip";
 import type { ProvClass } from "@/components/shared/provenance";
@@ -56,6 +58,25 @@ export function depositClaim(opts: {
   }
   if (opts.unvalued && opts.unvalued.amount > 0)
     parts.push({ label: opts.unvalued.symbol, usd: null, source: "not valued" });
+  return { usd: parts.reduce((s, p) => s + (p.usd ?? 0), 0), parts };
+}
+
+/** An LQTY stake's claim in dollars: the LUSD fees pending at their $1 face
+ *  and the ETH fees pending at the feed. The LQTY staked is not valued: no
+ *  LQTY price is read. Null where ETH fees are pending and the feed gave no
+ *  price. */
+export function stakeClaim(opts: {
+  stake: number;
+  lusd: number;
+  eth: number;
+  price: number | null | undefined;
+  feed: string;
+}): DepositClaim | null {
+  const priced = opts.price != null && Number.isFinite(opts.price) && opts.price > 0;
+  if (opts.eth > 0 && !priced) return null;
+  const parts: UsdPart[] = [{ label: "LUSD fees", usd: opts.lusd, pclass: "state", source: "LUSD's $1 face" }];
+  if (priced) parts.push({ label: "ETH fees", usd: opts.eth * opts.price!, pclass: "oracle", source: opts.feed });
+  if (opts.stake > 0) parts.push({ label: "LQTY", usd: null, source: "not valued" });
   return { usd: parts.reduce((s, p) => s + (p.usd ?? 0), 0), parts };
 }
 

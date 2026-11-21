@@ -11,9 +11,15 @@ import { WALLET_FORMER_FAMILIES } from "@/lib/wallet/moved-row";
 import { walletRowStatus } from "@/lib/wallet/moved-row";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { takesRow, walletApiWait, type HeadResult, type FamilyModule } from "@/lib/wallet/families/module";
-import { liquityV1, liquityV1Deposits, liquityV2Deposits } from "@/lib/wallet/families/liquity-listing";
+import {
+  liquityV1,
+  liquityV1Deposits,
+  liquityV1Stakes,
+  liquityV2Deposits,
+} from "@/lib/wallet/families/liquity-listing";
 import {
   liquityV1DepositSummaryRow,
+  liquityV1StakeSummaryRow,
   liquityV1TroveSummaryRow,
   liquityV2DepositSummaryRow,
 } from "@/lib/wallet/listing-summary-rows";
@@ -22,6 +28,7 @@ import { answerBody, routeBoxHop } from "@/lib/shared/proxy-answer";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
 import { readLiquityV1Sp, type LiquityV1DepositListResponse } from "@/lib/sources/api/liquity-v1-sp";
 import { readLiquityV2Sp, type LiquityV2DepositListResponse } from "@/lib/sources/api/liquity-v2-sp";
+import { readLiquityV1Staking, type LiquityV1StakeListResponse } from "@/lib/sources/api/liquity-v1-staking";
 import { aaveV3Base, aaveV3Ethereum, spark } from "@/lib/wallet/families/aave";
 import { compoundV3Base, compoundV3Ethereum } from "@/lib/wallet/families/compound";
 import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/families/ethereum-single";
@@ -55,6 +62,7 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   liquityV2Deposits,
   liquityV1,
   liquityV1Deposits,
+  liquityV1Stakes,
   makerdao,
   spark,
   fluid,
@@ -135,6 +143,14 @@ export async function readListingRows(
       read: async (signal) => {
         const r = await readLiquityV1Sp<LiquityV1DepositListResponse>("stability-pool", list, { ...hop, signal });
         return { rows: r.rows.map((d) => liquityV1DepositSummaryRow(d, address)), total: r.pagination.total };
+      },
+    },
+    {
+      module: liquityV1Stakes,
+      what: "Liquity V1 LQTY stakes",
+      read: async (signal) => {
+        const r = await readLiquityV1Staking<LiquityV1StakeListResponse>("staking", list, { ...hop, signal });
+        return { rows: r.rows.map((st) => liquityV1StakeSummaryRow(st, address)), total: r.pagination.total };
       },
     },
     {

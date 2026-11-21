@@ -36,6 +36,8 @@ import {
   viewFromSummary as liquityV1View,
 } from "@/components/protocol/liquity-v1/liquity-v1-position-card";
 import { LiquityV1DepositCard } from "@/components/protocol/liquity/v1-sp-deposit-card";
+import { LiquityV1StakeCard } from "@/components/protocol/liquity/v1-staking-card";
+import { stakeNowFromChain } from "@/lib/liquity-v1/staking-math";
 import { LiquityV2DepositCard } from "@/components/protocol/liquity/sp-deposit-card";
 import { depositNowFromChain as liquityV1DepositNow } from "@/lib/liquity-v1/sp-math";
 import { depositNowFromChain as liquityV2DepositNow } from "@/lib/liquity-v2/sp-math";
@@ -127,6 +129,15 @@ function FamilyCard({ card }: { card: WalletCard }) {
           row={card.row}
           surface="listing"
           now={card.head ? liquityV1DepositNow(card.head) : null}
+          nowBlock={card.head?.blockNumber}
+        />
+      );
+    case "liquity-v1-stake":
+      return (
+        <LiquityV1StakeCard
+          row={card.row}
+          surface="listing"
+          now={card.head ? stakeNowFromChain(card.head) : null}
           nowBlock={card.head?.blockNumber}
         />
       );
