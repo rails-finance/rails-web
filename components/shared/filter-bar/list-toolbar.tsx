@@ -173,10 +173,13 @@ export function ListToolbar<F extends BaseListFilters>({
   const countInButton = countFor != null;
   // Below sm the open search field takes the count's room in the line.
   const countAside = search && searchOpen ? "max-sm:hidden" : "";
+  // A count line the page writes (chain data, with its receipt) stays: below
+  // sm it takes a line to itself over the open search field.
+  const searchLine = search && searchOpen && countNode != null;
   const countLine =
     countNode != null ? (
       <span
-        className={`min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED} ${countAside}`}
+        className={`min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED} ${searchLine ? "max-sm:basis-full" : ""}`}
         data-anatomy="N1.6"
         data-prov-exempt=""
       >
@@ -277,7 +280,7 @@ export function ListToolbar<F extends BaseListFilters>({
             beside the sort, where a 343px row cannot hold all three on one
             line. */}
         <div
-          className={`order-1 ml-auto flex min-h-11 min-w-0 items-center gap-3 sm:min-h-10 sm:shrink-0 ${search && searchOpen ? "max-sm:flex-1" : ""} ${PANEL_OPEN_DIM}`}
+          className={`order-1 ml-auto flex min-h-11 min-w-0 items-center gap-3 sm:min-h-10 sm:shrink-0 ${search && searchOpen ? "max-sm:flex-1" : ""} ${searchLine ? "max-sm:basis-full max-sm:flex-wrap" : ""} ${PANEL_OPEN_DIM}`}
           inert={panelOpen}
         >
           {countLine}

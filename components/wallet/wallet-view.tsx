@@ -401,6 +401,8 @@ export function WalletView({
       className={`flex flex-col gap-7 transition-opacity ${reading ? "pointer-events-none opacity-50" : ""}`}
       aria-busy={reading || undefined}
       data-wallet-reading={reading ? "" : undefined}
+      // What the filter bar narrows: its open panel sets this back.
+      data-filters-results=""
     >
       {children}
     </div>

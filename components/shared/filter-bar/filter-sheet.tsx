@@ -180,23 +180,21 @@ export function FilterSheet<F>({
   useEffect(() => {
     onPanelOpenChangeRef.current?.(panelOpen);
   }, [panelOpen]);
-  // While the panel is open in the page, what follows it on the page (the
-  // results, the paging) stands back as the row does: dimmed
-  // (`[data-filters-dimmed]`, globals.css) and inert.
+  // While the panel is open in the page, the results it narrows stand back
+  // as the row does: the nearest `[data-filters-results]` the surface draws
+  // (one stable wrapper around its rows, so what loads into it later stands
+  // back too) is dimmed (`[data-filters-dimmed]`, globals.css) and inert.
   useEffect(() => {
     if (!panelOpen || !slot) return;
-    const held: { el: HTMLElement; inert: boolean }[] = [];
-    for (
-      let at: HTMLElement | null = slot;
-      at && at.tagName !== "MAIN" && at !== document.body;
-      at = at.parentElement
-    ) {
-      for (let sib = at.nextElementSibling; sib; sib = sib.nextElementSibling) {
-        if (!(sib instanceof HTMLElement)) continue;
-        held.push({ el: sib, inert: sib.inert });
-        sib.inert = true;
-        sib.setAttribute("data-filters-dimmed", "");
-      }
+    let found: HTMLElement[] = [];
+    for (let at = slot.parentElement; at && found.length === 0; at = at.parentElement) {
+      found = [...at.querySelectorAll<HTMLElement>("[data-filters-results]")];
+      if (at.tagName === "MAIN") break;
+    }
+    const held = found.map((el) => ({ el, inert: el.inert }));
+    for (const { el } of held) {
+      el.inert = true;
+      el.setAttribute("data-filters-dimmed", "");
     }
     return () => {
       for (const { el, inert } of held) {
