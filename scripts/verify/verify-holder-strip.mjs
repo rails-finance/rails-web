@@ -262,14 +262,17 @@ info(
   if (!check("P2. the wallet view draws the strip", strip != null, JSON.stringify(strip))) {
     await page.close();
   } else {
-    // The counts sentence's OWN numbers, against the API's statuses.
+    // The counts sentence's OWN numbers, against the API's statuses: the CDP
+    // sentence only, the first, since the other kinds' sentence follows it
+    // ("It has closed 1 Stability Pool deposit", §1b).
+    const cdpSaid = strip.counts.split(/\.(?:\s|$)/)[0];
     const said = {
       open: Number(
-        /holds ([\d,]+) open positions?/.exec(strip.counts)?.[1]?.replace(/,/g, "") ??
-          (/holds no open positions/.test(strip.counts) ? 0 : NaN),
+        /holds ([\d,]+) open positions?/.exec(cdpSaid)?.[1]?.replace(/,/g, "") ??
+          (/holds no open positions/.test(cdpSaid) ? 0 : NaN),
       ),
-      closed: Number(/has closed ([\d,]+)/.exec(strip.counts)?.[1]?.replace(/,/g, "") ?? 0),
-      liquidated: Number(/([\d,]+) (?:was|were) liquidated/.exec(strip.counts)?.[1]?.replace(/,/g, "") ?? 0),
+      closed: Number(/has closed ([\d,]+)/.exec(cdpSaid)?.[1]?.replace(/,/g, "") ?? 0),
+      liquidated: Number(/([\d,]+) (?:was|were) liquidated/.exec(cdpSaid)?.[1]?.replace(/,/g, "") ?? 0),
     };
     check(
       "P3a. the counts line states the API's own statuses",
@@ -353,7 +356,7 @@ info(
     strip != null &&
       Object.keys(strip.legs).length === 0 &&
       /21/.test(strip.counts) &&
-      /up to 20 positions; this one holds 21/.test(strip.note ?? ""),
+      /up to 20 positions; this wallet holds 21 positions/.test(strip.note ?? ""),
     JSON.stringify(strip),
   );
   await page.close();
