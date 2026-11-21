@@ -27,18 +27,37 @@
 // the rows. Past that they are not, and a sum over one page of a longer list is
 // the paging trap — so the strip states the count, says why the totals are
 // absent, and never quietly sums a slice.
+//
+// THE OTHER KINDS (rails-ops TO-DO-stability-pool-deposits §1b). A wallet search
+// also reads the wallet's Stability Pool deposits and reserve loans, every
+// status, one page each (lib/polaris/holder-kinds.tsx). They are counted in the
+// sentence and the band's two-position rules, and each is its own leg: a
+// deposit is USDp or GOLDp in its pool, a loan's debt is WETH, and neither
+// sums with a CDP's debt. Two pools' deposits are two tokens, so they stand
+// side by side with no total. A kind past one page states its count and no leg.
 
 import { shownComposedPrice } from "@/lib/shared/shown-usd";
 import { polarisPethUsdNote } from "./price-notes";
-import type { HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
+import type { HolderKindCount, HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
 import type { PolarisPositionSummary } from "@/lib/sources/api/polaris-positions";
 // Type-only — lib/sources/chain/* is server-only, and an `import type` is
 // erased before the client bundle is built (the position card does the same).
 import type { PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-position";
-import { POLARIS_CORE, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
+import {
+  POLARIS_CORE,
+  POLARIS_MARKET_CONFIG,
+  POLARIS_MARKETS,
+  POLARIS_WETH,
+  type PolarisMarket,
+} from "@/lib/polaris/asset-catalog";
 import { holderUsdReceipt, type UsdLeg } from "@/lib/shared/holder-usd-receipt";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { holderCollProv, holderDebtSumProv } from "@/lib/polaris/live-provenance";
+import type { HolderKindPage } from "@/components/shared/holder-kinds";
+import type { Provenance } from "@/components/shared/provenance";
+import type { PolarisDepositRow, PolarisLoanRow } from "@/lib/sources/api/polaris-sp-loans";
+import { kindsLine, type KindCount } from "@/lib/liquity/holder-deposits";
+import { big, units } from "./sp-loan-math";
 
 const BOARD_VIA = "GET /api/chain/polaris/markets";
 const TESTNET = "A Sepolia testnet figure: a test dollar.";
@@ -50,6 +69,119 @@ const LEG_TIP = {
   debtValued:
     "The open positions' debts as of each one's last touch, USDp at one dollar and GOLDp at the gold price the protocol's feed states. The interest, stability gains and PSM shares built up since are left out.",
 } as const;
+
+const KIND_TIP = {
+  deposit: "As of each open deposit's last touch. Liquidations since then have not been taken out.",
+  loan: "Each open loan's shares at the index the server last stored. The fee built up since is left out.",
+} as const;
+
+/** The wallet's Stability Pool deposits and reserve loans, each every status,
+ *  one page; a kind whose read failed is absent and goes unsaid. */
+export interface PolarisOtherKinds {
+  deposits?: HolderKindPage<PolarisDepositRow>;
+  loans?: HolderKindPage<PolarisLoanRow>;
+}
+
+const sumProv = (summary: string, via: string, contract: Provenance["contract"], formula: string): Provenance => ({
+  kind: "chain",
+  pclass: "indexed",
+  verify: { kind: "recompute", text: "Add the figure on each open card for this wallet." },
+  summary,
+  contract,
+  via,
+  formula,
+});
+
+/** The other kinds: their sentence, their counts and their legs. */
+function otherKinds(o: PolarisOtherKinds): {
+  line: string;
+  counts: HolderKindCount[];
+  legs: HolderLeg[];
+  positions: number;
+} {
+  const said: KindCount[] = [];
+  const counts: HolderKindCount[] = [];
+  const whole: string[] = [];
+  const legs: HolderLeg[] = [];
+  const kind = <R extends { status: string }>(
+    page: HolderKindPage<R> | undefined,
+    id: string,
+    noun: [string, string],
+    long: [string, string],
+  ): R[] | null => {
+    if (!page) return null;
+    if (page.total > page.rows.length) {
+      // A slice of the wallet's kind: its count, and no status or sum over it.
+      whole.push(plural(page.total, long[0], long[1]));
+      return null;
+    }
+    const open = page.rows.filter((r) => r.status === "open");
+    const closed = page.rows.length - open.length;
+    said.push({ one: long[0], many: long[1], open: open.length, closed });
+    counts.push({ id, noun, open: open.length, closed });
+    return open;
+  };
+
+  const deposits = kind(
+    o.deposits,
+    "deposit",
+    ["deposit", "deposits"],
+    ["Stability Pool deposit", "Stability Pool deposits"],
+  );
+  if (deposits) {
+    const parts = POLARIS_MARKETS.map((m) => {
+      const amount = units(deposits.filter((d) => d.market === m).reduce((s, d) => s + big(d.deposit_raw), BigInt(0)));
+      const stable = POLARIS_MARKET_CONFIG[m].stable;
+      return { m, amount, symbol: stable.symbol, address: stable.address };
+    }).filter((p) => p.amount > 0);
+    if (parts.length > 0) {
+      const one = parts.length === 1 ? parts[0] : null;
+      legs.push({
+        id: "deposit",
+        label: deposits.length === 1 ? "Stability Pool deposit" : "Stability Pool deposits",
+        // Two pools, two tokens: each pool's amount, side by side.
+        value: parts.map((p) => `${formatNumber(p.amount)} ${p.symbol}`).join(" · "),
+        approx: true,
+        tip: KIND_TIP.deposit,
+        ...(one
+          ? { figure: { amount: one.amount, tokens: [{ symbol: one.symbol, address: one.address }], usd: null } }
+          : {}),
+        prov: sumProv(
+          "The wallet's open Stability Pool deposits: each pool's sum of the deposit recorded at each one's last touch, from the index. The USDp and GOLDp pools take different tokens, so each pool is summed on its own. Liquidations since each deposit's last touch burn part of it; a deposit's page reads its pool at the latest block.",
+          "GET /api/polaris/stability-pool?wallet=… · Σ deposit over the open rows, per pool",
+          one
+            ? { name: `Polaris ${one.symbol} StabilityPool`, address: POLARIS_MARKET_CONFIG[one.m].stabilityPool }
+            : undefined,
+          "Σ deposit over the wallet's open deposits, per pool",
+        ),
+      });
+    }
+  }
+
+  const loans = kind(o.loans, "loan", ["loan", "loans"], ["reserve loan", "reserve loans"]);
+  if (loans) {
+    const debt = units(loans.reduce((s, l) => s + big(l.debt_at_index_raw), BigInt(0)));
+    if (debt > 0) {
+      legs.push({
+        id: "loan-debt",
+        label: "Reserve loan debt",
+        value: `${formatNumber(debt)} ${POLARIS_WETH.symbol}`,
+        approx: true,
+        tip: KIND_TIP.loan,
+        figure: { amount: debt, tokens: [{ symbol: POLARIS_WETH.symbol, address: POLARIS_WETH.address }], usd: null },
+        prov: sumProv(
+          "The WETH the wallet's open reserve loans owe: each loan's shares at the debt per share the server last stored, rounded up, summed, from the index. The fee built up since that index is not in it; a loan's page reads getLoanDebt at the latest block.",
+          "GET /api/polaris/reserve-loans?wallet=… · Σ debt_at_index over the open rows",
+          { name: "Polaris ReserveLoansManager", address: POLARIS_CORE.reserveLoansManager },
+          "Σ ceil(shares × debt per share ÷ 1e27) over the wallet's open loans",
+        ),
+      });
+    }
+  }
+
+  const line = `${kindsLine(said)}${whole.length ? ` It has ${whole.join(" and ")}.` : ""}`;
+  return { line, counts, legs, positions: (o.deposits?.total ?? 0) + (o.loans?.total ?? 0) };
+}
 
 const plural = (n: number, one: string, many: string): string => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
@@ -92,7 +224,12 @@ export function polarisHolderStrip(
   passedOn = 0,
   /** The wallet the search names (an address or an ENS name), for the link. */
   wallet?: string,
+  /** The wallet's deposits and reserve loans (§1b); absent, the strip states
+   *  its CDPs alone. */
+  others: PolarisOtherKinds = {},
 ): HolderStripProps {
+  const other = otherKinds(others);
+  const kinds = other.counts.length ? { kinds: other.counts } : {};
   // A CDP the wallet passed on is not its holding: left out of the counts,
   // the sums and the count it holds. Whether the page is the whole answer is
   // read on the answer's total, moved ones in.
@@ -111,11 +248,11 @@ export function polarisHolderStrip(
     // any sum over them is a statement about the wallet. State the one figure
     // that is — how many it holds — and say why the rest is absent.
     return {
-      countsLine: `This wallet holds ${plural(held, "position", "positions")}.`,
+      countsLine: `This wallet holds ${plural(held, "position", "positions")}.${other.line}`,
       counts: { open: 0, closed: 0, liquidated: 0 },
       legs: [],
       truncated: true,
-      positions: held,
+      positions: held + other.positions,
       wallet,
       note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} positions; this one holds ${held.toLocaleString("en-US")}.`,
     };
@@ -293,12 +430,16 @@ export function polarisHolderStrip(
     }
   }
 
+  legs.push(...other.legs);
+  // A wallet with no CDPs opens the band with its other kinds.
+  const cdpLine = countsLine(counts, new Set(open.map((r) => r.market)));
   return {
-    countsLine: countsLine(counts, new Set(open.map((r) => r.market))),
+    countsLine: held === 0 && other.line ? other.line.replace(/^ It/, "This wallet") : `${cdpLine}${other.line}`,
     counts,
     legs,
     truncated: false,
-    positions: held,
+    positions: held + other.positions,
     wallet,
+    ...kinds,
   };
 }
