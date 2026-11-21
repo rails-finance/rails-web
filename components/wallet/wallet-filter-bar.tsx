@@ -29,6 +29,7 @@ export function WalletFilterBar({
   status,
   setStatus,
   shown,
+  countFor,
   navigate,
 }: {
   address: string;
@@ -44,6 +45,8 @@ export function WalletFilterBar({
   setStatus: (s: WalletStatus | undefined) => void;
   /** The positions drawn under the selection. */
   shown: number;
+  /** The positions a staged Status and Kind would draw, from the cards read. */
+  countFor: (kinds: WalletKind[], status: WalletStatus | undefined) => number;
   /** Opens another URL of the page, under a transition. */
   navigate: (href: string) => void;
 }) {
@@ -64,6 +67,18 @@ export function WalletFilterBar({
         search={false}
         sortOptions={[]}
         count={{ total: shown, noun: "positions" }}
+        // "Show 2 positions" for a staged Status or Kind (ui-jobs 801). Another
+        // protocol is another read: its count as held where nothing else
+        // narrows it, else the button reads "Apply".
+        countFor={(draft) => {
+          const k = draft.kinds as WalletKind[];
+          const s = draft.status as WalletStatus | undefined;
+          if (draft.protocol === protocol) return countFor(k, s);
+          const other = held.find((h) => h.slug === draft.protocol);
+          if (k.length > 0 || s != null || (draft.protocol != null && !other))
+            return Promise.reject(new Error("unread"));
+          return other ? other.positions : held.reduce((n, h) => n + h.positions, 0);
+        }}
         onChange={(next) => {
           const k = next.kinds as WalletKind[];
           const s = next.status as WalletStatus | undefined;
