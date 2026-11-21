@@ -25,7 +25,9 @@
 // chain, still the holder's, just unredeemable until it is topped back up. It is
 // counted with the open troves and SAID as one only when the wallet has any.
 
-import type { HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
+import type { HolderKindCount, HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
+import type { HolderKindPage } from "@/components/shared/holder-kinds";
+import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import type { Provenance } from "@/components/shared/provenance";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
@@ -34,6 +36,7 @@ import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
 import { liquityV2PriceNote } from "@/lib/liquity-v2/price-notes";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
+import { big, units } from "./sp-math";
 
 const collToken = (collateralType: string) => ({
   symbol: collateralType,
@@ -47,6 +50,16 @@ const LEG_TIP = {
     "The open troves' collateral as of each one's last touch, each branch's amount at that branch's price, summed. Redistribution gains since then are left out.",
   debt: "As of each open trove's last touch. The interest and redistributed debt built up since are left out.",
 } as const;
+
+const DEPOSIT_TIP = "As of each deposit's last touch. Liquidations since then have not been taken out.";
+
+/** The deposits sentence after the Troves': every deposit is BOLD, at most one
+ *  on each branch. */
+function depositsLine(open: number, closed: number): string {
+  const noun = (n: number) => plural(n, "Stability Pool deposit", "Stability Pool deposits");
+  if (open > 0) return ` It has ${noun(open)}${closed > 0 ? ` and has closed ${closed.toLocaleString("en-US")}` : ""}.`;
+  return closed > 0 ? ` It has closed ${noun(closed)}.` : "";
+}
 
 const plural = (n: number, one: string, many: string): string => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
@@ -110,6 +123,8 @@ export function liquityV2HolderStrip(
   passedOn = 0,
   /** The wallet the search names (an address or an ENS name), for the link. */
   wallet?: string,
+  /** The wallet's Stability Pool deposits, every status, one page (§1b). */
+  deposits?: HolderKindPage<LiquityV2DepositRow>,
 ): HolderStripProps {
   // A Trove the wallet passed on (formerHold, ui-jobs 705) is not its
   // holding: left out of the counts, the sums and the count it holds. Whether
@@ -125,16 +140,23 @@ export function liquityV2HolderStrip(
     zombie: open.filter((t) => t.isZombie).length,
   };
 
-  if (truncated) {
+  const depOpen = deposits?.rows.filter((d) => d.status === "open") ?? [];
+  const depClosed = (deposits?.rows.length ?? 0) - depOpen.length;
+  const kinds: HolderKindCount[] | undefined = deposits
+    ? [{ id: "deposit", noun: ["deposit", "deposits"], open: depOpen.length, closed: depClosed }]
+    : undefined;
+  const positions = held + (deposits?.total ?? 0);
+
+  if (truncated || (deposits && deposits.total > deposits.rows.length)) {
     // The rows are a slice of the wallet: neither the per-status counts nor any
     // sum over them is a statement about the wallet. State the count it does
     // hold, and say why the rest is absent.
     return {
-      countsLine: `This wallet holds ${plural(held, "trove", "troves")}.`,
+      countsLine: `This wallet holds ${plural(held, "trove", "troves")}.${deposits ? depositsLine(deposits.total, 0) : ""}`,
       counts: { open: 0, closed: 0, liquidated: 0 },
       legs: [],
       truncated: true,
-      positions: held,
+      positions,
       wallet,
       note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} positions; this one holds ${held.toLocaleString("en-US")}.`,
     };
@@ -279,12 +301,35 @@ export function liquityV2HolderStrip(
     });
   }
 
+  // ── the deposits: BOLD on every branch, so a quantity, and its own leg ──
+  const deposited = units(depOpen.reduce((sum, d) => sum + big(d.deposit_raw), BigInt(0)));
+  if (deposited > 0) {
+    legs.push({
+      id: "deposit",
+      label: depOpen.length === 1 ? "Stability Pool deposit" : "Stability Pool deposits",
+      value: `${formatNumber(deposited)} BOLD`,
+      approx: true,
+      tip: DEPOSIT_TIP,
+      figure: { amount: deposited, tokens: [{ symbol: "BOLD" }], usd: null },
+      prov: {
+        kind: "chain",
+        pclass: "indexed",
+        verify: { kind: "recompute", text: "Add the deposit on each open deposit card for this wallet." },
+        summary:
+          "Stability Pool deposits — the sum of each open deposit's BOLD at its last touch, from the index. Every branch's pool takes BOLD, so the sum is a quantity of it. Liquidations since each deposit's last touch burn part of it; a deposit's page reads its pool at the latest block.",
+        via: "GET /api/liquity-v2/stability-pool?wallet=… · Σ deposit over the open rows",
+        formula: "Σ deposit over the wallet's open deposits",
+      },
+    });
+  }
+
   return {
-    countsLine: countsLine(counts, byBranch.size),
+    countsLine: `${countsLine(counts, byBranch.size)}${depositsLine(depOpen.length, depClosed)}`,
     counts: { open: counts.open, closed: counts.closed, liquidated: counts.liquidated, zombie: counts.zombie },
     legs,
     truncated: false,
-    positions: held,
+    positions,
     wallet,
+    ...(kinds ? { kinds } : {}),
   };
 }

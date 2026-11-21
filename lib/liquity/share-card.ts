@@ -15,6 +15,8 @@ import type { PositionCardModel } from "@/lib/share/position-card";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
 import { holderCardModel } from "@/lib/share/holder-card";
+import type { HolderKindPage } from "@/components/shared/holder-kinds";
+import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import { liquityV2HolderStrip } from "@/lib/liquity-v2/holder-strip";
 import { positionNounPlural } from "@/lib/shared/protocols";
 
@@ -95,12 +97,15 @@ export function liquityV2HolderCardModel(
   subject: string,
   /** The answer's count of Troves the wallet passed on (ui-jobs 705). */
   passedOn = 0,
+  /** The wallet's Stability Pool deposits, counted and totalled as the strip
+   *  does (§1b); absent where their read failed. */
+  deposits?: HolderKindPage<LiquityV2DepositRow>,
 ): PositionCardModel | null {
   // A Trove the wallet passed on is not its holding; the strip reads the
   // answer's total for truncation and leaves them out of the rest.
   const held = rows.filter((t) => !t.formerHold);
-  if (held.length === 0 || !prices) return null;
-  return holderCardModel(liquityV2HolderStrip(rows, total, prices, perPage, passedOn), {
+  if ((held.length === 0 && !deposits?.total) || !prices) return null;
+  return holderCardModel(liquityV2HolderStrip(rows, total, prices, perPage, passedOn, undefined, deposits), {
     session: "liquity-v2",
     subject,
     total: total - passedOn,

@@ -10,11 +10,20 @@ import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import { RailHeader } from "@/components/shared/rail-header";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { LiquityV2DepositCard } from "@/components/protocol/liquity/sp-deposit-card";
+import { HolderStrip } from "@/components/shared/holder-strip";
+import { HolderKinds, useHolderKinds, type HolderKindPage } from "@/components/shared/holder-kinds";
+import { useLiquityV2Prices } from "@/hooks/useLiquityV2Prices";
+import { liquityV2HolderStrip } from "@/lib/liquity-v2/holder-strip";
+import { LIQUITY_V2_ITEMS_PER_PAGE } from "@/lib/liquity-v2/list-filter-dimensions";
+import { liquityV2DepositListingCard, liquityV2TroveKind } from "@/lib/liquity-v2/holder-kinds";
+import { readListQuery } from "@/lib/shared/list-filter";
+import { useUrlSearchParams } from "@/lib/shared/use-url-search-params";
+import type { TroveSummary } from "@/types/api/trove";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { liquityV2DepositHref, LIQUITY_V2_SP_PATH, SP_BRANCHES } from "@/lib/liquity-v2/sp-routes";
 import {
   fetchSpPage,
+  namesDepositor,
   spListDimensions,
   spSortOptions,
   SP_ITEMS_PER_PAGE,
@@ -41,6 +50,30 @@ export function SpListing(props: {
       }),
     [],
   );
+  // The wallet's Troves, under the rows and counted in the strip (rails-ops
+  // TO-DO-stability-pool-deposits §1b). Their cards and totals carry USD at
+  // the branch prices.
+  const prices = useLiquityV2Prices();
+  const otherKinds = useMemo(() => [liquityV2TroveKind(prices)], [prices]);
+  const { reads } = useHolderKinds(otherKinds, readListQuery(useUrlSearchParams(props.initialSearch ?? "")));
+  const troves = reads.trove;
+
+  // The strip states the wallet: the search names a depositor, no pill
+  // narrows the rows, and the Troves and the prices have landed.
+  const holderStrip = (items: LiquityV2DepositRow[], total: number, f: SpListFilters) => {
+    if (!namesDepositor(f.q) || f.status.length || f.branch.length || f.tx.length) return null;
+    if (!prices || !troves || troves === "failed") return null;
+    const t = troves as HolderKindPage<TroveSummary>;
+    return (
+      <HolderStrip
+        {...liquityV2HolderStrip(t.rows, t.total, prices, LIQUITY_V2_ITEMS_PER_PAGE, t.passedOn ?? 0, f.q.trim(), {
+          rows: items,
+          total,
+        })}
+      />
+    );
+  };
+
   return (
     <ChainTruthListingPage<LiquityV2DepositRow, SpListFilters>
       title="Liquity V2 Stability Pool deposits"
@@ -51,7 +84,7 @@ export function SpListing(props: {
       defaults={SP_LIST_DEFAULTS}
       sortOptions={spSortOptions}
       searchPlaceholder="Depositor address or ENS"
-      renderCard={(r) => <LiquityV2DepositCard row={r} surface="listing" />}
+      renderCard={liquityV2DepositListingCard}
       hrefFor={(r) => liquityV2DepositHref(r.collateral_type, r.depositor)}
       keyFor={(r) => `${r.collateral_type}:${r.depositor}`}
       strategy={serverStrategy<LiquityV2DepositRow, SpListFilters>({
@@ -59,6 +92,8 @@ export function SpListing(props: {
         itemsPerPage: SP_ITEMS_PER_PAGE,
         fetchPage: (f, page) => fetchSpPage(f, page),
       })}
+      renderAbove={({ items, total, filters }) => holderStrip(items, total, filters)}
+      renderBelow={(f) => <HolderKinds kinds={otherKinds} reads={reads} q={f.q} />}
       {...props}
     />
   );

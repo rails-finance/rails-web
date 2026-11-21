@@ -26,6 +26,9 @@ const HOLDER_KIND_SHOWN = 10;
 export interface HolderKindPage<R> {
   rows: R[];
   total: number;
+  /** Of `total`, the positions the wallet passed on to another (Liquity V2's
+   *  formerHold, ui-jobs 705), which the strip leaves out of its count. */
+  passedOn?: number;
 }
 
 /** One position kind of a family, as a wallet search reads and draws it. */
