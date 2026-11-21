@@ -1848,11 +1848,11 @@ export const VIEW_NOTES: Record<string, string> = {
   "liquity-v1":
     "The system's state: TCR against the recovery line, the Stability Pool's depth against system debt, the shared base rate, and how deep the redemption queue is. The queue is the Trove listing sorted by ratio, and the view links there. Two more kinds of position have pages: Stability Pool deposits (Stability Pool) and LQTY stakes (Staking).",
   ebisu:
-    "The branches side by side: each one's oracle price, size, TCR and rate span, and a link per branch into the listing sorted by rate, which is that branch's redemption queue.",
+    "The branches side by side: each one's oracle price, size, TCR and rate span, and a link per branch into the listing sorted by rate, which is that branch's redemption queue. One more kind of position has pages: Stability Pool deposits (Stability Pool).",
   asymmetry:
-    "The same branch surface as Ebisu's: each branch's price, size, TCR and rate span, and the same per-branch link into the listing sorted by rate.",
+    "The same branch surface as Ebisu's: each branch's price, size, TCR and rate span, and the same per-branch link into the listing sorted by rate. One more kind of position has pages: Stability Pool deposits (Stability Pool).",
   basedollar:
-    "The same branch surface as Ebisu's, read on Base: each branch's price, size, TCR and rate span, and the same per-branch link into the listing sorted by rate.",
+    "The same branch surface as Ebisu's, read on Base: each branch's price, size, TCR and rate span, and the same per-branch link into the listing sorted by rate. One more kind of position has pages: Stability Pool deposits (Stability Pool).",
 };
 
 /**
