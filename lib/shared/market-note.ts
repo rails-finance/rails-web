@@ -318,7 +318,7 @@ export interface SpLiquidationsNote extends MarketNoteBase {
    *  Liquity V2. `unitLabel` is its stablecoin. */
   deployment?: SpDeploymentId;
   /** The block at which the branch's admin withdrew the pool's collateral
-   *  (Ebisu, `coll_withdrawn_at_block`): a stretch closed after it does not
+   *  (Ebisu, `coll_withdrawn_at_block`): a stretch closed at or after it does not
    *  reconcile and is not flagged unsettled. */
   collWithdrawnAtBlock?: number;
   /** This note carries the page's one line on that withdrawal. */

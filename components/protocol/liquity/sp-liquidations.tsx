@@ -9,7 +9,7 @@
 // the net. The deployment (lib/liquity-v2/sp-deployment.ts) names the units,
 // the contracts and the chain; on Ebisu, where the admin withdrew the pools'
 // collateral (`coll_withdrawn_at_block`), one line beside the gains says so,
-// and a stretch closed after that block is not flagged unsettled.
+// and a stretch closed at or after that block is not flagged unsettled.
 //
 // Two homes, one table: a closed stretch is a note row between its two
 // touches, on the shell Polaris's PSM gap uses
@@ -481,7 +481,7 @@ export function SpOpenStretchLiquidations({
         branch={branch}
         stretch={stretch}
         // The branch check stands on every deployment. On Ebisu a stretch
-        // closed after the withdrawal would count in it: should it ever fire
+        // closed at or after the withdrawal block would count in it: should it ever fire
         // for that reason, the fix is on the server, leaving stretches closed
         // at or after coll_withdrawn_at_block out of `unreconciled`.
         check={check}
@@ -507,7 +507,7 @@ export function SpOpenStretchLiquidations({
 
 /** The page's one line on the admin's withdrawal (Ebisu, ui-jobs 608, 612):
  *  the gains above are what each liquidation paid; the pool's collateral left
- *  at that block, so none of it is claimable now. Miles, 21 Nov 2026. */
+ *  at that block, so none of it is claimable now. */
 export function WithdrawalLine({
   dep,
   branch,
