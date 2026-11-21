@@ -3,7 +3,8 @@
 // ListToolbar — the shared listing-page filter strip (N1, ui-jobs 801): the
 // Filters button (N1.8.1) that opens every filter, one pill per filter group
 // that is set or rests on a default (N1.10, ui-jobs 681), Clear all, and at
-// the right the count (N1.6), the search as an icon that opens into its field
+// the right the count (N1.6; drawn only where the editors' button cannot
+// state it), the search as an icon that opens into its field
 // and stays open while it holds a query (N1.1), the sort (N1.3) and the ⋮
 // (N1.7). From sm one wrapping row: [Filters] [pills] [Clear all (two or more
 // set)] and, right-aligned as one group that wraps together, [count] [search]
@@ -166,6 +167,10 @@ export function ListToolbar<F extends BaseListFilters>({
   useFlip(rowRef, ordered.map((p) => p.name).join("|"));
 
   const editorCount = count ?? sheetCount;
+  // Where the editors' button states the count ("Show 110,192"), the row
+  // draws none (Miles, 21 Nov 2026): the figure stays for screen readers and
+  // its hook. A listing whose editors read "Apply" keeps it in the row.
+  const countInButton = countFor != null;
   // Below sm the open search field takes the count's room in the line.
   const countAside = search && searchOpen ? "max-sm:hidden" : "";
   const countLine =
@@ -179,7 +184,9 @@ export function ListToolbar<F extends BaseListFilters>({
       </span>
     ) : count ? (
       <span
-        className={`min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED} ${countAside}`}
+        className={
+          countInButton ? "sr-only" : `min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED} ${countAside}`
+        }
         data-anatomy="N1.6"
         data-result-count={count.total}
         data-prov-exempt=""
