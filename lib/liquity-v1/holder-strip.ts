@@ -25,6 +25,7 @@ import { formatNumber } from "@/lib/utils/format";
 import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
 import { COLLATERAL_ADDRESS, COLLATERAL_SYMBOL, DEBT_SYMBOL, LIQUITY_V1_ADDRESSES } from "./asset-catalog";
 import { big, units } from "./sp-math";
+import { depositsLine } from "@/lib/liquity/holder-deposits";
 
 const TROVE_MANAGER = { name: "Liquity V1 TroveManager", address: LIQUITY_V1_ADDRESSES.TROVE_MANAGER };
 const POOL = { name: "Liquity V1 StabilityPool", address: LIQUITY_V1_ADDRESSES.STABILITY_POOL };
@@ -41,21 +42,17 @@ const DEPOSIT_KIND = { id: "deposit", noun: ["deposit", "deposits"] as [string, 
 
 const count = (n: number, one: string, many: string): string => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
-/** The counts sentence, across Troves and the deposit. */
-function countsLine(t: { open: number; closed: number; liquidated: number }, d: { open: number; closed: number }) {
-  const held = [
-    t.open > 0 ? count(t.open, "open Trove", "open Troves") : null,
-    d.open > 0 ? "a Stability Pool deposit" : null,
-  ].filter(Boolean);
-  const closed = [
-    t.closed > 0 ? count(t.closed, "Trove", "Troves") : null,
-    d.closed > 0 ? "its Stability Pool deposit" : null,
-  ].filter(Boolean);
+/** The Troves' sentence, V2's shape: "This wallet holds 1 open Trove and has
+ *  closed 4; 1 was liquidated." */
+function trovesLine(t: { open: number; closed: number; liquidated: number }): string {
   const head =
-    held.length > 0 ? `This wallet holds ${held.join(" and ")}` : "This wallet holds no open Troves or deposit";
-  const tail = closed.length > 0 ? ` and has closed ${closed.join(" and ")}` : "";
-  const liq = t.liquidated > 0 ? `; ${count(t.liquidated, "Trove was", "Troves were")} liquidated` : "";
-  return `${head}${tail}${liq}.`;
+    t.open > 0 ? `This wallet holds ${count(t.open, "open Trove", "open Troves")}` : "This wallet holds no open Troves";
+  const closed = t.closed > 0 ? ` and has closed ${t.closed.toLocaleString("en-US")}` : "";
+  const liq =
+    t.liquidated > 0
+      ? `; ${t.liquidated.toLocaleString("en-US")} ${t.liquidated === 1 ? "was" : "were"} liquidated`
+      : "";
+  return `${head}${closed}${liq}.`;
 }
 
 const sumProv = (summary: string, via: string, contract: Provenance["contract"], formula: string): Provenance => ({
@@ -68,36 +65,43 @@ const sumProv = (summary: string, via: string, contract: Provenance["contract"],
   formula,
 });
 
-/** Build the strip for a wallet search's Troves and deposit. */
+/** Build the strip for a wallet search's Troves and deposit. A kind whose
+ *  read failed is absent and goes unsaid. */
 export function liquityV1HolderStrip(
-  troves: HolderKindPage<LiquityV1PositionSummary>,
-  deposits: HolderKindPage<LiquityV1DepositRow>,
+  troves: HolderKindPage<LiquityV1PositionSummary> | undefined,
+  deposits: HolderKindPage<LiquityV1DepositRow> | undefined,
+  /** The Trove listing's page size: totals stand for a wallet within one page. */
+  perPage: number,
   /** The wallet the search names, for the link. */
   wallet?: string,
 ): HolderStripProps {
-  const openTroves = troves.rows.filter((t) => t.status === "open");
-  const openDeposits = deposits.rows.filter((d) => d.status === "open");
+  const troveRows = troves?.rows ?? [];
+  const openTroves = troveRows.filter((t) => t.status === "open");
+  const openDeposits = deposits?.rows.filter((d) => d.status === "open") ?? [];
+  const closedDeposits = (deposits?.rows.length ?? 0) - openDeposits.length;
   const counts = {
     open: openTroves.length,
-    closed: troves.rows.filter((t) => t.status === "closed").length,
-    liquidated: troves.rows.filter((t) => t.status === "liquidated").length,
+    closed: troveRows.filter((t) => t.status === "closed").length,
+    liquidated: troveRows.filter((t) => t.status === "liquidated").length,
   };
-  const kinds: HolderKindCount[] = [
-    { ...DEPOSIT_KIND, open: openDeposits.length, closed: deposits.rows.length - openDeposits.length },
-  ];
-  const positions = troves.total + deposits.total;
+  const kinds: HolderKindCount[] | undefined = deposits
+    ? [{ ...DEPOSIT_KIND, open: openDeposits.length, closed: closedDeposits }]
+    : undefined;
+  const positions = (troves?.total ?? 0) + (deposits?.total ?? 0);
+  // An address holds at most one deposit, so the deposits fit one page.
+  const depositsSaid = deposits ? depositsLine(openDeposits.length, closedDeposits) : "";
 
-  if (troves.total > troves.rows.length || deposits.total > deposits.rows.length) {
+  if (troves && troves.total > troves.rows.length) {
     // A page is a slice of the wallet: no count by status and no sum over it
     // is a statement about the wallet.
     return {
-      countsLine: `This wallet holds ${count(troves.total, "Trove", "Troves")}${deposits.total > 0 ? " and a Stability Pool deposit" : ""}.`,
+      countsLine: `This wallet holds ${count(troves.total, "Trove", "Troves")}.${depositsSaid}`,
       counts: { open: 0, closed: 0, liquidated: 0 },
       legs: [],
       truncated: true,
       positions,
       wallet,
-      note: `Totals are stated for wallets holding up to ${troves.rows.length.toLocaleString("en-US")} Troves; this one holds ${troves.total.toLocaleString("en-US")}.`,
+      note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} Troves; this one holds ${troves.total.toLocaleString("en-US")}.`,
     };
   }
 
@@ -171,12 +175,13 @@ export function liquityV1HolderStrip(
   }
 
   return {
-    countsLine: countsLine(counts, kinds[0]),
+    // Without the Troves' read the deposits' sentence opens the band.
+    countsLine: troves ? `${trovesLine(counts)}${depositsSaid}` : depositsSaid.replace(/^ It/, "This wallet"),
     counts,
     legs,
     truncated: false,
     positions,
     wallet,
-    kinds,
+    ...(kinds ? { kinds } : {}),
   };
 }

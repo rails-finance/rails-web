@@ -98,13 +98,15 @@ export function liquityV2HolderCardModel(
   /** The answer's count of Troves the wallet passed on (ui-jobs 705). */
   passedOn = 0,
   /** The wallet's Stability Pool deposits, counted and totalled as the strip
-   *  does (§1b); absent where their read failed. */
+   *  does (§1b). */
   deposits?: HolderKindPage<LiquityV2DepositRow>,
 ): PositionCardModel | null {
   // A Trove the wallet passed on is not its holding; the strip reads the
   // answer's total for truncation and leaves them out of the rest.
   const held = rows.filter((t) => !t.formerHold);
-  if ((held.length === 0 && !deposits?.total) || !prices) return null;
+  // The card is headed by the wallet's Troves, so a wallet with none (a
+  // depositor only) keeps the static card.
+  if (held.length === 0 || !prices) return null;
   return holderCardModel(liquityV2HolderStrip(rows, total, prices, perPage, passedOn, undefined, deposits), {
     session: "liquity-v2",
     subject,

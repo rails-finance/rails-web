@@ -75,7 +75,7 @@ export function LiquityV2Listing({
 
   // The wallet's Stability Pool deposits, under the rows and counted in the
   // strip (rails-ops TO-DO-stability-pool-deposits §1b).
-  const { reads } = useHolderKinds(OTHER_KINDS, readListQuery(useUrlSearchParams(initialSearch ?? "")));
+  const { wallet, reads } = useHolderKinds(OTHER_KINDS, readListQuery(useUrlSearchParams(initialSearch ?? "")));
   const deposits = reads[LIQUITY_V2_DEPOSITS.id];
 
   // The branches against their CCR (ui-jobs 747): a branch the listing is
@@ -200,7 +200,7 @@ export function LiquityV2Listing({
           {holderStrip(items, total, filters)}
         </>
       )}
-      renderBelow={(f) => <HolderKinds kinds={OTHER_KINDS} reads={reads} q={f.q} />}
+      renderBelow={() => <HolderKinds kinds={OTHER_KINDS} reads={reads} wallet={wallet} />}
       initialItems={initialItems}
       initialTotal={initialTotal}
       initialKey={initialKey}

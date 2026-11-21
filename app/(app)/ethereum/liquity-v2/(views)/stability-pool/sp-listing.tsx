@@ -55,7 +55,7 @@ export function SpListing(props: {
   // the branch prices.
   const prices = useLiquityV2Prices();
   const otherKinds = useMemo(() => [liquityV2TroveKind(prices)], [prices]);
-  const { reads } = useHolderKinds(otherKinds, readListQuery(useUrlSearchParams(props.initialSearch ?? "")));
+  const { wallet, reads } = useHolderKinds(otherKinds, readListQuery(useUrlSearchParams(props.initialSearch ?? "")));
   const troves = reads.trove;
 
   // The strip states the wallet: the search names a depositor, no pill
@@ -93,7 +93,7 @@ export function SpListing(props: {
         fetchPage: (f, page) => fetchSpPage(f, page),
       })}
       renderAbove={({ items, total, filters }) => holderStrip(items, total, filters)}
-      renderBelow={(f) => <HolderKinds kinds={otherKinds} reads={reads} q={f.q} />}
+      renderBelow={() => <HolderKinds kinds={otherKinds} reads={reads} wallet={wallet} />}
       {...props}
     />
   );

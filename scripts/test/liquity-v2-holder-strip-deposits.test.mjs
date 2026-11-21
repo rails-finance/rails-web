@@ -79,9 +79,20 @@ test("without deposits the strip is as before", () => {
 
 test("the wallet card names the deposits in its status word", () => {
   const card = liquityV2HolderCardModel(troves, 2, prices, 20, "0xw", 0, deposits);
-  assert.equal(card.status, "1 open · 1 closed · 2 deposits · 1 closed deposit");
+  assert.equal(card.status, "1 open · 1 closed · 2 open deposits · 1 closed deposit");
   assert.deepEqual(
     card.stats.map((x) => x.label),
     ["Total collateral", "Total debt", "Stability Pool deposits"],
   );
+});
+
+test("Troves past one page: the count, then the deposits by status", () => {
+  const many = Array.from({ length: 20 }, (_, i) => trove(String(i), "open", 1, 1));
+  const s = liquityV2HolderStrip(many, 25, prices, 20, 0, "0xw", deposits);
+  assert.equal(s.truncated, true);
+  assert.equal(s.countsLine, "This wallet holds 25 troves. It has 2 Stability Pool deposits and has closed 1.");
+});
+
+test("a wallet with no Troves keeps the static card", () => {
+  assert.equal(liquityV2HolderCardModel([], 0, prices, 20, "0xw", 0, deposits), null);
 });

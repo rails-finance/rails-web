@@ -55,7 +55,9 @@ export async function GET(req: Request) {
       const params = liquityV2FiltersToFetchParams({ ...LIQUITY_V2_LIST_DEFAULTS, q }, 1);
       const query = trovesQuery({ ...params, ownerEns: undefined, ownerAddress: wallet });
       // The deposits as the deposit listing reads them for an address: every
-      // status, one page. A failed read leaves them off the card.
+      // status, one page. A failed read answers the static card, held five
+      // minutes, as a failed price read does: a card drawn without them would
+      // be held six hours.
       const [troves, prices, deposits] = await Promise.all([
         readTrovesFromBackend(query, readerIp),
         readLiquityV2OracleFromBackend(readerIp),
@@ -65,10 +67,10 @@ export async function GET(req: Request) {
           routeBoxHop(process.env.RAILS_API_URL ?? "", readerIp),
         ).then(
           (r) => ({ rows: r.rows, total: r.pagination.total }),
-          () => undefined,
+          () => null,
         ),
       ]);
-      if (!troves.ok) return null;
+      if (!troves.ok || !deposits) return null;
       const rows = troves.data.data ?? [];
 
       return liquityV2HolderCardModel(

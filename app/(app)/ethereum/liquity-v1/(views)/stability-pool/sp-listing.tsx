@@ -9,7 +9,9 @@ import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain
 import { RailHeader } from "@/components/shared/rail-header";
 import { liquityV1DepositHref, LIQUITY_V1_SP_PATH } from "@/lib/liquity-v1/sp-routes";
 import { HolderStrip } from "@/components/shared/holder-strip";
-import { HolderKinds, useHolderKinds } from "@/components/shared/holder-kinds";
+import { HolderKinds, useHolderKinds, type HolderKindPage } from "@/components/shared/holder-kinds";
+import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
+import { LIQUITY_V1_ITEMS_PER_PAGE } from "@/lib/liquity-v1/list-filter-dimensions";
 import { liquityV1HolderStrip } from "@/lib/liquity-v1/holder-strip";
 import { LIQUITY_V1_TROVES, liquityV1DepositListingCard } from "@/lib/liquity-v1/holder-kinds";
 import { readListQuery } from "@/lib/shared/list-filter";
@@ -36,17 +38,19 @@ export function SpListing(props: {
 }) {
   // The wallet's Troves, under the rows and counted in the strip (§1b).
   const q = readListQuery(useUrlSearchParams(props.initialSearch ?? ""));
-  const { reads } = useHolderKinds(OTHER_KINDS, q);
+  const { wallet, reads } = useHolderKinds(OTHER_KINDS, q);
   const troves = reads[LIQUITY_V1_TROVES.id];
 
   // The strip states the wallet: the search names a depositor and no pill
-  // narrows the rows.
+  // narrows the rows. It waits for the Troves' read; a failed one leaves the
+  // Troves unsaid.
   const holderStrip = (items: LiquityV1DepositRow[], total: number, f: SpListFilters) =>
-    namesDepositor(f.q) && f.status.length === 0 && !f.tx.length && troves && troves !== "failed" ? (
+    namesDepositor(f.q) && f.status.length === 0 && !f.tx.length && troves !== undefined ? (
       <HolderStrip
         {...liquityV1HolderStrip(
-          troves as Parameters<typeof liquityV1HolderStrip>[0],
+          troves === "failed" ? undefined : (troves as HolderKindPage<LiquityV1PositionSummary>),
           { rows: items, total },
+          LIQUITY_V1_ITEMS_PER_PAGE,
           f.q.trim(),
         )}
       />
@@ -71,7 +75,7 @@ export function SpListing(props: {
         fetchPage: (f, page) => fetchSpPage(f, page),
       })}
       renderAbove={({ items, total, filters }) => holderStrip(items, total, filters)}
-      renderBelow={(f) => <HolderKinds kinds={OTHER_KINDS} reads={reads} q={f.q} />}
+      renderBelow={() => <HolderKinds kinds={OTHER_KINDS} reads={reads} wallet={wallet} />}
       {...props}
     />
   );

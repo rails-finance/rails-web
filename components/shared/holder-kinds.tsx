@@ -75,7 +75,9 @@ export function useHolderKinds(kinds: AnyHolderKind[], q: string): { wallet: str
         : ((await resolveEnsViaApi(named, undefined, ctrl.signal))?.toLowerCase() ?? null);
       if (ctrl.signal.aborted) return;
       if (!wallet) {
-        setState({ named, wallet: null, reads: {} });
+        // A name nobody holds reads nothing: each kind is settled as failed,
+        // so a strip waiting on them draws without them.
+        setState({ named, wallet: null, reads: Object.fromEntries(kinds.map((k) => [k.id, "failed" as const])) });
         return;
       }
       setState({ named, wallet, reads: {} });
@@ -95,20 +97,33 @@ export function useHolderKinds(kinds: AnyHolderKind[], q: string): { wallet: str
   return named && state.named === named ? { wallet: state.wallet, reads: state.reads } : { wallet: null, reads: {} };
 }
 
-/** The sections under the rows: one per kind the wallet holds any of. */
-export function HolderKinds({ kinds, reads, q }: { kinds: AnyHolderKind[]; reads: HolderKindReads; q: string }) {
+/** The sections under the rows: one per kind the wallet holds any of.
+ *  `wallet` is the resolved address, which every kind's listing reads. */
+export function HolderKinds({
+  kinds,
+  reads,
+  wallet,
+}: {
+  kinds: AnyHolderKind[];
+  reads: HolderKindReads;
+  wallet: string | null;
+}) {
   const shown = kinds.flatMap((k) => {
     const page = reads[k.id];
     return page && page !== "failed" && page.total > 0 ? [{ k, page: page as HolderKindPage<never> }] : [];
   });
-  if (shown.length === 0) return null;
+  if (shown.length === 0 || !wallet) return null;
   return (
     <div className="mt-10 flex flex-col gap-10">
       {shown.map(({ k, page }) => (
         <section key={k.id} data-holder-kind={k.id} data-anatomy="N7.3">
           <h2 className="mb-3 text-lg font-semibold">
             {k.heading}
-            <span className="ml-2 font-normal text-rb-500 tabular-nums">{page.total.toLocaleString("en-US")}</span>
+            {/* The positions the wallet holds, as the strip counts them:
+                those it passed on are left out. */}
+            <span className="ml-2 font-normal text-rb-500 tabular-nums">
+              {(page.total - (page.passedOn ?? 0)).toLocaleString("en-US")}
+            </span>
           </h2>
           <div className="flex flex-col gap-3">
             {page.rows.slice(0, HOLDER_KIND_SHOWN).map((row) => (
@@ -119,7 +134,7 @@ export function HolderKinds({ kinds, reads, q }: { kinds: AnyHolderKind[]; reads
           </div>
           {page.total > HOLDER_KIND_SHOWN && (
             <Link
-              href={`${k.listingPath}?q=${encodeURIComponent(q.trim())}`}
+              href={`${k.listingPath}?q=${wallet}`}
               className={`mt-3 inline-block text-sm ${FOOT_LINK}`}
               data-holder-kind-all=""
             >

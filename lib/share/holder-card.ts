@@ -28,7 +28,8 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
 const MAX_STATS = 3;
 
 /** The counts as a card's status word — "4 open · 2 closed · 1 liquidated",
- *  then each other kind the wallet holds ("· 1 deposit").
+ *  then each other kind the wallet holds ("· 1 open deposit · 2 closed
+ *  deposits").
  *  The strip states them as a sentence, which at 24px in a pill would wrap; the
  *  card states the same three numbers in the shortest form that still names
  *  what each one counts. A status with none of a kind omits it rather than
@@ -39,9 +40,9 @@ function statusWord(counts: HolderStripProps["counts"], kinds: HolderStripProps[
     counts.open > 0 ? `${n(counts.open)} open` : null,
     counts.closed > 0 ? `${n(counts.closed)} closed` : null,
     counts.liquidated > 0 ? `${n(counts.liquidated)} liquidated` : null,
-    // The other kinds by their nouns: "1 deposit", "2 closed deposits".
+    // The other kinds by their nouns: "1 open deposit", "2 closed deposits".
     ...kinds.flatMap((k) => [
-      k.open > 0 ? `${n(k.open)} ${k.noun[k.open === 1 ? 0 : 1]}` : null,
+      k.open > 0 ? `${n(k.open)} open ${k.noun[k.open === 1 ? 0 : 1]}` : null,
       k.closed > 0 ? `${n(k.closed)} closed ${k.noun[k.closed === 1 ? 0 : 1]}` : null,
     ]),
   ].filter(Boolean);

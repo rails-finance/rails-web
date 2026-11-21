@@ -37,6 +37,7 @@ import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
 import { liquityV2PriceNote } from "@/lib/liquity-v2/price-notes";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { big, units } from "./sp-math";
+import { depositsLine } from "@/lib/liquity/holder-deposits";
 
 const collToken = (collateralType: string) => ({
   symbol: collateralType,
@@ -52,14 +53,6 @@ const LEG_TIP = {
 } as const;
 
 const DEPOSIT_TIP = "As of each deposit's last touch. Liquidations since then have not been taken out.";
-
-/** The deposits sentence after the Troves': every deposit is BOLD, at most one
- *  on each branch. */
-function depositsLine(open: number, closed: number): string {
-  const noun = (n: number) => plural(n, "Stability Pool deposit", "Stability Pool deposits");
-  if (open > 0) return ` It has ${noun(open)}${closed > 0 ? ` and has closed ${closed.toLocaleString("en-US")}` : ""}.`;
-  return closed > 0 ? ` It has closed ${noun(closed)}.` : "";
-}
 
 const plural = (n: number, one: string, many: string): string => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
@@ -147,12 +140,13 @@ export function liquityV2HolderStrip(
     : undefined;
   const positions = held + (deposits?.total ?? 0);
 
-  if (truncated || (deposits && deposits.total > deposits.rows.length)) {
+  // A wallet holds at most one deposit on each branch, so they fit one page.
+  if (truncated) {
     // The rows are a slice of the wallet: neither the per-status counts nor any
     // sum over them is a statement about the wallet. State the count it does
     // hold, and say why the rest is absent.
     return {
-      countsLine: `This wallet holds ${plural(held, "trove", "troves")}.${deposits ? depositsLine(deposits.total, 0) : ""}`,
+      countsLine: `This wallet holds ${plural(held, "trove", "troves")}.${depositsLine(depOpen.length, depClosed)}`,
       counts: { open: 0, closed: 0, liquidated: 0 },
       legs: [],
       truncated: true,

@@ -43,13 +43,16 @@ const deposit = (status, lusd) => ({
   deposit_raw: status === "open" ? `${lusd}${E18}` : "0",
 });
 
+const PER_PAGE = 20;
+
 test("one open Trove, one liquidated and an open deposit: counts across kinds, three legs", () => {
   const s = liquityV1HolderStrip(
     { rows: [trove(2, "open", 4, 2000), trove(1, "liquidated", 0, 0)], total: 2 },
     { rows: [deposit("open", 5000)], total: 1 },
+    PER_PAGE,
     "0xw",
   );
-  assert.equal(s.countsLine, "This wallet holds 1 open Trove and a Stability Pool deposit; 1 Trove was liquidated.");
+  assert.equal(s.countsLine, "This wallet holds 1 open Trove; 1 was liquidated. It has 1 Stability Pool deposit.");
   assert.deepEqual(s.counts, { open: 1, closed: 0, liquidated: 1 });
   assert.deepEqual(s.kinds, [{ id: "deposit", noun: ["deposit", "deposits"], open: 1, closed: 0 }]);
   assert.equal(s.positions, 3);
@@ -63,32 +66,74 @@ test("one open Trove, one liquidated and an open deposit: counts across kinds, t
   assert.equal(s.legs[2].approx, true);
 });
 
-test("a closed deposit and closed Troves are said as closed", () => {
+test("V2's sentence shape: closed and liquidated Troves, then the deposit", () => {
   const s = liquityV1HolderStrip(
-    { rows: [trove(1, "closed", 0, 0), trove(2, "closed", 0, 0)], total: 2 },
-    { rows: [deposit("closed")], total: 1 },
+    {
+      rows: [
+        trove(5, "open", 1, 1),
+        trove(4, "closed", 0, 0),
+        trove(3, "closed", 0, 0),
+        trove(2, "closed", 0, 0),
+        trove(1, "closed", 0, 0),
+        trove(0, "liquidated", 0, 0),
+      ],
+      total: 6,
+    },
+    { rows: [deposit("open", 10)], total: 1 },
+    PER_PAGE,
   );
   assert.equal(
     s.countsLine,
-    "This wallet holds no open Troves or deposit and has closed 2 Troves and its Stability Pool deposit.",
+    "This wallet holds 1 open Trove and has closed 4; 1 was liquidated. It has 1 Stability Pool deposit.",
+  );
+});
+
+test("none open: the Troves' sentence, then the closed deposit", () => {
+  const s = liquityV1HolderStrip(
+    { rows: [trove(1, "closed", 0, 0), trove(2, "closed", 0, 0)], total: 2 },
+    { rows: [deposit("closed")], total: 1 },
+    PER_PAGE,
+  );
+  assert.equal(
+    s.countsLine,
+    "This wallet holds no open Troves and has closed 2. It has closed 1 Stability Pool deposit.",
   );
   assert.equal(s.legs.length, 0);
 });
 
-test("Troves past one page: the count, no totals", () => {
-  const s = liquityV1HolderStrip({ rows: [trove(1, "open", 1, 1)], total: 25 }, { rows: [], total: 0 });
+test("Troves past one page: the count, the deposit, and the note names the page size on any page", () => {
+  // Page 2 of 25 Troves holds 5 rows; the note states the listing's page size.
+  const s = liquityV1HolderStrip(
+    { rows: Array.from({ length: 5 }, (_, i) => trove(i, "open", 1, 1)), total: 25 },
+    { rows: [deposit("open", 1)], total: 1 },
+    PER_PAGE,
+  );
   assert.equal(s.truncated, true);
   assert.equal(s.legs.length, 0);
-  assert.equal(s.countsLine, "This wallet holds 25 Troves.");
+  assert.equal(s.countsLine, "This wallet holds 25 Troves. It has 1 Stability Pool deposit.");
+  assert.equal(s.note, "Totals are stated for wallets holding up to 20 Troves; this one holds 25.");
+});
+
+test("a failed read leaves its kind unsaid", () => {
+  const noDeposit = liquityV1HolderStrip(
+    { rows: [trove(2, "open", 4, 2000), trove(1, "closed", 0, 0)], total: 2 },
+    undefined,
+    PER_PAGE,
+  );
+  assert.equal(noDeposit.countsLine, "This wallet holds 1 open Trove and has closed 1.");
+  assert.equal(noDeposit.kinds, undefined);
+  const noTroves = liquityV1HolderStrip(undefined, { rows: [deposit("open", 5)], total: 1 }, PER_PAGE);
+  assert.equal(noTroves.countsLine, "This wallet has 1 Stability Pool deposit.");
 });
 
 test("the share card's status word names the deposit and keeps three stats", () => {
   const s = liquityV1HolderStrip(
     { rows: [trove(2, "open", 4, 2000), trove(1, "liquidated", 0, 0)], total: 2 },
     { rows: [deposit("open", 5000)], total: 1 },
+    PER_PAGE,
   );
   const card = holderCardModel(s, { session: "liquity-v1", subject: "0xw", total: 3, plural: "Troves" });
-  assert.equal(card.status, "1 open · 1 liquidated · 1 deposit");
+  assert.equal(card.status, "1 open · 1 liquidated · 1 open deposit");
   assert.deepEqual(
     card.stats.map((x) => x.label),
     ["Total collateral", "Total debt", "Stability Pool deposit"],
