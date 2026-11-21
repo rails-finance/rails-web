@@ -53,6 +53,7 @@ import { chromium } from "playwright";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { openListingSearch } from "./lib/listing-toolbar.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -534,7 +535,8 @@ async function openListing(ctx, url) {
 /** Type into the listing's own search box and let the driver's 300 ms debounce
  *  push the URL — the path a reader takes to a wallet view. */
 async function searchWallet(page, wallet) {
-  const box = page.locator('[data-skel-section="listing-toolbar"] input').first();
+  // The search rests as an icon until pressed (N1.1, ui-jobs 801).
+  const box = await openListingSearch(page, page.locator('[data-skel-section="listing-toolbar"]'));
   await box.click();
   await box.fill(wallet);
   await page.waitForTimeout(4000);
@@ -561,7 +563,8 @@ async function statedTotal(page) {
 }
 {
   const page = await openListing(context, `${BASE}/ethereum/liquity-v2`);
-  const box = page.locator('[data-skel-section="listing-toolbar"] input').first();
+  // The search rests as an icon until pressed (N1.1, ui-jobs 801).
+  const box = await openListingSearch(page, page.locator('[data-skel-section="listing-toolbar"]'));
   await box.click();
   await box.fill(V2_WALLET);
   await page.waitForURL((u) => u.pathname.startsWith("/wallet/"), { timeout: 60000 }).catch(() => {});

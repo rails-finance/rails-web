@@ -1,9 +1,9 @@
 "use client";
 
-// The timeline's filters on the listings' pills (N1.10, ui-jobs 735): one pill
-// per axis the history offers (Type, Asset, Version, Address), each with its
-// editor, and the filter sheet below sm, over the model in
-// timeline-filter-model.ts. The toolbar draws the Date pill.
+// The timeline's filters on the listings' pills (N1.10, ui-jobs 735, 801): one
+// pill per axis that is set (Type, Asset, Version, Address), each with its
+// editor, and the Filters button with its sheet, over the model in
+// timeline-filter-model.ts. The toolbar draws the Date.
 
 import { useRef, useState } from "react";
 import { FilterPill } from "@/components/shared/filter-bar/filter-pill";

@@ -71,6 +71,7 @@
 //   registry, and the section for each is what says so. Reverted.
 
 import { chromium } from "playwright";
+import { openListingSearch } from "./lib/listing-toolbar.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 
@@ -242,7 +243,8 @@ const describeChips = (chips) =>
  *  check is about to assert. */
 async function search(page, text, rowSel) {
   const before = rowSel ? await page.locator(rowSel).count() : null;
-  const box = page.locator('[data-skel-section="listing-toolbar"] input').first();
+  // The search rests as an icon until pressed (N1.1, ui-jobs 801).
+  const box = await openListingSearch(page, page.locator('[data-skel-section="listing-toolbar"]'));
   await box.click();
   await box.fill(text);
   await page.waitForTimeout(1600);

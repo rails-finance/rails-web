@@ -3,7 +3,7 @@
 /**
  * FilterPill (N1.10, ui-jobs 681): one editable pill of a listing's toolbar.
  * Three states, worked out in ./pill-model:
- *   unset   — dashed outline, muted, "+ Market"; the whole pill opens the editor.
+ *   unset   — not drawn (ui-jobs 801): the Filters button reaches the group.
  *   set     — tonal teal fill and border, muted label and bold value
  *             ("Status Open"); the main area opens the editor and a sibling ×
  *             removes the filter (two buttons side by side, never nested).
@@ -15,7 +15,7 @@
  */
 
 import type { ReactNode, Ref } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, X } from "lucide-react";
 import type { PillState } from "@/components/shared/filter-bar/pill-model";
 
 /** 44px on a phone, 40px from sm; fully rounded. */
@@ -30,7 +30,6 @@ const LABEL = PILL_MUTED;
 /** The set pill's tonal fill and border. */
 export const PILL_SET_TONE = "border border-teal-600/35 bg-teal-500/[0.06] dark:border-teal-400/30 dark:bg-teal-400/10";
 const PILL_SET = `${PILL_SET_TONE} hover:bg-teal-500/10 dark:hover:bg-teal-400/15`;
-const PILL_UNSET = `border border-dashed border-rb-400 dark:border-rb-500/60 ${PILL_MUTED} hover:text-foreground hover:border-rb-500`;
 /** The sort pill and the Filters button: a neutral filled pill. */
 export const PILL_NEUTRAL =
   "border border-rb-200 bg-rb-100 text-foreground hover:bg-rb-200 dark:border-rb-700 dark:bg-rb-800 dark:hover:bg-rb-700";
@@ -44,7 +43,7 @@ export interface FilterPillProps {
   pinned?: boolean;
   label: string;
   value: string;
-  /** The pill's accessible name: "Status Open", "Add Market filter". */
+  /** The pill's accessible name: "Status Open". */
   spoken: string;
   expanded: boolean;
   onOpen: () => void;
@@ -81,27 +80,8 @@ export function FilterPill({
     "data-pill-state": state,
     "data-anatomy": anatomy ? `N1.10 ${anatomy}` : "N1.10",
   };
-  if (state === "unset") {
-    return (
-      <div className="relative shrink-0" {...hooks}>
-        <button
-          ref={buttonRef}
-          type="button"
-          onClick={onOpen}
-          className={`${PILL_BASE} ${PILL_UNSET} ${FOCUS} gap-1.5 pl-3 pr-3.5`}
-          aria-haspopup="dialog"
-          aria-expanded={expanded}
-          aria-label={spoken}
-          data-pill-open=""
-          {...openData}
-        >
-          <Plus className="size-3.5" aria-hidden="true" />
-          {name}
-        </button>
-        {children}
-      </div>
-    );
-  }
+  // An unset group draws no pill: the Filters button reaches it (ui-jobs 801).
+  if (state === "unset") return null;
   if (pinned) {
     return (
       <div className="relative shrink-0" {...hooks}>

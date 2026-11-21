@@ -32,6 +32,7 @@
 import { chromium } from "@playwright/test";
 import { countLineText, parseCountLine, NAMES_THE_CAP } from "../lib/timeline-draw.mjs";
 import { enGb } from "./lib/date.mjs";
+import { closeAxis, openAxis } from "./lib/timeline-pills.mjs";
 
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 const WALLET = (process.env.WALLET ?? "0xee7ca610d896c53ffe716b801c05748efd902954").toLowerCase();
@@ -304,19 +305,20 @@ async function main() {
     // can also be matched to a row by name, its own count is checked too.
     const largest = [...opening.byAction].sort((a, b) => b.count - a.count)[0];
     if (largest && largest.count > 0) {
-      // The Type pill (ui-jobs 735). Its editor's rows are read on their
-      // own hook; a leg nested under an umbrella type is left out, the
-      // umbrella's row counting each of its events once.
-      const menu = page.locator('[data-filter-pill="Type"] [data-pill-open]').first();
-      const opened = (await menu.count()) > 0;
-      assert(opened, "the type filter control is on the page", 'looked for the "Type" pill');
+      // The Type pill's editor (ui-jobs 735), or the Filters sheet's Type
+      // view while the axis hides nothing and draws no pill (ui-jobs 801).
+      // Its rows are read on their hook; a leg nested under an umbrella type
+      // is left out, the umbrella's row counting each of its events once.
+      const opened = await openAxis(page, "Type");
+      assert(opened, "the type filter control is on the page", 'looked for the "Type" pill or sheet row');
       if (opened) {
-        await menu.click();
         await page.waitForTimeout(400);
         const menuRows = await page.evaluate(() =>
-          [...document.querySelectorAll("[data-pill-option]:not([data-pill-nested])")].map(
-            (el) => el.textContent ?? "",
-          ),
+          [
+            ...document.querySelectorAll(
+              "[data-pill-option]:not([data-pill-nested]), [data-filter-sheet-option]:not([data-pill-nested])",
+            ),
+          ].map((el) => el.textContent ?? ""),
         );
         const countOf = (t) => {
           const m = t.match(/([\d][\d,]*)\s*$/);
@@ -352,7 +354,7 @@ async function main() {
         } else {
           console.log(`  (no menu row is named "${wanted}" — the sum assertions carry this protocol)`);
         }
-        await page.keyboard.press("Escape");
+        await closeAxis(page, "Type");
       }
     }
 

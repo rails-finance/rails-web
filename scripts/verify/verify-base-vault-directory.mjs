@@ -110,6 +110,7 @@ import { fileURLToPath } from "node:url";
 import { readStoreSeries, readVaultStrip, vaultStripChecks } from "./lib/vault-strip.mjs";
 import { expectedRoster } from "./lib/served-vault-roster.mjs";
 import { checkRosterView } from "./lib/vault-roster-view.mjs";
+import { setFilterViaSheet } from "./lib/listing-toolbar.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3022";
@@ -444,14 +445,10 @@ check(
 // ── 7: the Family facet ─────────────────────────────────────────────────────
 // Scoped to the panel: the LISTING's own toolbar sits above this drawer with
 // facets of its own, and an unscoped click would press the wrong control.
-// The facet is the Family pill (N1.10, ui-jobs 681): its editor ticks the
-// option and applies it.
+// An unset Family draws no pill (ui-jobs 801): the panel's Filters sheet ticks
+// the option and applies it, and the Family pill (N1.10) then stands set.
 const rosterPanel = page.locator("[data-roster-panel]");
-await rosterPanel.locator('[data-filter-pill="Family"] [data-pill-open]').first().click();
-const familyEditor = page.locator('[data-pill-editor="Family"]').first();
-await familyEditor.locator("[data-pill-option]", { hasText: "MetaMorpho V1.0" }).first().click();
-await familyEditor.locator("[data-pill-editor-apply]").click();
-await page.waitForTimeout(200);
+await setFilterViaSheet(page, "family", ["v1.0"], { scope: rosterPanel });
 const facetRows = (await readRows()).filter((r) => r.group === "funded");
 const ownV10Funded = CATALOG.filter((r) => r.factory === "v1.0" && (ownTotal.get(r.address) ?? 0n) > 0n).length;
 check(

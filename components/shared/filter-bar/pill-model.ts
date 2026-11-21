@@ -6,7 +6,8 @@
 //
 // A pill is in one of three states:
 //   unset    — every dimension in the group at its default, and the default
-//              constrains nothing: a dashed "+ Market" that opens the editor.
+//              constrains nothing: no pill in the row (ui-jobs 801); the
+//              Filters button reaches the group.
 //   set      — a dimension off its default: "Status Open", "Transactions ≥ 100",
 //              with a × that puts the group back to its default.
 //   default  — the group rests on a default that does constrain the list

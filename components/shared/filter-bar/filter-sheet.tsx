@@ -1,10 +1,13 @@
 "use client";
 
 /**
- * FilterSheet — every filter at once below sm (ui-jobs 544): the Filters
- * button at the head of the pill row (a sliders glyph and, while any group is
- * set, a badge with how many; ui-jobs 681), opening a bottom sheet over a
- * scrim.
+ * FilterSheet — every filter at once (ui-jobs 544, 801): the Filters button in
+ * the toolbar's row (the list-filter glyph; below sm a badge with how many
+ * groups are set, ui-jobs 681). Below sm it opens a bottom sheet over a scrim.
+ * From sm it opens a panel in the page, in the toolbar's `slot` under the row
+ * and above the results: the filters that open a sub-view at the left, the
+ * Size ranges in the middle, the section's other filters and the primary
+ * button at the right; a second press on the button closes it.
  * The sheet lists one row per dimension, its name at the left and the current
  * choice with a chevron at the right; a row opens that dimension's options
  * (multi, or single with three or more) as a sub-view with its own back
@@ -24,8 +27,9 @@
  * the back control at the top close the sheet and drop the draft; a facet's
  * back returns to the list keeping it.
  *
- * A modal dialog: focus is held inside while it is open and returns to the
- * Filters button on close; the page behind does not scroll.
+ * Below sm a modal dialog: focus is held inside while it is open and returns
+ * to the Filters button on close; the page behind does not scroll. The panel
+ * in the page is a labelled region and holds neither.
  *
  * Browser back steps back inside the sheet (a phone's edge swipe or back
  * button fires it): opening the sheet and opening a sub-view each push a
