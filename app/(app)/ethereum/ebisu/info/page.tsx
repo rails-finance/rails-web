@@ -8,6 +8,7 @@ import { ProtocolInfoPage, GlossaryLink, type InfoTerm, type InfoView } from "@/
 import { EBISU_DOCS_AND_CHAIN } from "@/lib/ebisu/docs-and-chain";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { forkSpInfoView } from "@/lib/liquity-fork/sp-info-view";
 
 export const metadata = infoMetadata("ebisu");
 
@@ -128,6 +129,13 @@ const views: readonly [InfoView, ...InfoView[]] = [
       </p>
     ),
   },
+  forkSpInfoView(
+    "ebisu",
+    <>
+      The branches have been shut down since 20 Aug 2026, and every pool has held 0 collateral since 21 Oct 2026; a
+      deposit can still be withdrawn.
+    </>,
+  ),
 ];
 
 export default function InfoPage() {
