@@ -29,7 +29,7 @@ import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { RATE_NOTE_T1, type SpLiquidationsNote } from "@/lib/shared/market-note";
 import { big, exactUnits, units } from "@/lib/liquity-v2/sp-math";
 import { spLiqProvFor } from "@/lib/liquity-v2/sp-provenance";
-import { spResidualClause } from "@/lib/liquity-v2/sp-liquidations";
+import { closedAfterWithdrawal, spResidualClause, statedWithdrawalBlock } from "@/lib/liquity-v2/sp-liquidations";
 import { SP_DEPLOYMENTS, spPoolOf, type SpDeployment } from "@/lib/liquity-v2/sp-deployment";
 import { recordedShutdown, shutdownDay, withdrawalDateProv } from "@/lib/shared/liquity-family-shutdown";
 import type { LiquityV2DepositLiquidation, LiquityV2DepositStretch } from "@/lib/sources/api/liquity-v2-sp";
@@ -320,7 +320,7 @@ function reconcileLine(note: SpLiquidationsNote): string {
   const wrote = `The touch on ${touch} wrote ${amt(big(s.to.deposit_loss))} ${S} burned and ${collAmt(big(s.to.coll_gain_since))} ${c} paid in`;
   // After the admin's withdrawal the touch wrote no collateral: the line on
   // the withdrawal says why, and the residual is no fault.
-  if (afterWithdrawal(note)) return `${wrote}.`;
+  if (closedAfterWithdrawal(note)) return `${wrote}.`;
   const clause = spResidualClause(s.residual, c, { bold: amt, coll: collAmt }, S);
   return clause ? `${wrote}; these liquidations ${clause}.` : `${wrote}.`;
 }
@@ -363,10 +363,11 @@ export function LiquityV2DepositLiquidationsRow({ note }: { note: SpLiquidations
   const net = big(s.totals.net);
   const range = gapRange(note.from.timestamp, note.to.timestamp);
   const tot = totalCells(dep, c, s);
-  // A stretch closed after the admin's withdrawal does not reconcile by the
-  // withdrawal's doing, and neither does the branch check it counts in.
+  // A stretch closed at or after the admin's withdrawal does not reconcile by
+  // the withdrawal's doing and carries no mark; every other stretch keeps it,
+  // the branch check's included.
   const unsettled =
-    note.collWithdrawnAtBlock == null && (s.reconciles === false || (note.branchCheck?.unreconciled ?? 0) > 0);
+    !closedAfterWithdrawal(note) && (s.reconciles === false || (note.branchCheck?.unreconciled ?? 0) > 0);
 
   // On the spine: the collateral the liquidations paid in points into the
   // deposit, as a deposit's legs do.
@@ -419,7 +420,7 @@ export function LiquityV2DepositLiquidationsRow({ note }: { note: SpLiquidations
             dep={dep}
             branch={c}
             stretch={s}
-            check={note.collWithdrawnAtBlock == null ? note.branchCheck : null}
+            check={note.branchCheck}
             netEcho
             foot={
               <>
@@ -427,7 +428,7 @@ export function LiquityV2DepositLiquidationsRow({ note }: { note: SpLiquidations
                 {note.withdrawalLine && (
                   <>
                     {" "}
-                    <WithdrawalLine dep={dep} branch={c} />
+                    <WithdrawalLine dep={dep} branch={c} answerBlock={String(note.collWithdrawnAtBlock)} />
                   </>
                 )}
               </>
@@ -454,6 +455,7 @@ export function SpOpenStretchLiquidations({
   servedThru,
   check,
   withdrawalLine = false,
+  withdrawnAtBlock,
 }: {
   dep: SpDeployment;
   branch: string;
@@ -462,6 +464,8 @@ export function SpOpenStretchLiquidations({
   check: SpLiquidationsNote["branchCheck"];
   /** This section carries the page's one line on the admin's withdrawal. */
   withdrawalLine?: boolean;
+  /** The answer's coll_withdrawn_at_block. */
+  withdrawnAtBlock?: string | null;
 }) {
   if (stretch.liquidations.length === 0) return null;
   const WORDS = words(dep.stable.symbol);
@@ -476,7 +480,11 @@ export function SpOpenStretchLiquidations({
         dep={dep}
         branch={branch}
         stretch={stretch}
-        check={withdrawalLine ? null : check}
+        // The branch check stands on every deployment. On Ebisu a stretch
+        // closed after the withdrawal would count in it: should it ever fire
+        // for that reason, the fix is on the server, leaving stretches closed
+        // at or after coll_withdrawn_at_block out of `unreconciled`.
+        check={check}
         foot={
           <>
             {WORDS.valued} {WORDS.openFoot}{" "}
@@ -487,7 +495,7 @@ export function SpOpenStretchLiquidations({
             {withdrawalLine && (
               <>
                 {" "}
-                <WithdrawalLine dep={dep} branch={branch} />
+                <WithdrawalLine dep={dep} branch={branch} answerBlock={withdrawnAtBlock} />
               </>
             )}
           </>
@@ -497,20 +505,23 @@ export function SpOpenStretchLiquidations({
   );
 }
 
-/** A stretch closed by a touch after the admin's withdrawal of the pool's
- *  collateral. */
-function afterWithdrawal(note: SpLiquidationsNote): boolean {
-  return note.collWithdrawnAtBlock != null && note.to.block > note.collWithdrawnAtBlock;
-}
-
 /** The page's one line on the admin's withdrawal (Ebisu, ui-jobs 608, 612):
  *  the gains above are what each liquidation paid; the pool's collateral left
  *  at that block, so none of it is claimable now. Miles, 21 Nov 2026. */
-function WithdrawalLine({ dep, branch }: { dep: SpDeployment; branch: string }) {
+export function WithdrawalLine({
+  dep,
+  branch,
+  answerBlock,
+}: {
+  dep: SpDeployment;
+  branch: string;
+  /** The answer's coll_withdrawn_at_block: the record must name the same. */
+  answerBlock: string | null | undefined;
+}) {
   const rec = recordedShutdown(dep.id, branch);
   const w = rec?.withdrawal;
   const prov = rec ? withdrawalDateProv(dep.id, branch, rec) : null;
-  if (!w || !prov) return null;
+  if (!w || !prov || statedWithdrawalBlock(answerBlock, w.block) == null) return null;
   return (
     <span data-sp-coll-withdrawn={w.block}>
       The admin withdrew the pool&rsquo;s collateral at block{" "}

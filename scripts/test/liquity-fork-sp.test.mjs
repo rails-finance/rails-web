@@ -162,3 +162,57 @@ test("a liquidations answer: collateral to 1e18, the 1e(36 − d) price to 1e18,
   // Twice is once.
   assert.deepEqual(scaleSpAnswer(structuredClone(a)), a);
 });
+
+const { statedWithdrawalBlock, closedAfterWithdrawal, spLiquidationNotes } = await import(
+  ROOT + "lib/liquity-v2/sp-liquidations.ts"
+);
+
+test("the page states the withdrawal only where the record names the answer's block", () => {
+  assert.equal(statedWithdrawalBlock("26238016", 26238016), 26238016);
+  // A record that differs, or none, states nothing and hides nothing.
+  assert.equal(statedWithdrawalBlock("26238017", 26238016), undefined);
+  assert.equal(statedWithdrawalBlock("26238016", undefined), undefined);
+  assert.equal(statedWithdrawalBlock(undefined, 26238016), undefined);
+});
+
+test("only a stretch closed at or after the withdrawal block loses its unsettled mark", () => {
+  const stretch = (toBlock) => ({
+    from: { event_key: "a", block_number: "100", block_timestamp: "1", tx_hash: "0x1", deposit: "1" },
+    to: {
+      event_key: "b",
+      block_number: String(toBlock),
+      block_timestamp: "2",
+      tx_hash: "0x2",
+      deposit_loss: "1",
+      coll_gain_since: "0",
+    },
+    liquidations: [],
+    totals: { bold_lost: "0", coll_gained: "0", coll_gained_value: "0", net: "0" },
+    residual: { bold_lost: "1", coll_gained: "0" },
+    reconciles: false,
+  });
+  const read = {
+    coll_withdrawn_at_block: "26238016",
+    branch_check: { deposits: "1", closed_stretches: "3", unreconciled: "0" },
+    stretches: [stretch(26238015), stretch(26238016), stretch(26238020)],
+  };
+  const dep = { id: "ebisu", stable: { symbol: "ebUSD", address: "0x" } };
+  const stated = spLiquidationNotes(
+    "LBTC",
+    "0xpool",
+    read,
+    dep,
+    statedWithdrawalBlock(read.coll_withdrawn_at_block, 26238016),
+  );
+  assert.deepEqual(stated.map(closedAfterWithdrawal), [false, true, true]);
+  assert.equal(stated[0].unitLabel, "ebUSD");
+  // No record to state the withdrawal: nothing is exempt.
+  const unstated = spLiquidationNotes(
+    "LBTC",
+    "0xpool",
+    read,
+    dep,
+    statedWithdrawalBlock(read.coll_withdrawn_at_block, undefined),
+  );
+  assert.deepEqual(unstated.map(closedAfterWithdrawal), [false, false, false]);
+});

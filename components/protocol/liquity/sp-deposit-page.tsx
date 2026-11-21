@@ -47,12 +47,22 @@ import { LiquityV2DepositEventCard } from "@/components/protocol/liquity/sp-even
 import { LiquityV2DepositFlowsNote, liquityV2DepositFlowsContent } from "@/components/protocol/liquity/sp-flows-note";
 import { LiquityV2DepositSinceTouchRow } from "@/components/protocol/liquity/sp-since-touch";
 import { SpOpenStretchLiquidations } from "@/components/protocol/liquity/sp-liquidations";
-import { spBranchCheck, spLiquidationNotes, spNotesOnRows } from "@/lib/liquity-v2/sp-liquidations";
+import {
+  spBranchCheck,
+  spLiquidationNotes,
+  spNotesOnRows,
+  statedWithdrawalBlock,
+} from "@/lib/liquity-v2/sp-liquidations";
 import { fetchLiquityV2DepositChain, type LiquityV2DepositChain } from "@/lib/api/fetch-liquity-v2-sp-chain";
 import { spPoolOf, spWalletHref, type SpDeployment } from "@/lib/liquity-v2/sp-deployment";
 import { useBranchShutdown } from "@/hooks/useBranchShutdown";
 import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
-import { shutdownDateProv, shutdownDay, withdrawalDateProv } from "@/lib/shared/liquity-family-shutdown";
+import {
+  recordedShutdown,
+  shutdownDateProv,
+  shutdownDay,
+  withdrawalDateProv,
+} from "@/lib/shared/liquity-family-shutdown";
 import { liquityFamilyTerms } from "@/lib/liquity/ltv";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { depositLifetime, depositNow, depositNowFromChain, priceUnits } from "@/lib/liquity-v2/sp-math";
@@ -164,9 +174,15 @@ export function SpDepositPage({
     // `api` is the deployment's, fixed for the page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branch, depositor, dep.liquidations]);
+  // The admin's withdrawal the page states: the answer's block where the
+  // catalog's record names the same one (statedWithdrawalBlock).
+  const withdrawnAt = statedWithdrawalBlock(
+    liqRead?.coll_withdrawn_at_block,
+    recordedShutdown(dep.id, branch)?.withdrawal?.block,
+  );
   const liqNotes = useMemo(
-    () => (liqRead ? spLiquidationNotes(branch, coll.pool, liqRead, dep) : NO_NOTES),
-    [liqRead, branch, coll.pool, dep],
+    () => (liqRead ? spLiquidationNotes(branch, coll.pool, liqRead, dep, withdrawnAt) : NO_NOTES),
+    [liqRead, branch, coll.pool, dep, withdrawnAt],
   );
   // The open stretch, where it starts at the touch the timeline holds as newest.
   const openStretch =
@@ -241,7 +257,7 @@ export function SpDepositPage({
   // The admin's withdrawal of the pool's collateral (Ebisu): one line, beside
   // the newest gains the page shows. The "Since its last touch" row's section
   // where it draws with liquidations, else the newest closed stretch's note.
-  const withdrawn = liqRead?.coll_withdrawn_at_block != null;
+  const withdrawn = withdrawnAt != null;
   const openWithLiqs = Boolean(now && lifetime && chain && openStretch && openStretch.liquidations.length > 0);
   const liqNotesShown = useMemo(() => {
     if (!withdrawn || openWithLiqs) return liqNotesOnRows;
@@ -446,6 +462,7 @@ export function SpDepositPage({
                                 servedThru={liqRead.served_thru_block}
                                 check={spBranchCheck(liqRead)}
                                 withdrawalLine={withdrawn && openWithLiqs}
+                                withdrawnAtBlock={liqRead.coll_withdrawn_at_block}
                               />
                             ) : undefined
                           }
