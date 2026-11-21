@@ -254,7 +254,10 @@ export function HolderStrip({
         )}
         {totals && (
           <div
-            className={`${countsLine ? "mt-2 " : ""}grid grid-cols-2 gap-4 ${legs.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+            // Four legs (a Polaris wallet's CDPs, deposit and loan; a Liquity
+            // V1 wallet's Troves, deposit and stake) stand in one row once
+            // there is room, two by two below that.
+            className={`${countsLine ? "mt-2 " : ""}grid grid-cols-2 gap-4 ${legs.length === 4 ? "lg:grid-cols-4" : legs.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
           >
             {legs.map((leg) => (
               <div key={leg.id} data-holder-leg={leg.id} data-anatomy="N7.1">
