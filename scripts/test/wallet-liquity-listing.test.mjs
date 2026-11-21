@@ -256,7 +256,7 @@ test("V1 full claim: the deposit at $1 face plus the ETH owed at the PriceFeed; 
     gainSymbol: "ETH",
     price: 3000,
     feed: "the Liquity V1 PriceFeed",
-    unvalued: "LQTY",
+    unvalued: { symbol: "LQTY", amount: 12 },
   });
   assert.equal(c.usd, 2500);
   assert.deepEqual(
@@ -266,6 +266,22 @@ test("V1 full claim: the deposit at $1 face plus the ETH owed at the PriceFeed; 
       ["ETH gain", 1500, "oracle", "the Liquity V1 PriceFeed"],
       ["LQTY", null, undefined, "not valued"],
     ],
+  );
+});
+
+test("no LQTY owed: no LQTY leg", () => {
+  const c = depositClaim({
+    deposit: 10,
+    symbol: "LUSD",
+    gain: 0,
+    gainSymbol: "ETH",
+    price: 3000,
+    feed: "f",
+    unvalued: { symbol: "LQTY", amount: 0 },
+  });
+  assert.deepEqual(
+    c.parts.map((x) => x.label),
+    ["deposit", "ETH gain"],
   );
 });
 

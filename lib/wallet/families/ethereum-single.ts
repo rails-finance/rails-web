@@ -325,14 +325,14 @@ export const fluid: FamilyModule = {
 
 // ── Liquity V2 ──────────────────────────────────────────────────────────────
 
-export const priceOf = (type: string, p: OraclePricesData | null): number | undefined => {
+const priceOf = (type: string, p: OraclePricesData | null): number | undefined => {
   if (!p) return undefined;
   const key = type.toLowerCase() as keyof OraclePricesData;
   return p[key] ?? undefined;
 };
 
 /** The branch prices the Trove listing side-fetches, from the api. */
-export async function liquityPrices(signal: AbortSignal): Promise<OraclePricesData | null> {
+async function liquityPrices(signal: AbortSignal): Promise<OraclePricesData | null> {
   const base = process.env.RAILS_API_URL?.replace(/\/$/, "");
   if (!base) throw new Error("RAILS_API_URL is not set");
   const res = await fetch(`${base}/api/oracle/liquity-v2`, {

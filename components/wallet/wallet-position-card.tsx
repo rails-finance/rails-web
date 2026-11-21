@@ -110,6 +110,7 @@ function FamilyCard({ card }: { card: WalletCard }) {
           row={card.row}
           surface="listing"
           now={card.head ? liquityV2DepositNow(card.head) : null}
+          nowBlock={card.head?.blockNumber}
         />
       );
     case "liquity-v1":
@@ -126,6 +127,7 @@ function FamilyCard({ card }: { card: WalletCard }) {
           row={card.row}
           surface="listing"
           now={card.head ? liquityV1DepositNow(card.head) : null}
+          nowBlock={card.head?.blockNumber}
         />
       );
     case "ebisu":

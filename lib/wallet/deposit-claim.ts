@@ -37,8 +37,9 @@ export function depositClaim(opts: {
   price: number | null | undefined;
   /** The price's source ("the Liquity V1 PriceFeed"). */
   feed: string;
-  /** A token the deposit is owed and no price is read for (V1's LQTY). */
-  unvalued?: string;
+  /** A token the deposit is owed and no price is read for (V1's LQTY): a
+   *  "not valued" leg where the amount owed is above zero. */
+  unvalued?: { symbol: string; amount: number };
 }): DepositClaim | null {
   const priced = opts.price != null && Number.isFinite(opts.price) && opts.price > 0;
   if (opts.gain > 0 && !priced) return null;
@@ -53,7 +54,8 @@ export function depositClaim(opts: {
       source: opts.feed,
     });
   }
-  if (opts.unvalued) parts.push({ label: opts.unvalued, usd: null, source: "not valued" });
+  if (opts.unvalued && opts.unvalued.amount > 0)
+    parts.push({ label: opts.unvalued.symbol, usd: null, source: "not valued" });
   return { usd: parts.reduce((s, p) => s + (p.usd ?? 0), 0), parts };
 }
 

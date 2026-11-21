@@ -172,3 +172,98 @@ test("counts: partial while a listing failed, and not kept; whole and kept after
   await readWalletCounts(W);
   assert.equal(calls.length, 0, "a whole answer is kept");
 });
+
+// The deposit modules' head reads, the pool reader stubbed.
+const { liquityV1DepositHead, liquityV2DepositHead } = await import("../../lib/wallet/families/liquity-listing.ts");
+
+const depositPos = (kind, row) => ({
+  chain: 1,
+  family: kind === "liquity-v1-deposit" ? "liquity-v1" : "liquity-v2",
+  familyName: "x",
+  positionId: "d",
+  href: "/x",
+  status: "open",
+  kind: "deposits",
+  card: { kind, row },
+  headRead: "none",
+});
+const v1Chain = (extra = {}) => ({
+  depositor: W,
+  blockNumber: 26462239,
+  blockTimestamp: 0,
+  compoundedRaw: `1000${E18}`,
+  recordedRaw: `1100${E18}`,
+  frontEnd: "0x0",
+  ethGainRaw: `5${E18.slice(1)}`, // 0.5 ETH
+  lqtyGainRaw: `2${E18}`,
+  priceRaw: `3000${E18}`,
+  priceStale: false,
+  totalDepositsRaw: null,
+  ...extra,
+});
+const v2Chain = (extra = {}) => ({
+  branch: "WETH",
+  depositor: W,
+  blockNumber: 26462240,
+  blockTimestamp: 0,
+  compoundedRaw: `300${E18}`,
+  recordedRaw: `310${E18}`,
+  collGainRaw: `1${E18.slice(1)}`, // 0.1 WETH
+  stashRaw: `2${E18.slice(1)}`, // 0.2 WETH
+  yieldGainRaw: "0",
+  priceRaw: `2000${E18}`,
+  priceStale: false,
+  totalDepositsRaw: null,
+  ...extra,
+});
+
+test("V1 head: the deposit plus the ETH owed at the read's PriceFeed price, scaled; LQTY not valued", async () => {
+  const head = liquityV1DepositHead(async () => v1Chain());
+  const { positions } = await head([depositPos("liquity-v1-deposit", { depositor: W })]);
+  const p = positions[0];
+  assert.equal(p.headRead, "read");
+  assert.equal(p.collateralUsd, 2500);
+  assert.equal(p.readAtBlock, 26462239);
+  assert.equal(p.card.head.blockNumber, 26462239);
+  assert.deepEqual(
+    p.usdParts.map((x) => [x.label, x.usd, x.source]),
+    [
+      ["deposit", 1000, "LUSD's $1 face"],
+      ["ETH gain", 1500, "the Liquity V1 PriceFeed's fetchPrice at block 26,462,239"],
+      ["LQTY", null, "not valued"],
+    ],
+  );
+  assert.equal(p.usdSource, "LUSD's $1 face and the Liquity V1 PriceFeed's fetchPrice at block 26,462,239");
+});
+
+test("V2 head: the collateral gain and the stash at the branch PriceFeed price of the same read", async () => {
+  const head = liquityV2DepositHead(async () => v2Chain());
+  const { positions } = await head([depositPos("liquity-v2-deposit", { collateral_type: "WETH", depositor: W })]);
+  const p = positions[0];
+  // 300 BOLD + (0.1 + 0.2) WETH × 2000.
+  assert.equal(Math.round(p.collateralUsd * 100) / 100, 900);
+  assert.equal(p.usdParts[1].source, "the Liquity V2 WETH PriceFeed's fetchPrice at block 26,462,240");
+});
+
+test("a stale price is named as lastGoodPrice", async () => {
+  const v1 = await liquityV1DepositHead(async () => v1Chain({ priceStale: true }))([
+    depositPos("liquity-v1-deposit", { depositor: W }),
+  ]);
+  assert.match(v1.positions[0].usdParts[1].source, /lastGoodPrice at block/);
+  const v2 = await liquityV2DepositHead(async () => v2Chain({ priceStale: true }))([
+    depositPos("liquity-v2-deposit", { collateral_type: "WETH", depositor: W }),
+  ]);
+  assert.match(v2.positions[0].usdParts[1].source, /lastGoodPrice at block/);
+});
+
+test("a gain with no price, or a stale chain read, fails the deposit's head read", async () => {
+  const noPrice = await liquityV2DepositHead(async () => v2Chain({ priceRaw: null }))([
+    depositPos("liquity-v2-deposit", { collateral_type: "WETH", depositor: W }),
+  ]);
+  assert.equal(noPrice.positions[0].headRead, "failed");
+  assert.equal(noPrice.positions[0].collateralUsd, undefined);
+  const stale = await liquityV1DepositHead(async () => v1Chain({ chainStale: true }))([
+    depositPos("liquity-v1-deposit", { depositor: W }),
+  ]);
+  assert.equal(stale.positions[0].headRead, "failed");
+});

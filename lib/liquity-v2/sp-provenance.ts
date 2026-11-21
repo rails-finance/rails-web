@@ -49,7 +49,9 @@ const GETTER: Record<
   },
 };
 
-export function spLiveProv(what: keyof typeof GETTER, branch: SpBranch): Provenance {
+/** A pool getter at head. `wallet`: read by the wallet page's route at
+ *  that block. */
+export function spLiveProv(what: keyof typeof GETTER, branch: SpBranch, wallet?: { block: number }): Provenance {
   const g = GETTER[what];
   return {
     kind: "chain",
@@ -57,7 +59,9 @@ export function spLiveProv(what: keyof typeof GETTER, branch: SpBranch): Provena
     verify: ask(g.method),
     summary: g.summary(branch),
     contract: pool(branch),
-    via: `${VIA} · ${g.method} @ head`,
+    via: wallet
+      ? `GET /api/chain/wallet/<address> · ${g.method} @ block ${wallet.block.toLocaleString("en-US")}`
+      : `${VIA} · ${g.method} @ head`,
   };
 }
 

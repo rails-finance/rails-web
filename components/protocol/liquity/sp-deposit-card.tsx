@@ -54,7 +54,11 @@ export interface LiquityV2DepositCardProps {
   surface?: "listing" | "detail";
   lifetime?: DepositLifetime | null;
   /** The chain read at head. */
+  /** The chain read at head. On a listing surface (the wallet page), the
+   *  Deposit now headline states it in place of the last touch's figure. */
   now?: DepositNow | null;
+  /** The block the wallet page read `now` at, for its receipts. */
+  nowBlock?: number;
   /** The chain read is in flight. */
   pending?: boolean;
   /** The pool's getTotalBoldDeposits() and the block of the read `now` came from. */
@@ -101,6 +105,7 @@ export function liquityV2DepositSlots({
   surface = "detail",
   lifetime,
   now,
+  nowBlock,
   pending = false,
   pool,
   indexBehind = false,
@@ -127,13 +132,14 @@ export function liquityV2DepositSlots({
     // collateral it is owed. A listing states the last touch's figure.
     const shown = listingDeposit(row.deposit_raw, closed ? null : now);
     const head = shown.at === "head" ? now! : null;
+    const wallet = nowBlock != null ? { block: nowBlock } : undefined;
     const heads: PositionCardHead[] = [
       head
         ? {
             id: "deposit",
-            label: "Deposit",
+            label: "Deposit now",
             value: (
-              <Prov info={spLiveProv("compounded", b)}>
+              <Prov info={spLiveProv("compounded", b, wallet)}>
                 <RawFigure raw={shown.raw} symbol={BOLD} />
               </Prov>
             ),
@@ -159,7 +165,7 @@ export function liquityV2DepositSlots({
               labelTip: pendingCollTip(b),
               labelTipOnListing: true,
               value: (
-                <Prov info={spLiveProv("pendingColl", b)}>
+                <Prov info={spLiveProv("pendingColl", b, wallet)}>
                   <RawFigure raw={head.pendingColl} symbol={b} />
                 </Prov>
               ),

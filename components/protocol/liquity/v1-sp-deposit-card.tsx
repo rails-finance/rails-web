@@ -57,6 +57,8 @@ export interface LiquityV1DepositCardProps {
   /** The chain read at head. On a listing surface (the wallet page), the
    *  Deposit headline states it in place of the last touch's figure. */
   now?: DepositNow | null;
+  /** The block the wallet page read `now` at, for its receipts. */
+  nowBlock?: number;
   /** The chain read is in flight. */
   pending?: boolean;
   /** The pool's getTotalLUSDDeposits() and the block of the read `now` came from. */
@@ -98,6 +100,7 @@ export function liquityV1DepositSlots({
   surface = "detail",
   lifetime,
   now,
+  nowBlock,
   pending = false,
   pool,
   indexBehind = false,
@@ -120,13 +123,14 @@ export function liquityV1DepositSlots({
     // owed. A listing states the last touch's figure.
     const shown = listingDeposit(row.deposit_raw, closed ? null : now);
     const head = shown.at === "head" ? now! : null;
+    const wallet = nowBlock != null ? { block: nowBlock } : undefined;
     const heads: PositionCardHead[] = [
       head
         ? {
             id: "deposit",
-            label: "Deposit",
+            label: "Deposit now",
             value: (
-              <Prov info={spLiveProv("compounded")}>
+              <Prov info={spLiveProv("compounded", wallet)}>
                 <RawFigure raw={shown.raw} symbol="LUSD" />
               </Prov>
             ),
@@ -152,7 +156,7 @@ export function liquityV1DepositSlots({
               labelTip: PENDING_ETH_TIP,
               labelTipOnListing: true,
               value: (
-                <Prov info={spLiveProv("ethGain")}>
+                <Prov info={spLiveProv("ethGain", wallet)}>
                   <RawFigure raw={head.pendingEth} symbol="ETH" />
                 </Prov>
               ),

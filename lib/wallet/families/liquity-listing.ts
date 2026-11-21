@@ -9,13 +9,16 @@
 //   V1 and V2 deposits  loadLiquityV1DepositFromChain and
 //                       loadLiquityV2DepositFromChain: the compounded deposit
 //                       and the collateral owed to it at head, in dollars as
-//                       the full claim (lib/wallet/deposit-claim.ts): V1's
-//                       ETH at the PriceFeed, V2's collateral at the branch
-//                       prices the Troves use.
+//                       the full claim (lib/wallet/deposit-claim.ts): the
+//                       collateral owed at the PriceFeed price the same
+//                       multicall reads at the same block (V1's ETH, V2's
+//                       branch collateral).
 
 import { loadLiquityV1PositionFromChain } from "@/lib/sources/chain/liquity-v1-position";
 import { loadLiquityV1DepositFromChain } from "@/lib/sources/chain/liquity-v1-sp";
 import { loadLiquityV2DepositFromChain } from "@/lib/sources/chain/liquity-v2-sp";
+import type { LiquityV1DepositChain } from "@/lib/api/fetch-liquity-v1-sp-chain";
+import type { LiquityV2DepositChain } from "@/lib/api/fetch-liquity-v2-sp-chain";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
 import type { LiquityV1DepositRow } from "@/lib/sources/api/liquity-v1-sp";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
@@ -23,7 +26,6 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, plural, scaled, storeStamp, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { FamilyModule, HeadResult } from "./module";
-import { liquityPrices, priceOf } from "./ethereum-single";
 import { depositClaim, type DepositClaim } from "@/lib/wallet/deposit-claim";
 
 const now = () => Math.floor(Date.now() / 1000);
@@ -146,7 +148,10 @@ function depositAtHead(
     card,
     collateralUsd: claim.usd,
     debtUsd: 0,
-    usdSource: claim.parts.map((x) => x.source).join(" and "),
+    usdSource: claim.parts
+      .filter((x) => x.usd != null)
+      .map((x) => x.source)
+      .join(" and "),
     usdParts: claim.parts,
     usdOwnOracle: true,
     headRead: "read",
@@ -154,6 +159,53 @@ function depositAtHead(
     readAt: now(),
   };
 }
+
+/** The PriceFeed price a deposit read gives, as the receipt names it:
+ *  fetchPrice, or lastGoodPrice where only that answered. */
+const feedOf = (name: string, stale: boolean, block: number) =>
+  `${name}'s ${stale ? "lastGoodPrice" : "fetchPrice"} at block ${block.toLocaleString("en-US")}`;
+
+/** The V1 deposit's head: its pool read, the ETH owed at the PriceFeed price
+ *  of the same read. `load` is the pool reader (a stub in the tests). */
+export const liquityV1DepositHead =
+  (load: (depositor: string) => Promise<LiquityV1DepositChain>) =>
+  (open: WalletPosition[]): Promise<HeadResult> =>
+    eachOpen(open, async (p) => {
+      const d = (p.card as { row: LiquityV1DepositRow }).row;
+      const c = await load(d.depositor);
+      if (c.chainStale) return null;
+      const claim = depositClaim({
+        deposit: scaled(c.compoundedRaw, 18),
+        symbol: "LUSD",
+        gain: scaled(c.ethGainRaw, 18),
+        gainSymbol: "ETH",
+        price: c.priceRaw != null ? scaled(c.priceRaw, 18) : null,
+        feed: feedOf("the Liquity V1 PriceFeed", c.priceStale, c.blockNumber),
+        unvalued: { symbol: "LQTY", amount: scaled(c.lqtyGainRaw, 18) },
+      });
+      return claim ? depositAtHead(p, claim, c.blockNumber, { kind: "liquity-v1-deposit", row: d, head: c }) : null;
+    });
+
+/** The V2 deposit's head: its branch pool read, the collateral owed (the
+ *  gain since the last touch and the stash, what a claiming touch sends) at
+ *  the branch PriceFeed price of the same read. */
+export const liquityV2DepositHead =
+  (load: (branch: LiquityV2DepositRow["collateral_type"], depositor: string) => Promise<LiquityV2DepositChain>) =>
+  (open: WalletPosition[]): Promise<HeadResult> =>
+    eachOpen(open, async (p) => {
+      const d = (p.card as { row: LiquityV2DepositRow }).row;
+      const c = await load(d.collateral_type, d.depositor);
+      if (c.chainStale) return null;
+      const claim = depositClaim({
+        deposit: scaled(c.compoundedRaw, 18),
+        symbol: "BOLD",
+        gain: scaled(c.collGainRaw, 18) + scaled(c.stashRaw, 18),
+        gainSymbol: d.collateral_type,
+        price: c.priceRaw != null ? scaled(c.priceRaw, 18) : null,
+        feed: feedOf(`the Liquity V2 ${d.collateral_type} PriceFeed`, c.priceStale, c.blockNumber),
+      });
+      return claim ? depositAtHead(p, claim, c.blockNumber, { kind: "liquity-v2-deposit", row: d, head: c }) : null;
+    });
 
 export const liquityV1Deposits: FamilyModule = {
   id: "liquity-v1-sp",
@@ -175,23 +227,7 @@ export const liquityV1Deposits: FamilyModule = {
       );
     });
   },
-  head(open) {
-    return eachOpen(open, async (p) => {
-      const d = (p.card as { row: LiquityV1DepositRow }).row;
-      const c = await loadLiquityV1DepositFromChain(d.depositor);
-      if (c.chainStale) return null;
-      const claim = depositClaim({
-        deposit: scaled(c.compoundedRaw, 18),
-        symbol: "LUSD",
-        gain: scaled(c.ethGainRaw, 18),
-        gainSymbol: "ETH",
-        price: c.priceRaw != null ? scaled(c.priceRaw, 18) : null,
-        feed: "the Liquity V1 PriceFeed",
-        unvalued: "LQTY",
-      });
-      return claim ? depositAtHead(p, claim, c.blockNumber, { kind: "liquity-v1-deposit", row: d, head: c }) : null;
-    });
-  },
+  head: liquityV1DepositHead(loadLiquityV1DepositFromChain),
 };
 
 export const liquityV2Deposits: FamilyModule = {
@@ -214,23 +250,5 @@ export const liquityV2Deposits: FamilyModule = {
       );
     });
   },
-  async head(open, _address, signal) {
-    // The branch prices the Troves are valued at, one read for every deposit.
-    const prices = await liquityPrices(signal).catch(() => null);
-    return eachOpen(open, async (p) => {
-      const d = (p.card as { row: LiquityV2DepositRow }).row;
-      const c = await loadLiquityV2DepositFromChain(d.collateral_type, d.depositor);
-      if (c.chainStale) return null;
-      const claim = depositClaim({
-        deposit: scaled(c.compoundedRaw, 18),
-        symbol: "BOLD",
-        // What a claiming touch sends: the gain since the last touch and the stash.
-        gain: scaled(c.collGainRaw, 18) + scaled(c.stashRaw, 18),
-        gainSymbol: d.collateral_type,
-        price: priceOf(d.collateral_type, prices),
-        feed: "the Liquity V2 price feed",
-      });
-      return claim ? depositAtHead(p, claim, c.blockNumber, { kind: "liquity-v2-deposit", row: d, head: c }) : null;
-    });
-  },
+  head: liquityV2DepositHead(loadLiquityV2DepositFromChain),
 };
