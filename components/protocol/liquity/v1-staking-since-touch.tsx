@@ -61,7 +61,7 @@ export function LiquityV1StakeSinceTouchRow({
         side: "collateral",
         id: "stake",
         name: "Stake",
-        tip: "The LQTY staked. A stake moves only at its own touches, so it stands as the last touch left it.",
+        tip: "A stake moves only at its touches, so it stands as the last touch left it.",
         icons: ["LQTY"],
         carry: [],
         rows: [],

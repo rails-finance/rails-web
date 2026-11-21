@@ -16,7 +16,7 @@ import { formatCompact } from "@/lib/shared/format-compact";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { NATIVE } from "@/lib/shared/asset-roster";
 import { big, exactUnits, units } from "@/lib/liquity-v1/staking-math";
-import { stTouchProv } from "@/lib/liquity-v1/staking-provenance";
+import { stReplayedProv, stTouchProv } from "@/lib/liquity-v1/staking-provenance";
 import { stEventLabel, stEventSentences } from "@/lib/liquity-v1/staking-event-prose";
 import type { LiquityV1StakeEventRow } from "@/lib/sources/api/liquity-v1-staking";
 import { stStakeSheet } from "./v1-staking-sheet";
@@ -127,7 +127,14 @@ export function LiquityV1StakeEventCard({
       big(row.stake_after),
       "LQTY",
       TOKEN_ADDRESSES.LQTY,
-      coord("Stake after — the touch's StakeChanged _newStake, or the stake before it on a claim."),
+      // A claim (unstake(0)) emits no StakeChanged: its stake is carried over,
+      // as the sheet's total says.
+      row.operation === "claim"
+        ? stReplayedProv(
+            "Stake after — the stake before this claim, carried over: unstake(0) emits no StakeChanged.",
+            "stake before",
+          )
+        : coord("Stake after — the touch's StakeChanged _newStake."),
     ),
     txCell(row.tx_hash, row.block_number, coord("Block — the block this touch's logs were emitted in.")),
   ];

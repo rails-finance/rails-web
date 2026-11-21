@@ -203,7 +203,7 @@ function stakeTimeline(
         debt: "Every figure is in LUSD.",
       },
       heldBasis: {
-        collateral: "the stake, which moves only at the staker's own touches.",
+        collateral: "the stake, which moves only at the staker's touches.",
         debt: "nothing at a touch, which pays out all the fees paid in.",
       },
       linePrices: "with the stake in LQTY and the fees in LUSD, each on its own scale",

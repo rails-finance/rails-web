@@ -14,7 +14,7 @@ export type WalletKind = "troves" | "deposits" | "stakes" | "loans" | "vaults";
 export const WALLET_KINDS: { value: WalletKind; label: string }[] = [
   { value: "troves", label: "Troves" },
   { value: "deposits", label: "Deposits" },
-  { value: "stakes", label: "Stakes" },
+  { value: "stakes", label: "LQTY stakes" },
   { value: "loans", label: "Loans" },
   { value: "vaults", label: "Vaults" },
 ];

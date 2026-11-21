@@ -3,7 +3,7 @@
 // A Liquity V1 LQTY stake on the shared position card, as the stability-pool
 // deposit draws one (v1-sp-deposit-card.tsx): one staker, one LQTYStaking.
 //
-// The stake moves only at the staker's own touches, so every surface states
+// The stake moves only at the staker's touches, so every surface states
 // it exact. On its page the other headlines are LQTYStaking's getters at
 // head: the LUSD and ETH fees the next touch pays out (getPendingLUSDGain,
 // getPendingETHGain). A listing row states the fees paid at touches; on the
@@ -345,7 +345,7 @@ export function liquityV1StakeSlots({
     right.push({
       id: "stake-share",
       label: "Share of the staked LQTY",
-      tip: "The stake's part of all the LQTY staked. The stake receives this share of every borrowing and redemption fee paid in.",
+      tip: "The stake's part of all the LQTY staked, and its share of every borrowing and redemption fee paid in.",
       value: (
         <Prov info={stShareProv(exactUnits(now.stake), exactUnits(pool.totalRaw), pool.block)}>
           {share > 0 ? pctText(share) : `${TINY_AMOUNT_FLOOR_TEXT}%`}

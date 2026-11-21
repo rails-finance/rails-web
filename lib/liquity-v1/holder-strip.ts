@@ -12,8 +12,8 @@
 // the card's figure: the debt with its USD line at LUSD's $1 face as the Trove
 // card draws it, the collateral and the deposit without one as their cards
 // draw them, and the deposit with the ≈ its card wears (liquidations burn it
-// between touches). The stake is LQTY, its own leg, exact: a stake moves only
-// at its own touches.
+// between touches). The stake is a separate LQTY leg, exact: a stake moves
+// only at its touches.
 //
 // An address holds at most one deposit in the pool and one stake.
 
@@ -40,7 +40,7 @@ const LEG_TIP = {
   collateral: "As of each open Trove's last touch. Redistribution gains since then are left out.",
   debt: "As of each open Trove's last touch. Redistributed debt since then is left out.",
   deposit: "As of the deposit's last touch. Liquidations since then have not been taken out.",
-  stake: "The LQTY staked; it moves only at the staker's own touches.",
+  stake: "The LQTY staked; it moves only at the staker's touches.",
 } as const;
 
 const DEPOSIT_KIND = { id: "deposit", noun: ["deposit", "deposits"] as [string, string] };

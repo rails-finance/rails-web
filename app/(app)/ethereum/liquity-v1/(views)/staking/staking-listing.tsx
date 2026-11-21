@@ -62,7 +62,7 @@ export function StakingListing(props: {
   return (
     <ChainTruthListingPage<LiquityV1StakeRow, StListFilters>
       title="Liquity V1 LQTY stakes"
-      noun="Stakes"
+      noun="LQTY stakes"
       basePath={LIQUITY_V1_STAKING_PATH}
       identity={<RailHeader session="liquity-v1" venue="subPage" stamp />}
       titleHidden

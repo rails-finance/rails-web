@@ -390,3 +390,37 @@ test("the wallet card's Deposit headline: the head read where handed, the last t
   assert.equal(v2math.listingDeposit(`300${E18}`, now2).at, "head");
   assert.equal(v2math.listingDeposit(`300${E18}`, undefined).approx, true);
 });
+
+const { isDust } = await import("../../lib/wallet/wallet-sections.ts");
+
+test("an LQTY stake: no dust floor, its receipt label drops the stake: prefix, its band leg is stakes() at head", () => {
+  const staker = "0x6bcde33a5cb39ebcbdce2702120c29672eb62b2e";
+  const stakeRow = { staker, status: "open", stake_raw: `100000${E18}` };
+  const p = {
+    chain: 1,
+    family: "liquity-v1",
+    familyName: "Liquity V1",
+    market: "Staking",
+    positionId: `stake:${staker}`,
+    href: "/x",
+    status: "open",
+    kind: "stakes",
+    card: { kind: "liquity-v1-stake", row: stakeRow, head: { stakeRaw: `100001${E18}` } },
+    headRead: "read",
+    usdOwnOracle: true,
+    collateralUsd: 3,
+    debtUsd: 0,
+    readAtBlock: 26463047,
+    usdParts: [
+      { label: "LUSD fees", usd: 3, pclass: "state", source: "LUSD's $1 face" },
+      { label: "LQTY", usd: null, source: "not valued" },
+    ],
+  };
+  assert.equal(isDust(p), false);
+  const [s] = walletSections([p], { bands: true });
+  assert.equal(s.dust, 0);
+  assert.equal(s.collateral.prov.inputs[0].label, "Staking · 0x6bcde3 LUSD fees");
+  const leg = s.band.legs.find((l) => l.id === "stake");
+  assert.equal(leg.figure.amount, 100001);
+  assert.match(leg.prov.summary, /stakes\(staker\) read at block 26,463,047/);
+});

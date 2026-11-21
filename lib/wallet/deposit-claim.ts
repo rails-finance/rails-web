@@ -108,3 +108,24 @@ export function headDepositLeg(
     },
   };
 }
+
+/** The band's LQTY stake leg from the head read: the stake LQTYStaking's
+ *  stakes(staker) answers, the figure the stake's card states. */
+export function headStakeLeg(leg: HolderLeg, stakes: { amount: number; block?: number }[]): HolderLeg {
+  const sum = stakes.reduce((s, d) => s + d.amount, 0);
+  const blocks = [...new Set(stakes.map((d) => d.block).filter((b): b is number => b != null))];
+  const at = blocks.length === 1 ? `at block ${blocks[0].toLocaleString("en-US")}` : "at the chain head";
+  return {
+    ...leg,
+    value: `${formatNumber(sum)} LQTY`,
+    approx: false,
+    figure: { amount: sum, tokens: [{ symbol: "LQTY" }], usd: null },
+    prov: {
+      kind: "chain",
+      pclass: "state",
+      summary: `LQTY stake — the LQTY the wallet has staked, LQTYStaking's stakes(staker) read ${at}.`,
+      via: "GET /api/chain/wallet/<address> · stakes(staker)",
+      formula: "stake",
+    },
+  };
+}

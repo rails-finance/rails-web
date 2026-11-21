@@ -23,7 +23,7 @@ import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-posi
 import type { LiquityV1DepositRow } from "@/lib/sources/api/liquity-v1-sp";
 import type { LiquityV1StakeRow } from "@/lib/sources/api/liquity-v1-staking";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
-import { headDepositLeg } from "@/lib/wallet/deposit-claim";
+import { headDepositLeg, headStakeLeg } from "@/lib/wallet/deposit-claim";
 import { scaled } from "@/lib/wallet/summary-row";
 import { formatUsdValue } from "@/lib/utils/format";
 import { walletProtocol } from "@/lib/wallet/wallet-filters";
@@ -37,7 +37,10 @@ export const DUST_USD = 10;
 
 /** The dollars the floor reads: the card's, or a rank-only figure. */
 const dustFigure = (p: WalletPosition) => p.collateralUsd ?? p.dustUsd;
+/** A stake's dollars are its fees pending, the LQTY not valued, so they say
+ *  nothing of its size: no stake is dust. */
 export const isDust = (p: WalletPosition) => {
+  if (p.kind === "stakes") return false;
   const d = dustFigure(p);
   return d != null && d < DUST_USD;
 };
@@ -102,12 +105,11 @@ const dollarsOf = (p: WalletPosition, field: "collateralUsd" | "debtUsd") =>
   (field === "debtUsd" && (p.kind === "deposits" || p.kind === "stakes") && p.headRead !== "read" ? 0 : undefined);
 
 /** The label a receipt row gives one position: its market, or its id. */
-const positionLabel = (p: WalletPosition) =>
-  p.market
-    ? `${p.market} · ${p.positionId.slice(0, 8)}`
-    : p.positionId.length > 12
-      ? `${p.positionId.slice(0, 8)}…`
-      : p.positionId;
+const positionLabel = (p: WalletPosition) => {
+  // A stake's id is "stake:<address>", apart from the address's deposit.
+  const id = p.positionId.replace(/^stake:/, "");
+  return p.market ? `${p.market} · ${id.slice(0, 8)}` : id.length > 12 ? `${id.slice(0, 8)}…` : id;
+};
 
 /** Σ one dollar field over a section's open positions, each as its card
  *  states it at the source its row names, to the cent. */
@@ -181,7 +183,8 @@ const usdLeg = (id: string, label: string, f: SectionFigure): HolderLeg => ({
 });
 
 /** The band's deposit leg from the head read, where every open deposit has
- *  one; the listing adapter's last-touch leg otherwise. */
+ *  one, and on Liquity V1 its stake leg from LQTYStaking's stakes(staker);
+ *  the listing adapter's legs otherwise. */
 function withHeadDeposits(
   band: HolderStripProps,
   positions: WalletPosition[],
@@ -191,15 +194,33 @@ function withHeadDeposits(
   for (const p of positions) {
     if (p.status !== "open") continue;
     if (p.card.kind !== "liquity-v1-deposit" && p.card.kind !== "liquity-v2-deposit") continue;
-    if (!p.card.head) return band;
+    if (!p.card.head) {
+      heads.length = 0;
+      break;
+    }
     heads.push({ amount: scaled(p.card.head.compoundedRaw, 18), block: p.readAtBlock });
   }
-  if (heads.length === 0) return band;
+  const stakes: { amount: number; block?: number }[] = [];
+  let stakesRead = true;
+  for (const p of positions) {
+    if (p.status !== "open" || p.card.kind !== "liquity-v1-stake") continue;
+    if (!p.card.head) stakesRead = false;
+    else stakes.push({ amount: scaled(p.card.head.stakeRaw, 18), block: p.readAtBlock });
+  }
   const opts =
     protocol === "V1"
       ? { symbol: "LUSD", getter: "getCompoundedLUSDDeposit", protocol: "Liquity V1" }
       : { symbol: "BOLD", getter: "getCompoundedBoldDeposit", protocol: "Liquity V2" };
-  return { ...band, legs: band.legs.map((l) => (l.id === "deposit" ? headDepositLeg(l, heads, opts) : l)) };
+  return {
+    ...band,
+    legs: band.legs.map((l) =>
+      l.id === "deposit" && heads.length > 0
+        ? headDepositLeg(l, heads, opts)
+        : l.id === "stake" && stakesRead && stakes.length > 0
+          ? headStakeLeg(l, stakes)
+          : l,
+    ),
+  };
 }
 
 /** Two section figures as one: the Troves' and the deposits'. */

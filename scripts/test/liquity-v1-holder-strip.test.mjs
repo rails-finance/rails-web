@@ -142,7 +142,7 @@ test("the share card's status word names the deposit and keeps three stats", () 
 
 const stake = (status, lqty) => ({ staker: "0xw", status, stake_raw: status === "open" ? `${lqty}${E18}` : "0" });
 
-test("a stake is counted beside the deposit and is its own LQTY leg", () => {
+test("a stake is counted beside the deposit and is a separate LQTY leg", () => {
   const s = liquityV1HolderStrip(
     { rows: [trove(2, "open", 4, 2000)], total: 1 },
     { rows: [deposit("open", 5000)], total: 1 },

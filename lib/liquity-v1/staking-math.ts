@@ -6,7 +6,7 @@
 //   stake_after = stake_before + stake_change
 // so over a life: staked − unstaked = the stake after the last touch, which is
 // LQTYStaking's stakes(staker) until the next one (a stake moves only at its
-// own touches). The fees accrue between touches without the staker acting:
+// touches). The fees accrue between touches without the staker acting:
 // getPendingETHGain and getPendingLUSDGain state them, and every touch pays
 // them out in full.
 

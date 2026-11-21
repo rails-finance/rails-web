@@ -30,7 +30,7 @@ export default async function LiquityV1StakingListingPage({
     defaults: ST_LIST_DEFAULTS,
     filters,
     page,
-    label: "Liquity V1 stakes",
+    label: "Liquity V1 LQTY stakes",
     fetchPage: (baseUrl, signal, headers) => fetchStakePage(filters, page, { baseUrl, signal, headers }),
   });
   return <StakingListing {...initial} initialSearch={sp.toString()} />;
