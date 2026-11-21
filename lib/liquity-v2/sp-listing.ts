@@ -1,4 +1,5 @@
-// The Liquity V2 Stability Pool listing beside the Troves: server-driven, as
+// The Liquity V2 Stability Pool listing beside the Troves, and each fork's
+// (lib/liquity-v2/sp-deployment.ts): server-driven, as
 // the Trove listing is. The selection maps onto /api/liquity-v2/stability-pool
 // params and rails-server filters, sorts and pages. Polaris's deposit listing
 // (lib/polaris/sp-loan-listing.ts) is the shape.
@@ -16,7 +17,8 @@ import type { BaseListFilters, SerializableDimension } from "@/lib/shared/list-f
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import { resolveEnsViaApi } from "@/lib/shared/listing-search";
 import { parseTroveSearch } from "./search";
-import { normalizeSpBranch, SP_BRANCHES } from "./sp-routes";
+import { SP_BRANCHES } from "./sp-routes";
+import { LIQUITY_V2_SP, spPool, type SpDeployment } from "./sp-deployment";
 import {
   readLiquityV2Sp,
   type LiquityV2DepositListResponse,
@@ -99,13 +101,15 @@ export function spListDimensions(
   ];
 }
 
-export function spSortOptions(f: SpListFilters): SortOption[] {
+/** The sorts; `dep` (Liquity V2 by default) decides whether the branch the
+ *  selection names is one of its own. */
+export function spSortOptions(f: SpListFilters, dep: SpDeployment = LIQUITY_V2_SP): SortOption[] {
   const base: SortOption[] = [
     { value: "recent", label: RECENT_ACTIVITY_LABEL },
     { value: "deposit", label: "Deposit" },
     { value: "yield", label: "Yield" },
   ];
-  if (normalizeSpBranch(f.branch[0])) base.push({ value: "coll", label: "Collateral" });
+  if (spPool(dep, f.branch[0])) base.push({ value: "coll", label: "Collateral" });
   base.push({ value: "tx", label: "Transactions" });
   return base;
 }
@@ -131,9 +135,10 @@ export function spListParams(
   f: SpListFilters,
   page: number,
   wallet: string | undefined,
+  dep: SpDeployment = LIQUITY_V2_SP,
 ): Record<string, string | undefined> {
-  const branch = normalizeSpBranch(f.branch[0]) ?? undefined;
-  const sortBy = spSortOptions(f).some((o) => o.value === f.sortBy) ? f.sortBy : "recent";
+  const branch = spPool(dep, f.branch[0])?.symbol;
+  const sortBy = spSortOptions(f, dep).some((o) => o.value === f.sortBy) ? f.sortBy : "recent";
   const statuses = effectiveStatuses(f);
   const { minTx, maxTx } = transactionBounds(f.tx);
   return {
@@ -149,17 +154,19 @@ export function spListParams(
   };
 }
 
-export async function fetchSpPage(
+/** One page of the deployment's deposits (Liquity V2's by default). */
+export async function fetchSpPage<B extends string = LiquityV2DepositRow["collateral_type"]>(
   filters: SpListFilters,
   page: number,
   hop: Hop = {},
-): Promise<{ data: LiquityV2DepositRow[]; total: number }> {
+  dep: SpDeployment = LIQUITY_V2_SP,
+): Promise<{ data: LiquityV2DepositRow<B>[]; total: number }> {
   const wallet = await depositorOf(filters.q, hop);
   if (wallet === null) return { data: [], total: 0 };
-  const r = await readLiquityV2Sp<LiquityV2DepositListResponse>("stability-pool", spListParams(filters, page, wallet), {
-    baseUrl: hop.baseUrl,
-    headers: hop.headers,
-    signal: hop.signal,
-  });
+  const r = await readLiquityV2Sp<LiquityV2DepositListResponse<B>>(
+    "stability-pool",
+    spListParams(filters, page, wallet, dep),
+    { baseUrl: hop.baseUrl, headers: hop.headers, signal: hop.signal, api: dep.api },
+  );
   return { data: r.rows, total: r.pagination.total };
 }

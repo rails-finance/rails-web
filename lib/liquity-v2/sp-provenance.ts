@@ -1,41 +1,47 @@
-// Receipts for the Liquity V2 stability-pool deposit page: the branch pool's
-// getters at head (the chain lane), the index's sums over a deposit's rows
-// (rails-server migs 490 and 491), and one operation's fields from its log.
-// The field meanings are rails-ops reference/liquity-v2-stability-pool-deposits.md.
+// Receipts for the Liquity V2 stability-pool deposit page and its forks'
+// (lib/liquity-v2/sp-deployment.ts): the branch pool's getters at head (the
+// chain lane), the index's sums over a deposit's rows (rails-server migs 490
+// and 491, the forks' 504-507), and one operation's fields from its log. The
+// field meanings are rails-ops reference/liquity-v2-stability-pool-deposits.md.
+// Every helper takes the deployment last, Liquity V2's by default.
 
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import type { SpLiquidationsNote } from "@/lib/shared/market-note";
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
-import { LIQUITY_V2_SP_POOLS } from "./sp-catalog";
+import { LIQUITY_V2_SP, spPool, type SpDeployment } from "./sp-deployment";
 import type { SpBranch } from "./sp-routes";
 import type { TxTrove } from "./tx-troves-words";
 
-const VIA = "GET /api/chain/liquity-v2/stability-pool";
+const via = (dep: SpDeployment) => `GET ${dep.chainApi}`;
 
-const pool = (b: SpBranch) => ({ name: `Liquity V2 ${b} StabilityPool`, address: LIQUITY_V2_SP_POOLS[b] });
-const feed = (b: SpBranch) => ({
-  name: `Liquity V2 ${b} PriceFeed`,
-  address: LIQUITY_V2_BRANCHES[b.toLowerCase()].priceFeed,
+const pool = (b: string, dep: SpDeployment = LIQUITY_V2_SP) => ({
+  name: `${dep.name} ${b} StabilityPool`,
+  address: spPool(dep, b)?.pool ?? "",
+});
+const feed = (b: string, dep: SpDeployment) => ({
+  name: `${dep.name} ${b} PriceFeed`,
+  address: spPool(dep, b)?.priceFeed ?? "",
 });
 
-const ask = (method: string): ProvVerify => ({
+const ask = (method: string, dep: SpDeployment = LIQUITY_V2_SP): ProvVerify => ({
   kind: "recompute",
-  text: `To check: ask any Ethereum archive node for ${method} at the stamped block.`,
+  text: `To check: ask any ${dep.chainId === BASE_CHAIN_ID ? "Base" : "Ethereum"} archive node for ${method} at the stamped block.`,
 });
 
 const GETTER: Record<
   "compounded" | "yieldGain" | "pendingColl" | "collGain",
-  { method: string; summary: (coll: string) => string }
+  { method: string; summary: (coll: string, S: string) => string }
 > = {
   compounded: {
     method: "getCompoundedBoldDeposit(depositor)",
-    summary: () =>
-      "Deposit now — the pool's getCompoundedBoldDeposit(depositor) at the latest block: the BOLD recorded at the last touch, less what liquidations have burned since.",
+    summary: (_c, S) =>
+      `Deposit now — the pool's getCompoundedBoldDeposit(depositor) at the latest block: the ${S} recorded at the last touch, less what liquidations have burned since.`,
   },
   yieldGain: {
     method: "getDepositorYieldGainWithPending(depositor)",
-    summary: () =>
-      "BOLD yield pending — the pool's getDepositorYieldGainWithPending(depositor) at the latest block: the yield the branch's interest has paid the deposit since its last touch, the interest not yet minted included. The next touch pays it; what that touch does not claim joins the deposit.",
+    summary: (_c, S) =>
+      `${S} yield pending — the pool's getDepositorYieldGainWithPending(depositor) at the latest block: the yield the branch's interest has paid the deposit since its last touch, the interest not yet minted included. The next touch pays it; what that touch does not claim joins the deposit.`,
   },
   pendingColl: {
     method: "getDepositorCollGain(depositor) + stashedColl(depositor)",
@@ -51,68 +57,81 @@ const GETTER: Record<
 
 /** A pool getter at head. `wallet`: read by the wallet page's route at
  *  that block. */
-export function spLiveProv(what: keyof typeof GETTER, branch: SpBranch, wallet?: { block: number }): Provenance {
+export function spLiveProv(
+  what: keyof typeof GETTER,
+  branch: string,
+  wallet?: { block: number },
+  dep: SpDeployment = LIQUITY_V2_SP,
+): Provenance {
   const g = GETTER[what];
   return {
     kind: "chain",
     pclass: "state",
-    verify: ask(g.method),
-    summary: g.summary(branch),
-    contract: pool(branch),
+    verify: ask(g.method, dep),
+    summary: g.summary(branch, dep.stable.symbol),
+    contract: pool(branch, dep),
     via: wallet
       ? `GET /api/chain/wallet/<address> · ${g.method} @ block ${wallet.block.toLocaleString("en-US")}`
-      : `${VIA} · ${g.method} @ head`,
+      : `${via(dep)} · ${g.method} @ head`,
   };
 }
 
 /** The pending loss: the recorded deposit less the deposit now. */
-export function spPendingLossProv(branch: SpBranch): Provenance {
+export function spPendingLossProv(branch: string, dep: SpDeployment = LIQUITY_V2_SP): Provenance {
   return {
     kind: "chain-derived",
     pclass: "state",
-    verify: ask("deposits(depositor) and getCompoundedBoldDeposit(depositor)"),
-    summary:
-      "BOLD burned since the last touch — the pool's deposits(depositor), the deposit recorded at the last touch, less its getCompoundedBoldDeposit(depositor), both at the latest block. The next touch writes it as the operation's deposit loss.",
-    contract: pool(branch),
+    verify: ask("deposits(depositor) and getCompoundedBoldDeposit(depositor)", dep),
+    summary: `${dep.stable.symbol} burned since the last touch — the pool's deposits(depositor), the deposit recorded at the last touch, less its getCompoundedBoldDeposit(depositor), both at the latest block. The next touch writes it as the operation's deposit loss.`,
+    contract: pool(branch, dep),
     formula: "deposits(depositor) − getCompoundedBoldDeposit(depositor)",
-    via: `${VIA} @ head`,
+    via: `${via(dep)} @ head`,
   };
 }
 
 /** The deposit's share of its pool: the two getters and the division. */
-export function spPoolShareProv(branch: SpBranch, deposit: string, total: string, block: number): Provenance {
+export function spPoolShareProv(
+  branch: string,
+  deposit: string,
+  total: string,
+  block: number,
+  dep: SpDeployment = LIQUITY_V2_SP,
+): Provenance {
+  const S = dep.stable.symbol;
   return {
     kind: "chain-derived",
     pclass: "state",
-    verify: ask("getCompoundedBoldDeposit(depositor) and getTotalBoldDeposits()"),
-    summary: `Share of the pool — the deposit now over all the BOLD in the ${branch} Stability Pool, both at the stamped block.`,
-    contract: pool(branch),
+    verify: ask("getCompoundedBoldDeposit(depositor) and getTotalBoldDeposits()", dep),
+    summary: `Share of the pool — the deposit now over all the ${S} in the ${branch} Stability Pool, both at the stamped block.`,
+    contract: pool(branch, dep),
     source: { block },
     formula: "getCompoundedBoldDeposit(depositor) ÷ getTotalBoldDeposits()",
     inputs: [
       {
-        label: "Deposit now, getCompoundedBoldDeposit(depositor), BOLD",
+        label: `Deposit now, getCompoundedBoldDeposit(depositor), ${S}`,
         value: deposit,
         kind: "chain",
         pclass: "state",
       },
-      { label: "All deposits, getTotalBoldDeposits(), BOLD", value: total, kind: "chain", pclass: "state" },
+      { label: `All deposits, getTotalBoldDeposits(), ${S}`, value: total, kind: "chain", pclass: "state" },
     ],
-    via: `${VIA} · getCompoundedBoldDeposit(depositor) ÷ getTotalBoldDeposits() @ head`,
+    via: `${via(dep)} · getCompoundedBoldDeposit(depositor) ÷ getTotalBoldDeposits() @ head`,
   };
 }
 
-const SUM: Record<string, (c: string) => string> = {
-  deposited: () => "BOLD deposited — the sum of every DepositOperation's positive topUpOrWithdrawal on this deposit.",
-  withdrawn: () => "BOLD withdrawn — the sum of every DepositOperation's negative topUpOrWithdrawal on this deposit.",
-  burned: () =>
-    "BOLD burned at touches — the sum of every DepositOperation's depositLossSinceLastOperation: the deposit liquidations used, written at the next touch.",
-  kept: () =>
-    "Yield kept — the sum of every DepositOperation's yieldGainSinceLastOperation less its yieldGainClaimed: the BOLD yield the touches added to the deposit.",
+const SUM: Record<string, (c: string, S: string) => string> = {
+  deposited: (_c, S) =>
+    `${S} deposited — the sum of every DepositOperation's positive topUpOrWithdrawal on this deposit.`,
+  withdrawn: (_c, S) =>
+    `${S} withdrawn — the sum of every DepositOperation's negative topUpOrWithdrawal on this deposit.`,
+  burned: (_c, S) =>
+    `${S} burned at touches — the sum of every DepositOperation's depositLossSinceLastOperation: the deposit liquidations used, written at the next touch.`,
+  kept: (_c, S) =>
+    `Yield kept — the sum of every DepositOperation's yieldGainSinceLastOperation less its yieldGainClaimed: the ${S} yield the touches added to the deposit.`,
   recorded: () =>
     "Deposit at the last touch — the deposit before each operation, less its loss, plus its top-up or withdrawal and its yield kept, replayed from the first operation: the pool's deposits(depositor) after the last touch.",
-  yieldGain: () => "BOLD yield paid at touches — the sum of every DepositOperation's yieldGainSinceLastOperation.",
-  yieldClaimed: () => "BOLD yield claimed — the sum of every DepositOperation's yieldGainClaimed.",
+  yieldGain: (_c, S) => `${S} yield paid at touches — the sum of every DepositOperation's yieldGainSinceLastOperation.`,
+  yieldClaimed: (_c, S) => `${S} yield claimed — the sum of every DepositOperation's yieldGainClaimed.`,
   collGain: (c) => `${c} paid in at touches — the sum of every DepositOperation's ethGainSinceLastOperation.`,
   collClaimed: (c) =>
     `${c} claimed — the sum of every DepositOperation's ethGainClaimed, which includes the stash from earlier touches.`,
@@ -124,47 +143,55 @@ const SUM: Record<string, (c: string) => string> = {
  *  listing row from the listing route. */
 export function spSumProv(
   what: keyof typeof SUM,
-  branch: SpBranch,
+  branch: string,
   surface: "detail" | "listing" = "detail",
+  dep: SpDeployment = LIQUITY_V2_SP,
 ): Provenance {
   return {
     kind: "derived",
     pclass: "indexed",
-    summary: SUM[what](branch),
-    contract: pool(branch),
+    summary: SUM[what](branch, dep.stable.symbol),
+    contract: pool(branch, dep),
     via:
       surface === "detail"
-        ? "GET /api/liquity-v2/stability-pool/timeline · position"
-        : "GET /api/liquity-v2/stability-pool?wallet=… · row",
+        ? `GET ${dep.api}/stability-pool/timeline · position`
+        : `GET ${dep.api}/stability-pool?wallet=… · row`,
   };
 }
 
 /** One operation's field, from its log. */
-export function spTouchProv(summary: string, txHash: string, block: string, branch: SpBranch): Provenance {
+export function spTouchProv(
+  summary: string,
+  txHash: string,
+  block: string,
+  branch: string,
+  dep: SpDeployment = LIQUITY_V2_SP,
+): Provenance {
   return {
     kind: "chain",
     pclass: "emitted",
     summary,
-    contract: pool(branch),
+    contract: pool(branch, dep),
     source: { block, txHash },
   };
 }
 
-/** What a compounding touch kept: the BOLD yield it added to the deposit, or
- *  the collateral it stashed, each its log's gain less its claim. */
+/** What a compounding touch kept: the yield it added to the deposit, or the
+ *  collateral it stashed, each its log's gain less its claim. */
 export function spCompoundProv(
   what: "yield" | "stash",
   txHash: string,
   block: string,
-  branch: SpBranch,
+  branch: string,
   inputs: { since: string; claimed: string },
+  dep: SpDeployment = LIQUITY_V2_SP,
 ): Provenance {
   const y = what === "yield";
   return {
     kind: "chain-derived",
     pclass: "emitted",
     summary: y
-      ? "BOLD yield added — the DepositOperation's yieldGainSinceLastOperation less its yieldGainClaimed: the yield this touch kept in the deposit."
+      ? `${dep.stable.symbol} yield added — the DepositOperation's yieldGainSinceLastOperation less its yieldGainClaimed: the yield this touch kept in the deposit.`
       : `${branch} stashed — the DepositOperation's ethGainSinceLastOperation less its ethGainClaimed: the ${branch} this touch left in the pool for a later claim.`,
     formula: y ? "yieldGainSinceLastOperation − yieldGainClaimed" : "ethGainSinceLastOperation − ethGainClaimed",
     inputs: [
@@ -176,22 +203,22 @@ export function spCompoundProv(
       },
       { label: y ? "yieldGainClaimed" : "ethGainClaimed", value: inputs.claimed, kind: "chain", pclass: "emitted" },
     ],
-    contract: pool(branch),
+    contract: pool(branch, dep),
     source: { block, txHash },
   };
 }
 
 /** The branch's collateral in USD at its PriceFeed, read with the deposit. */
-export function spFeedProv(branch: SpBranch, stale: boolean): Provenance {
+export function spFeedProv(branch: string, stale: boolean, dep: SpDeployment = LIQUITY_V2_SP): Provenance {
   return {
     kind: "chain",
     pclass: "oracle",
-    verify: ask(stale ? "lastGoodPrice()" : "fetchPrice()"),
+    verify: ask(stale ? "lastGoodPrice()" : "fetchPrice()", dep),
     summary: stale
       ? `${branch} in USD — the branch PriceFeed's lastGoodPrice() at the latest block: the price the branch's last operation fetched.`
       : `${branch} in USD — the branch PriceFeed's fetchPrice(), simulated at the latest block: the price the branch would liquidate and redeem at now.`,
-    contract: feed(branch),
-    via: `${VIA} · ${stale ? "lastGoodPrice()" : "fetchPrice()"} @ head`,
+    contract: feed(branch, dep),
+    via: `${via(dep)} · ${stale ? "lastGoodPrice()" : "fetchPrice()"} @ head`,
   };
 }
 
@@ -297,7 +324,14 @@ export const spLiqProv = {
       { source: { block } },
     ),
   /** A compounding touch's deposit change, where a loss landed with it. */
-  depositChange: (b: SpBranch, txHash: string, block: string, before: string, after: string) => ({
+  depositChange: (
+    b: string,
+    txHash: string,
+    block: string,
+    before: string,
+    after: string,
+    dep: SpDeployment = LIQUITY_V2_SP,
+  ) => ({
     kind: "derived" as const,
     pclass: "indexed" as const,
     summary:
@@ -307,9 +341,9 @@ export const spLiqProv = {
       { label: "deposit before", value: before, kind: "derived" as const, pclass: "indexed" as const },
       { label: "deposit after", value: after, kind: "derived" as const, pclass: "indexed" as const },
     ],
-    contract: pool(b),
+    contract: pool(b, dep),
     source: { block, txHash },
-    via: "GET /api/liquity-v2/stability-pool/timeline",
+    via: `GET ${dep.api}/stability-pool/timeline`,
   }),
 };
 

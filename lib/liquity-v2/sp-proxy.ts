@@ -1,5 +1,6 @@
 // The four Liquity V2 deposit proxies (app/api/liquity-v2/stability-pool,
-// /timeline, /flows/daily, /liquidations): forward the route's allowlisted params to
+// /timeline, /flows/daily, /liquidations), and the forks' three
+// (app/api/<fork>/stability-pool, /timeline, /flows/daily): forward the route's allowlisted params to
 // rails-server and pass its answer through unchanged, 404 included.
 // Server-only.
 
@@ -10,7 +11,12 @@ import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache"
 import { publicErrorMessage } from "@/lib/api/public-error";
 import { liquityV2SpQuery, type LiquityV2SpRoute } from "@/lib/sources/api/liquity-v2-sp";
 
-export async function forwardLiquityV2Sp(request: NextRequest, route: LiquityV2SpRoute): Promise<NextResponse> {
+export async function forwardLiquityV2Sp(
+  request: NextRequest,
+  route: LiquityV2SpRoute,
+  /** The deployment's api prefix: Liquity V2's, or a fork's ("ebisu"). */
+  prefix = "liquity-v2",
+): Promise<NextResponse> {
   const base = process.env.RAILS_API_URL;
   if (!base) {
     console.error("RAILS_API_URL environment variable is not set");
@@ -18,7 +24,7 @@ export async function forwardLiquityV2Sp(request: NextRequest, route: LiquityV2S
   }
   try {
     const qs = liquityV2SpQuery(route, request.nextUrl.searchParams);
-    const res = await fetch(`${base}/api/liquity-v2/${route}?${qs}`, {
+    const res = await fetch(`${base}/api/${prefix}/${route}?${qs}`, {
       ...createAuthFetchOptions(undefined, readerIpFromRequest(request)),
       signal: request.signal,
     });
@@ -29,7 +35,7 @@ export async function forwardLiquityV2Sp(request: NextRequest, route: LiquityV2S
     }
     return NextResponse.json(await res.json(), { headers: proxyCacheControl(res, LISTING_CACHE_CONTROL) });
   } catch (error) {
-    console.error(`Error fetching liquity-v2 ${route} from backend:`, error);
+    console.error(`Error fetching ${prefix} ${route} from backend:`, error);
     return NextResponse.json({ error: publicErrorMessage(error, "Failed to fetch") }, { status: 500 });
   }
 }

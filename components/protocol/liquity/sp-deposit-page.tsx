@@ -1,6 +1,7 @@
 "use client";
 
-// A Liquity V2 stability-pool deposit's page, in the three sections
+// A stability-pool deposit's page on Liquity V2 or one of its forks
+// (lib/liquity-v2/sp-deployment.ts; Asymmetry, Basedollar, Ebisu), in the three sections
 // (rails-ops standards/detail-page-anatomy.md) on Polaris's deposit shell
 // (app/(app)/sepolia/polaris/stability-pool/[market]/[id]/deposit-view.tsx):
 // the card, the Lifetime flows panel (lib/liquity-v2/sp-flow-timelines.ts,
@@ -12,10 +13,12 @@
 // flows read the life's day rows (/stability-pool/flows/daily). Under
 // `event/<id>` the page draws one operation on the shared event page (P4).
 // What each liquidation did to the deposit between its touches
-// (/stability-pool/liquidations) is a note row per closed stretch and a
-// section of the "Since its last touch" row (sp-liquidations.tsx).
+// (/stability-pool/liquidations, Liquity V2's only) is a note row per closed
+// stretch and a section of the "Since its last touch" row (sp-liquidations.tsx).
+// A fork's shut-down branch (ui-jobs 608, 612) reads "Shut down" on the card
+// with one line on the shutdown and the pools' collateral.
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import { FlowHuesContext, PAID_IN_HUES } from "@/components/shared/lifetime-flows-tip";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
@@ -36,16 +39,21 @@ import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { boldPriceReason, boldStripAsset, useBoldPrice } from "@/lib/liquity-v2/use-bold-price";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { liquityV2SpSizeDims } from "@/lib/liquity-v2/timeline-size";
+import { Prov } from "@/components/shared/provenance";
 import { LiquityV2DepositCard } from "@/components/protocol/liquity/sp-deposit-card";
 import { LiquityV2DepositEventCard } from "@/components/protocol/liquity/sp-event-card";
 import { LiquityV2DepositFlowsNote, liquityV2DepositFlowsContent } from "@/components/protocol/liquity/sp-flows-note";
 import { LiquityV2DepositSinceTouchRow } from "@/components/protocol/liquity/sp-since-touch";
 import { SpOpenStretchLiquidations } from "@/components/protocol/liquity/sp-liquidations";
 import { spBranchCheck, spLiquidationNotes, spNotesOnRows } from "@/lib/liquity-v2/sp-liquidations";
-import { LIQUITY_V2_SP_POOLS } from "@/lib/liquity-v2/sp-catalog";
 import { fetchLiquityV2DepositChain, type LiquityV2DepositChain } from "@/lib/api/fetch-liquity-v2-sp-chain";
-import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
-import { LIQUITY_V2_SP_PATH, type SpBranch } from "@/lib/liquity-v2/sp-routes";
+import { spPoolOf, spWalletHref, type SpDeployment } from "@/lib/liquity-v2/sp-deployment";
+import type { SpBranch } from "@/lib/liquity-v2/sp-routes";
+import { useBranchShutdown } from "@/hooks/useBranchShutdown";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
+import { shutdownDateProv, shutdownDay, withdrawalDateProv } from "@/lib/shared/liquity-family-shutdown";
+import { liquityFamilyTerms } from "@/lib/liquity/ltv";
+import type { SessionProtocol } from "@/lib/shared/sessions";
 import { depositLifetime, depositNow, depositNowFromChain, priceUnits } from "@/lib/liquity-v2/sp-math";
 import { spDepositFlows, spDepositFlowsFromDays } from "@/lib/liquity-v2/sp-flow-timelines";
 import { SP_FIRST_READ, spTimelineEvent, SP_WHOLE_LIFE_READ } from "@/lib/liquity-v2/sp-timeline-events";
@@ -62,21 +70,30 @@ import {
   type LiquityV2DepositTimelineResponse,
 } from "@/lib/sources/api/liquity-v2-sp";
 
-export default function DepositView({
+export function SpDepositPage({
+  dep,
   branch,
   depositor,
   initial,
 }: {
-  branch: SpBranch;
+  dep: SpDeployment;
+  /** The branch symbol, as the routes key it. */
+  branch: string;
   depositor: string;
-  initial: LiquityV2DepositTimelineResponse | null;
+  initial: LiquityV2DepositTimelineResponse<string> | null;
 }) {
-  const coll = LIQUITY_V2_BRANCHES[branch.toLowerCase()];
+  const coll = spPoolOf(dep, branch);
+  const S = dep.stable.symbol;
+  const v2 = dep.id === "liquity-v2";
+  const api = { api: dep.api };
   const [data, setData] = useState(initial);
   const [failed, setFailed] = useState(false);
   const [chain, setChain] = useState<LiquityV2DepositChain | null>(null);
   const [chainSettled, setChainSettled] = useState(false);
-  const boldPrice = useBoldPrice();
+  // BOLD's price is Liquity V2's strip alone; a fork's stablecoin has no read.
+  const boldPrice = useBoldPrice(v2 ? undefined : null);
+  // A fork's branch shutdown (ui-jobs 612): the catalog's record, the live read confirming it.
+  const shutdown = useBranchShutdown(dep.id, branch, !v2);
   // The event route draws the timeline alone, its card in page mode.
   const rawEventId = useParams<{ eventId?: string }>()?.eventId;
   const onEventPage = rawEventId != null;
@@ -85,17 +102,23 @@ export default function DepositView({
   useEffect(() => {
     if (initial) return;
     let cancelled = false;
-    readLiquityV2Sp<LiquityV2DepositTimelineResponse>("stability-pool/timeline", {
-      collateralType: branch,
-      wallet: depositor,
-      order: "desc",
-      limit: String(SP_FIRST_READ),
-    })
+    readLiquityV2Sp<LiquityV2DepositTimelineResponse<string>>(
+      "stability-pool/timeline",
+      {
+        collateralType: branch,
+        wallet: depositor,
+        order: "desc",
+        limit: String(SP_FIRST_READ),
+      },
+      api,
+    )
       .then((d) => !cancelled && setData(d))
       .catch(() => !cancelled && setFailed(true));
     return () => {
       cancelled = true;
     };
+    // `api` is the deployment's, fixed for the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial, branch, depositor]);
 
   const row = data?.position ?? null;
@@ -109,35 +132,40 @@ export default function DepositView({
       return;
     }
     let cancelled = false;
-    fetchLiquityV2DepositChain(branch, depositor)
+    fetchLiquityV2DepositChain(branch, depositor, dep)
       .then((c) => !cancelled && !c.chainStale && setChain(c))
       .catch(() => undefined)
       .finally(() => !cancelled && setChainSettled(true));
     return () => {
       cancelled = true;
     };
-  }, [open, branch, depositor]);
+  }, [open, branch, depositor, dep]);
 
   // What each liquidation did to the deposit between its touches
   // (/stability-pool/liquidations). Any answer but a 200 — the route absent
   // on the api, a 503 before the capture has a tip or while the branch's
-  // replay does not hold — leaves the page as it is without it.
+  // replay does not hold — leaves the page as it is without it. A deployment
+  // that serves no such route (the forks) reads nothing.
   const [liqRead, setLiqRead] = useState<LiquityV2DepositLiquidationsResponse | null>(null);
   useEffect(() => {
+    if (!dep.liquidations) return;
     let cancelled = false;
-    readLiquityV2Sp<LiquityV2DepositLiquidationsResponse>("stability-pool/liquidations", {
-      collateralType: branch,
-      wallet: depositor,
-    })
+    readLiquityV2Sp<LiquityV2DepositLiquidationsResponse>(
+      "stability-pool/liquidations",
+      { collateralType: branch, wallet: depositor },
+      api,
+    )
       .then((d) => !cancelled && Array.isArray(d?.stretches) && setLiqRead(d))
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [branch, depositor]);
+    // `api` is the deployment's, fixed for the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branch, depositor, dep.liquidations]);
   const liqNotes = useMemo(
-    () => (liqRead ? spLiquidationNotes(branch, LIQUITY_V2_SP_POOLS[branch], liqRead) : NO_NOTES),
-    [liqRead, branch],
+    () => (liqRead ? spLiquidationNotes(branch as SpBranch, coll.pool, liqRead) : NO_NOTES),
+    [liqRead, branch, coll.pool],
   );
   // The open stretch, where it starts at the touch the timeline holds as newest.
   const openStretch =
@@ -149,17 +177,18 @@ export default function DepositView({
   // else one read of up to SP_WHOLE_LIFE_READ; past that, the day rows.
   const firstRows = data?.rows;
   const firstWhole = firstRows != null && firstRows.length >= total;
-  const [lifeRows, setLifeRows] = useState<LiquityV2DepositEventRow[] | null>(null);
+  const [lifeRows, setLifeRows] = useState<LiquityV2DepositEventRow<string>[] | null>(null);
   const [lifeRead, setLifeRead] = useState<FlowsRead>("reading");
   const [lifeDays, setLifeDays] = useState<LiquityV2DepositDay[] | null>(null);
   useEffect(() => {
     if (firstRows == null || firstWhole) return;
     let cancelled = false;
     if (total > SP_WHOLE_LIFE_READ) {
-      readLiquityV2Sp<LiquityV2DepositDaysResponse>("stability-pool/flows/daily", {
-        collateralType: branch,
-        wallet: depositor,
-      })
+      readLiquityV2Sp<LiquityV2DepositDaysResponse<string>>(
+        "stability-pool/flows/daily",
+        { collateralType: branch, wallet: depositor },
+        api,
+      )
         .then((d) => {
           if (cancelled) return;
           setLifeDays(d.days);
@@ -167,12 +196,11 @@ export default function DepositView({
         })
         .catch(() => !cancelled && setLifeRead("failed"));
     } else {
-      readLiquityV2Sp<LiquityV2DepositTimelineResponse>("stability-pool/timeline", {
-        collateralType: branch,
-        wallet: depositor,
-        order: "asc",
-        limit: String(SP_WHOLE_LIFE_READ),
-      })
+      readLiquityV2Sp<LiquityV2DepositTimelineResponse<string>>(
+        "stability-pool/timeline",
+        { collateralType: branch, wallet: depositor, order: "asc", limit: String(SP_WHOLE_LIFE_READ) },
+        api,
+      )
         .then((d) => {
           if (cancelled) return;
           setLifeRows(d.rows);
@@ -183,6 +211,8 @@ export default function DepositView({
     return () => {
       cancelled = true;
     };
+    // `api` is the deployment's, fixed for the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstRows, firstWhole, total, branch, depositor]);
   const wholeAsc = useMemo(
     () => (firstWhole && firstRows ? [...firstRows].reverse() : lifeRows),
@@ -195,7 +225,7 @@ export default function DepositView({
   // Each liquidations note between two touches the page holds, under its
   // closing touch.
   const liqNotesShown = useMemo(() => spNotesOnRows(liqNotes, (k) => rowById.has(k)), [liqNotes, rowById]);
-  const events = useMemo(() => listed.map(spTimelineEvent), [listed]);
+  const events = useMemo(() => listed.map((r) => spTimelineEvent(r, dep.chainId)), [listed, dep.chainId]);
   const olderCount = Math.max(0, total - listed.length);
   const lastTouch = listed.length > 0 ? listed[listed.length - 1] : null;
   // The deposit's one operation is its open: the window is its whole life.
@@ -216,11 +246,11 @@ export default function DepositView({
       !flowsReady || nowSec == null
         ? null
         : wholeAsc
-          ? spDepositFlows(branch, wholeAsc, { open, now, nowSec })
+          ? spDepositFlows(branch, wholeAsc, { open, now, nowSec }, dep)
           : lifeDays
-            ? spDepositFlowsFromDays(branch, lifeDays, { open, now, nowSec })
+            ? spDepositFlowsFromDays(branch, lifeDays, { open, now, nowSec }, dep)
             : null,
-    [flowsReady, wholeAsc, lifeDays, nowSec, open, branch, now],
+    [flowsReady, wholeAsc, lifeDays, nowSec, open, branch, now, dep],
   );
   const flowFocus = useFlowFocusValue(useFlowFocusRoot(flows?.focus ?? NO_FOCUS), flows?.timeline ?? null);
   const flowsRead: FlowsRead = flowsReady
@@ -232,9 +262,9 @@ export default function DepositView({
   const lifePending = !firstWhole && total <= SP_WHOLE_LIFE_READ && lifeRows == null && lifeRead === "reading";
 
   // "Deposited (BOLD)": each touch's top-up or withdrawal (ui-jobs 752).
-  const sizeDims = useMemo(() => liquityV2SpSizeDims((e) => rowById.get(e.id)?.top_up_or_withdrawal), [rowById]);
+  const sizeDims = useMemo(() => liquityV2SpSizeDims((e) => rowById.get(e.id)?.top_up_or_withdrawal, S), [rowById, S]);
   const tl = useTimelineEvents(events, {
-    storageKey: `liquity-v2-sp-${branch}-${depositor}`,
+    storageKey: `${dep.id}-sp-${branch}-${depositor}`,
     protocolKey: "liquity-v2-sp",
     olderCount,
     size: sizeDims,
@@ -270,11 +300,11 @@ export default function DepositView({
             price,
             label: `${coll.symbol} at the branch price feed`,
             triggerLabel: coll.symbol,
-            info: spFeedProv(branch, chain.priceStale),
+            info: spFeedProv(branch, chain.priceStale, dep),
           },
         ]
       : []),
-    boldStripAsset(boldPrice),
+    ...(v2 ? [boldStripAsset(boldPrice)] : []),
   ];
 
   if (!data && !failed) return <DetailBodySkeleton />;
@@ -295,16 +325,16 @@ export default function DepositView({
         <FlowHuesContext.Provider value={PAID_IN_HUES}>
           <div className="py-8 space-y-6" style={PAID_IN_VARS}>
             <DetailTopRow
-              session="liquity-v2"
+              session={dep.session as SessionProtocol}
               wallet={depositor}
               owner={{
                 wallet: depositor,
-                href: `${LIQUITY_V2_SP_PATH}?q=${depositor}`,
-                vault: sboldDepositorVault(depositor),
+                href: spWalletHref(dep, depositor),
+                vault: v2 ? sboldDepositorVault(depositor) : undefined,
               }}
-              fallbackHref={LIQUITY_V2_SP_PATH}
+              fallbackHref={dep.spPath}
               assets={stripAssets}
-              priceReason={boldPriceReason(boldPrice)}
+              priceReason={v2 ? boldPriceReason(boldPrice) : undefined}
               closed={!open}
               tools={false}
             />
@@ -312,6 +342,8 @@ export default function DepositView({
               <>
                 <LiquityV2DepositCard
                   row={row}
+                  dep={dep}
+                  shutdown={shutdown}
                   lifetime={lifetime}
                   now={cardNow}
                   pending={open && !chainSettled}
@@ -324,14 +356,15 @@ export default function DepositView({
                   explanation={
                     <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
                       <li>
-                        A deposit in the {branch} Stability Pool repays the BOLD debt of liquidated {branch} Troves.
-                        Each liquidation burns a share of every deposit and pays {branch} in its place.
+                        A deposit in the {branch} Stability Pool repays the {S} debt of liquidated {branch} Troves. Each
+                        liquidation burns a share of every deposit and pays {branch} in its place.
                       </li>
                       <li>
-                        The branch&rsquo;s interest pays the pool a BOLD yield. A touch that claims sends the yield and
+                        The branch&rsquo;s interest pays the pool a {S} yield. A touch that claims sends the yield and
                         the {branch}; one that does not adds the yield to the deposit and stashes the {branch}.
                       </li>
                       <li>The deposit now and the pending gains are the pool&rsquo;s current figures.</li>
+                      {shutdown && <ShutdownLine dep={dep} symbol={branch} state={shutdown} />}
                     </ul>
                   }
                 />
@@ -340,10 +373,10 @@ export default function DepositView({
                   read={flowsRead}
                   explanation={
                     <div className="space-y-2 text-sm text-rb-500">
-                      <LiquityV2DepositFlowsNote coll={branch} />
+                      <LiquityV2DepositFlowsNote coll={branch} stable={S} />
                     </div>
                   }
-                  learnMore={liquityV2DepositFlowsContent(branch)}
+                  learnMore={liquityV2DepositFlowsContent(branch, S, dep.docs)}
                 />
               </>
             )}
@@ -377,6 +410,7 @@ export default function DepositView({
                     ? () => (
                         <LiquityV2DepositSinceTouchRow
                           branch={branch}
+                          dep={dep}
                           recorded={lifetime.recorded}
                           burned={now.pendingLoss}
                           now={now.now}
@@ -393,7 +427,7 @@ export default function DepositView({
                           liquidations={
                             openStretch && liqRead ? (
                               <SpOpenStretchLiquidations
-                                branch={branch}
+                                branch={branch as SpBranch}
                                 stretch={openStretch}
                                 servedThru={liqRead.served_thru_block}
                                 check={spBranchCheck(liqRead)}
@@ -405,12 +439,12 @@ export default function DepositView({
                     : undefined
                 }
                 eventPage={(slot) =>
-                  liquityV2DepositEventPage({ ...slot, branch, depositor, row: rowById.get(slot.event.id) })
+                  liquityV2DepositEventPage({ ...slot, branch, depositor, row: rowById.get(slot.event.id), dep })
                 }
                 renderCard={(event, meta) => {
                   const r = rowById.get(event.id);
                   return r ? (
-                    <LiquityV2DepositEventCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} />
+                    <LiquityV2DepositEventCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} dep={dep} />
                   ) : null;
                 }}
               />
@@ -420,6 +454,36 @@ export default function DepositView({
         </FlowHuesContext.Provider>
       </FlowFocusContext.Provider>
     </FlowsStoreContext.Provider>
+  );
+}
+
+/** A shut-down branch's line in the card's explanation (ui-jobs 608, 612):
+ *  the shutdown and, where the record holds it, the admin's withdrawal of the
+ *  pools' collateral, each date with its receipt. The deposit still reads at
+ *  head and can be withdrawn (rails-ops TO-DO-stability-pool-deposits §3.2). */
+function ShutdownLine({ dep, symbol, state }: { dep: SpDeployment; symbol: string; state: BranchShutdownState }) {
+  const terms = liquityFamilyTerms(dep.id);
+  const day = <Prov info={shutdownDateProv(dep.id, symbol, state)}>{shutdownDay(state.at)}</Prov>;
+  const w = state.record?.withdrawal;
+  const wProv = state.record ? withdrawalDateProv(dep.id, symbol, state.record) : null;
+  let line: ReactNode;
+  if (state.record && w && wProv)
+    line = (
+      <>
+        The {terms.branch}&rsquo;s {state.record.by} shut it down on {day}. Every pool has held 0 collateral since{" "}
+        <Prov info={wProv}>{shutdownDay(w.at)}</Prov>; the deposit can still be withdrawn.
+      </>
+    );
+  else
+    line = (
+      <>
+        The {terms.branch} shut down on {day}; the deposit can still be withdrawn.
+      </>
+    );
+  return (
+    <li data-sp-shutdown="" data-anatomy="C6.1">
+      {line}
+    </li>
   );
 }
 

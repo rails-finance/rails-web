@@ -1,7 +1,7 @@
 "use client";
 
 // A Liquity V2 redeemer's page on the deposit page's shell
-// (app/(app)/ethereum/liquity-v2/stability-pool/[collateralType]/[wallet]/deposit-view.tsx):
+// (components/protocol/liquity/sp-deposit-page.tsx):
 // the card (P1) with the wallet's sums, then the shared timeline (P3), one
 // row per Trove a redemption hit, newest first, with its filters (the
 // collateral narrows to a branch). Between them the Lifetime flows panel

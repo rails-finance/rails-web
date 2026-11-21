@@ -1,10 +1,11 @@
-// Lifetime flows for a Liquity V2 stability-pool deposit: the page's rows
+// Lifetime flows for a Liquity V2 (or fork) stability-pool deposit: the page's rows
 // replayed into the day rows the Lifetime flows panel reads
 // (lib/shared/flows-timeline.ts), each bar in its own token
 // (`FlowTimeline.sideUnits`). Nothing is priced (decision 0022, token mode;
 // the bars per its 2026-11-17 amendment).
 //
-// The deposit's bar is BOLD: deposited and the BOLD yield the touches paid in,
+// The deposit's bar is the pool's stablecoin (BOLD on Liquity V2): deposited
+// and its yield the touches paid in,
 // less withdrawn, burned by liquidations and the yield claimed, holds the
 // deposit recorded at the last touch. The second bar is the branch collateral:
 // paid in at touches, less claimed, holds the stash. Today each bar adds what
@@ -18,18 +19,15 @@ import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { DayObs } from "@/lib/shared/price-series";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
-import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
-import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import type { LiquityV2DepositDay, LiquityV2DepositEventRow } from "@/lib/sources/api/liquity-v2-sp";
 import { big, depositLegs, units, type DepositNow } from "./sp-math";
-import type { SpBranch } from "./sp-routes";
+import { LIQUITY_V2_SP, spPoolOf, type SpDeployment } from "./sp-deployment";
 
 const DAY_S = 86_400;
 const DUST = 1e-12;
 const ZERO = BigInt(0);
 const A = "a";
 const B = "b";
-const BOLD = "BOLD";
 
 type Grains = { collateral: number; debt: number };
 
@@ -89,10 +87,10 @@ const D = {
   collClaimed: "v2-sp-coll-claimed",
 } as const;
 
-function depositBuckets(coll: string): FlowBucket[] {
+function depositBuckets(coll: string, S: string): FlowBucket[] {
   return [
     { key: D.deposited, label: "Deposited", event: "Deposit", side: "collateral", dir: "in" },
-    { key: D.yieldIn, label: "BOLD yield paid in", event: "", side: "collateral", dir: "in", hatch: "dashes" },
+    { key: D.yieldIn, label: `${S} yield paid in`, event: "", side: "collateral", dir: "in", hatch: "dashes" },
     { key: D.withdrawn, label: "Withdrawn", event: "Withdrawal", side: "collateral", dir: "out" },
     {
       key: D.burned,
@@ -105,7 +103,7 @@ function depositBuckets(coll: string): FlowBucket[] {
     },
     {
       key: D.yieldClaimed,
-      label: "BOLD yield claimed",
+      label: `${S} yield claimed`,
       event: "Claim",
       side: "collateral",
       dir: "out",
@@ -120,9 +118,15 @@ type Opts = { open: boolean; now: DepositNow | null; nowSec: number };
 
 /** A deposit's rows, oldest first, as the panel's timeline and focus events.
  *  Null without a row. */
-export function spDepositFlows(branch: SpBranch, rowsAsc: LiquityV2DepositEventRow[], o: Opts): SpDepositFlows | null {
+export function spDepositFlows(
+  branch: string,
+  rowsAsc: LiquityV2DepositEventRow<string>[],
+  o: Opts,
+  dep: SpDeployment = LIQUITY_V2_SP,
+): SpDepositFlows | null {
   if (rowsAsc.length === 0) return null;
   const c = branch;
+  const S = dep.stable.symbol;
   let peakA = 0;
   let peakB = 0;
   let inA = 0;
@@ -144,8 +148,7 @@ export function spDepositFlows(branch: SpBranch, rowsAsc: LiquityV2DepositEventR
   const events: FlowEvent[] = rowsAsc.map((r, i) => {
     const g = legsOf[i];
     const legs: FlowEvent["legs"] = [];
-    const a = (bucket: string, v: bigint) =>
-      v > ZERO && legs.push({ bucket, usd: units(v) * G.collateral, symbol: BOLD });
+    const a = (bucket: string, v: bigint) => v > ZERO && legs.push({ bucket, usd: units(v) * G.collateral, symbol: S });
     const b = (bucket: string, v: bigint) => v > ZERO && legs.push({ bucket, usd: units(v) * G.debt, symbol: c });
     a(D.deposited, g.deposited);
     a(D.withdrawn, g.withdrawn);
@@ -154,7 +157,7 @@ export function spDepositFlows(branch: SpBranch, rowsAsc: LiquityV2DepositEventR
     a(D.yieldClaimed, g.yieldClaimed);
     b(D.collIn, g.collIn);
     b(D.collClaimed, g.collClaimed);
-    const movedA = legs.some((l) => l.symbol === BOLD);
+    const movedA = legs.some((l) => l.symbol === S);
     const movedB = legs.some((l) => l.symbol === c);
     return {
       id: r.event_key,
@@ -164,7 +167,7 @@ export function spDepositFlows(branch: SpBranch, rowsAsc: LiquityV2DepositEventR
       legs,
       tx: r.tx_hash,
       balances: [
-        { asset: A, symbol: BOLD, side: "collateral", amount: units(g.deposit) },
+        { asset: A, symbol: S, side: "collateral", amount: units(g.deposit) },
         { asset: B, symbol: c, side: "debt", amount: units(g.stash) },
       ],
       prices: [
@@ -173,7 +176,7 @@ export function spDepositFlows(branch: SpBranch, rowsAsc: LiquityV2DepositEventR
       ],
     };
   });
-  const buckets = depositBuckets(c);
+  const buckets = depositBuckets(c, S);
   const days: FlowDayRow[] = daysFromEvents(
     buckets.map((x) => x.key),
     events,
@@ -181,20 +184,22 @@ export function spDepositFlows(branch: SpBranch, rowsAsc: LiquityV2DepositEventR
   const firstDay = Math.floor(events[0].ts / DAY_S);
   const lastDay = Math.floor(events[events.length - 1].ts / DAY_S);
   const last = legsOf[legsOf.length - 1];
-  const timeline = depositTimeline(branch, buckets, days, { firstDay, lastDay, last, scale, G }, o);
+  const timeline = depositTimeline(branch, buckets, days, { firstDay, lastDay, last, scale, G }, o, dep);
   return { timeline, focus: focusEvents(events, buckets, G) };
 }
 
 /** The deposit's timeline around its day rows: the live figures (what the
  *  pool has done since the last touch, at today), the axes and the words. */
 function depositTimeline(
-  branch: SpBranch,
+  branch: string,
   buckets: FlowBucket[],
   days: FlowDayRow[],
   at: { firstDay: number; lastDay: number; last: { deposit: bigint; stash: bigint }; scale: Grains; G: Grains },
   o: Opts,
+  dep: SpDeployment,
 ): FlowTimeline {
   const c = branch;
+  const S = dep.stable.symbol;
   const { firstDay, lastDay, last, scale, G } = at;
   const today = Math.floor(o.nowSec / DAY_S);
   const endDay = o.open ? Math.max(today, lastDay + 1) : lastDay + 1;
@@ -205,20 +210,19 @@ function depositTimeline(
   const heldB = units(last.stash) + (o.open && n ? units(n.collSinceTouch) : 0);
   const pending: NonNullable<FlowTimeline["live"]["pending"]> = [];
   if (n) {
-    if (n.pendingLoss > ZERO)
-      pending.push({ bucket: D.burned, symbol: BOLD, usd: units(n.pendingLoss) * G.collateral });
+    if (n.pendingLoss > ZERO) pending.push({ bucket: D.burned, symbol: S, usd: units(n.pendingLoss) * G.collateral });
     if (n.pendingYield > ZERO)
-      pending.push({ bucket: D.yieldIn, symbol: BOLD, usd: units(n.pendingYield) * G.collateral });
+      pending.push({ bucket: D.yieldIn, symbol: S, usd: units(n.pendingYield) * G.collateral });
     if (n.collSinceTouch > ZERO) pending.push({ bucket: D.collIn, symbol: c, usd: units(n.collSinceTouch) * G.debt });
   }
   const assets: NonNullable<FlowTimeline["live"]["assets"]> = [];
-  if (heldA > DUST) assets.push({ side: "collateral", symbol: BOLD, amount: heldA, usd: heldA * G.collateral });
+  if (heldA > DUST) assets.push({ side: "collateral", symbol: S, amount: heldA, usd: heldA * G.collateral });
   if (heldB > DUST) assets.push({ side: "debt", symbol: c, amount: heldB, usd: heldB * G.debt });
 
   return {
-    unit: { symbol: BOLD, scale: scale.collateral },
+    unit: { symbol: S, scale: scale.collateral },
     sideUnits: {
-      collateral: { symbol: BOLD, scale: scale.collateral },
+      collateral: { symbol: S, scale: scale.collateral },
       debt: { symbol: c, scale: scale.debt },
     },
     buckets,
@@ -233,20 +237,20 @@ function depositTimeline(
     dailyPrices: sidePrices(firstDay, endDay, G),
     seriesCarry: true,
     today: o.open ? today : endDay,
-    labels: { collateral: "BOLD deposit", debt: `${c} paid in` },
-    addresses: { [BOLD]: TOKEN_ADDRESSES.BOLD, [c]: LIQUITY_V2_BRANCHES[c.toLowerCase()].collateralAddr },
+    labels: { collateral: `${S} deposit`, debt: `${c} paid in` },
+    addresses: { [S]: dep.stable.address, [c]: spPoolOf(dep, c).collateralAddr },
     words: {
       held: "Held",
       restBySide: { collateral: "Burned since the last touch", debt: "Paid in since the last touch" },
       basis: {
-        collateral: "Every figure is in BOLD.",
-        debt: `Every figure is in ${c}; the bar does not price ${c} in BOLD.`,
+        collateral: `Every figure is in ${S}.`,
+        debt: `Every figure is in ${c}; the bar does not price ${c} in ${S}.`,
       },
       heldBasis: {
         collateral: "the deposit recorded at its last touch; the pool records a deposit only when it is touched.",
         debt: `the ${c} stashed at the last touch.`,
       },
-      linePrices: `with the deposit in BOLD and the ${c} in ${c}, each on its own scale`,
+      linePrices: `with the deposit in ${S} and the ${c} in ${c}, each on its own scale`,
       moment: { tokensOnly: ["collateral", "debt"] },
     },
   };
@@ -255,9 +259,15 @@ function depositTimeline(
 /** A deposit too long to send whole, from its day rows
  *  (/stability-pool/flows/daily): the running sums after each day's last
  *  operation. No focus events: the page lists only the newest operations. */
-export function spDepositFlowsFromDays(branch: SpBranch, rows: LiquityV2DepositDay[], o: Opts): SpDepositFlows | null {
+export function spDepositFlowsFromDays(
+  branch: string,
+  rows: LiquityV2DepositDay[],
+  o: Opts,
+  dep: SpDeployment = LIQUITY_V2_SP,
+): SpDepositFlows | null {
   if (rows.length === 0) return null;
   const c = branch;
+  const S = dep.stable.symbol;
   const v = (raw: string) => units(big(raw));
   let peakA = 0;
   let peakB = 0;
@@ -295,7 +305,7 @@ export function spDepositFlowsFromDays(branch: SpBranch, rows: LiquityV2DepositD
     };
     const cumAsset = Object.entries(cum).map(([bucket, usd]) => ({
       bucket,
-      symbol: bucket === D.collIn || bucket === D.collClaimed ? c : BOLD,
+      symbol: bucket === D.collIn || bucket === D.collClaimed ? c : S,
       usd,
     }));
     return {
@@ -306,7 +316,7 @@ export function spDepositFlowsFromDays(branch: SpBranch, rows: LiquityV2DepositD
       tick: movedA && movedB ? "both" : movedB ? "debt" : "collateral",
       cum,
       balances: [
-        { asset: A, symbol: BOLD, side: "collateral", amount: v(r.deposit) },
+        { asset: A, symbol: S, side: "collateral", amount: v(r.deposit) },
         { asset: B, symbol: c, side: "debt", amount: v(r.stash) },
       ],
       prices: [
@@ -317,7 +327,7 @@ export function spDepositFlowsFromDays(branch: SpBranch, rows: LiquityV2DepositD
   });
   const timeline = depositTimeline(
     branch,
-    depositBuckets(c),
+    depositBuckets(c, S),
     days,
     {
       firstDay: rows[0].day,
@@ -327,6 +337,7 @@ export function spDepositFlowsFromDays(branch: SpBranch, rows: LiquityV2DepositD
       G,
     },
     o,
+    dep,
   );
   return { timeline, focus: [] };
 }
