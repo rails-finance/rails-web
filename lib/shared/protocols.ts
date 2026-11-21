@@ -20,6 +20,7 @@ import { CHAINS, MAINNET_CHAIN_ID, type ChainId, type ChainMeta } from "@/lib/sh
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import type { ProtocolLifecycle } from "@/lib/shared/lifecycle";
 import { POLARIS_TESTNET_CLOSED } from "@/lib/polaris/asset-catalog";
+import { walletProtocolHref, WALLET_SEARCH_FAMILIES } from "@/lib/wallet/wallet-filters";
 
 /** A roster entry as it is written down. `href` is NOT here: it is derived from
  *  `(chainId, slug)` below, so the path text exists in exactly one place. */
@@ -1718,6 +1719,9 @@ export function subPageForPathname(entry: ProtocolEntry, pathname: string | null
  *  Lowercasing is load-bearing, not cosmetic: `parseAaveV4Search`'s address regex
  *  is `[a-f0-9]` only, so a checksummed address silently matches nothing. */
 export function listingHrefForWallet(session: SessionProtocol, wallet: string, takenOn?: string): string | null {
+  // A family whose listings send a wallet search to the wallet page links
+  // there directly (ui-jobs 738).
+  if (WALLET_SEARCH_FAMILIES.has(session)) return walletProtocolHref(wallet, session);
   const entry = protocolForSession(session);
   if (!entry) return null;
   let listing = entry.listingHref;

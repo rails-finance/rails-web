@@ -4,34 +4,29 @@
 // lib/wallet/read-wallet.ts). It spans chains, so it sits under no chain and
 // no explorer rail.
 // `[address]` is a 0x address or an ENS name; a name, or an address in mixed
-// case, redirects to the lower-cased address. `?from=<path>` is the explorer
+// case, redirects to the lower-cased address, and a name that resolves to no
+// address draws a page saying so. `?from=<path>` is the explorer
 // page the reader came from (the wallet menu adds it): the empty state links
 // back to that explorer's listing.
-// `?protocol=<slug>` reads that protocol alone (ui-jobs 738); Liquity V2's is
-// its Trove listing with the wallet in place of the search. `?kind=` is the
-// Kind pill's selection,
-// `?status=` the Status pill's.
+// `?protocol=<slug>` reads that protocol alone (ui-jobs 738), and is where a
+// wallet search on the Liquity V2 and fork listings lands. `?kind=` is the
+// Kind pill's selection, `?status=` the Status pill's.
 
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { WalletView } from "@/components/wallet/wallet-view";
-import { readWallet, readWalletCounts, walletFamiliesLine } from "@/lib/wallet/read-wallet";
-import { WalletProtocolListing } from "@/components/wallet/wallet-protocol-listing";
+import { WalletUnresolved, WalletView } from "@/components/wallet/wallet-view";
+import { readWallet, walletFamiliesLine } from "@/lib/wallet/read-wallet";
 import {
-  LISTED_ON_WALLET,
+  isWalletEnsName,
   parseKinds,
   parseStatus,
+  WALLET_ADDRESS as ADDRESS,
   walletProtocol,
-  WALLET_PROTOCOLS,
+  walletProtocolHref,
 } from "@/lib/wallet/wallet-filters";
-import {
-  walletLiquityV2Dimensions,
-  walletLiquityV2FetchParams,
-  WALLET_LIQUITY_V2_DEFAULTS,
-} from "@/lib/wallet/liquity-v2-on-wallet";
-import { fetchTroves } from "@/lib/api/fetch-troves";
-import { ssrDecode, ssrInitial, toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
+import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { explorerName, protocolForPathname } from "@/lib/shared/protocols";
+import { holderListingMetadata } from "@/lib/shared/page-metadata";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { resolveEnsAddress, resolveEnsNames } from "@/lib/ens/resolve-ens";
 import { readCowWalletEntry } from "@/lib/sources/api/cow";
@@ -40,21 +35,37 @@ export const dynamic = "force-dynamic";
 // The read's budget (8 s) sits under it.
 export const maxDuration = 30;
 
-const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
-const ENS = /^[^\s]+\.eth$/i;
-
 interface Props {
   params: Promise<{ address: string }>;
   searchParams: Promise<RawSearchParams>;
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+// Preview-only until the charter amendment is ruled (decision 0050, open point 1).
+const NO_INDEX = { index: false, follow: false };
+
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { address } = await params;
   const subject = decodeURIComponent(address);
+  // Liquity V2 chosen: the holder's card its listing search unfurled as before
+  // the search moved here (/api/share/liquity-v2-wallet).
+  if (
+    ADDRESS.test(subject) &&
+    walletProtocol(toURLSearchParams(await searchParams).get("protocol"))?.slug === "liquity-v2"
+  ) {
+    const q = encodeURIComponent(subject.toLowerCase());
+    return {
+      ...holderListingMetadata({
+        session: "liquity-v2",
+        subject,
+        canonicalPath: walletProtocolHref(subject, "liquity-v2"),
+        imagePath: `/api/share/liquity-v2-wallet?q=${q}`,
+      }),
+      robots: NO_INDEX,
+    };
+  }
   return {
     title: `Wallet ${ADDRESS.test(subject) ? `${subject.slice(0, 6)}…${subject.slice(-4)}` : subject}`,
-    // Preview-only until the charter amendment is ruled (decision 0050, open point 1).
-    robots: { index: false, follow: false },
+    robots: NO_INDEX,
   };
 }
 
@@ -67,60 +78,20 @@ export default async function WalletPage({ params, searchParams }: Props) {
   // A redirect keeps the query as it came.
   const keep = sp.size ? `?${sp.toString()}` : "";
   const typed = decodeURIComponent(raw).trim();
-  if (ENS.test(typed) && typed.length >= 7) {
+  // Only an explorer's own listing is linked back to.
+  const entry = protocolForPathname(from?.split("?")[0] ?? null);
+  const back = entry ? { href: entry.href, name: explorerName(entry) } : null;
+  if (isWalletEnsName(typed)) {
     const resolved = await resolveEnsAddress(typed.toLowerCase());
-    if (!resolved || !ADDRESS.test(resolved)) notFound();
+    if (!resolved || !ADDRESS.test(resolved)) return <WalletUnresolved name={typed.toLowerCase()} back={back} />;
     redirect(`/wallet/${resolved.toLowerCase()}${keep}`);
   }
   if (!ADDRESS.test(typed)) notFound();
   const address = typed.toLowerCase();
   if (address !== typed) redirect(`/wallet/${address}${keep}`);
-  // Only an explorer's own listing is linked back to.
-  const entry = protocolForPathname(from?.split("?")[0] ?? null);
-  const back = entry ? { href: entry.href, name: explorerName(entry) } : null;
 
   const ip = await readerIpFromHeaders();
   const protocol = walletProtocol(sp.get("protocol"))?.slug;
-
-  if (protocol && LISTED_ON_WALLET.has(protocol)) {
-    // The protocol's listing for this wallet: its first page read here, as
-    // the listing's page reads it, and the summary rows' counts for the
-    // Protocol pill (no head read).
-    const dims = walletLiquityV2Dimensions(address);
-    const { filters, page } = ssrDecode(dims, sp, WALLET_LIQUITY_V2_DEFAULTS);
-    let passedOn = 0;
-    const [initial, counts, names] = await Promise.all([
-      ssrInitial({
-        dims,
-        defaults: WALLET_LIQUITY_V2_DEFAULTS,
-        filters,
-        page,
-        label: "Wallet Liquity V2",
-        fetchPage: (baseUrl, signal, headers) =>
-          fetchTroves({ ...walletLiquityV2FetchParams(address, filters, page), baseUrl, signal, headers }).then((r) => {
-            passedOn = r.pagination.passedOn;
-            return { data: r.data, total: r.pagination.total };
-          }),
-      }),
-      readWalletCounts(address, ip),
-      resolveEnsNames([address]).catch(() => ({}) as Record<string, string | null>),
-    ]);
-    const held = WALLET_PROTOCOLS.map((p) => ({
-      slug: p.slug,
-      name: p.name,
-      positions: counts.families.filter((f) => f.family === p.slug).reduce((s, f) => s + f.positions, 0),
-    })).filter((p) => p.positions > 0);
-    return (
-      <WalletProtocolListing
-        address={address}
-        ensName={names[address] ?? null}
-        held={held}
-        {...initial}
-        initialPassedOn={passedOn}
-        initialSearch={sp.toString()}
-      />
-    );
-  }
 
   // The CoW row (W7) streams in after the page: started here, awaited by the
   // view under its own Suspense, never by the page; not read where one

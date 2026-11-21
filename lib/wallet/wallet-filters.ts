@@ -1,9 +1,7 @@
 // The wallet page's filters (ui-jobs 738): the Protocol pill and the
 // position-kind pill, as URL params `protocol` and `kind`. With one protocol
 // chosen the page reads that protocol alone (lib/wallet/read-wallet.ts,
-// `readWallet(…, { protocol })`); a protocol with a listing on the wallet
-// page (Liquity V2) draws its listing's pills and sort there
-// (components/wallet/wallet-protocol-listing.tsx). Client-safe: no reads.
+// `readWallet(…, { protocol })`). Client-safe: no reads.
 
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
@@ -40,9 +38,9 @@ export const WALLET_PROTOCOLS: WalletProtocol[] = [
   { slug: "makerdao", name: "MakerDAO", kinds: ["vaults"] },
   { slug: "spark", name: "SparkLend", kinds: ["loans", "deposits"] },
   { slug: "fluid", name: "Fluid", kinds: ["vaults"] },
-  { slug: "ebisu", name: "Ebisu", kinds: ["troves"] },
-  { slug: "asymmetry", name: "Asymmetry", kinds: ["troves"] },
-  { slug: "basedollar", name: "Basedollar", kinds: ["troves"] },
+  { slug: "ebisu", name: "Ebisu", kinds: ["troves", "deposits"] },
+  { slug: "asymmetry", name: "Asymmetry", kinds: ["troves", "deposits"] },
+  { slug: "basedollar", name: "Basedollar", kinds: ["troves", "deposits"] },
 ];
 
 export const walletProtocol = (slug: string | null | undefined): WalletProtocol | undefined =>
@@ -55,8 +53,31 @@ export const walletProtocol = (slug: string | null | undefined): WalletProtocol 
 export const walletPageHref = (protocol: string | undefined, wallet: string | undefined): string | null =>
   wallet && walletProtocol(protocol) ? `/wallet/${encodeURIComponent(wallet)}` : null;
 
-/** The protocols whose wallet view is their listing, with its pills. */
-export const LISTED_ON_WALLET = new Set(["liquity-v2"]);
+/** A wallet address, as the wallet page takes it. */
+export const WALLET_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+
+/** An ENS name the wallet page resolves: no space, ending ".eth", seven
+ *  characters or more. A listing search sends only these to the wallet page. */
+export const isWalletEnsName = (v: string): boolean => /^[^\s]+\.eth$/i.test(v) && v.length >= 7;
+
+/** The families whose listings send a wallet search to the wallet page
+ *  (ui-jobs 738): their Trove and Stability Pool listings. The session id of
+ *  each explorer is its slug here. */
+export const WALLET_SEARCH_FAMILIES = new Set(["liquity-v2", "ebisu", "asymmetry", "basedollar"]);
+
+/** The wallet page for a wallet within one protocol. */
+export const walletProtocolHref = (wallet: string, protocol: string): string =>
+  `/wallet/${encodeURIComponent(wallet.toLowerCase())}?protocol=${protocol}`;
+
+/** Where a listing search lands: the wallet page with the protocol chosen,
+ *  where the search names a whole address or an ENS name and the family's
+ *  listings send a wallet there; null for anything else, which the listing
+ *  searches itself. */
+export function walletSearchHref(protocol: string | undefined, q: string | null | undefined): string | null {
+  if (!protocol || !WALLET_SEARCH_FAMILIES.has(protocol)) return null;
+  const v = (q ?? "").trim();
+  return WALLET_ADDRESS.test(v) || isWalletEnsName(v) ? walletProtocolHref(v, protocol) : null;
+}
 
 /** Fields that name a market's figures or a count, never the account's debt. */
 const NOT_THE_ACCOUNTS = /total|bad_?debt|rate|count|symbol|address|apy|index|share|cap/i;
@@ -126,8 +147,7 @@ export function walletHref(
   const sp = new URLSearchParams();
   if (p) sp.set("protocol", p.slug);
   if (keep.length) sp.set("kind", keep.join(","));
-  // A protocol listed on the page reads its own Status pill.
-  if (status && !(p && LISTED_ON_WALLET.has(p.slug))) sp.set("status", status);
+  if (status) sp.set("status", status);
   const s = sp.toString().replace(/%2C/gi, ",");
   return `/wallet/${address}${s ? `?${s}` : ""}`;
 }

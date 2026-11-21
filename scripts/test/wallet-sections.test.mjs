@@ -182,6 +182,27 @@ test("a section with collateral and no debt figure says so in its band", () => {
   assert.equal(s[0].band.note, "No debt total: an open position's debt states no dollars.");
 });
 
+test("a fork's unpriced deposit leaves the collateral total, keeps the debt total, and is named", () => {
+  const deposit = {
+    kind: "deposits",
+    market: "WBTC Stability Pool",
+    headRead: "none",
+    usdOwnOracle: undefined,
+    card: { kind: "fork-deposit" },
+  };
+  const s = walletSections([pos("ebisu", { collateralUsd: 300, debtUsd: 100 }), pos("ebisu", deposit)], {
+    bands: true,
+  });
+  assert.equal(s[0].collateral, undefined);
+  assert.equal(s[0].debt.usd, 100);
+  assert.equal(s[0].band.legs.map((l) => l.id).join(), "debt");
+  assert.equal(s[0].band.note, "No collateral total: the WBTC Stability Pool deposit states no dollars.");
+  // Deposits alone owe nothing.
+  const only = walletSections([pos("ebisu", deposit)], { bands: true });
+  assert.equal(only[0].debt.usd, 0);
+  assert.equal(only[0].band.note, "No collateral total: the WBTC Stability Pool deposit states no dollars.");
+});
+
 test("an ETH-quoted Comet's head dollars convert through the read's WETH price", async () => {
   const { cometHeadUsd } = await import("../../lib/wallet/comet-head-usd.ts");
   const live = {

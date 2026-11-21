@@ -1,5 +1,5 @@
-// A Liquity V2 WALLET's live share card — what `/ethereum/liquity-v2?q=<holder>`
-// unfurls as. Polaris's twin; the note in
+// A Liquity V2 WALLET's live share card — what `/wallet/<holder>?protocol=liquity-v2`
+// unfurls as (ui-jobs 738; the listing's `?q=<holder>` redirects there). Polaris's twin; the note in
 // `app/api/share/polaris-wallet/route.tsx` explains why the wallet view's card
 // is a route handler rather than an `opengraph-image.tsx`, and why it reads
 // the backend in process rather than through this deployment's own proxies.

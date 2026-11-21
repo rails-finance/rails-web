@@ -496,7 +496,7 @@ export function SboldVaultPage({
     {
       item: "sp-deposits",
       title: "Stability Pool deposits",
-      subtitle: "The vault's three deposits in the listing",
+      subtitle: "The vault's deposits on its wallet page",
       href: SBOLD_DEPOSITS_HREF,
     },
     {

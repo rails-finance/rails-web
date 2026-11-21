@@ -4,7 +4,10 @@
 // /api/<fork>/troves answers, mig 398) by the fork's listing builder, the
 // step the fork's listing proxy takes. The head read is the listing's own
 // price read: one multicall of the fork's branch PriceFeeds for every Trove
-// at once, which values the collateral and gives the collateral ratio.
+// at once, which values the collateral and gives the collateral ratio. Each
+// fork's Stability Pool deposits come from its deposit listing's route for the
+// wallet (read-wallet.ts, readListingRows) with their stored figures: the
+// forks' deposit listings price nothing, so neither does the wallet page.
 
 import { formerHoldOf, movedHistory } from "@/lib/wallet/moved-row";
 import { buildEbisuTroveRows, type EbisuTroveSummary, type RawEbisuTroveRow } from "@/lib/sources/api/ebisu-troves";
@@ -25,7 +28,8 @@ import { ASYMMETRY_BRANCHES, resolveBranch as asymmetryBranch } from "@/lib/asym
 import { BASEDOLLAR_BRANCHES, resolveBranch as basedollarBranch } from "@/lib/basedollar/asset-catalog";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { WalletCard, WalletPosition } from "@/lib/wallet/types";
-import { amountText, historyBase, plural, storeStamp, type WalletSummaryRow } from "@/lib/wallet/summary-row";
+import { amountText, historyBase, plural, scaled, storeStamp, type WalletSummaryRow } from "@/lib/wallet/summary-row";
+import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import type { FamilyModule, HeadResult } from "./module";
 
 type ForkSummary = EbisuTroveSummary | AsymmetryTroveSummary | BasedollarTroveSummary;
@@ -186,3 +190,54 @@ export const basedollar = forkModule<RawBasedollarTroveRow, BasedollarTroveSumma
   build: buildBasedollarTroveRows,
   mcr: (c) => basedollarBranch(c)?.mcr,
 });
+
+/** A fork's Stability Pool deposits: the deposit card, and for a closed one
+ *  what it put in. No head read: the card states the stored figures. */
+function forkDepositModule(
+  fork: ForkKind,
+  name: string,
+  chain: ChainId,
+  summaryChain: WalletSummaryRow["chain"],
+  stable: string,
+): FamilyModule {
+  return {
+    id: `${fork}-sp`,
+    name,
+    chain,
+    summaryChain,
+    summaryFamily: fork,
+    summaryKind: "deposits",
+    async shape(rows) {
+      return rows.map((r): WalletPosition => {
+        const d = r.card as LiquityV2DepositRow<string>;
+        const p: WalletPosition = {
+          chain,
+          family: fork,
+          familyName: name,
+          market: `${d.collateral_type} Stability Pool`,
+          positionId: r.positionId,
+          href: r.href,
+          status: r.status,
+          card: { kind: "fork-deposit", fork, row: d },
+          kind: "deposits",
+          headRead: "none",
+          ...storeStamp(r),
+        };
+        if (r.status === "open") return p;
+        const total = scaled(d.deposited_raw, 18);
+        return {
+          ...p,
+          history: {
+            ...historyBase(r),
+            size: total > 0 ? amountText(total, stable) : undefined,
+            sizeNote: total > 0 ? "deposited in all" : undefined,
+          },
+        };
+      });
+    },
+  };
+}
+
+export const ebisuDeposits = forkDepositModule("ebisu", "Ebisu", MAINNET_CHAIN_ID, "ethereum", "ebUSD");
+export const asymmetryDeposits = forkDepositModule("asymmetry", "Asymmetry", MAINNET_CHAIN_ID, "ethereum", "USDaf");
+export const basedollarDeposits = forkDepositModule("basedollar", "Basedollar", BASE_CHAIN_ID, "base", "BD");

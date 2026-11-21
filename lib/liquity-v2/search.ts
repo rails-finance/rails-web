@@ -28,12 +28,3 @@ export function namesIdentity(q: string | undefined): boolean {
   const { troveId, ownerAddress, ownerEns } = parseTroveSearch(q ?? "");
   return Boolean(troveId ?? ownerAddress ?? ownerEns);
 }
-
-/** True when the query names a HOLDER specifically — an address or an ENS
- *  name, not a trove id. The holder strip mounts on this and nothing else: a
- *  trove-id search is one position, and a wallet summary over it would say
- *  nothing the card does not. */
-export function namesHolder(q: string | undefined): boolean {
-  const { ownerAddress, ownerEns } = parseTroveSearch(q ?? "");
-  return Boolean(ownerAddress ?? ownerEns);
-}

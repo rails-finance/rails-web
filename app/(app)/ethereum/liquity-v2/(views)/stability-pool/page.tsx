@@ -1,7 +1,8 @@
 // Liquity V2 Stability Pool deposits (/ethereum/liquity-v2/stability-pool) —
 // server half: decodes the URL, reads the first page through this
 // deployment's proxy, and hands it to the client half (sp-listing.tsx) as
-// first paint.
+// first paint. A depositor search redirects to the wallet page before this
+// renders (proxy.ts, ui-jobs 738).
 
 import { SpListing } from "./sp-listing";
 import { fetchSpPage, spListDimensions, SP_LIST_DEFAULTS } from "@/lib/liquity-v2/sp-listing";

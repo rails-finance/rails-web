@@ -1,7 +1,6 @@
 // The Liquity V2 forks: a deposit answer scaled to 1e18 where a branch is 8
-// decimals (lib/liquity-v2/sp-decimals.ts), and the fork holder strip across
-// Troves and deposits, debt never summed with a deposit (rails-ops
-// TO-DO-stability-pool-deposits §1b, §3). Imports through `@/` resolve as in
+// decimals (lib/liquity-v2/sp-decimals.ts; rails-ops
+// TO-DO-stability-pool-deposits §3). Imports through `@/` resolve as in
 // liquity-v1-holder-strip.test.mjs.
 // Run: npm test
 import test from "node:test";
@@ -34,7 +33,6 @@ export async function resolve(spec, ctx, next) {
 register("data:text/javascript," + encodeURIComponent(hook));
 
 const { toE18, priceToE18, scaleSpAnswer } = await import(ROOT + "lib/liquity-v2/sp-decimals.ts");
-const { liquityForkHolderStrip } = await import(ROOT + "lib/liquity-fork/holder-strip.ts");
 const { depositNow, depositLifetime } = await import(ROOT + "lib/liquity-v2/sp-math.ts");
 
 const E18 = "000000000000000000";
@@ -119,88 +117,4 @@ test("the index and the chain, both scaled, agree: the index-lag line stays away
     yieldGainRaw: "0",
   };
   assert.notEqual(depositNow(depositLifetime(position), chain), null);
-});
-
-const trove = (status, collateralType, collateral, debt, extra = {}) => ({
-  status,
-  collateralType,
-  collateral,
-  debt,
-  ...extra,
-});
-const deposit = (status, amount) => ({
-  status,
-  collateral_type: "WBTC",
-  depositor: "0xw",
-  deposit_raw: status === "open" ? `${amount}${E18}` : "0",
-});
-const OPTS = { protocol: "ebisu", stable: "ebUSD", wallet: "0xw" };
-
-test("Troves and deposits: counts across kinds; debt and the deposit are two legs", () => {
-  const s = liquityForkHolderStrip(
-    [trove("open", "WBTC", 0.5, 1000), trove("closed", "WBTC", 0, 0)],
-    { rows: [deposit("open", 250), deposit("closed")], total: 2 },
-    OPTS,
-  );
-  assert.equal(
-    s.countsLine,
-    "This wallet holds 1 open Trove and has closed 1. It has 1 Stability Pool deposit and has closed 1.",
-  );
-  assert.deepEqual(
-    s.legs.map((l) => l.id),
-    ["collateral", "debt", "deposit"],
-  );
-  assert.equal(s.legs[1].value, "1,000 ebUSD");
-  assert.equal(s.legs[2].value, "250 ebUSD");
-  assert.equal(s.positions, 4);
-  assert.deepEqual(s.kinds, [{ id: "deposit", noun: ["deposit", "deposits"], open: 1, closed: 1 }]);
-});
-
-test("a Trove the wallet moved on is not counted; collateral across branches has no total", () => {
-  const s = liquityForkHolderStrip(
-    [
-      trove("open", "WBTC", 1, 10),
-      trove("open", "weETH", 2, 10),
-      trove("open", "LBTC", 9, 9, { formerHold: { movedTo: "0xo" } }),
-    ],
-    undefined,
-    OPTS,
-  );
-  assert.equal(s.counts.open, 2);
-  assert.equal(s.kinds, undefined);
-  assert.match(s.legs[0].value, /WBTC · .*weETH/);
-  assert.equal(s.positions, 2);
-});
-
-test("deposits alone: the strip says the wallet holds no open Troves, and links its wallet page", () => {
-  const s = liquityForkHolderStrip([], { rows: [deposit("open", 5)], total: 1 }, OPTS);
-  assert.equal(s.countsLine, "This wallet holds no open Troves. It has 1 Stability Pool deposit.");
-  assert.deepEqual(
-    s.legs.map((l) => l.id),
-    ["deposit"],
-  );
-});
-
-test("an Ebisu Trove on an emptied branch: recorded collateral, the shutdown and the pool at 0", () => {
-  const s = liquityForkHolderStrip([trove("open", "stcUSD", 14404.93, 10804.25)], undefined, OPTS);
-  const coll = s.legs[0];
-  assert.equal(coll.label, "Recorded collateral");
-  assert.equal(coll.footnote.text, "Shut down 20 Aug 2026 · pool holds 0 stcUSD");
-  assert.match(coll.prov.summary, /record/);
-  assert.match(coll.prov.summary, /held 0 stcUSD since/);
-  assert.match(coll.tip, /pool holds 0/);
-  // A live branch elsewhere keeps "Total collateral".
-  const live = liquityForkHolderStrip([trove("open", "WETH", 1, 10)], undefined, { ...OPTS, protocol: "basedollar" });
-  assert.equal(live.legs[0].label, "Total collateral");
-  assert.equal(live.legs[0].footnote, undefined);
-});
-
-test("a Trove read short of the fork's total states the counts and no totals", () => {
-  const s = liquityForkHolderStrip([trove("open", "WBTC", 1, 10)], undefined, {
-    ...OPTS,
-    trovesPartial: { read: 500 },
-  });
-  assert.equal(s.truncated, true);
-  assert.deepEqual(s.legs, []);
-  assert.match(s.note, /first 500/);
 });

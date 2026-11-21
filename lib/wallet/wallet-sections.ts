@@ -104,6 +104,14 @@ const dollarsOf = (p: WalletPosition, field: "collateralUsd" | "debtUsd") =>
   p[field] ??
   (field === "debtUsd" && (p.kind === "deposits" || p.kind === "stakes") && p.headRead !== "read" ? 0 : undefined);
 
+/** A deposit or stake with no head read and no debt figure: it owes nothing. */
+const owesNothingUnread = (p: WalletPosition) =>
+  (p.kind === "deposits" || p.kind === "stakes") && p.headRead !== "read" && p.debtUsd == null;
+
+/** The position states its dollars in the field at the protocol's oracle. */
+const stated = (p: WalletPosition, field: "collateralUsd" | "debtUsd") =>
+  p.usdOwnOracle === true && dollarsOf(p, field) != null;
+
 /** The label a receipt row gives one position: its market, or its id. */
 const positionLabel = (p: WalletPosition) => {
   // A stake's id is "stake:<address>", apart from the address's deposit.
@@ -115,11 +123,15 @@ const positionLabel = (p: WalletPosition) => {
  *  states it at the source its row names, to the cent. */
 function sumOfCards(
   name: string,
-  open: WalletPosition[],
+  held: WalletPosition[],
   field: "collateralUsd" | "debtUsd",
 ): SectionFigure | undefined {
-  if (open.length === 0) return undefined;
-  if (!open.every((p) => p.usdOwnOracle && dollarsOf(p, field) != null)) return undefined;
+  if (held.length === 0) return undefined;
+  // A deposit or stake no head read prices (a fork's deposit) owes nothing:
+  // it leaves the debt sum, and a section of them alone owes none.
+  const open = field === "debtUsd" ? held.filter((p) => !owesNothingUnread(p)) : held;
+  if (open.length === 0) return zeroDebt(name);
+  if (!open.every((p) => stated(p, field))) return undefined;
   const word = field === "collateralUsd" ? "collateral" : "debt";
   const deposits = field === "collateralUsd" && open.every((p) => p.kind === "deposits");
   // A position whose dollars come from more than one source (a deposit's
@@ -412,7 +424,14 @@ export function walletSections(
       // One figure stands: the band says the other states none, so a lone
       // "Total collateral" never reads as owing nothing.
       const missing = collateral == null ? "collateral" : "debt";
-      band = { ...band, note: `No ${missing} total: an open position's ${missing} states no dollars.` };
+      const field = missing === "collateral" ? "collateralUsd" : "debtUsd";
+      const lacking = open.filter((p) => !stated(p, field) && !(field === "debtUsd" && owesNothingUnread(p)));
+      // Unpriced deposits are named (a fork's deposit states no dollars).
+      const named =
+        lacking.length > 0 && lacking.every((p) => p.kind === "deposits" && p.market)
+          ? `${andList(lacking.map((p) => `the ${p.market} deposit`))} ${lacking.length === 1 ? "states" : "state"} no dollars`
+          : `an open position's ${missing} states no dollars`;
+      band = { ...band, note: `No ${missing} total: ${named}.` };
     }
     if (!opts.bands) band = { ...band, positions: 0 };
     sections.push({

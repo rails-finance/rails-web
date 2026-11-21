@@ -75,7 +75,7 @@ export function liquityShareCardModel(
   };
 }
 
-/** The WALLET's card — what `/ethereum/liquity-v2?q=<holder>` unfurls as.
+/** The WALLET's card — what `/wallet/<holder>?protocol=liquity-v2` unfurls as.
  *
  *  Built from the SAME adapter the wallet view mounts above its cards
  *  (`liquityV2HolderStrip`), so the card and the page can never state different

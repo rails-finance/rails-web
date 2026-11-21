@@ -64,7 +64,10 @@ export type WalletCard =
   | { kind: "liquity-v1-stake"; row: LiquityV1StakeRow; head?: LiquityV1StakeChain }
   | { kind: "ebisu"; row: EbisuTroveSummary }
   | { kind: "asymmetry"; row: AsymmetryTroveSummary }
-  | { kind: "basedollar"; row: BasedollarTroveSummary };
+  | { kind: "basedollar"; row: BasedollarTroveSummary }
+  /** A Liquity V2 fork's Stability Pool deposit: its deposit listing's row,
+   *  as stored (no head read). */
+  | { kind: "fork-deposit"; fork: "ebisu" | "asymmetry" | "basedollar"; row: LiquityV2DepositRow<string> };
 
 /** A closed position's row in the History table: what the store states, each
  *  field absent where it states nothing. */
@@ -170,7 +173,9 @@ export interface WalletFamilyRead {
   error?: string;
   /** A listing read that did not answer (read-wallet.ts, readListingRows):
    *  the protocol's slug and what it would have read ("Liquity V1 Troves"). */
-  unanswered?: { family: string; what: string };
+  /** `total: false` where the read cannot hold a position the wallet total
+   *  needs: a fork's deposit read for a wallet holding nothing on that fork. */
+  unanswered?: { family: string; what: string; total?: false };
 }
 
 /** The answer of /api/chain/wallet/<address>. */
