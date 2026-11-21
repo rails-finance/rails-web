@@ -300,6 +300,19 @@ function Sheet<F>({
     editsRef.current = e;
     setEdits(e);
   };
+  // A dimension the listing moved while the sheet is open (a type hidden from
+  // a row's ⋮) takes the listing's value: its edit goes.
+  const seenApplied = useRef(applied);
+  useLayoutEffect(() => {
+    const was = seenApplied.current;
+    seenApplied.current = applied;
+    if (was === applied || editsRef.current.size === 0) return;
+    const e = new Map(editsRef.current);
+    for (const d of dimensionsRef.current) if (e.has(d.id) && !sameValues(d.get(was), d.get(applied))) e.delete(d.id);
+    if (e.size === editsRef.current.size) return;
+    editsRef.current = e;
+    setEdits(e);
+  }, [applied]);
   const isDirty = (base: F, e: ReadonlyMap<string, string[]>) =>
     dimensionsRef.current.some((d) => e.has(d.id) && !sameValues(e.get(d.id)!, d.get(base)));
   // Each range row's pending slider move, written before Show.
@@ -317,12 +330,18 @@ function Sheet<F>({
 
   // The draft's count, read after a short pause; null until it lands (or
   // when the read fails, and the button then names no figure).
-  const [draftCount, setDraftCount] = useState<number | null>(count?.total ?? null);
+  const [draftCount, setDraftCount] = useState<number | null>(null);
   const [draftPending, setDraftPending] = useState(false);
   const countForRef = useRef(countFor);
   countForRef.current = countFor;
   useEffect(() => {
-    if (!dirty || !countForRef.current) return;
+    // Unedited there is no draft figure: the next first edit starts from none.
+    if (!dirty) {
+      setDraftCount(null);
+      setDraftPending(false);
+      return;
+    }
+    if (!countForRef.current) return;
     let cancelled = false;
     setDraftPending(true);
     const t = window.setTimeout(() => {
@@ -488,8 +507,9 @@ function Sheet<F>({
     onChange(next);
   };
 
-  // Unedited, the listing's own count; edited, the draft's once read (the
-  // last figure stays, dimmed, while a read is in flight).
+  // Unedited, the listing's count; edited, the draft's once read: "Apply",
+  // dimmed, until the first figure lands, and after it the last figure,
+  // dimmed, while a read is in flight.
   const shown = dirty ? (countFor ? draftCount : null) : (count?.total ?? null);
   const pending = dirty ? draftPending : countPending;
   const noun = count ? (dirty && nounFor ? nounFor(filters) : count.noun) : "";

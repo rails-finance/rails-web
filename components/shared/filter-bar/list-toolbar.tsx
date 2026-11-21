@@ -198,18 +198,20 @@ export function ListToolbar<F extends BaseListFilters>({
         {/* The shared search's look (H15); the listing's own behaviour: the
             query filters this explorer, family identifiers included. */}
         {search && searchOpen && (
-          <SearchBox
-            value={filters.q}
-            onChange={(q) => onChange({ ...filters, q })}
-            placeholder={searchPlaceholder}
-            size="pill"
-            anatomy="N1.1 H15"
-            inputRef={searchRef}
-            onKeyDown={onSearchKeyDown}
-            onFocus={() => setSearchOpened(true)}
-            onBlur={() => setSearchOpened(false)}
-            className={`max-sm:basis-full sm:min-w-[220px] sm:flex-[0_1_300px] ${PANEL_OPEN_DIM}`}
-          />
+          <div className="contents" inert={panelOpen}>
+            <SearchBox
+              value={filters.q}
+              onChange={(q) => onChange({ ...filters, q })}
+              placeholder={searchPlaceholder}
+              size="pill"
+              anatomy="N1.1 H15"
+              inputRef={searchRef}
+              onKeyDown={onSearchKeyDown}
+              onFocus={() => setSearchOpened(true)}
+              onBlur={() => setSearchOpened(false)}
+              className={`max-sm:basis-full sm:min-w-[220px] sm:flex-[0_1_300px] ${PANEL_OPEN_DIM}`}
+            />
+          </div>
         )}
         {/* Below sm one sideways-scrolling row with a fade at its right edge;
             from sm its pills join the wrapping row (display: contents). */}

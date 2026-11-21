@@ -753,7 +753,11 @@ export function TimelineToolbar({
                 count={draftBase}
                 countFor={countFor}
                 slot={sheetSlot}
-                onPanelOpenChange={setPanelOpen}
+                onPanelOpenChange={(o) => {
+                  setPanelOpen(o);
+                  // One editor at a time: the Date navigator closes.
+                  if (o && tl.heatmapOpen) tl.toggleHeatmap();
+                }}
               />
               <TimelineAxisPills model={model} count={draftBase} countFor={countFor} inert={panelOpen} />
               {/* At rest the Date is a round icon button (ui-jobs 801), in the
@@ -798,7 +802,11 @@ export function TimelineToolbar({
                 />
               )}
               {!tl.datesAxis && datesHeld && <FilterPillReserve name="Date" />}
-              {!tl.datesAxis && cutPill}
+              {!tl.datesAxis && cutPill != null && (
+                <div className="contents" inert={panelOpen}>
+                  {cutPill}
+                </div>
+              )}
               <span className="w-6 shrink-0 sm:hidden" aria-hidden="true" />
             </div>
             <div
