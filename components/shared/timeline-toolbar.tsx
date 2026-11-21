@@ -743,23 +743,29 @@ export function TimelineToolbar({
             >
               <TimelineFilterSheet model={model} count={draftBase} countFor={countFor} slot={sheetSlot} />
               <TimelineAxisPills model={model} count={draftBase} countFor={countFor} />
+              {/* At rest the Date is a round icon button (ui-jobs 801), in the
+                  pill's wrapper so its hooks stand where a pill's do. */}
               {tl.datesAxis && !filterActive && (
-                <button
-                  type="button"
-                  onClick={tl.toggleHeatmap}
-                  className={PILL_ICON_BUTTON}
-                  aria-haspopup="dialog"
-                  aria-expanded={datePanelOpen}
-                  aria-label="Add Date filter"
-                  title="Date"
+                <div
+                  className="relative shrink-0"
                   data-filter-pill="Date"
                   data-pill-state="unset"
-                  data-pill-open=""
-                  data-date-control=""
                   data-anatomy="N1.10 L1.7"
                 >
-                  <CalendarDays className="w-[18px] h-[18px]" aria-hidden="true" />
-                </button>
+                  <button
+                    type="button"
+                    onClick={tl.toggleHeatmap}
+                    className={PILL_ICON_BUTTON}
+                    aria-haspopup="dialog"
+                    aria-expanded={datePanelOpen}
+                    aria-label="Add Date filter"
+                    title="Date"
+                    data-pill-open=""
+                    data-date-control=""
+                  >
+                    <CalendarDays className="w-[18px] h-[18px]" aria-hidden="true" />
+                  </button>
+                </div>
               )}
               {tl.datesAxis && filterActive && (
                 <FilterPill
