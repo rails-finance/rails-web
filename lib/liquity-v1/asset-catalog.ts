@@ -15,6 +15,9 @@ export const LIQUITY_V1_ADDRESSES = {
   BORROWER_OPERATIONS: "0x24179cd81c9e782a4096035f7ec97fb8b783e007",
   /** StabilityPool — LUSD deposits absorb liquidated debt, earn ETH. */
   STABILITY_POOL: "0x66017d22b0f8556afdd19fc67041899eb65a21bb",
+  /** LQTYStaking — LQTY stakes, paid the protocol's ETH redemption fees and
+   *  LUSD borrowing fees (docs.liquity.org, "lqtyStaking"; TroveManager.lqtyStaking()). */
+  LQTY_STAKING: "0x4f9fbb3f1e99b56e0fe2892e623ed36a76fc605d",
   /** PriceFeed — the protocol's own ETH:USD oracle (Chainlink + Tellor fallback).
    *  Named by TroveManager.priceFeed(); verified by scripts/verify-liquity-v1-chain.mjs. */
   PRICE_FEED: "0x4c517d4e2c851ca76d7ec94b805269df0f2201de",

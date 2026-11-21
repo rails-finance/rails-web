@@ -801,6 +801,7 @@ const SPECS: ProtocolSpec[] = [
     subPages: [
       { segment: "system", label: "System overview", tab: "System" },
       { segment: "stability-pool", label: "Stability Pool deposits", tab: "Stability Pool" },
+      { segment: "staking", label: "LQTY stakes", tab: "Staking" },
       { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },
