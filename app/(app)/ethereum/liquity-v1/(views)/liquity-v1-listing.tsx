@@ -13,7 +13,15 @@ import { useUrlSearchParams } from "@/lib/shared/use-url-search-params";
 import { readListQuery } from "@/lib/shared/list-filter";
 import { fetchLiquityV1Positions } from "@/lib/api/fetch-liquity-v1-positions";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
-import { LiquityV1PositionCard, viewFromSummary } from "@/components/protocol/liquity-v1/liquity-v1-position-card";
+import { HolderStrip } from "@/components/shared/holder-strip";
+import { HolderKinds, useHolderKinds } from "@/components/shared/holder-kinds";
+import { liquityV1HolderStrip } from "@/lib/liquity-v1/holder-strip";
+import {
+  LIQUITY_V1_DEPOSITS,
+  liquityV1TroveCard,
+  liquityV1TroveHref,
+  liquityV1TroveKey,
+} from "@/lib/liquity-v1/holder-kinds";
 import {
   liquityV1ListDimensions,
   liquityV1FiltersToFetchParams,
@@ -30,9 +38,39 @@ export interface LiquityV1ListingProps {
   initialSearch?: string;
 }
 
+const OTHER_KINDS = [LIQUITY_V1_DEPOSITS];
+const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+
 export function LiquityV1Listing({ initialItems, initialTotal, initialKey, initialSearch }: LiquityV1ListingProps) {
   // A wallet search rests on every status (liquityV1ListDefaults).
-  const defaults = liquityV1ListDefaults(readListQuery(useUrlSearchParams(initialSearch ?? "")));
+  const q = readListQuery(useUrlSearchParams(initialSearch ?? ""));
+  const defaults = liquityV1ListDefaults(q);
+  // The wallet's deposit, under the rows and counted in the strip (§1b).
+  const { reads } = useHolderKinds(OTHER_KINDS, q);
+  const deposits = reads[LIQUITY_V1_DEPOSITS.id];
+
+  // The strip states the wallet, so it mounts only where the page is the
+  // wallet's whole set of Troves: the search names an address and no pill
+  // narrows the rows.
+  const holderStrip = (items: LiquityV1PositionSummary[], total: number, f: LiquityV1ListFilters) =>
+    ADDRESS.test(f.q.trim()) &&
+    f.status.length === 0 &&
+    !f.liquidations.length &&
+    !f.redemptions.length &&
+    !f.debt.length &&
+    !f.coll.length &&
+    !f.tx.length &&
+    deposits &&
+    deposits !== "failed" ? (
+      <HolderStrip
+        {...liquityV1HolderStrip(
+          { rows: items, total },
+          deposits as Parameters<typeof liquityV1HolderStrip>[1],
+          f.q.trim(),
+        )}
+      />
+    ) : null;
+
   return (
     <ChainTruthListingPage<LiquityV1PositionSummary, LiquityV1ListFilters>
       title="Liquity V1 Troves"
@@ -41,15 +79,9 @@ export function LiquityV1Listing({ initialItems, initialTotal, initialKey, initi
       defaults={defaults}
       sortOptions={LIQUITY_V1_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"
-      renderCard={(p) => (
-        <LiquityV1PositionCard
-          v={viewFromSummary(p)}
-          surface="listing"
-          endedBy={p.closedByRedemption ? "redemption" : null}
-        />
-      )}
-      hrefFor={(p) => `/ethereum/liquity-v1/${p.wallet}?epoch=${p.epoch}`}
-      keyFor={(p) => `${p.wallet}-${p.epoch}`}
+      renderCard={liquityV1TroveCard}
+      hrefFor={liquityV1TroveHref}
+      keyFor={liquityV1TroveKey}
       strategy={serverStrategy<LiquityV1PositionSummary, LiquityV1ListFilters>({
         dimensions: liquityV1ListDimensions(),
         itemsPerPage: LIQUITY_V1_ITEMS_PER_PAGE,
@@ -59,6 +91,8 @@ export function LiquityV1Listing({ initialItems, initialTotal, initialKey, initi
             total: r.pagination.total,
           })),
       })}
+      renderAbove={({ items, total, filters }) => holderStrip(items, total, filters)}
+      renderBelow={(f) => <HolderKinds kinds={OTHER_KINDS} reads={reads} q={f.q} />}
       initialItems={initialItems}
       initialTotal={initialTotal}
       initialKey={initialKey}
