@@ -68,6 +68,7 @@ import { AAVE_V3_ARBITRUM_SYMBOL_BY_ADDR } from "@/lib/aave-v3-arbitrum/asset-ca
 import { COMPOUND_ARBITRUM_DEPLOYMENT } from "@/lib/compound-arbitrum/asset-catalog";
 import { COLLATERAL_PARAM as COMPOUND_ARBITRUM_COLLATERAL_PARAM } from "@/lib/compound-arbitrum/comet-cards";
 import { COLLATERAL_PARAM, collateralOptions } from "@/lib/shared/collateral-facet";
+import { everyStatusParam } from "@/lib/shared/status-choice";
 import { MORPHO_ARBITRUM_MARKETS } from "@/lib/morpho-arbitrum/market-catalog";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -277,7 +278,7 @@ function liquidated(): ResultRow[] {
     if (history) {
       // Every status, so a position liquidated and then closed is listed too.
       const params: Record<string, string> = { [history.param]: history.value };
-      if (status?.options?.length) params.status = status.options.map((o) => o.value).join(",");
+      if (status?.options?.length) params.status = everyStatusParam(status.options.map((o) => o.value));
       rows.push({ entry, href: withParams(entry, params), applied: true, source: "the listing's liquidation filter" });
     } else if (status && offers(dims, "status", spec.status)) {
       rows.push({

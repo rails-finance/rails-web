@@ -44,12 +44,12 @@ import type {
   AaveV3PositionSort,
 } from "@/lib/api/fetch-aave-v3-positions";
 import {
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  isAllStatuses,
-  sameStatusSet,
+  aaveV3StatusBuckets,
+  defaultStatusChoice,
+  endedByLiquidation,
+  statusChoice,
 } from "@/lib/aave-v3/listing-visibility";
+import { ENDED_BY_LIQUIDATION, readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** The Transactions slider's top on Ethereum: the round number above the
  *  busiest listed position (76,778 transactions, 16 Oct 2026). */
@@ -59,8 +59,11 @@ const AAVE_V3_TX_TOP = 100000;
 export const AAVE_V3_ITEMS_PER_PAGE = 20;
 
 export interface AaveV3ListFilters extends BaseListFilters {
-  /** open / closed / liquidated — lifecycle status (multi-select). */
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
+  /** "" | "liquidated" — with Closed, the positions that ended by liquidation.
+   *  URL param `ended`. */
+  ended: string[];
   /** core / prime / etherfi — single-select market (stored as an array). */
   market: string[];
   /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
@@ -86,6 +89,7 @@ export const AAVE_V3_LIST_DEFAULTS: AaveV3ListFilters = {
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
+  ended: [],
   market: [],
   debt: [],
   coll: [],
@@ -100,12 +104,6 @@ export const AAVE_V3_SORT_OPTIONS: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },
   { value: "debt", label: "Debt" },
   { value: "coll", label: "Collateral" },
-];
-
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated" },
 ];
 
 const MARKET_OPTIONS: FilterOptionDef[] = [
@@ -140,16 +138,25 @@ export function aaveV3ListDimensions(
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
+      options: STATUS_CHOICE_OPTIONS,
+      // One choice of three in the filter panel, each with its count, and no
+      // pill in the row (ui-jobs 805).
+      segmented: true,
+      optionCounts: true,
+      pill: false,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses.
       set: (f, v) => {
-        const sel = canonicalStatuses(v);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
+        const read = readStatusParam(v);
+        const choice = read.choice ?? defaultStatusChoice(f);
+        return {
+          ...f,
+          status: choice === defaultStatusChoice(f) ? [] : [choice],
+          ended: choice !== "closed" ? [] : read.endedByLiquidation ? [ENDED_BY_LIQUIDATION] : f.ended,
+        };
       },
     },
     {
@@ -172,7 +179,7 @@ export function aaveV3ListDimensions(
     }),
     {
       id: "liquidations",
-      label: "History",
+      label: "Liquidated before",
       group: "History",
       cardinality: "single",
       param: "liq",
@@ -180,6 +187,19 @@ export function aaveV3ListDimensions(
       get: (f) => f.liquidations,
       set: (f, v) => ({ ...f, liquidations: v }),
       chipLabel: () => "Liquidated before",
+    },
+    {
+      id: "ended",
+      label: "Closed by liquidation",
+      group: "History",
+      cardinality: "single",
+      param: "ended",
+      options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
+      // Offered with Closed, which it narrows.
+      available: (f) => statusChoice(f) === "closed",
+      get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
+      set: (f, v) => ({ ...f, ended: v }),
+      chipLabel: () => "Closed by liquidation",
     },
     {
       id: "supplying",
@@ -212,8 +232,8 @@ export function aaveV3FiltersToFetchParams(filters: AaveV3ListFilters, page: num
   const wallet = filters.q.trim();
   return {
     wallet: wallet ? wallet : undefined,
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // All maps to no status filter; Closed asks for closed and liquidated.
+    status: aaveV3StatusBuckets(filters) as FetchAaveV3PositionsParams["status"],
     market: filters.market[0] || undefined,
     debt: debtFacet(filters.debt),
     ...usdBounds(filters),

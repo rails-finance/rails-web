@@ -4,73 +4,57 @@
 // shows the positions still open; a search naming a holder shows every status. The argument for
 // it is written once, on the pilot — lib/liquity-v2/listing-visibility.ts.
 //
-// Status is a MULTI-SELECT over the lifecycle vocabulary mv_aave_v3_wallets answers with — open
-// / closed / liquidated — serialized as one comma-separated `status` URL param.
-// (Ever-liquidated is the orthogonal History facet; this axis is the lifecycle.)
+// Status is ONE CHOICE of three (ui-jobs 805; lib/shared/status-choice.ts): Open, Closed or All,
+// one `status` URL value. mv_aave_v3_wallet_markets gives each account one of open / closed /
+// liquidated, so Closed asks for closed and liquidated together, and the "Closed by liquidation"
+// switch (`ended`) narrows Closed to the liquidated ones. (Liquidated before is the orthogonal
+// History switch.)
 //
 // `status` on the filter object carries RAW user intent: [] is "no opinion" and resolves here
-// at read time, a concrete set is an explicit choice. The default is never written into the
-// filter object, so clearing a selection returns to whatever the current context rests on, and
-// an identity search relaxes the view without the reader touching the Status facet. Because the
-// default is contextual rather than a selection it draws NO chip and NO Reset link (the shared
-// driver hides a dimension sitting on its `defaultValues`) and the bare directory URL stays
-// clean.
+// at read time, one value is an explicit choice. The default is never written into the filter
+// object, so an identity search relaxes the view without the reader touching Status, and the
+// bare directory URL stays clean.
 
 import { namesIdentity } from "@/lib/aave-v3/search";
-
-/** The lifecycle buckets the Status facet exposes. */
-export type AaveV3StatusBucket = "open" | "closed" | "liquidated";
-
-/** Canonical order — used for stable URL/chip serialization and set compares. */
-export const ALL_AAVE_V3_STATUS_BUCKETS: AaveV3StatusBucket[] = ["open", "closed", "liquidated"];
-
-export function isAaveV3StatusBucket(v: string): v is AaveV3StatusBucket {
-  return (ALL_AAVE_V3_STATUS_BUCKETS as string[]).includes(v);
-}
-
-/** Reduce an arbitrary token list to valid buckets, deduped, in canonical order. */
-export function canonicalStatuses(values: string[]): AaveV3StatusBucket[] {
-  const set = new Set(values.filter(isAaveV3StatusBucket));
-  return ALL_AAVE_V3_STATUS_BUCKETS.filter((b) => set.has(b));
-}
-
-/** Order-independent equality of two bucket selections. */
-export function sameStatusSet(a: AaveV3StatusBucket[], b: AaveV3StatusBucket[]): boolean {
-  if (a.length !== b.length) return false;
-  const bs = new Set(b);
-  return a.every((x) => bs.has(x));
-}
+import {
+  ENDED_BY_LIQUIDATION,
+  readStatusParam,
+  statusBuckets,
+  statusNoun,
+  type StatusChoice,
+} from "@/lib/shared/status-choice";
 
 /** Just the filter fields visibility depends on — structural, so the page's AaveV3ListFilters
  *  satisfies it without an import cycle. */
 export interface AaveV3VisibilityInput {
   status?: string[];
+  ended?: string[];
   q?: string;
 }
 
 /** The contextual default: the open positions while the search box names no identity, every
  *  status once it does. */
-export function defaultStatuses(f: AaveV3VisibilityInput): AaveV3StatusBucket[] {
-  return namesIdentity(f.q) ? [...ALL_AAVE_V3_STATUS_BUCKETS] : ["open"];
+export function defaultStatusChoice(f: AaveV3VisibilityInput): StatusChoice {
+  return namesIdentity(f.q) ? "all" : "open";
 }
 
-/** The selection actually in effect: an explicit non-empty choice wins; an empty selection
- *  resolves to the contextual default (zero buckets is not a view). */
-export function effectiveStatuses(f: AaveV3VisibilityInput): AaveV3StatusBucket[] {
-  const sel = canonicalStatuses(f.status ?? []);
-  return sel.length > 0 ? sel : defaultStatuses(f);
+/** The choice in effect: an explicit one wins; none resolves to the contextual default. */
+export function statusChoice(f: AaveV3VisibilityInput): StatusChoice {
+  return readStatusParam(f.status ?? []).choice ?? defaultStatusChoice(f);
 }
 
-/** True when the effective selection is the full set — "show everything", which maps to NO
- *  server-side status filter. */
-export function isAllStatuses(f: AaveV3VisibilityInput): boolean {
-  return effectiveStatuses(f).length === ALL_AAVE_V3_STATUS_BUCKETS.length;
+/** The "Closed by liquidation" switch, which narrows Closed alone. */
+export function endedByLiquidation(f: AaveV3VisibilityInput): boolean {
+  return statusChoice(f) === "closed" && (f.ended ?? []).includes(ENDED_BY_LIQUIDATION);
 }
 
-/** The count line on a resting directory: the default narrows the set to the open positions
- *  without drawing a chip, so the line names the filter and where the rest are. An explicit
- *  selection draws its own chips and needs nothing here. */
-export function aaveV3RestingCountLine(f: AaveV3VisibilityInput): { noun: string; note: string } | null {
-  if (canonicalStatuses(f.status ?? []).length > 0 || namesIdentity(f.q)) return null;
-  return { noun: "open positions", note: "closed and liquidated ones are under Status" };
+/** The lifecycle buckets the API is asked for; undefined for no status filter. */
+export function aaveV3StatusBuckets(f: AaveV3VisibilityInput): string[] | undefined {
+  return statusBuckets(statusChoice(f), endedByLiquidation(f));
+}
+
+/** The count line's noun: Status draws no pill, so the line under the results names what is
+ *  shown ("open positions", "closed positions", "positions" for All). */
+export function aaveV3CountLine(f: AaveV3VisibilityInput): { noun: string } {
+  return { noun: statusNoun(statusChoice(f), "positions") };
 }

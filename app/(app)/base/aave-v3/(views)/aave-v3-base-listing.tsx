@@ -5,7 +5,7 @@
 // the Base box and each row's balances from a chain sweep; the coverage banner
 // stating where both stand lives on the rail's /info page with the intro.
 
-import { aaveV3RestingCountLine } from "@/lib/aave-v3/listing-visibility";
+import { aaveV3CountLine } from "@/lib/aave-v3/listing-visibility";
 import { fetchAaveV3Positions, type AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import {
@@ -34,7 +34,7 @@ export function AaveV3BaseListing({ initialItems, initialTotal, initialKey, init
     <ChainTruthListingPage<AaveV3PositionRow, AaveV3ListFilters>
       title="Aave V3 Positions"
       noun="positions"
-      countLine={aaveV3RestingCountLine}
+      countLine={aaveV3CountLine}
       basePath="/base/aave-v3"
       defaults={AAVE_V3_BASE_LIST_DEFAULTS}
       sortOptions={AAVE_V3_BASE_SORT_OPTIONS}

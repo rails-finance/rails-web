@@ -141,7 +141,12 @@ export function ListToolbar<F extends BaseListFilters>({
     searchRef.current?.focus();
   }, [searchOpen]);
 
-  const groups = groupDimensions(dimensions, filters);
+  // A dimension with `pill: false` (Status, ui-jobs 805) has no pill: it is
+  // read and changed in the filter panel, and Clear all leaves it.
+  const groups = groupDimensions(
+    dimensions.filter((d) => d.pill !== false),
+    filters,
+  );
   const pills = groups.map((g) => pillFor(g, filters));
   // The order the set pills were set in: those set on arrival in the fixed
   // order, then each newly set one after them.

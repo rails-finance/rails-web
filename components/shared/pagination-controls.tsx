@@ -30,7 +30,17 @@ export function PaginationControls({
   noun = "positions",
   note,
 }: PaginationControlsProps) {
-  if (totalPages <= 1) return null;
+  // One page: the count alone, so the listing states what is shown where the
+  // toolbar draws no count (ui-jobs 805): "12 open positions".
+  if (totalPages <= 1) {
+    if (totalCount <= 0) return null;
+    return (
+      <div className="mt-8 text-sm text-rb-500" data-anatomy="N3" data-prov-exempt="">
+        {totalCount.toLocaleString("en-US")} {totalCount === 1 ? noun.replace(/s$/, "") : noun}
+        {note ? <> · {note}</> : null}
+      </div>
+    );
+  }
 
   const showingFrom = (currentPage - 1) * itemsPerPage + 1;
   const showingTo = Math.min(currentPage * itemsPerPage, totalCount);

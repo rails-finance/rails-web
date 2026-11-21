@@ -84,6 +84,15 @@ export interface FilterDimension<F> {
   property?: boolean;
   /** Hide from the + Filter menu when false (e.g. Borrowing while Supply-only). */
   available?: (f: F) => boolean;
+  /** A single-choice dimension drawn in the filter panel as one segmented row
+   *  whatever its option count (Status: Open / Closed / All, ui-jobs 805). */
+  segmented?: boolean;
+  /** Each option states the count it would give, beside its label in the
+   *  panel ("Open 110,192"), read through the listing's draft count. */
+  optionCounts?: boolean;
+  /** False: the dimension draws no pill in the toolbar's row in any state; the
+   *  filter panel is where it is read and changed (ui-jobs 805). */
+  pill?: false;
   /** One short line at the foot of the dimension's group panel (the price
    *  source a USD range is valued at). A group draws the first one it holds. */
   panelNote?: ReactNode;
