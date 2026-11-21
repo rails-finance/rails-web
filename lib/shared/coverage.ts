@@ -40,20 +40,25 @@ export type DepthKey =
   | "forensics"
   | "views";
 
-export const CAPABILITIES: { key: DepthKey; label: string; detail: string }[] = [
+/** `label` is the capability's full name (the mobile pills, the tip's title);
+ *  `word` is the matrix's one-word column heading (ui-jobs 796). */
+export const CAPABILITIES: { key: DepthKey; label: string; word: string; detail: string }[] = [
   {
     key: "dashboard",
     label: "Live dashboard",
+    word: "Dashboard",
     detail: "health factor, collateral ratio, rates read live from the protocol's contracts",
   },
   {
     key: "oracleUsd",
     label: "Oracle USD",
+    word: "USD",
     detail: "USD from the protocol's oracle, the prices it liquidates with",
   },
   {
     key: "atBlockPrices",
     label: "Prices at the block",
+    word: "Prices",
     // Orthogonal to `oracleUsd`, which is USD at HEAD: this is the protocol's
     // own oracle read back at each event's block and stored, so a card values
     // the event as the protocol did when it happened. Morpho is `{ why }` on
@@ -63,6 +68,7 @@ export const CAPABILITIES: { key: DepthKey; label: string; detail: string }[] = 
   {
     key: "verification",
     label: "Chain verification",
+    word: "Verified",
     // Two narrowings, 2026-07-20. The claim used to read "the position
     // re-derived … and checked against the index", which a reader could only
     // take as a check running behind the page they were looking at. It isn't:
@@ -77,22 +83,26 @@ export const CAPABILITIES: { key: DepthKey; label: string; detail: string }[] = 
   {
     key: "llm",
     label: "Copy for LLM",
+    word: "LLM",
     detail: "export the position as Markdown or CSV, ready to paste into an LLM or agent context",
   },
   {
     key: "explainers",
     label: "Event explainers",
+    word: "Explainers",
     detail: "a plain-language explainer on every event card",
   },
   {
     key: "forensics",
     label: "Liquidation forensics",
+    word: "Forensics",
     detail:
       "what was seized, the premium paid, health at the moment it fired. Every explorer flags and links liquidations on the timeline",
   },
   {
     key: "views",
     label: "Protocol views",
+    word: "Views",
     detail:
       "protocol-level pages that read the whole system's state live at head: market rosters, branch comparisons, redemption queues, balance sheets. What each explorer's view shows opens from its row of the matrix",
   },

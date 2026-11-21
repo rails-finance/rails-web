@@ -1,6 +1,6 @@
 /**
  * /coverage — cell-anchored popovers for column notes, essay under the name,
- * header-anchored popovers for capability definitions.
+ * a one-word heading tip over each column for its capability's definition.
  *
  * Asserts the current interaction model: an info mark (ⓘ) beside each Protocol
  * views ✓ tick opens a POPOVER pinned to that cell showing the explorer's own
@@ -9,23 +9,24 @@
  * in the same row show two DIFFERENT strings, never a shared one. Separately,
  * EVERY protocol carrying a COVERAGE_NOTES entry (whether or not it also
  * carries a ⊘ cell) gets a "Why not deeper" trigger under its name that opens
- * the full essay as a push-down row. A THIRD grammar sits in `<thead>`: an
- * info mark beside each column's label opens a popover pinned to that header
- * showing `CAPABILITIES[].detail`, sentence-cased for display — what
- * replaced the standalone `<dl>` legend this page used to open with on both
- * viewports. Below md, the definitions live one tap away instead: each
+ * the full essay as a push-down row. In `<thead>` each column heading is one
+ * word (`CAPABILITIES[].word`), the house heading tip (`data-heading-tip`):
+ * a press opens the full name over `CAPABILITIES[].detail`, sentence-cased
+ * (ui-jobs 796). The page has no key: every cell's title names its state,
+ * and a clock cell opens a popover with its state and reason.
+ * Below lg, the definitions live one tap away instead: each
  * included-capability pill on a mobile card is its own trigger, opening a
  * bottom sheet with that capability's `detail` (capability-sheet.tsx) — see
- * mobile()'s own assertions. Single-open accordion across all THREE header/
- * cell/essay grammars; one ground for every row (no stripes), full-bleed
+ * mobile()'s own assertions. Single-open accordion across the cell and essay
+ * grammars; one ground for every row (no stripes), full-bleed
  * colSpan and the house table's hairlines all still hold. The mobile card stack's own disclosure (protocol view
  * + structural note, unrelated to the capability sheet) is unchanged.
  *
  * Visibility is asserted with innerText / bounding boxes, never textContent —
  * textContent returns the text of `display:none` nodes, so a collapsed-panel
  * check written with it passes in every state and can never go red. A cell
- * popover, the essay drawer, and a header popover are all always-mounted-
- * and-hidden, so this discipline is checked on one of each.
+ * popover and the essay drawer are always-mounted-and-hidden, so this
+ * discipline is checked on one of each.
  *
  * Roster and trigger counts are derived from the source modules, never
  * hardcoded.
@@ -188,6 +189,10 @@ const CAP_ENTRIES = [
     /key:\s*"([a-zA-Z0-9]+)"[\s\S]*?label:\s*"([^"]+)"[\s\S]*?detail:\s*\n?\s*"((?:[^"\\]|\\.)*)"/g,
   ),
 ].map(([, key, label, detail]) => ({ key, label, detail }));
+// Each capability's one-word column heading, by key.
+const CAP_WORDS = Object.fromEntries(
+  [...CAP_BLOCK.matchAll(/key:\s*"([a-zA-Z0-9]+)"[\s\S]*?word:\s*"([^"]+)"/g)].map(([, key, word]) => [key, word]),
+);
 
 // Every popover body renders `sentenceCase(text)` — the page capitalises the
 // first character of the raw `detail` / `why` / view one-liner for display
@@ -407,20 +412,70 @@ async function desktop(theme) {
     `${NAME_TRIGGER_IDS.length} name-level essay triggers (ALL protocols with a note, incl. ⊘-cell ones)`,
   );
 
-  // Header-anchored popover triggers — one per capability column, showing
-  // that column's own `detail`. Count is derived from CAPABILITIES, not
-  // hardcoded.
-  const headerTriggers = table.locator("button[aria-controls^='coverage-header-']");
-  assert((await headerTriggers.count()) === CAP_COUNT, `${CAP_COUNT} header popover triggers`);
+  // One heading tip per capability column, each its one word.
+  const headingTips = table.locator("thead [data-coverage-heading] [data-heading-tip]");
+  assert((await headingTips.count()) === CAP_COUNT, `${CAP_COUNT} column heading tips`);
+  const headingWords = await headingTips.allInnerTexts();
+  assert(
+    headingWords.every((w, i) => w.trim() === CAP_WORDS[CAP_ENTRIES[i].key] && !/\s/.test(w.trim())),
+    `every column heading is its one word (${headingWords.join(", ")})`,
+  );
+  assert((await table.locator("thead svg").count()) === 0, "no ⓘ mark in the column headings");
 
-  // Every disclosure trigger controls a cell popover (`coverage-cell-`), the
-  // name-level essay (`coverage-details-`), or a header popover
-  // (`coverage-header-`) — the three id families are disjoint, so this also
-  // proves no trigger controls a fourth, unaccounted shape.
+  // A clock cell opens the house popover with its state and reason, and
+  // carries no browser title (Miles, 21 Nov 2026).
+  const awaitingCells = table.locator("td[data-cell-state='awaiting']");
+  const awaitingCount = await awaitingCells.count();
+  assert(awaitingCount > 0, `awaiting cells on /coverage/ethereum (${awaitingCount})`);
+  const awaitingShape = await awaitingCells.evaluateAll((tds) =>
+    tds.every((td) => !td.title && td.querySelectorAll("button[aria-controls^='coverage-cell-']").length === 1),
+  );
+  assert(awaitingShape, "every awaiting cell is one popover trigger with no title");
+  const firstAwaiting = awaitingCells.first();
+  await firstAwaiting.locator("button").click();
+  await page.waitForTimeout(150);
+  const awaitingNote = firstAwaiting.locator("[role=tooltip]");
+  assert(await awaitingNote.isVisible(), "an awaiting cell's popover opens");
+  assert(
+    /^Awaiting the first on-chain instance: \S/.test(await awaitingNote.innerText()),
+    "the awaiting popover names the state, then the reason",
+  );
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(100);
+  assert(!(await awaitingNote.isVisible()), "Escape closed the awaiting popover");
+
+  // Every disclosure trigger controls a cell popover (`coverage-cell-`) or the
+  // name-level essay (`coverage-details-`) — the id families are disjoint, so
+  // this also proves no trigger controls an unaccounted shape.
   const allTriggers = table.locator("button[aria-controls^='coverage-']");
   assert(
-    (await allTriggers.count()) === VIEWS_TRIGGER_COUNT + WHY_CELL_TRIGGER_COUNT + NAME_TRIGGER_IDS.length + CAP_COUNT,
+    (await allTriggers.count()) ===
+      VIEWS_TRIGGER_COUNT + WHY_CELL_TRIGGER_COUNT + awaitingCount + NAME_TRIGGER_IDS.length,
     "every disclosure trigger is one of the four known shapes",
+  );
+
+  // No key and no lead line (ui-jobs 796): every capability cell's title
+  // names its state instead.
+  const bodyText = await page.locator("body").innerText();
+  assert(!/not yet built|awaiting the first on-chain instance/i.test(bodyText), "no key above the matrix");
+  assert(!/Details of the protocols we cover/.test(bodyText), "no lead line under the title");
+  const cellTitles = await markRows.evaluateAll((trs) =>
+    trs.flatMap((tr) =>
+      [...tr.querySelectorAll("td:not([data-anatomy~='D5']):not([data-cell-state='awaiting'])")].map((td) => td.title),
+    ),
+  );
+  assert(
+    cellTitles.length > 0 && cellTitles.every((t) => /^(Included|Not yet built|The protocol can't provide it)/.test(t)),
+    `every capability cell's title names its state (${cellTitles.length} cells)`,
+  );
+
+  // The page is one chain: the lead cell draws the protocol's mark alone.
+  const leadMarks = await table
+    .locator("[data-lead-plain]")
+    .evaluateAll((tds) => tds.map((td) => td.querySelectorAll(":scope > span[aria-hidden] > *").length));
+  assert(
+    leadMarks.every((n) => n <= 1),
+    "no chain glyph beside the protocol mark",
   );
 
   // Every protocol desc renders as an always-visible second line.
@@ -734,195 +789,52 @@ async function desktop(theme) {
   await page.waitForTimeout(120);
   assert(!(await page.locator("#coverage-cell-morpho-views").isVisible()), "clicking the open trigger again closes it");
 
-  /* ── Column-header popovers: the third disclosure grammar, replacing the
-       standalone <dl> legend on desktop ────────────────────────────────── */
+  /* ── Column heading tips (ui-jobs 796) ──────────────────────────────── */
 
-  // Every header label is forced onto exactly two stacked lines
-  // (splitHeaderLabel splits at the first space, not the browser's own
-  // width-dependent wrap) — so every column's label block renders at the
-  // SAME height, keeping the row aligned regardless of word count
-  // ("Copy for LLM" is three words; the rest are two).
-  const labelHeights = await page
-    .locator("thead button span.flex.flex-col")
-    .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)));
-  assert(labelHeights.length === CAP_COUNT, `${CAP_COUNT} two-line header label blocks`);
-  assert(
-    new Set(labelHeights).size === 1,
-    `every header label block renders at the same height (uniform two lines: ${labelHeights.join(", ")})`,
-  );
-
-  // Each header popover's own detail ships in the DOM (collapsed) — checked
-  // against the parsed CAPABILITIES source, not a hardcoded string, and for
-  // every column (cheap: only 7).
+  // Each heading's tip opens on a press with the full name over the detail,
+  // and names itself "<word>, explain" for a screen reader.
   for (const cap of CAP_ENTRIES) {
-    const panel = page.locator(`#coverage-header-${cap.key}`);
-    assert((await panel.count()) === 1, `header popover for "${cap.label}" is in the DOM`);
+    const tip = page.locator(`thead [data-coverage-heading='${cap.key}'] [data-reveal-tip]`);
     assert(
-      (await panel.textContent()).includes(sentenceCase(cap.detail)),
-      `header popover for "${cap.label}" carries its own detail text, sentence-cased (textContent)`,
+      ((await tip.locator(".sr-only").textContent()) ?? "").trim() === `${CAP_WORDS[cap.key]}, explain`,
+      `"${CAP_WORDS[cap.key]}" heading is named "${CAP_WORDS[cap.key]}, explain"`,
     );
-    assert(!(await panel.isVisible()), `header popover for "${cap.label}" is collapsed by default`);
+    await tip.click();
+    await page.waitForTimeout(150);
+    const bubble = tip.locator("[role=tooltip]");
+    assert(await bubble.isVisible(), `"${CAP_WORDS[cap.key]}" heading tip opens`);
+    const text = await bubble.innerText();
+    assert(
+      text.includes(cap.label) && text.includes(sentenceCase(cap.detail)),
+      `"${CAP_WORDS[cap.key]}" tip says "${cap.label}" and its detail`,
+    );
+    const box = await bubble.boundingBox();
+    assert(
+      box.x >= 0 && box.x + box.width <= viewportWidth + 1 && box.y >= 0,
+      `"${CAP_WORDS[cap.key]}" tip stays inside the viewport (${Math.round(box.x)}–${Math.round(box.x + box.width)}, top ${Math.round(box.y)})`,
+    );
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(100);
+    assert(!(await bubble.isVisible()), `Escape closed the "${CAP_WORDS[cap.key]}" tip`);
   }
 
-  // Spot-check two different columns show genuinely DIFFERENT detail text
-  // when opened, aria-expanded flips, and opening a second header popover
-  // closes the first (single-open within the header kind itself).
-  const dashboardHeaderTrigger = page.locator("button[aria-controls='coverage-header-dashboard']");
-  const oracleHeaderTrigger = page.locator("button[aria-controls='coverage-header-oracleUsd']");
-  const dashboardHeaderPopover = page.locator("#coverage-header-dashboard");
-  const oracleHeaderPopover = page.locator("#coverage-header-oracleUsd");
-  // Same static-ⓘ grammar as the cells (see the maple check above): read the
-  // closed colour first, because rotation is not what changes here.
-  const oracleHeaderGlyph = oracleHeaderTrigger.locator("svg").last();
-  const oracleHeaderClosedColor = await oracleHeaderGlyph.evaluate((el) => getComputedStyle(el).color);
-  assert(
-    (await dashboardHeaderTrigger.getAttribute("aria-expanded")) === "false",
-    "dashboard header trigger starts collapsed",
-  );
-  await dashboardHeaderTrigger.click();
+  // A press elsewhere closes a heading tip.
+  const viewsTip = page.locator("thead [data-coverage-heading='views'] [data-reveal-tip]");
+  await viewsTip.click();
   await page.waitForTimeout(150);
-  assert(await dashboardHeaderPopover.isVisible(), "dashboard header popover opens");
-  assert(
-    (await dashboardHeaderTrigger.getAttribute("aria-expanded")) === "true",
-    "dashboard header trigger aria-expanded flips true",
-  );
-  const dashboardHeaderText = await dashboardHeaderPopover.innerText();
-  await oracleHeaderTrigger.click();
-  await page.waitForTimeout(150);
-  assert(await oracleHeaderPopover.isVisible(), "oracleUsd header popover opens");
-  assert(
-    !(await dashboardHeaderPopover.isVisible()),
-    "opening a second header popover closed the first (single-open within the header kind)",
-  );
-  assert(
-    (await dashboardHeaderTrigger.getAttribute("aria-expanded")) === "false",
-    "dashboard header trigger aria-expanded dropped back to false",
-  );
-  const oracleHeaderText = await oracleHeaderPopover.innerText();
-  assert(
-    dashboardHeaderText !== oracleHeaderText && dashboardHeaderText.length > 0 && oracleHeaderText.length > 0,
-    "two different header popovers show genuinely DIFFERENT detail text",
-  );
-
-  // Pointer parked off the trigger for the same reason as the maple check above.
-  await page.mouse.move(4, 4);
-  await page.waitForTimeout(300);
-  const oracleHeaderOpenColor = await oracleHeaderGlyph.evaluate((el) => getComputedStyle(el).color);
-  assert(
-    oracleHeaderOpenColor !== oracleHeaderClosedColor,
-    `oracleUsd header ⓘ mark changes colour when open (${oracleHeaderClosedColor} → ${oracleHeaderOpenColor})`,
-  );
-
-  // innerText-vs-textContent discipline, same trap as the essay/cell checks
-  // above, now proven on a header popover: "Event explainers" detail's
-  // "plain-language explainer" fragment ships in the DOM but is absent from
-  // collapsed innerText.
-  await oracleHeaderTrigger.click(); // close it — back to nothing open
-  await page.waitForTimeout(150);
-  const explainersFragment = "plain-language explainer";
-  const explainersHeaderPopover = page.locator("#coverage-header-explainers");
-  assert(
-    (await explainersHeaderPopover.textContent()).includes(explainersFragment),
-    "explainers header popover carries its detail in the DOM by default (textContent)",
-  );
-  const bodyTextHeaderCollapsed = await page.locator("body").innerText();
-  assert(
-    !bodyTextHeaderCollapsed.includes(explainersFragment),
-    "explainers header detail is NOT in body innerText when collapsed",
-  );
-
-  // Edge clamp: the last two capability columns (Liquidation forensics,
-  // Protocol views) open their header popover inward, never clipping the
-  // page's right edge.
-  const forensicsHeaderTrigger = page.locator("button[aria-controls='coverage-header-forensics']");
-  const forensicsHeaderPopover = page.locator("#coverage-header-forensics");
-  await forensicsHeaderTrigger.click();
-  await page.waitForTimeout(150);
-  assert(await forensicsHeaderPopover.isVisible(), "forensics header popover opens (2nd-to-last column)");
-  const forensicsHeaderBox = await forensicsHeaderPopover.boundingBox();
-  assert(
-    forensicsHeaderBox.x + forensicsHeaderBox.width <= viewportWidth + 1,
-    `forensics header popover stays inside the viewport (right edge ${Math.round(forensicsHeaderBox.x + forensicsHeaderBox.width)} <= ${viewportWidth})`,
-  );
-
-  const viewsHeaderTrigger = page.locator("button[aria-controls='coverage-header-views']");
-  const viewsHeaderPopover = page.locator("#coverage-header-views");
-  await viewsHeaderTrigger.click();
-  await page.waitForTimeout(150);
-  assert(await viewsHeaderPopover.isVisible(), "views header popover opens (last column)");
-  assert(
-    !(await forensicsHeaderPopover.isVisible()),
-    "opening the views header popover closed the forensics one (single-open)",
-  );
-  const viewsHeaderBox = await viewsHeaderPopover.boundingBox();
-  assert(
-    viewsHeaderBox.x + viewsHeaderBox.width <= viewportWidth + 1,
-    `views header popover (last column) stays inside the viewport (right edge ${Math.round(viewsHeaderBox.x + viewsHeaderBox.width)} <= ${viewportWidth})`,
-  );
-
-  // Escape closes a header popover.
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(120);
-  assert(!(await viewsHeaderPopover.isVisible()), "Escape closed the open header popover");
-
-  // Outside pointerdown closes a header popover.
-  await viewsHeaderTrigger.click();
-  await page.waitForTimeout(150);
-  assert(await viewsHeaderPopover.isVisible(), "views header popover reopened for the dismissal test");
+  assert(await viewsTip.locator("[role=tooltip]").isVisible(), "views heading tip reopened for the dismissal test");
   await page.locator("h1").first().click();
   await page.waitForTimeout(150);
-  assert(!(await viewsHeaderPopover.isVisible()), "outside pointerdown closed the open header popover");
-
-  /* Single-open ACROSS ALL THREE KINDS: a header popover closes an open cell
-     popover / essay drawer, and opening a cell popover or the essay closes an
-     open header popover — proven in both directions. */
-  await pwnDashboardTrigger.click();
-  await page.waitForTimeout(150);
-  assert(await pwnDashboardPopover.isVisible(), "pwn dashboard cell popover reopened for the cross-kind test");
-  await dashboardHeaderTrigger.click();
-  await page.waitForTimeout(150);
-  assert(await dashboardHeaderPopover.isVisible(), "dashboard header popover opened");
-  assert(
-    !(await pwnDashboardPopover.isVisible()),
-    "opening a header popover closed the open cell popover (single-open, cell -> header)",
-  );
-
-  await pwnNameTrigger.click();
-  await page.waitForTimeout(150);
-  assert(await pwnEssay.isVisible(), "pwn essay reopened for the cross-kind test");
-  assert(
-    !(await dashboardHeaderPopover.isVisible()),
-    "opening the essay closed the open header popover (single-open, header -> essay)",
-  );
-
-  await dashboardHeaderTrigger.click();
-  await page.waitForTimeout(150);
-  assert(await dashboardHeaderPopover.isVisible(), "dashboard header popover reopened");
-  assert(
-    !(await pwnEssay.isVisible()),
-    "opening a header popover closed the open essay drawer (single-open, essay -> header)",
-  );
-
-  await mapleViewsTrigger.click();
-  await page.waitForTimeout(150);
-  assert(await mapleViewsPopover.isVisible(), "maple views cell popover opened");
-  assert(
-    !(await dashboardHeaderPopover.isVisible()),
-    "opening a cell popover closed the open header popover (single-open, header -> cell)",
-  );
-  // Return to nothing-open for the assertions below.
-  await mapleViewsTrigger.click();
-  await page.waitForTimeout(150);
-  assert(!(await mapleViewsPopover.isVisible()), "closed for a clean slate");
+  assert(!(await viewsTip.locator("[role=tooltip]").isVisible()), "outside pointerdown closed the heading tip");
 
   /* Accessible names stay distinct across every trigger, and every popover /
      essay panel id is unique — two different cells never collide on either. */
   const labels = await allTriggers.evaluateAll((bs) => bs.map((b) => b.getAttribute("aria-label")));
   assert(new Set(labels).size === labels.length, "all trigger accessible names are distinct across the table");
   const panelIds = await page
-    .locator("[id^='coverage-cell-'], [id^='coverage-details-'], [id^='coverage-header-']")
+    .locator("[id^='coverage-cell-'], [id^='coverage-details-']")
     .evaluateAll((els) => els.map((e) => e.id));
-  assert(new Set(panelIds).size === panelIds.length, "every popover/essay/header panel id is unique across the table");
+  assert(new Set(panelIds).size === panelIds.length, "every popover/essay panel id is unique across the table");
 
   /* Theme sanity with a panel open: the hairline follows the theme. */
   const seam = await markRows

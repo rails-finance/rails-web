@@ -452,13 +452,16 @@ export function DataTableLeadHeader({ sticky = "", plain }: { sticky?: string; p
  *  protocol's and the chain's names for a screen reader. `plain` on a row that
  *  is not a position (the vault index, /about/figures, /coverage): the mark and
  *  the glyph in grey, no tint, which marks a position (C20); below the stacking
- *  width the cell is not drawn and `DataTableLeadMark` carries both. */
+ *  width the cell is not drawn and `DataTableLeadMark` carries both.
+ *  `chainless` with `plain`, on a page that is one chain (/coverage): no chain
+ *  glyph, the mark drawn at 28px. */
 export function DataTableLeadCell({
   protocol,
   protocolName,
   chain,
   sticky = "",
   plain,
+  chainless,
 }: {
   /** The `protocols.ts` id: the tint and the mark. */
   protocol: string;
@@ -466,6 +469,7 @@ export function DataTableLeadCell({
   chain: ChainId;
   sticky?: string;
   plain?: boolean;
+  chainless?: boolean;
 }) {
   if (plain)
     return (
@@ -485,8 +489,13 @@ export function DataTableLeadCell({
         </span>
         <span className="flex items-center gap-2.5 text-rb-500" aria-hidden>
           {/* An empty id is a vault no explorer deploys (sBOLD, ui-jobs 765): no mark. */}
-          {protocol && <ProtocolIcon id={protocol} className="h-[18px] w-[18px] shrink-0 [&:is(img)]:grayscale" />}
-          <ChainGlyph id={chain} className="h-[18px] w-[18px] shrink-0" />
+          {protocol && (
+            <ProtocolIcon
+              id={protocol}
+              className={`${chainless ? "h-7 w-7" : "h-[18px] w-[18px]"} shrink-0 [&:is(img)]:grayscale`}
+            />
+          )}
+          {!chainless && <ChainGlyph id={chain} className="h-[18px] w-[18px] shrink-0" />}
         </span>
       </DataTableCell>
     );
