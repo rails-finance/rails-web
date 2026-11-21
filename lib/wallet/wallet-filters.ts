@@ -9,11 +9,12 @@ import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-f
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { WalletSummaryRow } from "@/lib/wallet/summary-row";
 
-export type WalletKind = "troves" | "deposits" | "loans" | "vaults";
+export type WalletKind = "troves" | "deposits" | "stakes" | "loans" | "vaults";
 
 export const WALLET_KINDS: { value: WalletKind; label: string }[] = [
   { value: "troves", label: "Troves" },
   { value: "deposits", label: "Deposits" },
+  { value: "stakes", label: "LQTY stakes" },
   { value: "loans", label: "Loans" },
   { value: "vaults", label: "Vaults" },
 ];
@@ -35,7 +36,7 @@ export const WALLET_PROTOCOLS: WalletProtocol[] = [
   { slug: "compound-v3", name: "Compound V3", kinds: ["loans", "deposits"], arbitrum: true },
   { slug: "morpho", name: "Morpho Blue", kinds: ["loans", "deposits"], arbitrum: true },
   { slug: "liquity-v2", name: "Liquity V2", kinds: ["troves", "deposits"] },
-  { slug: "liquity-v1", name: "Liquity V1", kinds: ["troves", "deposits"] },
+  { slug: "liquity-v1", name: "Liquity V1", kinds: ["troves", "deposits", "stakes"] },
   { slug: "makerdao", name: "MakerDAO", kinds: ["vaults"] },
   { slug: "spark", name: "SparkLend", kinds: ["loans", "deposits"] },
   { slug: "fluid", name: "Fluid", kinds: ["vaults"] },

@@ -1,15 +1,17 @@
 // The wallet read's rows for the kinds wallet_positions does not hold yet:
-// Liquity V1 Troves and the Stability Pool deposits on Liquity V1 and V2
-// (ui-jobs 794). Each row is shaped from the protocol listing's row for the
-// wallet, as rails-server's listing route answers it, into the summary row the
-// family modules take, with the listing row as its `card`. A deposit row
-// carries `kind: "deposits"`, which routes it to its own module. Pure: the
-// reads are in lib/wallet/read-wallet.ts.
+// Liquity V1 Troves and LQTY stakes, and the Stability Pool deposits on
+// Liquity V1 and V2 (ui-jobs 794). Each row is shaped from the protocol
+// listing's row for the wallet, as rails-server's listing route answers it,
+// into the summary row the family modules take, with the listing row as its
+// `card`. A deposit row carries `kind: "deposits"` and a stake row
+// `kind: "stakes"`, which route each to its own module. Pure: the reads are in
+// lib/wallet/read-wallet.ts.
 
 import type { WalletSummaryRow } from "./summary-row";
 import type { LiquityV1PositionSummary } from "../sources/api/liquity-v1-positions";
 import type { LiquityV1DepositRow } from "../sources/api/liquity-v1-sp";
 import type { LiquityV2DepositRow } from "../sources/api/liquity-v2-sp";
+import type { LiquityV1StakeRow } from "../sources/api/liquity-v1-staking";
 
 const V1_PATH = "/ethereum/liquity-v1";
 const V2_SP_PATH = "/ethereum/liquity-v2/stability-pool";
@@ -114,3 +116,36 @@ export const liquityV2DepositSummaryRow = (r: LiquityV2DepositRow, owner: string
     "BOLD",
     `${V2_SP_PATH}/${r.collateral_type}/${r.depositor.toLowerCase()}`,
   );
+
+/** The one LQTY stake an address holds in Liquity V1's LQTYStaking. Its id
+ *  is apart from the same address's deposit. */
+export function liquityV1StakeSummaryRow(r: LiquityV1StakeRow, owner: string): WalletSummaryRow {
+  const open = r.status === "open";
+  const staker = r.staker.toLowerCase();
+  return {
+    chain: "ethereum",
+    family: "liquity-v1",
+    kind: "stakes",
+    positionId: `stake:${staker}`,
+    owner,
+    market: null,
+    status: r.status,
+    collateral: { amount: r.stake_raw, symbol: "LQTY" },
+    debt: null,
+    collateralUsd: null,
+    debtUsd: null,
+    usdSource: null,
+    peakCollateral: null,
+    peakDebt: null,
+    openedAt: seconds(r.first_timestamp),
+    closedAt: open ? null : seconds(r.last_timestamp),
+    lastActivityAt: seconds(r.last_timestamp),
+    txCount: r.tx_count,
+    liquidationCount: null,
+    readBlock: blockOf(r.last_block),
+    readAt: null,
+    href: `${V1_PATH}/staking/${staker}`,
+    card: r,
+    writtenAt: "",
+  };
+}

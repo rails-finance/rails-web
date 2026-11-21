@@ -13,7 +13,8 @@ import { HolderKinds, useHolderKinds, type HolderKindPage } from "@/components/s
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
 import { LIQUITY_V1_ITEMS_PER_PAGE } from "@/lib/liquity-v1/list-filter-dimensions";
 import { liquityV1HolderStrip } from "@/lib/liquity-v1/holder-strip";
-import { LIQUITY_V1_TROVES, liquityV1DepositListingCard } from "@/lib/liquity-v1/holder-kinds";
+import { LIQUITY_V1_STAKES, LIQUITY_V1_TROVES, liquityV1DepositListingCard } from "@/lib/liquity-v1/holder-kinds";
+import type { LiquityV1StakeRow } from "@/lib/sources/api/liquity-v1-staking";
 import { readListQuery } from "@/lib/shared/list-filter";
 import { useUrlSearchParams } from "@/lib/shared/use-url-search-params";
 import {
@@ -28,7 +29,7 @@ import {
 import type { LiquityV1DepositRow } from "@/lib/sources/api/liquity-v1-sp";
 
 const SORT_OPTIONS = spSortOptions();
-const OTHER_KINDS = [LIQUITY_V1_TROVES];
+const OTHER_KINDS = [LIQUITY_V1_TROVES, LIQUITY_V1_STAKES];
 
 export function SpListing(props: {
   initialItems?: LiquityV1DepositRow[];
@@ -36,22 +37,25 @@ export function SpListing(props: {
   initialKey?: string;
   initialSearch?: string;
 }) {
-  // The wallet's Troves, under the rows and counted in the strip (§1b).
+  // The wallet's Troves and stake, under the rows and counted in the strip
+  // (§1b, §6).
   const q = readListQuery(useUrlSearchParams(props.initialSearch ?? ""));
   const { wallet, reads } = useHolderKinds(OTHER_KINDS, q);
   const troves = reads[LIQUITY_V1_TROVES.id];
+  const stakes = reads[LIQUITY_V1_STAKES.id];
 
   // The strip states the wallet: the search names a depositor and no pill
-  // narrows the rows. It waits for the Troves' read; a failed one leaves the
-  // Troves unsaid.
+  // narrows the rows. It waits for the Troves' and the stake's reads; a
+  // failed one leaves its kind unsaid.
   const holderStrip = (items: LiquityV1DepositRow[], total: number, f: SpListFilters) =>
-    namesDepositor(f.q) && f.status.length === 0 && !f.tx.length && troves !== undefined ? (
+    namesDepositor(f.q) && f.status.length === 0 && !f.tx.length && troves !== undefined && stakes !== undefined ? (
       <HolderStrip
         {...liquityV1HolderStrip(
           troves === "failed" ? undefined : (troves as HolderKindPage<LiquityV1PositionSummary>),
           { rows: items, total },
           LIQUITY_V1_ITEMS_PER_PAGE,
           f.q.trim(),
+          stakes === "failed" ? undefined : (stakes as HolderKindPage<LiquityV1StakeRow>),
         )}
       />
     ) : null;

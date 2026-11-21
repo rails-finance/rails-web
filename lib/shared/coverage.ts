@@ -1773,8 +1773,9 @@ export function coverageRows(comingSoon: ComingSoonEntry[], chainId: ChainId): C
  * block above; do not invent capabilities a view doesn't offer.
  *
  * Invariant: an entry exists here iff that protocol's `views` cell is `true`.
- * Liquity V1's and V2's also name their second kind of position page, the
- * Stability Pool deposit, and the menu entry that reaches it.
+ * Liquity V1's and V2's also name their other kinds of position page (the
+ * Stability Pool deposit on both, the LQTY stake on V1) and the menu entry
+ * that reaches each.
  * The three Arbitrum explorers' markets sub-pages (2026-10-20) are the
  * newest.
  */
@@ -1845,7 +1846,7 @@ export const VIEW_NOTES: Record<string, string> = {
   dolomite:
     "Every market's margin ladder: a multiplicative premium over the 117.65% base, including the LST/ETH override.",
   "liquity-v1":
-    "The system's state: TCR against the recovery line, the Stability Pool's depth against system debt, the shared base rate, and how deep the redemption queue is. The queue is the Trove listing sorted by ratio, and the view links there. One more kind of position has pages: Stability Pool deposits (Stability Pool).",
+    "The system's state: TCR against the recovery line, the Stability Pool's depth against system debt, the shared base rate, and how deep the redemption queue is. The queue is the Trove listing sorted by ratio, and the view links there. Two more kinds of position have pages: Stability Pool deposits (Stability Pool) and LQTY stakes (Staking).",
   ebisu:
     "The branches side by side: each one's oracle price, size, TCR and rate span, and a link per branch into the listing sorted by rate, which is that branch's redemption queue.",
   asymmetry:

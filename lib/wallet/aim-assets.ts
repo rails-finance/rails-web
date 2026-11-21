@@ -13,6 +13,7 @@
 //   liquity-v2-deposit     BOLD, and the branch's collateral symbol (its gains)
 //   liquity-v1             ETH and LUSD
 //   liquity-v1-deposit     LUSD, and ETH (its gains)
+//   liquity-v1-stake       LQTY, and LUSD and ETH (its fees)
 //   ebisu / asymmetry / basedollar   collateral symbol, and the fork's debt symbol
 //   the three Arbitrum kinds         nothing: AIM's universe has no Arbitrum token
 //
@@ -62,6 +63,9 @@ export function walletPositionAssetKeys(p: WalletPosition): string[] {
     case "liquity-v1":
     case "liquity-v1-deposit":
       symbols.push("LUSD", "ETH");
+      break;
+    case "liquity-v1-stake":
+      symbols.push("LQTY", "LUSD", "ETH");
       break;
     case "ebisu":
     case "asymmetry":

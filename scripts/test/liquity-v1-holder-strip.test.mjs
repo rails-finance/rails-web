@@ -139,3 +139,41 @@ test("the share card's status word names the deposit and keeps three stats", () 
     ["Total collateral", "Total debt", "Stability Pool deposit"],
   );
 });
+
+const stake = (status, lqty) => ({ staker: "0xw", status, stake_raw: status === "open" ? `${lqty}${E18}` : "0" });
+
+test("a stake is counted beside the deposit and is a separate LQTY leg", () => {
+  const s = liquityV1HolderStrip(
+    { rows: [trove(2, "open", 4, 2000)], total: 1 },
+    { rows: [deposit("open", 5000)], total: 1 },
+    PER_PAGE,
+    "0xw",
+    { rows: [stake("open", 300)], total: 1 },
+  );
+  assert.equal(s.countsLine, "This wallet holds 1 open Trove. It has 1 Stability Pool deposit and 1 LQTY stake.");
+  assert.deepEqual(
+    s.legs.map((l) => l.id),
+    ["collateral", "debt", "deposit", "stake"],
+  );
+  const leg = s.legs[3];
+  assert.equal(leg.figure.amount, 300);
+  assert.equal(leg.approx, false);
+  assert.equal(s.positions, 3);
+  assert.deepEqual(
+    s.kinds.map((k) => [k.id, k.open, k.closed]),
+    [
+      ["deposit", 1, 0],
+      ["stake", 1, 0],
+    ],
+  );
+});
+
+test("closed kinds are said once, after the open ones; a stake alone opens the band", () => {
+  const s = liquityV1HolderStrip(undefined, { rows: [deposit("closed")], total: 1 }, PER_PAGE, "0xw", {
+    rows: [stake("open", 2)],
+    total: 1,
+  });
+  assert.equal(s.countsLine, "This wallet has 1 LQTY stake. It has closed 1 Stability Pool deposit.");
+  const only = liquityV1HolderStrip(undefined, undefined, PER_PAGE, "0xw", { rows: [stake("closed")], total: 1 });
+  assert.equal(only.countsLine, "This wallet has closed 1 LQTY stake.");
+});

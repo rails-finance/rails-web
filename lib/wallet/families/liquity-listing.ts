@@ -1,5 +1,5 @@
-// Liquity V1 Troves and the Stability Pool deposits on Liquity V1 and V2, for
-// the wallet view (ui-jobs 794; SERVER-ONLY). Their rows come from the
+// Liquity V1 Troves and LQTY stakes, and the Stability Pool deposits on
+// Liquity V1 and V2, for the wallet view (ui-jobs 794; SERVER-ONLY). Their rows come from the
 // protocol listings' routes, not wallet_positions (read-wallet.ts,
 // `readListingRows`); each card is the listing row as served. The head reads
 // are the position pages' own readers, one per open position:
@@ -13,12 +13,19 @@
 //                       collateral owed at the PriceFeed price the same
 //                       multicall reads at the same block (V1's ETH, V2's
 //                       branch collateral).
+//   V1 LQTY stake       loadLiquityV1StakeFromChain: the stake and the fees
+//                       pending at head, in dollars as the claim: the LUSD
+//                       fees at $1, the ETH fees at the PriceFeed price of the
+//                       same read, the LQTY staked not valued.
 
 import { loadLiquityV1PositionFromChain } from "@/lib/sources/chain/liquity-v1-position";
 import { loadLiquityV1DepositFromChain } from "@/lib/sources/chain/liquity-v1-sp";
 import { loadLiquityV2DepositFromChain } from "@/lib/sources/chain/liquity-v2-sp";
 import type { LiquityV1DepositChain } from "@/lib/api/fetch-liquity-v1-sp-chain";
 import type { LiquityV2DepositChain } from "@/lib/api/fetch-liquity-v2-sp-chain";
+import type { LiquityV1StakeChain } from "@/lib/api/fetch-liquity-v1-staking-chain";
+import type { LiquityV1StakeRow } from "@/lib/sources/api/liquity-v1-staking";
+import { loadLiquityV1StakeFromChain } from "@/lib/sources/chain/liquity-v1-staking";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
 import type { LiquityV1DepositRow } from "@/lib/sources/api/liquity-v1-sp";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
@@ -26,7 +33,7 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, plural, scaled, storeStamp, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { FamilyModule, HeadResult } from "./module";
-import { depositClaim, type DepositClaim } from "@/lib/wallet/deposit-claim";
+import { depositClaim, stakeClaim, type DepositClaim } from "@/lib/wallet/deposit-claim";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -251,4 +258,53 @@ export const liquityV2Deposits: FamilyModule = {
     });
   },
   head: liquityV2DepositHead(loadLiquityV2DepositFromChain),
+};
+
+/** The V1 stake's head: LQTYStaking's read, the LUSD fees at $1 and the ETH
+ *  fees at the PriceFeed price of the same read, the LQTY not valued. `load`
+ *  is the staking reader (a stub in the tests). */
+export const liquityV1StakeHead =
+  (load: (staker: string) => Promise<LiquityV1StakeChain>) =>
+  (open: WalletPosition[]): Promise<HeadResult> =>
+    eachOpen(open, async (p) => {
+      const r = (p.card as { row: LiquityV1StakeRow }).row;
+      const c = await load(r.staker);
+      if (c.chainStale) return null;
+      const claim = stakeClaim({
+        stake: scaled(c.stakeRaw, 18),
+        lusd: scaled(c.lusdGainRaw, 18),
+        eth: scaled(c.ethGainRaw, 18),
+        price: c.priceRaw != null ? scaled(c.priceRaw, 18) : null,
+        feed: feedOf("the Liquity V1 PriceFeed", c.priceStale, c.blockNumber),
+      });
+      return claim ? depositAtHead(p, claim, c.blockNumber, { kind: "liquity-v1-stake", row: r, head: c }) : null;
+    });
+
+export const liquityV1Stakes: FamilyModule = {
+  id: "liquity-v1-staking",
+  name: "Liquity V1",
+  chain: MAINNET_CHAIN_ID,
+  summaryChain: "ethereum",
+  summaryFamily: "liquity-v1",
+  summaryKind: "stakes",
+  async shape(rows) {
+    return rows.map((row): WalletPosition => {
+      const r = row.card as LiquityV1StakeRow;
+      const p: WalletPosition = {
+        ...base(row, "Liquity V1", "Staking", { kind: "liquity-v1-stake", row: r }),
+        kind: "stakes",
+      };
+      if (row.status === "open") return p;
+      const staked = scaled(r.staked_raw, 18);
+      return {
+        ...p,
+        history: {
+          ...historyBase(row),
+          size: staked > 0 ? amountText(staked, "LQTY") : undefined,
+          sizeNote: staked > 0 ? "staked in all" : undefined,
+        },
+      };
+    });
+  },
+  head: liquityV1StakeHead(loadLiquityV1StakeFromChain),
 };

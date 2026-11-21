@@ -9,6 +9,7 @@ import { infoMetadata } from "@/lib/shared/page-metadata";
 import { liquityV1Glossary } from "@/lib/liquity-v1/event-templates";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { LIQUITY_V1_SP_PATH } from "@/lib/liquity-v1/sp-routes";
+import { LIQUITY_V1_STAKING_PATH } from "@/lib/liquity-v1/staking-routes";
 
 export const metadata = infoMetadata("liquity-v1");
 
@@ -30,10 +31,13 @@ export default function InfoPage() {
           <Link href={LIQUITY_V1_SP_PATH} className={INLINE_LINK}>
             Stability Pool deposit
           </Link>{" "}
+          and every{" "}
+          <Link href={LIQUITY_V1_STAKING_PATH} className={INLINE_LINK}>
+            LQTY stake
+          </Link>{" "}
           with its history.
         </>
       }
-      notCovered="Staking of LQTY, Liquity's token, isn't covered here."
       glossary={liquityV1Glossary()}
       howItWorks={[
         <>
@@ -120,6 +124,30 @@ export default function InfoPage() {
                 its touches.{" "}
                 <Link href={LIQUITY_V1_SP_PATH} className={INLINE_LINK}>
                   See the deposits
+                </Link>
+                .
+              </li>
+            </ul>
+          ),
+        },
+        {
+          heading: "LQTY stakes",
+          section: "staking",
+          body: (
+            <ul className={UL}>
+              <li>
+                LQTY, Liquity&apos;s token, can be staked in LQTYStaking. A stake earns a share of the protocol&apos;s
+                fees in proportion to its size: the borrowing fees in LUSD and the redemption fees in ETH.
+              </li>
+              <li>
+                A stake moves only when the staker stakes or unstakes, and every touch pays out the fees paid in since
+                the last one. Unstaking 0 claims the fees and moves no LQTY.
+              </li>
+              <li>
+                The listing has one card per stake; open stakes show by default. A stake&apos;s page shows the stake and
+                the fees the next touch would pay, read from the chain now, and a timeline of its touches.{" "}
+                <Link href={LIQUITY_V1_STAKING_PATH} className={INLINE_LINK}>
+                  See the stakes
                 </Link>
                 .
               </li>

@@ -53,6 +53,8 @@ const ROUTES = [
   ["liquity-v1", "/ethereum/liquity-v1/0x04ca2a945ccba92ca2443024c07c99f81e71547f?epoch=1"],
   // A Stability Pool deposit: an open, claims, a gain sent to the Trove, a full withdrawal.
   ["liquity-v1-sp", "/ethereum/liquity-v1/stability-pool/0x8aad71ecd4712c48d6443718009f73e580148b12"],
+  // An LQTY stake: an open, a stake with fees paid, a claim and an unstake.
+  ["liquity-v1-st", "/ethereum/liquity-v1/staking/0x0f43150e96bd5ff48909c6b3b5a029aeba8eda5a"],
   ["ebisu", "/ethereum/ebisu/WBTC/75911241408635389930317354588378809432274724767733080584082611717827843647638"],
   [
     "asymmetry",

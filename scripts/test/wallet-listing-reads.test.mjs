@@ -74,6 +74,11 @@ globalThis.fetch = async (input, init = {}) => {
       limit: 100,
       offset: 0,
     });
+  if (url.pathname === "/api/liquity-v1/staking")
+    return json({
+      rows: [{ staker: W, status: "open", stake_raw: `7${E18}`, staked_raw: `7${E18}`, tx_count: 1 }],
+      pagination: { total: 1 },
+    });
   if (url.pathname === "/api/liquity-v1/stability-pool")
     return json({
       rows: [{ depositor: W, status: "open", deposit_raw: `5${E18}`, deposited_raw: `5${E18}`, tx_count: 1 }],
@@ -103,7 +108,7 @@ test("every listing answers: the rows of each kind, nothing failed", async () =>
   assert.deepEqual(r.failed, []);
   assert.deepEqual(
     r.rows.map((x) => `${x.family}:${x.kind ?? "troves"}`),
-    ["liquity-v1:troves", "liquity-v1:deposits", "liquity-v2:deposits"],
+    ["liquity-v1:troves", "liquity-v1:deposits", "liquity-v1:stakes", "liquity-v2:deposits"],
   );
 });
 
@@ -114,7 +119,7 @@ test("a listing that fails is named; the others' rows stand", async () => {
     r.failed.map((f) => f.what),
     ["Liquity V2 Stability Pool deposits"],
   );
-  assert.equal(r.rows.length, 2);
+  assert.equal(r.rows.length, 3);
 });
 
 test("a listing that hangs fails alone at its own wait", async () => {
@@ -127,7 +132,7 @@ test("a listing that hangs fails alone at its own wait", async () => {
     ["Liquity V2 Stability Pool deposits"],
   );
   assert.match(r.failed[0].error, /no answer/);
-  assert.equal(r.rows.length, 2);
+  assert.equal(r.rows.length, 3);
 });
 
 test("a listing that answers part of the wallet counts as failed", async () => {
@@ -143,8 +148,8 @@ test("a listing that answers part of the wallet counts as failed", async () => {
 test("the summary carries the listing rows and their failures", async () => {
   v2sp = "fail";
   const s = await readSummary(W, signal());
-  assert.equal(s.total, 2);
-  assert.equal(s.open, 2);
+  assert.equal(s.total, 3);
+  assert.equal(s.open, 3);
   assert.deepEqual(
     s.listingFailed.map((f) => f.what),
     ["Liquity V2 Stability Pool deposits"],
@@ -155,17 +160,17 @@ test("counts: partial while a listing failed, and not kept; whole and kept after
   v2sp = "fail";
   const first = await readWalletCounts(W);
   assert.deepEqual(first.partial, ["Liquity V2 Stability Pool deposits"]);
-  assert.equal(first.total, 2);
+  assert.equal(first.total, 3);
   await new Promise((r) => setTimeout(r, 0));
   v2sp = "ok";
   calls = [];
   const second = await readWalletCounts(W);
   assert.ok(calls.length > 0, "a partial answer is read again");
   assert.equal(second.partial, undefined);
-  assert.equal(second.total, 3);
+  assert.equal(second.total, 4);
   assert.deepEqual(
     second.families.map((f) => `${f.family}:${f.positions}`),
-    ["liquity-v1:2", "liquity-v2:1"],
+    ["liquity-v1:3", "liquity-v2:1"],
   );
   await new Promise((r) => setTimeout(r, 0));
   calls = [];
@@ -266,4 +271,48 @@ test("a gain with no price, or a stale chain read, fails the deposit's head read
     depositPos("liquity-v1-deposit", { depositor: W }),
   ]);
   assert.equal(stale.positions[0].headRead, "failed");
+});
+
+const { liquityV1StakeHead } = await import("../../lib/wallet/families/liquity-listing.ts");
+
+test("V1 stake head: the LUSD fees at $1 and the ETH fees at the read's PriceFeed price; the LQTY not valued", async () => {
+  const chain = (extra = {}) => ({
+    staker: W,
+    blockNumber: 26463047,
+    blockTimestamp: 0,
+    stakeRaw: `100${E18}`,
+    lusdGainRaw: `2${E18}`,
+    ethGainRaw: `1${E18.slice(3)}`, // 0.001 ETH
+    totalStakedRaw: null,
+    priceRaw: `3000${E18}`,
+    priceStale: false,
+    ...extra,
+  });
+  const pos = {
+    chain: 1,
+    family: "liquity-v1",
+    familyName: "x",
+    positionId: `stake:${W}`,
+    href: "/x",
+    status: "open",
+    kind: "stakes",
+    card: { kind: "liquity-v1-stake", row: { staker: W } },
+    headRead: "none",
+  };
+  const { positions } = await liquityV1StakeHead(async () => chain())([pos]);
+  const p = positions[0];
+  assert.equal(p.headRead, "read");
+  assert.equal(p.collateralUsd, 5);
+  assert.deepEqual(
+    p.usdParts.map((x) => [x.label, x.usd, x.source]),
+    [
+      ["LUSD fees", 2, "LUSD's $1 face"],
+      ["ETH fees", 3, "the Liquity V1 PriceFeed's fetchPrice at block 26,463,047"],
+      ["LQTY", null, "not valued"],
+    ],
+  );
+  assert.equal(p.usdSource, "LUSD's $1 face and the Liquity V1 PriceFeed's fetchPrice at block 26,463,047");
+  assert.equal(p.card.head.stakeRaw, `100${E18}`);
+  const noPrice = await liquityV1StakeHead(async () => chain({ priceRaw: null }))([pos]);
+  assert.equal(noPrice.positions[0].headRead, "failed");
 });
