@@ -7,7 +7,9 @@
  * From sm it opens a panel in the page, in the toolbar's `slot` under the row
  * and above the results: the filters that open a sub-view at the left, the
  * Size ranges in the middle, the section's other filters and the primary
- * button at the right; a second press on the button closes it.
+ * button at the right; while it is open the results under it are dimmed and
+ * inert, and a second press on the button or a press outside the panel
+ * closes it.
  * The sheet lists one row per dimension, its name at the left and the current
  * choice with a chevron at the right; a row opens that dimension's options
  * (multi, or single with three or more) as a sub-view with its own back
@@ -178,6 +180,31 @@ export function FilterSheet<F>({
   useEffect(() => {
     onPanelOpenChangeRef.current?.(panelOpen);
   }, [panelOpen]);
+  // While the panel is open in the page, what follows it on the page (the
+  // results, the paging) stands back as the row does: dimmed
+  // (`[data-filters-dimmed]`, globals.css) and inert.
+  useEffect(() => {
+    if (!panelOpen || !slot) return;
+    const held: { el: HTMLElement; inert: boolean }[] = [];
+    for (
+      let at: HTMLElement | null = slot;
+      at && at.tagName !== "MAIN" && at !== document.body;
+      at = at.parentElement
+    ) {
+      for (let sib = at.nextElementSibling; sib; sib = sib.nextElementSibling) {
+        if (!(sib instanceof HTMLElement)) continue;
+        held.push({ el: sib, inert: sib.inert });
+        sib.inert = true;
+        sib.setAttribute("data-filters-dimmed", "");
+      }
+    }
+    return () => {
+      for (const { el, inert } of held) {
+        el.inert = inert;
+        el.removeAttribute("data-filters-dimmed");
+      }
+    };
+  }, [panelOpen, slot]);
   // The badge counts what the pills show set: groups off their default.
   const active = activeGroupCount(groupDimensions(dimensions, filters), filters);
 
@@ -490,11 +517,21 @@ function Sheet<F>({
         first.focus();
       }
     };
+    // In the page a press outside the panel and its button closes it and
+    // drops the edits, as Escape does (a press on the dimmed, inert results
+    // lands on an ancestor of theirs).
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (modal || !t || panelRef.current?.contains(t) || buttonRef.current?.contains(t)) return;
+      closeSheetRef.current();
+    };
     document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onDown);
     const prev = document.body.style.overflow;
     if (modal) document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onDown);
       if (modal) document.body.style.overflow = prev;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reads refs only
