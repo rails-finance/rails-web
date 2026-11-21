@@ -3,7 +3,17 @@
 import { useState } from "react";
 import Link from "next/link";
 import { LwNotice } from "@/components/shared/lw-attribution";
-import { Activity, DraftingCompass, FileText, Home, Info, LayoutGrid, ReceiptText, Signpost } from "lucide-react";
+import {
+  Activity,
+  DraftingCompass,
+  FileText,
+  Home,
+  Info,
+  LayoutGrid,
+  ReceiptText,
+  Signpost,
+  Vault,
+} from "lucide-react";
 import { INPLACE_TEXT, NAV_LINK } from "@/lib/shared/ui-grammar";
 import { DonateModal } from "@/components/site/DonateModal";
 import { LiquityModal } from "@/components/site/LiquityModal";
@@ -149,6 +159,12 @@ export function SiteFooter() {
                   <Link href="/about/provenance" className={`flex items-center gap-2 text-sm duration-150 ${NAV_LINK}`}>
                     <ReceiptText className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Receipts</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/vaults" className={`flex items-center gap-2 text-sm duration-150 ${NAV_LINK}`}>
+                    <Vault className="w-4 h-4 shrink-0" aria-hidden="true" />
+                    <span>Vaults</span>
                   </Link>
                 </li>
                 <li>

@@ -6,9 +6,10 @@
 // heading under them; the chain's explorers stand in two columns below, the most
 // used shown and "View all <n> explorers" opening /protocols on that chain
 // (lib/shared/explorer-rank.ts; decision 0068 point 7, ui-jobs 781). Under
-// the chooser, a plain Assets link (Vaults joins at its launch, ui-jobs 775). The coverage pages are reached from the
-// home directory and the site footer, not from here (Miles, 5 Nov 2026). It opens on Ethereum, the first chain, whatever the page's chain (Miles,
-// 4 Nov 2026).
+// the chooser, a Vaults row (ui-jobs 775) in the explorer rows' shape, one
+// for every chain. The coverage pages are reached from the home directory and
+// the site footer, not from here (Miles, 5 Nov 2026). It opens on Ethereum, the
+// first chain, whatever the page's chain (Miles, 4 Nov 2026).
 //
 // Under the asset preference (ui-jobs 557) only the explorers that list one of
 // the reader's assets stand here, every one of them on its chain, and only the
@@ -20,6 +21,7 @@
 
 import { CHROME_HOVER } from "@/components/nav/chrome-hover";
 import { useState } from "react";
+import { Vault } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CHAINS, MAINNET_CHAIN_ID, ROBINHOOD_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
@@ -182,6 +184,23 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
             </Link>
           )}
         </nav>
+      )}
+      {/* Vaults (ui-jobs 775): the cross-chain index, a row in the explorer rows'
+          shape under the roster. Not an explorer (no data-switcher-explorer),
+          and absent under the asset preference, which narrows to explorers. */}
+      {!filtering && (
+        <Link
+          href="/vaults"
+          onClick={onNavigate}
+          data-chooser-vaults=""
+          aria-current={pathname === "/vaults" ? "page" : undefined}
+          className={`-mx-2 mt-2 flex min-w-0 items-center gap-2.5 rounded-lg border border-transparent px-[7px] py-[11px] text-sm transition-colors focus-ring ${
+            pathname === "/vaults" ? ROW_CURRENT : ROW_REST
+          }`}
+        >
+          <Vault className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <span className="truncate">Vaults</span>
+        </Link>
       )}
       <ScopeNote scoped={roster} noun={["explorer", "explorers"]} className="mt-3" />
     </div>
