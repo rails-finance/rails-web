@@ -1,15 +1,16 @@
 "use client";
 
 // ListToolbar — the shared listing-page filter strip (N1, ui-jobs 801): the
-// search as an icon that opens into its field and stays open while it holds a
-// query, the Filters button (N1.8.1) that opens every filter, one pill per
-// filter group that is set or rests on a default (N1.10, ui-jobs 681), the
-// sort (N1.3), the ⋮ (N1.7), and the count (N1.6) with Clear all. From sm one
-// wrapping row: [search] [Filters] [pills] [Clear all (two or more set)] and,
-// right-aligned as one group that wraps together, [count] [sort] [⋮]. Below
-// sm: the open search field alone; one row that scrolls sideways and never
-// wraps, led by the search icon and the Filters button; then Reset at the
-// left and the count, sort and ⋮ at the right. From sm the Filters button
+// Filters button (N1.8.1) that opens every filter, one pill per filter group
+// that is set or rests on a default (N1.10, ui-jobs 681), Clear all, and at
+// the right the count (N1.6), the search as an icon that opens into its field
+// and stays open while it holds a query (N1.1), the sort (N1.3) and the ⋮
+// (N1.7). From sm one wrapping row: [Filters] [pills] [Clear all (two or more
+// set)] and, right-aligned as one group that wraps together, [count] [search]
+// [sort] [⋮]. Below sm: one row that scrolls sideways and never wraps, led by
+// the Filters button; then Reset at the left and the count, the search, the
+// sort and ⋮ at the right, the open search field taking the count's room.
+// From sm the Filters button
 // opens its panel under the row, and while it is open the row's other
 // controls are dimmed and inert. A page passes its dimension registry and
 // param object; the toolbar holds no filter state beyond which editor is
@@ -165,10 +166,12 @@ export function ListToolbar<F extends BaseListFilters>({
   useFlip(rowRef, ordered.map((p) => p.name).join("|"));
 
   const editorCount = count ?? sheetCount;
+  // Below sm the open search field takes the count's room in the line.
+  const countAside = search && searchOpen ? "max-sm:hidden" : "";
   const countLine =
     countNode != null ? (
       <span
-        className={`min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED}`}
+        className={`min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED} ${countAside}`}
         data-anatomy="N1.6"
         data-prov-exempt=""
       >
@@ -176,7 +179,7 @@ export function ListToolbar<F extends BaseListFilters>({
       </span>
     ) : count ? (
       <span
-        className={`min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED}`}
+        className={`min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED} ${countAside}`}
         data-anatomy="N1.6"
         data-result-count={count.total}
         data-prov-exempt=""
@@ -195,47 +198,15 @@ export function ListToolbar<F extends BaseListFilters>({
       {...ctrlWaking(hydrated)}
     >
       <div className="flex flex-wrap items-center gap-2">
-        {/* The shared search's look (H15); the listing's own behaviour: the
-            query filters this explorer, family identifiers included. */}
-        {search && searchOpen && (
-          <div className="contents" inert={panelOpen}>
-            <SearchBox
-              value={filters.q}
-              onChange={(q) => onChange({ ...filters, q })}
-              placeholder={searchPlaceholder}
-              size="pill"
-              anatomy="N1.1 H15"
-              inputRef={searchRef}
-              onKeyDown={onSearchKeyDown}
-              onFocus={() => setSearchOpened(true)}
-              onBlur={() => setSearchOpened(false)}
-              className={`max-sm:basis-full sm:min-w-[220px] sm:flex-[0_1_300px] ${PANEL_OPEN_DIM}`}
-            />
-          </div>
-        )}
         {/* Below sm one sideways-scrolling row with a fade at its right edge;
             from sm its pills join the wrapping row (display: contents). */}
-        <div className="relative max-sm:-mx-4 max-sm:mt-1 max-sm:min-w-0 max-sm:basis-[calc(100%+2rem)] sm:contents">
+        <div className="relative max-sm:-mx-4 max-sm:min-w-0 max-sm:basis-[calc(100%+2rem)] sm:contents">
           <div
             ref={rowRef}
             className="flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:contents [&::-webkit-scrollbar]:hidden"
             data-pill-row=""
             data-anatomy="N1.2"
           >
-            {search && !searchOpen && (
-              <button
-                type="button"
-                onClick={openSearch}
-                disabled={panelOpen}
-                className={`${PILL_ICON_BUTTON} ${PANEL_OPEN_DIM}`}
-                aria-label={searchPlaceholder}
-                title={searchPlaceholder}
-                data-search-open=""
-                data-anatomy="N1.1"
-              >
-                <Search className="w-[18px] h-[18px]" aria-hidden="true" />
-              </button>
-            )}
             <FilterSheet
               dimensions={dimensions}
               filters={filters}
@@ -303,6 +274,37 @@ export function ListToolbar<F extends BaseListFilters>({
           inert={panelOpen}
         >
           {countLine}
+          {/* The search, at the right before the sort (Miles, 21 Nov 2026):
+              an icon until pressed, then the shared search's field (H15),
+              which opens leftward; the listing's own behaviour: the query
+              filters this explorer, family identifiers included. */}
+          {search && !searchOpen && (
+            <button
+              type="button"
+              onClick={openSearch}
+              className={PILL_ICON_BUTTON}
+              aria-label={searchPlaceholder}
+              title={searchPlaceholder}
+              data-search-open=""
+              data-anatomy="N1.1"
+            >
+              <Search className="w-[18px] h-[18px]" aria-hidden="true" />
+            </button>
+          )}
+          {search && searchOpen && (
+            <SearchBox
+              value={filters.q}
+              onChange={(q) => onChange({ ...filters, q })}
+              placeholder={searchPlaceholder}
+              size="pill"
+              anatomy="N1.1 H15"
+              inputRef={searchRef}
+              onKeyDown={onSearchKeyDown}
+              onFocus={() => setSearchOpened(true)}
+              onBlur={() => setSearchOpened(false)}
+              className="min-w-0 max-sm:flex-1 sm:w-[300px]"
+            />
+          )}
           {sortOptions.length > 0 && (
             <SortPill
               options={sortOptions}
