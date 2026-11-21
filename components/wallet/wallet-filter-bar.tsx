@@ -47,12 +47,12 @@ export function WalletFilterBar({
   /** Opens another URL of the page, under a transition. */
   navigate: (href: string) => void;
 }) {
-  // A pill with one option chooses nothing and is left out, unless the URL
-  // chose it; with none left, the bar is.
+  // A pill with one option chooses nothing and is left out, whatever the URL
+  // chose (Miles, 21 Nov 2026); with none left, the bar is.
   const dims = [
-    ...(held.length > 1 || protocol ? [protocolDimension<WalletPillFilters>(held)] : []),
-    ...(statuses.length > 1 || status ? [statusDimension<WalletPillFilters>()] : []),
-    ...(offered.length > 1 || kinds.length > 0 ? [kindDimension<WalletPillFilters>(offered)] : []),
+    ...(held.length > 1 ? [protocolDimension<WalletPillFilters>(held)] : []),
+    ...(statuses.length > 1 ? [statusDimension<WalletPillFilters>()] : []),
+    ...(offered.length > 1 ? [kindDimension<WalletPillFilters>(offered)] : []),
   ];
   if (dims.length === 0) return null;
   const filters: WalletPillFilters = { q: "", sortBy: "risk", sortOrder: "asc", protocol, kinds, status };
