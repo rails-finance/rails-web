@@ -524,7 +524,7 @@ export function WithdrawalLine({
   if (!w || !prov || statedWithdrawalBlock(answerBlock, w.block) == null) return null;
   return (
     <span data-sp-coll-withdrawn={w.block}>
-      The admin withdrew the pool&rsquo;s collateral at block{" "}
+      The admin withdrew the branch&rsquo;s collateral at block{" "}
       <Prov info={prov} value={String(w.block)}>
         {w.block.toLocaleString("en-US")}
       </Prov>{" "}
