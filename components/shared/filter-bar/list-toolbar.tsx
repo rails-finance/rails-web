@@ -270,7 +270,7 @@ export function ListToolbar<F extends BaseListFilters>({
             beside the sort, where a 343px row cannot hold all three on one
             line. */}
         <div
-          className={`order-1 ml-auto flex min-h-11 min-w-0 items-center gap-3 sm:min-h-10 sm:shrink-0 ${PANEL_OPEN_DIM}`}
+          className={`order-1 ml-auto flex min-h-11 min-w-0 items-center gap-3 sm:min-h-10 sm:shrink-0 ${search && searchOpen ? "max-sm:flex-1" : ""} ${PANEL_OPEN_DIM}`}
           inert={panelOpen}
         >
           {countLine}
@@ -302,7 +302,7 @@ export function ListToolbar<F extends BaseListFilters>({
               onKeyDown={onSearchKeyDown}
               onFocus={() => setSearchOpened(true)}
               onBlur={() => setSearchOpened(false)}
-              className="min-w-0 max-sm:flex-1 sm:w-[300px]"
+              className="min-w-0 max-sm:flex-[1_1_0%] sm:w-[300px]"
             />
           )}
           {sortOptions.length > 0 && (
