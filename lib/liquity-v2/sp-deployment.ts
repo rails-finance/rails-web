@@ -16,6 +16,7 @@ import { BASEDOLLAR_BRANCHES, DEBT_ADDRESS as BD, DEBT_SYMBOL as BD_SYMBOL } fro
 import { EBISU_BRANCHES, DEBT_ADDRESS as EBUSD, DEBT_SYMBOL as EBUSD_SYMBOL } from "@/lib/ebisu/asset-catalog";
 import { LIQUITY_V2_SP_POOLS } from "./sp-catalog";
 import { LIQUITY_V2_BASE_PATH, LIQUITY_V2_SP_PATH } from "./sp-routes";
+import { walletProtocolHref } from "@/lib/wallet/wallet-filters";
 
 export type SpDeploymentId = "liquity-v2" | "asymmetry" | "basedollar" | "ebisu";
 
@@ -201,5 +202,5 @@ export function spDepositHref(dep: SpDeployment, collateralType: string, deposit
   return `${dep.spPath}/${spPool(dep, collateralType)?.symbol ?? collateralType}/${depositor.toLowerCase()}`;
 }
 
-/** The depositor's search on the deployment's deposit listing. */
-export const spWalletHref = (dep: SpDeployment, depositor: string): string => `${dep.spPath}?q=${depositor}`;
+/** The depositor on the wallet page, the deployment chosen (ui-jobs 738). */
+export const spWalletHref = (dep: SpDeployment, depositor: string): string => walletProtocolHref(depositor, dep.id);

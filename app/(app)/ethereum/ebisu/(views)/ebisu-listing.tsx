@@ -1,9 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { formerHoldFor } from "@/lib/liquity-fork/former-holders";
-import { useForkHolderView } from "@/components/protocol/liquity/fork-holder-search";
-
 // Ebisu Trove listing — client half. One row per Trove (across 5 collateral branches),
 // replayed straight from the Ebisu TroveUpdated events — chain-direct values only
 // (branch collateral + ebUSD debt, user-set interest rate, status). There is no
@@ -31,12 +27,6 @@ export interface EbisuListingProps {
 }
 
 export function EbisuListing({ initialItems, initialTotal, initialKey, initialSearch }: EbisuListingProps) {
-  // The search, so a Trove the searched wallet passed on reads "moved to"
-  // (lib/liquity-fork/former-holders.ts).
-  const [q, setQ] = useState(() => new URLSearchParams(initialSearch ?? "").get("q") ?? "");
-  // A wallet search: the holder strip above the Troves and the wallet's
-  // Stability Pool deposits under them (rails-ops TO-DO-stability-pool-deposits §1b).
-  const holder = useForkHolderView("ebisu", q);
   return (
     <ChainTruthListingPage<EbisuTroveSummary, EbisuListFilters>
       title="Ebisu Troves"
@@ -45,8 +35,8 @@ export function EbisuListing({ initialItems, initialTotal, initialKey, initialSe
       defaults={EBISU_LIST_DEFAULTS}
       sortOptions={EBISU_SORT_OPTIONS}
       searchPlaceholder="Search trove id or collateral"
-      renderCard={(t) => <EbisuPositionCard v={{ ...viewFromSummary(t), formerHold: formerHoldFor(t, q) }} compact />}
-      onFilters={(filters) => setQ(filters.q ?? "")}
+      renderCard={(t) => <EbisuPositionCard v={viewFromSummary(t)} compact />}
+      walletSearch="ebisu"
       hrefFor={(t) => `/ethereum/ebisu/${t.collateralType}/${t.id}`}
       keyFor={(t) => `${t.collateralType}-${t.id}`}
       strategy={memoryStrategy<EbisuTroveSummary, EbisuListFilters>({
@@ -55,8 +45,6 @@ export function EbisuListing({ initialItems, initialTotal, initialKey, initialSe
         dimensions: ebisuListDimensions,
         apply: EBISU_APPLY,
       })}
-      renderAbove={holder.renderAbove}
-      renderBelow={holder.renderBelow}
       initialItems={initialItems}
       initialTotal={initialTotal}
       initialKey={initialKey}

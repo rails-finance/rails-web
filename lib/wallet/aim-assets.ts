@@ -60,6 +60,9 @@ export function walletPositionAssetKeys(p: WalletPosition): string[] {
     case "liquity-v2-deposit":
       symbols.push("BOLD", c.row.collateral_type);
       break;
+    case "fork-deposit":
+      symbols.push(FORK_DEBT[c.fork], c.row.collateral_type);
+      break;
     case "liquity-v1":
     case "liquity-v1-deposit":
       symbols.push("LUSD", "ETH");

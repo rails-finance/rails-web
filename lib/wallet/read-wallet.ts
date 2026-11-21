@@ -22,6 +22,7 @@ import {
   liquityV1StakeSummaryRow,
   liquityV1TroveSummaryRow,
   liquityV2DepositSummaryRow,
+  forkDepositSummaryRow,
 } from "@/lib/wallet/listing-summary-rows";
 import { readLiquityV1Positions } from "@/lib/liquity-v1/proxy-reads";
 import { answerBody, routeBoxHop } from "@/lib/shared/proxy-answer";
@@ -33,7 +34,15 @@ import { aaveV3Base, aaveV3Ethereum, spark } from "@/lib/wallet/families/aave";
 import { compoundV3Base, compoundV3Ethereum } from "@/lib/wallet/families/compound";
 import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/families/ethereum-single";
 import { aaveV3Arbitrum, compoundV3Arbitrum, morphoArbitrum } from "@/lib/wallet/families/arbitrum";
-import { asymmetry, basedollar, ebisu } from "@/lib/wallet/families/liquity-forks";
+import {
+  asymmetry,
+  asymmetryDeposits,
+  basedollar,
+  basedollarDeposits,
+  ebisu,
+  ebisuDeposits,
+} from "@/lib/wallet/families/liquity-forks";
+import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
 import { withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
@@ -67,8 +76,11 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   spark,
   fluid,
   ebisu,
+  ebisuDeposits,
   asymmetry,
+  asymmetryDeposits,
   basedollar,
+  basedollarDeposits,
 ];
 
 /** The families the page reads, by chain, in one sentence for the empty
@@ -112,8 +124,9 @@ export const LISTING_BUDGET_MS = 4000;
 /**
  * The rows wallet_positions does not hold yet, read from the protocol
  * listings' routes for the wallet: Liquity V1's Troves, its Stability Pool
- * deposit, and Liquity V2's deposits (ui-jobs 794). Every status, newest
- * first. A read that fails leaves its rows out and names its module.
+ * deposit, and the deposits on Liquity V2 (ui-jobs 794) and its forks
+ * (ui-jobs 738). Every status, newest first. A read that fails leaves its rows
+ * out and names its module.
  */
 export async function readListingRows(
   address: string,
@@ -161,6 +174,22 @@ export async function readListingRows(
         return { rows: r.rows.map((d) => liquityV2DepositSummaryRow(d, address)), total: r.pagination.total };
       },
     },
+    ...[ebisuDeposits, asymmetryDeposits, basedollarDeposits].map((module) => {
+      const dep = SP_DEPLOYMENTS[module.summaryFamily as "ebisu" | "asymmetry" | "basedollar"];
+      const fork = { id: dep.id, chain: module.summaryChain, stable: dep.stable.symbol, spPath: dep.spPath };
+      return {
+        module,
+        what: `${dep.name} Stability Pool deposits`,
+        read: async (signal: AbortSignal) => {
+          const r = await readLiquityV2Sp<LiquityV2DepositListResponse<string>>("stability-pool", list, {
+            ...hop,
+            signal,
+            api: dep.api,
+          });
+          return { rows: r.rows.map((d) => forkDepositSummaryRow(d, address, fork)), total: r.pagination.total };
+        },
+      };
+    }),
   ];
   const settled = await Promise.allSettled(
     reads.map(async (r) => {

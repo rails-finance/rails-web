@@ -8,6 +8,7 @@ import { fetchEbisuTroves } from "@/lib/api/fetch-ebisu-troves";
 import { ebisuListDimensions, EBISU_LIST_DEFAULTS } from "@/lib/ebisu/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { redirectWalletSearch } from "@/lib/wallet/wallet-search-redirect";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -23,6 +24,8 @@ export const metadata = listingMetadata({
 async function EbisuListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = ebisuListDimensions([]);
   const sp = toURLSearchParams(await searchParams);
+  // A wallet search opens the wallet page (ui-jobs 738).
+  redirectWalletSearch(sp, "ebisu");
   const { filters, page } = ssrDecode(dims, sp, EBISU_LIST_DEFAULTS);
 
   const initial = await ssrInitial({

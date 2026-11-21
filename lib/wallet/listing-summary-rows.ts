@@ -1,6 +1,6 @@
 // The wallet read's rows for the kinds wallet_positions does not hold yet:
 // Liquity V1 Troves and LQTY stakes, and the Stability Pool deposits on
-// Liquity V1 and V2 (ui-jobs 794). Each row is shaped from the protocol
+// Liquity V1, V2 (ui-jobs 794) and V2's forks (ui-jobs 738). Each row is shaped from the protocol
 // listing's row for the wallet, as rails-server's listing route answers it,
 // into the summary row the family modules take, with the listing row as its
 // `card`. A deposit row carries `kind: "deposits"` and a stake row
@@ -63,10 +63,11 @@ function depositRow(
   market: string | null,
   symbol: string,
   href: string,
+  chain: WalletSummaryRow["chain"] = "ethereum",
 ): WalletSummaryRow {
   const open = r.status === "open";
   return {
-    chain: "ethereum",
+    chain,
     family,
     kind: "deposits",
     positionId,
@@ -115,6 +116,24 @@ export const liquityV2DepositSummaryRow = (r: LiquityV2DepositRow, owner: string
     r.collateral_type,
     "BOLD",
     `${V2_SP_PATH}/${r.collateral_type}/${r.depositor.toLowerCase()}`,
+  );
+
+/** One branch pool's deposit on a Liquity V2 fork: its deployment's slug,
+ *  chain, stablecoin and deposit listing's path. */
+export const forkDepositSummaryRow = (
+  r: LiquityV2DepositRow<string>,
+  owner: string,
+  fork: { id: string; chain: WalletSummaryRow["chain"]; stable: string; spPath: string },
+): WalletSummaryRow =>
+  depositRow(
+    r as LiquityV2DepositRow,
+    owner,
+    fork.id,
+    `${r.collateral_type}:${r.depositor.toLowerCase()}`,
+    r.collateral_type,
+    fork.stable,
+    `${fork.spPath}/${r.collateral_type}/${r.depositor.toLowerCase()}`,
+    fork.chain,
   );
 
 /** The one LQTY stake an address holds in Liquity V1's LQTYStaking. Its id

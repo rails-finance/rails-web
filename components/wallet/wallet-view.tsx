@@ -20,7 +20,13 @@ import { useRouter } from "next/navigation";
 import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
 import { WalletHeader } from "@/components/wallet/wallet-header";
 import { WalletFilterBar } from "@/components/wallet/wallet-filter-bar";
-import { walletProtocol, type WalletKind, type WalletStatus } from "@/lib/wallet/wallet-filters";
+import {
+  walletProtocol,
+  WALLET_KINDS,
+  WALLET_STATUSES,
+  type WalletKind,
+  type WalletStatus,
+} from "@/lib/wallet/wallet-filters";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { WalletLookup } from "@/components/shared/wallet-lookup";
@@ -345,6 +351,10 @@ export function WalletView({
       address={address}
       protocol={read.protocol}
       held={read.held}
+      statuses={WALLET_STATUSES.map((s) => s.value).filter((s) =>
+        scoped.rows.some((p) => (s === "open") === (p.status === "open")),
+      )}
+      offered={WALLET_KINDS.map((k) => k.value).filter((k) => scoped.rows.some((p) => p.kind === k))}
       kinds={kinds}
       setKinds={setKinds}
       status={status}

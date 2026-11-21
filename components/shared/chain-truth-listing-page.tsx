@@ -18,6 +18,8 @@
 // facets, sort and search can't drift or go missing per protocol.
 
 import { listingSearchNote } from "@/lib/shared/listing-search";
+import { useRouter } from "next/navigation";
+import { walletSearchHref } from "@/lib/wallet/wallet-filters";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChainTruthListing, ListingUnavailable } from "@/components/shared/chain-truth-listing";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -123,6 +125,11 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
   /** False: no search box, for a page that names its subject (the wallet
    *  page's protocol listing, ui-jobs 738). */
   search?: boolean;
+  /** The wallet page's protocol slug, on a family whose listings send a
+   *  search by a whole address or an ENS name to /wallet/<wallet>?protocol=
+   *  (`WALLET_SEARCH_FAMILIES`, ui-jobs 738); the box keeps searching the
+   *  family's identifiers. */
+  walletSearch?: string;
   renderCard: (item: T) => ReactNode;
   hrefFor: (item: T) => string;
   keyFor: (item: T) => string;
@@ -217,6 +224,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   sortOptions,
   searchPlaceholder,
   search,
+  walletSearch,
   renderCard,
   hrefFor,
   keyFor,
@@ -397,8 +405,15 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
     };
   }, [strategy.kind, filters, page, retryTick]);
 
+  const router = useRouter();
   const pushFilters = useCallback(
     (next: F, nextPage: number) => {
+      // A wallet named in the search opens the wallet page.
+      const wallet = walletSearchHref(walletSearch, next.q);
+      if (wallet) {
+        router.push(wallet);
+        return;
+      }
       const qs = encodeListFilters(dims, next, defaults);
       if (nextPage > 1) qs.set("page", String(nextPage));
       const s = qs.toString().replace(/%2C/gi, ",");
@@ -418,7 +433,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
       // pushState doesn't fire popstate; nudge useUrlSearchParams to re-read.
       notifyUrlChanged();
     },
-    [dims, defaults, basePath],
+    [dims, defaults, basePath, walletSearch, router],
   );
 
   // Reconcile seam (opt-in, server tier): once the external state resolves, drop

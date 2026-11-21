@@ -1,9 +1,11 @@
-// Liquity V2's adapter onto the shared holder strip — what a wallet search
-// states about the wallet above its own trove cards.
+// Liquity V2's adapter onto the shared holder strip — what the wallet page's
+// Liquity V2 section (lib/wallet/wallet-sections.ts) and the wallet's share
+// card (lib/liquity/share-card.ts) state about the wallet's Troves and
+// Stability Pool deposits. The listing draws no band since a wallet search
+// there opens the wallet page (ui-jobs 738).
 //
-// A pure function of the two responses the listing already holds: the rows the
-// search returned (`/api/troves?ownerAddress=…`) and the ONE oracle read the
-// listing side-fetches on mount (`/api/oracle/liquity-v2`, the same read every
+// A pure function of the wallet's Trove rows (`/api/troves?ownerAddress=…`)
+// and the ONE branch-price read (`/api/oracle/liquity-v2`, the same read every
 // card's USD and collateral ratio come from). It fetches nothing.
 //
 // V2 IS POLARIS'S MIRROR, and the units say why. Every trove owes BOLD, so the
@@ -17,8 +19,8 @@
 // position card's figure: compact, the token's icon, the USD line. The rows are
 // each trove's figures as of its last touch, as the cards below are, so the
 // legs wear no ≈ where the cards wear none; the tip and the receipt say what
-// built up since. `positions` lets the listing's band draw from two troves and
-// its totals from two open ones (components/shared/holder-strip.tsx); the
+// built up since. `positions` lets the band draw from two troves and its totals
+// from two open ones (components/shared/holder-strip.tsx); the
 // share card reads the same model whole.
 //
 // A ZOMBIE TROVE IS AN OPEN ONE — redeemed below the minimum debt, still on

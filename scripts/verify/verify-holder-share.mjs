@@ -21,7 +21,8 @@
 //      as holding more than one page states its count and no totals;
 //   e  the same for Liquity V2, in its own units;
 //   f  the URL a reader ends up with carries the wallet and nothing else —
-//      `?q=<wallet>` on both explorers, where it used to carry a
+//      `?q=<wallet>` on Polaris and `/wallet/<wallet>?protocol=liquity-v2` on
+//      Liquity V2 (ui-jobs 738), where it used to carry a
 //      `status=open,closed,liquidated` that said what the absent param already
 //      said. The explorers that DON'T declare a contextual default are
 //      untouched: on /ethereum/spark clearing Status still writes an explicit
@@ -271,7 +272,10 @@ const v2StaticBytes = (await readImage(V2_STATIC)).bytes;
 info("V0. the explorer's static roster card", `${V2_STATIC}, ${v2StaticBytes.length} bytes`);
 
 const vShareUrl = `/api/share/liquity-v2-wallet?q=${V2_WALLET}`;
-const vMeta = await readMeta(`/ethereum/liquity-v2?q=${V2_WALLET}`);
+// A wallet search on the listing redirects to the wallet page with Liquity V2
+// chosen (ui-jobs 738); that page advertises the same card.
+const vWalletUrl = `/wallet/${V2_WALLET}?protocol=liquity-v2`;
+const vMeta = await readMeta(vWalletUrl);
 check(
   "A5. og:image and twitter:image on V2's wallet page are its own share route",
   rel(vMeta.ogImage) === vShareUrl && rel(vMeta.twitterImage) === vShareUrl,
@@ -280,9 +284,9 @@ check(
 {
   const c = new URL(vMeta.canonical ?? "https://x.invalid/");
   check(
-    "A6. …and the canonical is `/ethereum/liquity-v2?q=<wallet>` with no other param",
-    c.pathname === "/ethereum/liquity-v2" &&
-      c.searchParams.get("q") === V2_WALLET &&
+    "A6. …and the canonical is `/wallet/<wallet>?protocol=liquity-v2` with no other param",
+    c.pathname === `/wallet/${V2_WALLET}` &&
+      c.searchParams.get("protocol") === "liquity-v2" &&
       [...c.searchParams.keys()].length === 1,
     rel(vMeta.canonical),
   );
@@ -292,6 +296,14 @@ check(
   vMeta.ogTitle?.toLowerCase() === `Rails | Liquity V2 Troves held by ${short(V2_WALLET)}`.toLowerCase(),
   `"${vMeta.ogTitle}"`,
 );
+{
+  const res = await fetch(`${BASE}/ethereum/liquity-v2?q=${V2_WALLET}`, { redirect: "manual" });
+  check(
+    "A8. an old `/ethereum/liquity-v2?q=<wallet>` link redirects to that wallet page",
+    res.status >= 300 && res.status < 400 && rel(new URL(res.headers.get("location") ?? "", BASE).href) === vWalletUrl,
+    `${res.status} ${res.headers.get("location")}`,
+  );
+}
 const vImage = await readImage(vShareUrl);
 check(
   "B3. V2's wallet card renders — 200 image/png, not the static card, short edge cache",
@@ -302,11 +314,11 @@ check(
   `${vImage.status} ${vImage.contentType}, ${vImage.bytes.length} bytes, ${vImage.cacheControl}`,
 );
 {
-  const meta = await readMeta(`/ethereum/liquity-v2?q=${NONSENSE_ENS}`);
+  const img = await readImage(`/api/share/liquity-v2-wallet?q=${encodeURIComponent(NONSENSE_ENS)}`);
   check(
-    "C3. V2: an ENS that resolves to nothing keeps the static card",
-    rel(meta.ogImage) === V2_STATIC,
-    rel(meta.ogImage),
+    "C3. V2: the share route answers an ENS that resolves to nothing with the static card",
+    img.status === 200 && img.contentType === "image/png" && img.bytes.equals(v2StaticBytes),
+    `${img.status} ${img.contentType}, ${img.bytes.length} bytes`,
   );
 }
 
@@ -550,8 +562,12 @@ async function statedTotal(page) {
 {
   const page = await openListing(context, `${BASE}/ethereum/liquity-v2`);
   await searchWallet(page, V2_WALLET);
-  const search = await page.evaluate(() => location.search);
-  check("F2. Liquity V2: the same — ?q=<wallet> alone", search === `?q=${V2_WALLET}`, `"${search}"`);
+  const at = await page.evaluate(() => location.pathname + location.search);
+  check(
+    "F2. Liquity V2: a wallet search opens /wallet/<wallet>?protocol=liquity-v2",
+    at === `/wallet/${V2_WALLET}?protocol=liquity-v2`,
+    `"${at}"`,
+  );
   await page.close();
 }
 

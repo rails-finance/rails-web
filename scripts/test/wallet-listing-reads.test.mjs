@@ -1,5 +1,5 @@
-// The wallet read's listing reads (rails-ops ui-jobs 794): beside the summary
-// route, the Liquity V1 Trove and the V1 and V2 deposit listings. A read that
+// The wallet read's listing reads (rails-ops ui-jobs 794, 738): beside the
+// summary route, the Liquity V1 Trove and the V1, V2 and fork deposit listings. A read that
 // fails, hangs past its own wait or answers part of the wallet is named and
 // leaves the answer partial; a partial counts answer is never kept; the page
 // and the counts read take the same rows. The backend is a stubbed fetch.
@@ -40,8 +40,10 @@ process.env.RAILS_API_URL = "http://box.test";
 const W = "0x2291f52bddc937b5b840d15e551e1da8c80c2b3c";
 const E18 = "000000000000000000";
 
-// The backend, by route. `v2sp` sets how the V2 deposit listing answers.
+// The backend, by route. `v2sp` sets how the V2 deposit listing answers;
+// `ebisuSp` the rows Ebisu's deposit listing answers (the other forks' none).
 let v2sp = "ok";
+let ebisuSp = [];
 let calls = [];
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -95,6 +97,10 @@ globalThis.fetch = async (input, init = {}) => {
       pagination: { total: 1 },
     });
   }
+  if (url.pathname === "/api/ebisu/stability-pool")
+    return json({ rows: ebisuSp, pagination: { total: ebisuSp.length } });
+  if (url.pathname === "/api/asymmetry/stability-pool" || url.pathname === "/api/basedollar/stability-pool")
+    return json({ rows: [], pagination: { total: 0 } });
   return json({ error: `no stub for ${url.pathname}` }, 404);
 };
 
@@ -110,6 +116,29 @@ test("every listing answers: the rows of each kind, nothing failed", async () =>
     r.rows.map((x) => `${x.family}:${x.kind ?? "troves"}`),
     ["liquity-v1:troves", "liquity-v1:deposits", "liquity-v1:stakes", "liquity-v2:deposits"],
   );
+});
+
+test("a fork's deposits read from its deposit listing, under the fork's slug", async () => {
+  v2sp = "ok";
+  ebisuSp = [
+    {
+      collateral_type: "WBTC",
+      depositor: W,
+      status: "closed",
+      deposit_raw: "0",
+      deposited_raw: `9${E18}`,
+      tx_count: 2,
+    },
+  ];
+  const r = await readListingRows(W, signal());
+  ebisuSp = [];
+  assert.deepEqual(r.failed, []);
+  const fork = r.rows.find((x) => x.family === "ebisu");
+  assert.equal(fork.kind, "deposits");
+  assert.equal(fork.chain, "ethereum");
+  assert.equal(fork.positionId, `WBTC:${W}`);
+  assert.equal(fork.href, `/ethereum/ebisu/stability-pool/WBTC/${W}`);
+  assert.equal(fork.collateral.symbol, "ebUSD");
 });
 
 test("a listing that fails is named; the others' rows stand", async () => {

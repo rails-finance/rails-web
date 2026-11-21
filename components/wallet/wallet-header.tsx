@@ -1,8 +1,7 @@
 "use client";
 
-// The wallet page's heading (W1) under Back's row (H7), shared by the view of
-// every protocol (wallet-view.tsx) and a protocol's listing on the wallet page
-// (wallet-protocol-listing.tsx).
+// The wallet page's heading (W1) under Back's row (H7), drawn by the wallet
+// view (wallet-view.tsx).
 
 import type { ReactNode } from "react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";

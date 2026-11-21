@@ -1,10 +1,10 @@
 "use client";
 
 // The wallet page's filter bar (W8, ui-jobs 738): the listings' toolbar (N1)
-// with no search, a Protocol pill, a Status pill and a Kind pill. Choosing a
-// protocol opens the page for that protocol alone, which reads it alone (the
-// page dims while it reads, `navigate`); Status and Kind narrow the cards
-// already read.
+// with no search, a Protocol pill, a Status pill and a Kind pill, each drawn
+// where it offers more than one option. Choosing a protocol opens the page for
+// that protocol alone, which reads it alone (the page dims while it reads,
+// `navigate`); Status and Kind narrow the cards already read.
 
 import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
 import {
@@ -12,8 +12,6 @@ import {
   protocolDimension,
   statusDimension,
   walletHref,
-  walletProtocol,
-  WALLET_KINDS,
   type WalletKind,
   type WalletPillFilters,
   type WalletProtocolCount,
@@ -24,6 +22,8 @@ export function WalletFilterBar({
   address,
   protocol,
   held,
+  statuses,
+  offered,
   kinds,
   setKinds,
   status,
@@ -34,6 +34,10 @@ export function WalletFilterBar({
   address: string;
   protocol?: string;
   held: WalletProtocolCount[];
+  /** The statuses the positions read take: the Status pill's options. */
+  statuses: WalletStatus[];
+  /** The kinds the positions read take: the Kind pill's options. */
+  offered: WalletKind[];
   kinds: WalletKind[];
   setKinds: (k: WalletKind[]) => void;
   status?: WalletStatus;
@@ -43,16 +47,14 @@ export function WalletFilterBar({
   /** Opens another URL of the page, under a transition. */
   navigate: (href: string) => void;
 }) {
-  // The kinds on offer: the chosen protocol's where it holds more than one,
-  // every kind the held protocols hold otherwise.
-  const offered = protocol
-    ? (walletProtocol(protocol)?.kinds ?? [])
-    : WALLET_KINDS.map((k) => k.value).filter((k) => held.some((h) => walletProtocol(h.slug)?.kinds.includes(k)));
+  // A pill with one option chooses nothing and is left out, unless the URL
+  // chose it; with none left, the bar is.
   const dims = [
-    protocolDimension<WalletPillFilters>(held),
-    statusDimension<WalletPillFilters>(),
-    ...(offered.length > 1 ? [kindDimension<WalletPillFilters>(offered)] : []),
+    ...(held.length > 1 || protocol ? [protocolDimension<WalletPillFilters>(held)] : []),
+    ...(statuses.length > 1 || status ? [statusDimension<WalletPillFilters>()] : []),
+    ...(offered.length > 1 || kinds.length > 0 ? [kindDimension<WalletPillFilters>(offered)] : []),
   ];
+  if (dims.length === 0) return null;
   const filters: WalletPillFilters = { q: "", sortBy: "risk", sortOrder: "asc", protocol, kinds, status };
   return (
     <div data-wallet-filters="" data-anatomy="W8" data-prov-exempt="" className="-mb-6">

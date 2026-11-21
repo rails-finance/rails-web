@@ -30,7 +30,9 @@ import { SparkPositionCard, viewFromSummary as sparkView } from "@/components/pr
 import { FluidPositionCard, viewFromSummary as fluidView } from "@/components/protocol/fluid/fluid-position-card";
 import { MakerVaultCard, viewFromSummary as makerView } from "@/components/protocol/makerdao/makerdao-vault-card";
 import { LiquityPositionCard, viewFromForkSummary } from "@/components/protocol/liquity-family/liquity-position-card";
-import { viewFromTroveSummary } from "@/lib/liquity/trove-card-view";
+import { liquityV2TroveCard } from "@/lib/liquity-v2/listing-cards";
+import { forkDepositListingCard } from "@/lib/liquity-fork/deposit-card";
+import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
 import {
   LiquityV1PositionCard,
   viewFromSummary as liquityV1View,
@@ -98,14 +100,7 @@ function FamilyCard({ card }: { card: WalletCard }) {
     case "makerdao":
       return <MakerVaultCard v={makerView(card.row)} surface="listing" />;
     case "liquity-v2":
-      return (
-        <LiquityPositionCard
-          protocol="liquity-v2"
-          surface="listing"
-          v={viewFromTroveSummary(card.row, card.prices)}
-          compact
-        />
-      );
+      return liquityV2TroveCard(card.row, card.prices);
     case "liquity-v2-deposit":
       return (
         <LiquityV2DepositCard
@@ -152,6 +147,8 @@ function FamilyCard({ card }: { card: WalletCard }) {
           compact
         />
       );
+    case "fork-deposit":
+      return forkDepositListingCard(SP_DEPLOYMENTS[card.fork])(card.row);
   }
 }
 

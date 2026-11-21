@@ -64,7 +64,10 @@ export type WalletCard =
   | { kind: "liquity-v1-stake"; row: LiquityV1StakeRow; head?: LiquityV1StakeChain }
   | { kind: "ebisu"; row: EbisuTroveSummary }
   | { kind: "asymmetry"; row: AsymmetryTroveSummary }
-  | { kind: "basedollar"; row: BasedollarTroveSummary };
+  | { kind: "basedollar"; row: BasedollarTroveSummary }
+  /** A Liquity V2 fork's Stability Pool deposit: its deposit listing's row,
+   *  as stored (no head read). */
+  | { kind: "fork-deposit"; fork: "ebisu" | "asymmetry" | "basedollar"; row: LiquityV2DepositRow<string> };
 
 /** A closed position's row in the History table: what the store states, each
  *  field absent where it states nothing. */

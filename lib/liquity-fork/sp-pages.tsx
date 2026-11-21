@@ -17,6 +17,7 @@ import { assetKey } from "@/lib/shared/asset-family";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { SpDepositPage } from "@/components/protocol/liquity/sp-deposit-page";
 import { ForkSpListing } from "@/components/protocol/liquity/fork-sp-listing";
+import { redirectWalletSearch } from "@/lib/wallet/wallet-search-redirect";
 import { fetchSpPage, spListDimensions, SP_LIST_DEFAULTS } from "@/lib/liquity-v2/sp-listing";
 import { loadSpDeposit } from "@/lib/liquity-v2/sp-page-data";
 import { normalizeDepositor } from "@/lib/liquity-v2/sp-routes";
@@ -55,6 +56,8 @@ export async function ForkSpListingPage({
   const dep = SP_DEPLOYMENTS[fork];
   const dims = spListDimensions();
   const sp = toURLSearchParams(await searchParams);
+  // A depositor search opens the wallet page (ui-jobs 738).
+  redirectWalletSearch(sp, fork);
   const { filters, page } = ssrDecode(dims, sp, SP_LIST_DEFAULTS);
   const initial = await ssrInitial({
     dims,

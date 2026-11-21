@@ -9,6 +9,7 @@ import { fetchBasedollarTroves } from "@/lib/api/fetch-basedollar-troves";
 import { basedollarListDimensions, BASEDOLLAR_LIST_DEFAULTS } from "@/lib/basedollar/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { redirectWalletSearch } from "@/lib/wallet/wallet-search-redirect";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -24,6 +25,8 @@ export const metadata = listingMetadata({
 async function BasedollarListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = basedollarListDimensions([]);
   const sp = toURLSearchParams(await searchParams);
+  // A wallet search opens the wallet page (ui-jobs 738).
+  redirectWalletSearch(sp, "basedollar");
   const { filters, page } = ssrDecode(dims, sp, BASEDOLLAR_LIST_DEFAULTS);
 
   const initial = await ssrInitial({

@@ -14,9 +14,8 @@ import type { LiquityFamilyId } from "./types";
  * Trove identifier — owner address + Trove ID label + NFT/OpenSea link,
  * rendered as inline text (no pill chrome) so it sits cleanly next to the
  * status pill in the summary-card header. The owner falls back to the last
- * known owner once a trove is closed/liquidated, and clicking it re-filters
- * the listing in place via `?q=` (the listing's tri-modal search — there's
- * no standalone address page).
+ * known owner once a trove is closed/liquidated, and clicking it opens the
+ * wallet page with the family chosen (`listingHrefForWallet`, ui-jobs 738).
  *
  * Generalised off Liquity V2's original (the retired
  * components/trove/trove-identity-row.tsx) to the whole family: `protocol` selects the
