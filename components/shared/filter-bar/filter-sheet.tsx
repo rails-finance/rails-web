@@ -108,6 +108,8 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [href], [tabin
 /** The groups the sheet draws together as one section, and its heading. */
 const SECTION_GROUPS = ["Size", "Transactions", "History"];
 const SECTION_TITLE = "Size and history";
+/** In the page a column's last row has no rule under it. */
+const LAST_ROW_OPEN = "[&>li:last-child]:border-b-0";
 
 /** The dimension back at its default. */
 const resetDim = <F,>(dim: FilterDimension<F>, f: F): F => dim.set(f, dim.defaultValues?.(f) ?? []);
@@ -539,8 +541,8 @@ function Sheet<F>({
         <h2 id="filter-sheet-title" className="pb-4 text-base font-semibold" data-anatomy="N1.8.2">
           Filters
         </h2>
-        <div className={`grid gap-x-8 gap-y-4 ${columns} lg:divide-x lg:divide-rb-200 dark:lg:divide-rb-800`}>
-          <div className="min-w-0">
+        <div className={`grid gap-y-4 ${columns} lg:divide-x lg:divide-rb-200 dark:lg:divide-rb-800`}>
+          <div className="min-w-0 lg:pr-8">
             {openDim ? (
               <>
                 <div className="flex h-12 items-center gap-1 border-b border-rb-200 dark:border-rb-800">
@@ -561,13 +563,13 @@ function Sheet<F>({
                 </div>
               </>
             ) : (
-              <ul>{plain.map(dimRow)}</ul>
+              <ul className={LAST_ROW_OPEN}>{plain.map(dimRow)}</ul>
             )}
           </div>
           {section.length > 0 && (
-            <div className="min-w-0 lg:pl-8" data-filter-sheet-section="" data-anatomy="N1.8.10">
+            <div className="min-w-0 lg:px-8" data-filter-sheet-section="" data-anatomy="N1.8.10">
               {sectionHead}
-              <ul>{sectionA.map(dimRow)}</ul>
+              <ul className={LAST_ROW_OPEN}>{sectionA.map(dimRow)}</ul>
             </div>
           )}
           <div className="flex min-w-0 flex-col lg:pl-8">
@@ -577,7 +579,7 @@ function Sheet<F>({
                 <div className="invisible max-lg:hidden" aria-hidden="true">
                   {sectionHead}
                 </div>
-                <ul>{sectionB.map(dimRow)}</ul>
+                <ul className={LAST_ROW_OPEN}>{sectionB.map(dimRow)}</ul>
               </>
             )}
             <div className="mt-auto flex items-center justify-end gap-4 pt-6" data-anatomy="N1.8.8">
