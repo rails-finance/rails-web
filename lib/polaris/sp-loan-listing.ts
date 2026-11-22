@@ -5,9 +5,9 @@
 //
 // The search box reads what the CDP listing's does (lib/polaris/search.ts): a
 // number (a deposit names its market first, "usdp:40"; a bare number reads
-// both pools), a holder address, or an ENS name, resolved here first. Naming
-// one relaxes the resting Status default (Open) to every status, the CDP
-// listing's middle path. Deposit and Gain sorts appear once a market is
+// both pools), a holder address, or an ENS name, resolved here first. Status
+// is Open / Closed / All (ui-jobs 805, sp-loan-visibility.ts): naming one rests
+// it on All. Deposit and Gain sorts appear once a market is
 // chosen: the two pools' deposits are different tokens.
 
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
@@ -16,7 +16,9 @@ import type { BaseListFilters, SerializableDimension } from "@/lib/shared/list-f
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import { resolveEnsViaApi } from "@/lib/shared/listing-search";
 import { normalizeMarket, type PolarisMarket } from "@/lib/polaris/asset-catalog";
-import { namesIdentity, parsePolarisSearch } from "@/lib/polaris/search";
+import { parsePolarisSearch } from "@/lib/polaris/search";
+import { defaultStatusChoice, statusChoice, statusParam } from "@/lib/polaris/sp-loan-visibility";
+import { readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 import {
   readPolarisSpLoans,
   type PolarisDepositListResponse,
@@ -30,12 +32,14 @@ export const SP_LOAN_ITEMS_PER_PAGE = 20;
 
 export interface PolarisDepositFilters extends BaseListFilters {
   market: string[];
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
   vault: string[];
   tx: string[];
 }
 
 export interface PolarisLoanFilters extends BaseListFilters {
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
   tx: string[];
 }
@@ -58,37 +62,21 @@ export const LOAN_LIST_DEFAULTS: PolarisLoanFilters = {
   tx: [],
 };
 
-const STATUSES = ["open", "closed"] as const;
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-];
-
-/** Open while browsing, every status once the search names a holder or a number. */
-const defaultStatuses = (f: { q?: string }): string[] => (namesIdentity(f.q) ? [...STATUSES] : ["open"]);
-const canonical = (v: string[]) => STATUSES.filter((s) => v.includes(s));
-export const effectiveStatuses = (f: { q?: string; status: string[] }): string[] => {
-  const sel = canonical(f.status);
-  return sel.length > 0 ? sel : defaultStatuses(f);
-};
-
 function statusDimension<F extends BaseListFilters & { status: string[] }>(): SerializableDimension<F> {
   return {
     id: "status",
     label: "Status",
     group: "Status",
-    cardinality: "multi",
+    cardinality: "single",
     param: "status",
-    options: STATUS_OPTIONS,
-    get: (f) => effectiveStatuses(f),
-    defaultValues: (f) => defaultStatuses(f),
-    defaultChip: (f) => (defaultStatuses(f).length < STATUSES.length ? "Status: Open" : null),
-    clearDefault: (f) => ({ ...f, status: [...STATUSES] }),
+    options: STATUS_CHOICE_OPTIONS,
+    segmented: true,
+    get: (f) => [statusChoice(f)],
+    defaultValues: (f) => [defaultStatusChoice(f)],
+    // Takes the choice, or an old link's list of statuses (ui-jobs 805).
     set: (f, v) => {
-      const sel = canonical(v);
-      const def = defaultStatuses(f);
-      const same = sel.length === def.length && sel.every((s) => def.includes(s));
-      return { ...f, status: sel.length === 0 || same ? [] : sel };
+      const choice = readStatusParam(v).choice ?? defaultStatusChoice(f);
+      return { ...f, status: choice === defaultStatusChoice(f) ? [] : [choice] };
     },
   };
 }
@@ -156,6 +144,8 @@ interface Hop {
   baseUrl?: string;
   signal?: AbortSignal;
   headers?: HeadersInit;
+  /** Rows asked for; a page's worth by default (one for a draft's count). */
+  limit?: number;
 }
 
 /** The holder the search names, as an address: an ENS name resolves first.
@@ -166,11 +156,6 @@ async function holderOf(q: string, hop: Hop): Promise<string | undefined | null>
   if (ownerEns) return (await resolveEnsViaApi(ownerEns, hop.baseUrl, hop.signal))?.toLowerCase() ?? null;
   return undefined;
 }
-
-const statusParam = (f: { q: string; status: string[] }) => {
-  const s = effectiveStatuses(f);
-  return s.length === STATUSES.length ? undefined : s.join(",");
-};
 
 export async function fetchDepositPage(
   filters: PolarisDepositFilters,
@@ -190,6 +175,7 @@ export async function fetchDepositPage(
         ? "tx"
         : "recent";
   const { minTx, maxTx } = transactionBounds(filters.tx);
+  const limit = hop.limit ?? SP_LOAN_ITEMS_PER_PAGE;
   const params = {
     wallet,
     status: statusParam(filters),
@@ -198,8 +184,8 @@ export async function fetchDepositPage(
     maxTx: maxTx?.toString(),
     sortBy,
     sortOrder: filters.sortOrder,
-    limit: String(SP_LOAN_ITEMS_PER_PAGE),
-    offset: String((page - 1) * SP_LOAN_ITEMS_PER_PAGE),
+    limit: String(limit),
+    offset: String((page - 1) * limit),
   };
   const opts = { baseUrl: hop.baseUrl, headers: hop.headers, signal: hop.signal };
   // A token id is per pool: a bare number reads both.
@@ -228,6 +214,7 @@ export async function fetchLoanPage(
   if (wallet === null) return { data: [], total: 0 };
   const { cdpId } = parsePolarisSearch(filters.q);
   const { minTx, maxTx } = transactionBounds(filters.tx);
+  const limit = hop.limit ?? SP_LOAN_ITEMS_PER_PAGE;
   const r = await readPolarisSpLoans<PolarisLoanListResponse>(
     "reserve-loans",
     {
@@ -238,8 +225,8 @@ export async function fetchLoanPage(
       maxTx: maxTx?.toString(),
       sortBy: LOAN_SORT_OPTIONS.some((o) => o.value === filters.sortBy) ? filters.sortBy : "recent",
       sortOrder: filters.sortOrder,
-      limit: String(SP_LOAN_ITEMS_PER_PAGE),
-      offset: String((page - 1) * SP_LOAN_ITEMS_PER_PAGE),
+      limit: String(limit),
+      offset: String((page - 1) * limit),
     },
     { baseUrl: hop.baseUrl, headers: hop.headers, signal: hop.signal },
   );

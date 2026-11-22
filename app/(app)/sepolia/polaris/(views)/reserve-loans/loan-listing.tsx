@@ -15,6 +15,7 @@ import { polarisHolderStrip } from "@/lib/polaris/holder-strip";
 import { POLARIS_DEPOSITS, polarisCdpKind, polarisLoanListingCard } from "@/lib/polaris/holder-kinds";
 import { POLARIS_ITEMS_PER_PAGE } from "@/lib/polaris/list-filter-dimensions";
 import { namesHolder } from "@/lib/polaris/search";
+import { loanCountLine } from "@/lib/polaris/sp-loan-visibility";
 import { readListQuery } from "@/lib/shared/list-filter";
 import { useUrlSearchParams } from "@/lib/shared/use-url-search-params";
 import type { PolarisPositionSummary } from "@/lib/sources/api/polaris-positions";
@@ -73,6 +74,7 @@ export function LoanListing(props: {
       basePath={POLARIS_LOANS_PATH}
       identity={<RailHeader session="polaris" venue="subPage" stamp />}
       titleHidden
+      countLine={loanCountLine}
       defaults={LOAN_LIST_DEFAULTS}
       sortOptions={LOAN_SORT_OPTIONS}
       searchPlaceholder="Address, ENS, or loan number"
@@ -83,6 +85,8 @@ export function LoanListing(props: {
         dimensions: loanListDimensions(),
         itemsPerPage: SP_LOAN_ITEMS_PER_PAGE,
         fetchPage: (f, page) => fetchLoanPage(f, page),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (f) => fetchLoanPage(f, 1, { limit: 1 }).then((r) => r.total),
       })}
       renderAbove={({ items, total, filters }) => holderStrip(items, total, filters)}
       renderBelow={() => <HolderKinds kinds={otherKinds} reads={reads} wallet={wallet} />}

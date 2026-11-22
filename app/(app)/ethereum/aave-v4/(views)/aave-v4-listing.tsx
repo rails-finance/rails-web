@@ -25,6 +25,7 @@ import { useWalletContext } from "@/components/nav/wallet-context";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import { fetchAaveV4SpokePositions, type AaveV4SpokePositionRow } from "@/lib/api/fetch-aave-v4-spoke-positions";
 import { fetchAaveV4AssetUniverse, type AaveV4AssetUniverseEntry } from "@/lib/api/fetch-aave-v4-asset-universe";
+import { aaveV4CountLine } from "@/lib/aave-v4/listing-visibility";
 import { slugifySpoke } from "@/lib/aave-v4/spoke-meta";
 import {
   aaveV4ListDimensions,
@@ -110,6 +111,7 @@ export function AaveV4Listing({ initialItems, initialTotal, initialKey, initialS
     <ChainTruthListingPage<AaveV4SpokePositionRow, AaveV4ListFilters, AaveV4AssetUniverseEntry[]>
       title="Aave V4 Positions"
       noun="positions"
+      countLine={aaveV4CountLine}
       basePath="/ethereum/aave-v4"
       defaults={AAVE_V4_LIST_DEFAULTS}
       sortOptions={AAVE_V4_SORT_OPTIONS}
@@ -129,6 +131,11 @@ export function AaveV4Listing({ initialItems, initialTotal, initialKey, initialS
             data: r.rows,
             total: r.total,
           })),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchAaveV4SpokePositions({ ...aaveV4FiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.total,
+          ),
       })}
       onFilters={onFilters}
       initialItems={initialItems}

@@ -6,7 +6,7 @@
 // backend is the filter.
 //
 // Facets that ship LIVE (backend + proxy honor the params):
-//   • Status     — open / closed (lifecycle over mv_fluid_positions).
+//   • Status     — Open / Closed / All (ui-jobs 805), over mv_fluid_positions.
 //   • Size       — a Debt range in the vault's borrow token
 //     (lib/shared/size-dimensions.ts), sent as minDebt / maxDebt. A smart
 //     vault with no single borrow token has no figure and sits outside any
@@ -32,13 +32,8 @@ import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { FetchFluidPositionsParams } from "@/lib/api/fetch-fluid-positions";
-import {
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  isAllStatuses,
-  sameStatusSet,
-} from "@/lib/fluid/listing-visibility";
+import { defaultStatusChoice, fluidStatusBuckets, statusChoice } from "@/lib/fluid/listing-visibility";
+import { readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const FLUID_ITEMS_PER_PAGE = 20;
@@ -56,7 +51,7 @@ const FLUID_SIZE_NOTE =
   "Debt in the vault's borrow token; smart vaults with no single borrow token sit outside any bound.";
 
 export interface FluidListFilters extends BaseListFilters {
-  /** open / closed — multi (OR). Lifecycle over mv_fluid_positions. */
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
   /** Debt range in the borrow token, one encodeRange value or [] for no
    *  bound. URL param `debt`, read from the old `state` too. */
@@ -73,9 +68,7 @@ export interface FluidListFilters extends BaseListFilters {
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
 // listing-visibility.ts resolves it per context — the open positions on the bare directory,
-// every status once the search names an identity. Because the default is contextual rather
-// than a selection it draws no chip and no Reset link, and a cleared selection resolves back
-// to what the context rests on.
+// every status once the search names an identity.
 export const FLUID_LIST_DEFAULTS: FluidListFilters = {
   q: "",
   sortBy: "lastActivity",
@@ -93,11 +86,6 @@ export const FLUID_SORT_OPTIONS: SortOption[] = [
   { value: "debt", label: "Debt size" },
   { value: "collateral", label: "Collateral size" },
   { value: "events", label: "Event count" },
-];
-
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
 ];
 
 const LIQUIDATION_OPTIONS: FilterOptionDef[] = [
@@ -118,16 +106,16 @@ export function fluidListDimensions(
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses (ui-jobs 805).
       set: (f, v) => {
-        const sel = canonicalStatuses(v);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
+        const choice = readStatusParam(v).choice ?? defaultStatusChoice(f);
+        return { ...f, status: choice === defaultStatusChoice(f) ? [] : [choice] };
       },
     },
     ...sizeDimensions<FluidListFilters>({
@@ -193,8 +181,8 @@ export function fluidFiltersToFetchParams(filters: FluidListFilters, page: numbe
   return {
     wallet: q && !/^\d+$/.test(q) ? q : undefined,
     nft: q && /^\d+$/.test(q) ? q : undefined,
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // All maps to no status filter.
+    status: fluidStatusBuckets(filters),
     // The old Position dropdown's flags for the two Debt ranges it maps to.
     hasDebt: filters.debt[0] === "1-" ? true : undefined,
     noDebt: filters.debt[0] === "-0" ? true : undefined,

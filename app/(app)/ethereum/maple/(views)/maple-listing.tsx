@@ -5,6 +5,7 @@
 // page.tsx. The driver owns the toolbar, pagination, debounced search and the
 // fetch lifecycle; this file is just the Maple-specific config.
 
+import { mapleCountLine } from "@/lib/maple/listing-visibility";
 import type { MaplePositionSummary } from "@/lib/sources/api/maple-positions";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { fetchMaplePositions } from "@/lib/api/fetch-maple-positions";
@@ -34,6 +35,7 @@ export function MapleListing({ initialItems, initialTotal, initialKey, initialSe
     <ChainTruthListingPage<MaplePositionSummary, MapleListFilters>
       title="Maple Positions"
       noun="positions"
+      countLine={mapleCountLine}
       basePath="/ethereum/maple"
       defaults={MAPLE_LIST_DEFAULTS}
       sortOptions={MAPLE_SORT_OPTIONS}
@@ -52,6 +54,11 @@ export function MapleListing({ initialItems, initialTotal, initialKey, initialSe
             data: r.data,
             total: r.pagination.total,
           })),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchMaplePositions({ ...mapleFiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

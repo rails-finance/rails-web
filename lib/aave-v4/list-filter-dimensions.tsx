@@ -40,13 +40,17 @@ import {
   type AaveV4Show,
 } from "@/lib/aave-v4/list-filter-types";
 import {
-  bucketsToWireStatuses,
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  sameStatusSet,
-  type AaveV4StatusBucket,
+  aaveV4StatusBuckets,
+  defaultStatusChoice,
+  endedByLiquidation,
+  statusChoice,
 } from "@/lib/aave-v4/listing-visibility";
+import {
+  ENDED_BY_LIQUIDATION,
+  readStatusParam,
+  STATUS_CHOICE_OPTIONS,
+  type StatusChoice,
+} from "@/lib/shared/status-choice";
 import { parseAaveV4Search } from "@/lib/aave-v4/search";
 import type { AaveV4AssetUniverseEntry } from "@/lib/api/fetch-aave-v4-asset-universe";
 import {
@@ -80,7 +84,11 @@ export interface AaveV4ListFilters extends BaseListFilters {
   coll: string[];
   health: AaveV4Health;
   liquidations: AaveV4Liquidations;
-  statuses?: AaveV4StatusBucket[];
+  /** One of open / closed / all, or undefined for the resting choice (ui-jobs 805). */
+  statuses?: StatusChoice[];
+  /** "" | "liquidated" — with Closed, the positions that ended by liquidation.
+   *  URL param `ended`. */
+  ended: string[];
   show?: AaveV4Show;
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx?: string[];
@@ -102,6 +110,7 @@ export const AAVE_V4_LIST_DEFAULTS: AaveV4ListFilters = {
   coll: [],
   health: "all",
   liquidations: "all",
+  ended: [],
 };
 
 // UI labels → backend sort fields.
@@ -208,30 +217,46 @@ export function aaveV4ListDimensions(
   const spokeOptions = spokeOptionsForHubs(filters.hubs);
   const { supplyOptions, borrowOptions } = assetSideOptions(universe ?? []);
 
-  // Lifecycle status — the STRUCTURAL axis: open | closed. Liquidation is NOT a
-  // status here (Aave liquidations are partial/survivable) — it's the orthogonal
-  // History toggle below. The default is contextual (open while browsing, both
-  // buckets once the search names a holder); `set` writes undefined when the
-  // selection is empty or equals that default, keeping it out of the URL.
+  // Lifecycle status — the STRUCTURAL axis: Open / Closed / All (ui-jobs 805).
+  // Liquidation is NOT a status here (Aave liquidations are partial/survivable) —
+  // it's the orthogonal History toggle below. The default is contextual (Open
+  // while browsing, All once the search names a holder); `set` writes undefined
+  // when the choice equals that default, keeping it out of the URL.
   const status: SerializableDimension<AaveV4ListFilters> = {
     id: "status",
     label: "Status",
     group: "Status",
-    cardinality: "multi",
+    cardinality: "single",
     param: "status",
-    options: [
-      { value: "open", label: "Open" },
-      { value: "closed", label: "Closed" },
-    ],
-    get: (f) => effectiveStatuses(f),
-    defaultValues: (f) => defaultStatuses(f),
-    defaultChip: (f) => (defaultStatuses(f).length < 2 ? "Status: Open" : null),
-    clearDefault: (f) => ({ ...f, statuses: ["open", "closed"] }),
+    options: STATUS_CHOICE_OPTIONS,
+    segmented: true,
+    get: (f) => [statusChoice(f)],
+    defaultValues: (f) => [defaultStatusChoice(f)],
+    // Takes the choice, or an old link's list of statuses (ui-jobs 805).
     set: (f, values) => {
-      const sel = canonicalStatuses(values);
-      return { ...f, statuses: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? undefined : sel };
+      const read = readStatusParam(values);
+      const choice = read.choice ?? defaultStatusChoice(f);
+      return {
+        ...f,
+        statuses: choice === defaultStatusChoice(f) ? undefined : [choice],
+        ended: choice !== "closed" ? [] : read.endedByLiquidation ? [ENDED_BY_LIQUIDATION] : f.ended,
+      };
     },
-    chipLabel: (vals, opts) => `Status: ${joinOptionLabels(canonicalStatuses(vals), opts)}`,
+  };
+
+  const ended: SerializableDimension<AaveV4ListFilters> = {
+    id: "ended",
+    label: "Closed by liquidation",
+    // Its own group, for its pill; in the panel it sits under Status.
+    group: "Closed by liquidation",
+    cardinality: "single",
+    param: "ended",
+    options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
+    // Offered with Closed, which it narrows.
+    available: (f) => statusChoice(f) === "closed",
+    get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
+    set: (f, v) => ({ ...f, ended: v }),
+    chipLabel: () => "Closed by liquidation",
   };
 
   // Liquidatable: HF below 1.0, a factual on-chain state. The `state` param
@@ -249,17 +274,17 @@ export function aaveV4ListDimensions(
   };
 
   // Liquidation history — orthogonal to current state (a position can be Borrowing
-  // now AND have been liquidated before). A lone toggle under a "History" header.
+  // now AND have been liquidated before). A lone toggle under History.
   const liquidated: SerializableDimension<AaveV4ListFilters> = {
     id: "liquidations",
-    label: "History",
-    group: "Status",
+    label: "Liquidated before",
+    group: "History",
     cardinality: "single",
     param: "liquidations",
     options: [{ value: "with", label: "Liquidated before" }],
     get: (f) => (f.liquidations === "with" ? ["with"] : []),
     set: (f, values) => ({ ...f, liquidations: values[0] === "with" ? "with" : "all" }),
-    chipLabel: bareLabel,
+    chipLabel: () => "Liquidated before",
   };
 
   const hubs: SerializableDimension<AaveV4ListFilters> = {
@@ -348,7 +373,7 @@ export function aaveV4ListDimensions(
     collLabel: "Supply",
   });
 
-  return [status, state, liquidated, hubs, spokes, supplying, borrowing, ...size, transactions, dust];
+  return [status, ended, state, liquidated, hubs, spokes, supplying, borrowing, ...size, transactions, dust];
 }
 
 /** Map the decoded selection + page onto the spoke-positions fetch params — the
@@ -368,14 +393,10 @@ export function aaveV4FiltersToFetchParams(filters: AaveV4ListFilters, page: num
     healthBelow: filters.health === "underwater" ? 1.0 : undefined,
     // Dust → server floor; the open/closed axis is the `status` filter, not a USD cut.
     minTotalUsd: effectiveAaveV4Show(filters) === "nodust" ? AAVE_V4_DUST_USD : undefined,
-    // Lifecycle status buckets → wire statuses ("closed" expands to closed +
-    // liquidated). Sent for every selection, the full set included. An absent
-    // `status` does NOT mean "no restriction" on this index: api/src/routes/aaveV4.ts
-    // rests an unscoped listing on ["open"], and its token for no restriction is the
-    // explicit "all". Measured 2026-09-20 — no param and status=open both answer
-    // 3,931; the three buckets answer 7,507 — so omitting it made Closed a chip that
-    // changed the URL and not the list.
-    status: bucketsToWireStatuses(effectiveStatuses(filters)),
+    // The choice → wire statuses (Closed expands to closed + liquidated), sent for
+    // every choice: an absent `status` does NOT mean "no restriction" on this index
+    // (api/src/routes/aaveV4.ts rests an unscoped listing on ["open"]).
+    status: aaveV4StatusBuckets(filters),
     ...transactionBounds(filters.tx ?? []),
     sortBy: filters.sortBy as AaveV4SpokePositionSort,
     sortOrder: filters.sortOrder,
