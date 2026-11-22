@@ -38,7 +38,7 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
-  assetCountHead,
+  assetsHead,
 } from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
@@ -348,17 +348,18 @@ export function useDolomiteCardSlots({
   const borrowId = /^Borrow Position #(.+)$/.test(v.accountLabel) ? accountNumberId(v.accountNumber) : undefined;
   const tag = borrowId ? <ListingTag id={borrowId} /> : <ListingTag market={wlfi ? "WLFI" : v.accountLabel} />;
 
-  // Closed / liquidated: every par is back at zero, so the heads are what each
-  // market lane held at its height, the highest recorded par. The LIQUIDATED
+  // Closed / liquidated: every par is back at zero, so each side states the
+  // markets it held, and what each market lane held at its height, the highest
+  // recorded par, opens behind the press under the peak label (C19). The LIQUIDATED
   // outcome appears only here: an open survivor never reaches this branch,
   // however many liquidations its meta cluster counts.
   let heads: PositionCardHead[];
   let outcome: PositionCardOutcome | undefined;
   if (v.status !== "open") {
-    // Many markets: their count opens the peaks, so the head holds one line.
-    const many = (lines: DolomitePeakAmount[], side: "supply" | "debt") =>
-      lines.length > 1
-        ? assetCountHead(
+    const held = (lines: DolomitePeakAmount[], side: "supply" | "debt") =>
+      lines.length > 0
+        ? assetsHead(
+            side === "supply" ? CARD_VOCAB.peakCollateral : CARD_VOCAB.peakDebt,
             lines.map((r) => ({ symbol: r.symbol, address: r.token ?? null })),
             <span className="text-sm font-semibold tabular-nums text-foreground">
               <PeakLines lines={lines} side={side} iconSize={16} />
@@ -368,15 +369,15 @@ export function useDolomiteCardSlots({
     heads = [
       {
         id: "peak-collateral",
-        label: CARD_VOCAB.peakCollateral,
-        value: v.peakSupplies.length > 0 ? <PeakLines lines={v.peakSupplies} side="supply" /> : null,
-        ...many(v.peakSupplies, "supply"),
+        label: CARD_VOCAB.collateral,
+        value: null,
+        ...held(v.peakSupplies, "supply"),
       },
       {
         id: "peak-debt",
-        label: CARD_VOCAB.peakDebt,
-        value: v.peakBorrows.length > 0 ? <PeakLines lines={v.peakBorrows} side="debt" /> : null,
-        ...many(v.peakBorrows, "debt"),
+        label: CARD_VOCAB.debt,
+        value: null,
+        ...held(v.peakBorrows, "debt"),
       },
     ];
     outcome = {

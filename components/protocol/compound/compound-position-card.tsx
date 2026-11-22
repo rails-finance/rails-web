@@ -37,7 +37,7 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
-  assetCountHead,
+  assetsHead,
 } from "@/components/shared/position-card";
 import type { PositionCardMetaProps } from "@/components/shared/position-card-meta";
 import { AssetAmount } from "@/components/shared/asset-amount";
@@ -491,15 +491,21 @@ export function useCompoundCardSlots({
         label: plan.label === "supply" ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
         value: supplyLines.length > 0 ? <div className="flex flex-col gap-1">{supplyLines}</div> : null,
         sub: noPeaksNote,
-        // Many collateral assets: their count opens the peaks, the lent base
-        // after them under its caption, so the head holds one line.
+        // Two or more collateral assets: the head states them as the account
+        // families' closed heads do, under the open card's label, and their
+        // peaks, the lent base after them under its caption, open behind the
+        // press under the peak label (C19).
         ...(peaks && plan.count != null
-          ? assetCountHead(
-              v.peak.collateral.map((c) => ({ symbol: c.symbol, address: c.address })),
-              <div className="flex flex-col gap-1 text-sm font-semibold tabular-nums text-foreground">
-                {supplyLinesOf(16)}
-              </div>,
-            )
+          ? {
+              label: CARD_VOCAB.collateral,
+              ...assetsHead(
+                CARD_VOCAB.peakCollateral,
+                v.peak.collateral.map((c) => ({ symbol: c.symbol, address: c.address })),
+                <div className="flex flex-col gap-1 text-sm font-semibold tabular-nums text-foreground">
+                  {supplyLinesOf(16)}
+                </div>,
+              ),
+            }
           : {}),
       },
     ];

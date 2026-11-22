@@ -44,7 +44,7 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
-  assetCountHead,
+  assetsHead,
 } from "@/components/shared/position-card";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { AssetAmount } from "@/components/shared/asset-amount";
@@ -466,27 +466,34 @@ export function useCompoundV2CardSlots({
     menu,
   };
 
-  // Closed / liquidated: the wallet holds no open markets, so the headline is
-  // what each asset held at its height: the highest recorded per-market supply
-  // and debt (replayed MAX over the wallet's life, per asset; no USD). The
+  // Closed / liquidated: the wallet holds no open markets, so each side states
+  // the assets it held, and the highest recorded per-market supply and debt
+  // (replayed MAX over the wallet's life, per asset; no USD) open behind the
+  // press under the peak label (C19). The
   // liquidated outcome appears only here: an open survivor never reaches this
   // branch, however many liquidations its counters show.
   if (ended) {
-    // Many markets: their count opens the peaks, so the head holds one line.
-    const peakHead = (id: string, label: string, lines: CompoundV2PeakAmount[], side: "supply" | "debt") => ({
+    const peakHead = (
+      id: string,
+      label: string,
+      peakLabel: string,
+      lines: CompoundV2PeakAmount[],
+      side: "supply" | "debt",
+    ) => ({
       id,
       label,
-      value: peakValue(lines, side),
-      ...(lines.length > 1
-        ? assetCountHead(
+      value: null,
+      ...(lines.length > 0
+        ? assetsHead(
+            peakLabel,
             lines.map(markOf),
             <span className="text-sm font-semibold tabular-nums text-foreground">{peakValue(lines, side, 16)}</span>,
           )
         : {}),
     });
     const heads: PositionCardHead[] = [
-      peakHead("peak-collateral", CARD_VOCAB.peakCollateral, v.peakSupplies, "supply"),
-      peakHead("peak-debt", CARD_VOCAB.peakDebt, v.peakBorrows, "debt"),
+      peakHead("peak-collateral", SUPPLIED, CARD_VOCAB.peakCollateral, v.peakSupplies, "supply"),
+      peakHead("peak-debt", CARD_VOCAB.debt, CARD_VOCAB.peakDebt, v.peakBorrows, "debt"),
     ];
     const outcome: PositionCardOutcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",

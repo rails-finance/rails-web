@@ -34,7 +34,7 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
-  assetCountHead,
+  assetsHead,
 } from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
@@ -358,14 +358,15 @@ export function useMoonwellCardSlots({
   let heads: PositionCardHead[];
   let outcome: PositionCardOutcome | undefined;
   if (ended) {
-    // Closed / liquidated: the wallet holds no open markets, so the headline is
-    // what each asset held at its height — highest recorded per-market supply +
-    // debt (replayed MAX over the wallet's life, per asset; no USD).
+    // Closed / liquidated: the wallet holds no open markets, so each side
+    // states the assets it held, and the highest recorded per-market supply
+    // and debt (replayed MAX over the wallet's life, per asset; no USD) open
+    // behind the press under the peak label (C19).
     const noPeaksNote = !peaks ? notRecordedNote("position") : undefined;
-    // Many markets: their count opens the peaks, so the head holds one line.
-    const many = (lines: MoonwellPeakAmount[], side: "supply" | "debt") =>
-      peaks && lines.length > 1
-        ? assetCountHead(
+    const held = (lines: MoonwellPeakAmount[], side: "supply" | "debt") =>
+      peaks && lines.length > 0
+        ? assetsHead(
+            side === "supply" ? CARD_VOCAB.peakCollateral : CARD_VOCAB.peakDebt,
             lines.map((r) => ({ symbol: r.symbol, address: r.address })),
             <span className="text-sm font-semibold tabular-nums text-foreground">
               <PeakLines lines={lines} side={side} iconSize={16} />
@@ -375,17 +376,17 @@ export function useMoonwellCardSlots({
     heads = [
       {
         id: "peak-collateral",
-        label: CARD_VOCAB.peakCollateral,
-        value: peaks && v.peakSupplies.length > 0 ? <PeakLines lines={v.peakSupplies} side="supply" /> : null,
+        label: SUPPLIED,
+        value: null,
         sub: noPeaksNote,
-        ...many(v.peakSupplies, "supply"),
+        ...held(v.peakSupplies, "supply"),
       },
       {
         id: "peak-debt",
-        label: CARD_VOCAB.peakDebt,
-        value: peaks && v.peakBorrows.length > 0 ? <PeakLines lines={v.peakBorrows} side="debt" /> : null,
+        label: CARD_VOCAB.debt,
+        value: null,
         sub: noPeaksNote,
-        ...many(v.peakBorrows, "debt"),
+        ...held(v.peakBorrows, "debt"),
       },
     ];
     outcome = {

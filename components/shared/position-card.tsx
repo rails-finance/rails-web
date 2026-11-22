@@ -49,7 +49,7 @@ import Link from "next/link";
 import { PositionCardStripSlot } from "@/components/shared/position-card-strip";
 import { PositionReadStamp } from "@/components/shared/position-read";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
-import { BreakdownOverlay } from "@/components/shared/stat-breakdown";
+import { BreakdownOverlay, assetsWords } from "@/components/shared/stat-breakdown";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import type { AssetMark } from "@/lib/shared/asset-mark";
 import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
@@ -162,31 +162,29 @@ export interface PositionCardHead {
    *  the icon cluster opens their breakdown in a popover (a bottom sheet on
    *  a phone), one side at a time (`asset-donut.tsx`). */
   breakdown?: AssetBreakdown;
-  /** A side of two or more unpriced assets (a closed card's peaks): on a
-   *  detail card the figure (their count) and the icon cluster are the C19
-   *  button, and it opens `panel`, the assets one line each, in the same
-   *  dropdown. A listing card draws the count and the cluster alone. Built
-   *  by `assetCountHead`. */
-  list?: { count: number; panel: ReactNode };
+  /** A side stated by its assets alone (a closed account's peaks): the
+   *  figure is the icon cluster, and on a detail card it is the C19 button
+   *  that opens `panel`, the assets one line each, in the same dropdown,
+   *  headed `label` (the peak label). A listing card draws the icons alone.
+   *  Built by `assetsHead`. */
+  list?: { label: string; count: number; panel: ReactNode };
   /** The side's USD total and its receipt: the breakdown's heading states it
    *  exact, and carries the receipt the headline (inside the button) cannot. */
   total?: { usd: number; info: Provenance };
 }
 
-/** A head's figure, icons and list for a side of unpriced assets: "10
- *  assets" with the cluster, opening `panel` (`PositionCardHead.list`). The
- *  count is `assets.length`, so the caller passes a mark for every asset the
- *  panel lists, a reserve whose decimals did not load included, and the
- *  cluster's icons and "+N" always add up to the count. */
-export function assetCountHead(
+/** A head stated by its assets (`PositionCardHead.list`): the figure is
+ *  their icons, opening `panel` under `label`. The caller passes a mark for
+ *  every asset the panel lists, a reserve whose decimals did not load
+ *  included, so the icons and "+N" add up to the lines. */
+export function assetsHead(
+  label: string,
   assets: AssetMark[],
   panel: ReactNode,
-): Pick<PositionCardHead, "value" | "assets" | "list"> {
+): Pick<PositionCardHead, "value" | "list"> {
   return {
-    // A count of the lines the overlay lists, each with its receipt.
-    value: <span data-prov-exempt="">{assets.length} assets</span>,
-    assets: <InlineAssetCluster assets={assets} />,
-    list: { count: assets.length, panel },
+    value: <InlineAssetCluster assets={assets} />,
+    list: { label, count: assets.length, panel },
   };
 }
 
@@ -576,8 +574,8 @@ function HeadBody({
       aria-expanded={toggle.open}
       aria-controls={toggle.open ? toggle.panelId : undefined}
       aria-label={[
-        head.total ? `${head.label} ${formatUsdValue(head.total.usd)}` : head.label,
-        head.list ? `${head.list.count} assets` : head.breakdown ? `${head.breakdown.assets.length} assets` : null,
+        head.list ? head.list.label : head.total ? `${head.label} ${formatUsdValue(head.total.usd)}` : head.label,
+        head.list ? assetsWords(head.list.count) : head.breakdown ? `${head.breakdown.assets.length} assets` : null,
         "show breakdown",
       ]
         .filter(Boolean)
@@ -588,7 +586,7 @@ function HeadBody({
     >
       <QuietTipsContext.Provider value={true}>
         <ProvInert>{head.value}</ProvInert>
-        <span className="inline-flex shrink-0 items-center">{head.assets}</span>
+        {head.assets != null && <span className="inline-flex shrink-0 items-center">{head.assets}</span>}
       </QuietTipsContext.Provider>
     </button>
   );
@@ -644,7 +642,7 @@ function useHeadPanels(heads: PositionCardHead[], detail: boolean) {
   const buttons = useRef<Record<string, HTMLButtonElement | null>>({});
   const panelId = useId();
   const has = (h: PositionCardHead) =>
-    detail && ((!!h.breakdown && h.breakdown.assets.length > 1) || (!!h.list && h.list.count > 1));
+    detail && ((!!h.breakdown && h.breakdown.assets.length > 1) || (!!h.list && h.list.count > 0));
   const toggleOf = (h: PositionCardHead) =>
     has(h)
       ? {
@@ -666,7 +664,7 @@ function useHeadPanels(heads: PositionCardHead[], detail: boolean) {
   const panel = openHead && (
     <BreakdownOverlay
       id={`${panelId}-${openHead.id}`}
-      label={openHead.label}
+      label={openHead.list?.label ?? openHead.label}
       total={openHead.total}
       anchor={() => buttons.current[openHead.id] ?? null}
       onClose={close}

@@ -28,7 +28,7 @@ import {
   type PositionCardStatus,
   type PositionPanelColumns,
   type PositionPanelRow,
-  assetCountHead,
+  assetsHead,
 } from "@/components/shared/position-card";
 import { formatDate, formatDateRange, formatDuration } from "@/lib/date";
 import { useMountedNow } from "@/hooks/useMountedNow";
@@ -402,29 +402,17 @@ function closedPanel(peakOthers: SparkReserveAmount[]): PositionPanelColumns | u
         id: "peak-not-collateral",
         label: "Supplied, not collateral",
         tip: PEAK_NOT_COLLATERAL_TIP,
-        value: (
-          <span data-spark-not-collateral="">
-            {peakOthers.length > 1 ? (
-              // A count of the peaks the overlay lists, each with its receipt.
-              <span data-prov-exempt="">{peakOthers.length} assets</span>
-            ) : (
+        // The assets' icons open their peaks, as the heads do. The peaks
+        // carry no USD (PeakLines).
+        value: null,
+        breakdown: {
+          assets: peakOthers.map((r) => ({ symbol: r.symbol, address: r.address })),
+          panel: (
+            <span className="text-sm font-semibold tabular-nums text-foreground" data-spark-peak-breakdown="">
               <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
-            )}
-          </span>
-        ),
-        // Many assets: their count opens the peaks, so the cell holds one
-        // line. The peaks carry no USD (PeakLines).
-        breakdown:
-          peakOthers.length > 1
-            ? {
-                assets: loadedMarks(peakOthers),
-                panel: (
-                  <span className="text-sm font-semibold tabular-nums text-foreground" data-spark-peak-breakdown="">
-                    <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
-                  </span>
-                ),
-              }
-            : undefined,
+            </span>
+          ),
+        },
       },
     ],
     [],
@@ -485,16 +473,17 @@ export function useSparkCardSlots({
   let outcome: PositionCardOutcome | undefined;
   let notice: ReactNode;
   if (ended) {
-    // The wallet holds no open reserves, so the headline is what each asset
-    // held at its height. Where the peaks are read, a side the account never
-    // held reads "None": no supply backed borrowing (the switches read), or
-    // nothing was borrowed.
+    // The wallet holds no open reserves, so each side states the assets it
+    // held, and their peaks, each at a different moment, open behind the
+    // press under the peak label (C19). Where the peaks are read, a side the
+    // account never held reads "None": no supply backed borrowing (the
+    // switches read), or nothing was borrowed.
     const peakColl = v.peakSupplies.filter((r) => !isOther(r));
     const peaksRead = v.peakSupplies.length + v.peakBorrows.length > 0;
-    // Many reserves: their count opens the peaks, so the head holds one line.
-    const many = (reserves: SparkReserveAmount[], side: "supply" | "debt") =>
-      reserves.length > 1
-        ? assetCountHead(
+    const held = (reserves: SparkReserveAmount[], side: "supply" | "debt") =>
+      reserves.length > 0
+        ? assetsHead(
+            side === "supply" ? CARD_VOCAB.peakCollateral : CARD_VOCAB.peakDebt,
             reserves.map((r) => ({ symbol: r.symbol, address: r.address })),
             <span className="text-sm font-semibold tabular-nums text-foreground">
               <PeakLines reserves={reserves} side={side} iconSize={16} />
@@ -504,25 +493,15 @@ export function useSparkCardSlots({
     heads = [
       {
         id: "peak-collateral",
-        label: CARD_VOCAB.peakCollateral,
-        value:
-          peakColl.length > 0 ? (
-            <PeakLines reserves={peakColl} side="supply" />
-          ) : peaksRead && notCollateral != null ? (
-            <PeakNone />
-          ) : null,
-        ...many(peakColl, "supply"),
+        label: CARD_VOCAB.collateral,
+        value: peaksRead && notCollateral != null ? <PeakNone /> : null,
+        ...held(peakColl, "supply"),
       },
       {
         id: "peak-debt",
-        label: CARD_VOCAB.peakDebt,
-        value:
-          v.peakBorrows.length > 0 ? (
-            <PeakLines reserves={v.peakBorrows} side="debt" />
-          ) : peaksRead ? (
-            <PeakNone />
-          ) : null,
-        ...many(v.peakBorrows, "debt"),
+        label: CARD_VOCAB.debt,
+        value: peaksRead ? <PeakNone /> : null,
+        ...held(v.peakBorrows, "debt"),
       },
     ];
     outcome = {

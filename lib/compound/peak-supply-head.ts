@@ -1,6 +1,7 @@
 // A closed Compound V3 card's supply-side peak head (rails-ops ui-jobs 803):
-// which lines it holds, in order, and the count its figure reads. The count is
-// the collateral assets alone; the lent base, where the account was ever a net
+// which lines it holds, in order, and whether the head states its collateral
+// by their icons. Two or more collateral assets do; the count is the
+// collateral alone, and the lent base, where the account was ever a net
 // lender, is a line under its own caption and never counted. A wallet that only
 // lent the base posted no collateral, and its head is "supply". Imports
 // nothing, so scripts/test reads it directly.
@@ -15,8 +16,9 @@ export interface CompoundPeakSupplyHead {
   /** "supply" when no collateral was posted and the base was lent. */
   label: "collateral" | "supply";
   lines: CompoundPeakSupplyLine[];
-  /** Two or more collateral assets: the figure reads their count and opens
-   *  `lines`. Null: the head shows `lines` as they are. */
+  /** Two or more collateral assets: the head shows their icons, and the
+   *  press opens `lines` (the count names the button). Null: the head shows
+   *  `lines` as they are. */
   count: number | null;
 }
 

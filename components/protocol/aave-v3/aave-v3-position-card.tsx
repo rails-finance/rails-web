@@ -34,7 +34,7 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
-  assetCountHead,
+  assetsHead,
 } from "@/components/shared/position-card";
 import { Icon } from "@/components/icons/icon";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
@@ -240,8 +240,8 @@ function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
 }
 
 /** A headline's reserves as token amounts, one per line, each traced: an
- *  unpriced side's figure, and a closed account's highest recorded balances
- *  (no USD there: the peaks are maxima at different moments, so pricing them
+ *  unpriced side's figure, and in a closed account's dropdown its highest
+ *  recorded balances (no USD there: the peaks are maxima at different moments, so pricing them
  *  at one block would assert a portfolio that never existed). */
 function ReserveAmounts({
   reserves,
@@ -417,20 +417,22 @@ export function useAaveV3CardSlots({
   // debt (chain-state MAX over the account's life, per asset; no USD).
   if (v.status === "closed" || v.status === "liquidated") {
     const notRecorded = peaks ? undefined : notRecordedNote("position");
+    // Each side states the assets it held; their peaks, each at a different
+    // moment, open behind the press under the peak label (C19).
     const peakHead = (
       id: string,
       label: string,
+      peakLabel: string,
       reserves: AaveV3ReserveAmount[],
       receipt: (symbol: string) => Provenance,
     ): PositionCardHead => ({
       id,
       label,
-      value:
-        peaks && reserves.length > 0 ? <ReserveAmounts reserves={reserves} receipt={(r) => receipt(r.symbol)} /> : null,
+      value: null,
       sub: notRecorded,
-      // Many reserves: their count opens the peaks, so the head holds one line.
-      ...(peaks && reserves.length > 1
-        ? assetCountHead(
+      ...(peaks && reserves.length > 0
+        ? assetsHead(
+            peakLabel,
             reserves.map((r) => ({ symbol: r.symbol, address: r.address })),
             <span className="text-sm font-semibold tabular-nums text-foreground">
               <ReserveAmounts reserves={reserves} receipt={(r) => receipt(r.symbol)} iconSize={16} />
@@ -450,7 +452,7 @@ export function useAaveV3CardSlots({
     const peakOthers = split ? v.peakSupplies.filter(isOther) : [];
     const supplyHead = split
       ? {
-          ...peakHead("peak-collateral", CARD_VOCAB.peakCollateral, peakColl, dep.peakSupply),
+          ...peakHead("peak-collateral", CARD_VOCAB.collateral, CARD_VOCAB.peakCollateral, peakColl, dep.peakSupply),
           ...(peakColl.length === 0 && v.peakSupplies.length > 0
             ? {
                 value: (
@@ -461,7 +463,7 @@ export function useAaveV3CardSlots({
               }
             : {}),
         }
-      : peakHead("peak-supplied", "Highest recorded supplied", v.peakSupplies, dep.peakSupply);
+      : peakHead("peak-supplied", "Supplied", "Highest recorded supplied", v.peakSupplies, dep.peakSupply);
     const othersLines = (iconSize?: number) => (
       <span className="flex flex-col gap-1">
         {peakOthers.map((r) => (
@@ -491,30 +493,19 @@ export function useAaveV3CardSlots({
               id: "peak-not-collateral",
               label: "Supplied, not collateral",
               tip: PEAK_NOT_COLLATERAL_TIP,
-              // Many assets: their count opens the peaks, so the cell holds
-              // one line. The peaks carry no USD (ReserveAmounts).
-              value:
-                peakOthers.length > 1 ? (
-                  // A count of the peaks the overlay lists, each with its receipt.
-                  <span data-prov-exempt="">{peakOthers.length} assets</span>
-                ) : (
-                  othersLines(16)
-                ),
-              breakdown:
-                peakOthers.length > 1
-                  ? {
-                      assets: loadedMarks(peakOthers),
-                      panel: (
-                        <span className="text-sm font-semibold tabular-nums text-foreground">{othersLines(16)}</span>
-                      ),
-                    }
-                  : undefined,
+              // The assets' icons open their peaks, as the heads do. The
+              // peaks carry no USD (ReserveAmounts).
+              value: null,
+              breakdown: {
+                assets: peakOthers.map((r) => ({ symbol: r.symbol, address: r.address })),
+                panel: <span className="text-sm font-semibold tabular-nums text-foreground">{othersLines(16)}</span>,
+              },
             },
           ];
     const common = {
       name,
       status,
-      heads: [supplyHead, peakHead("peak-debt", CARD_VOCAB.peakDebt, v.peakBorrows, dep.peakDebt)],
+      heads: [supplyHead, peakHead("peak-debt", CARD_VOCAB.debt, CARD_VOCAB.peakDebt, v.peakBorrows, dep.peakDebt)],
       identity,
       counters,
       outcome: {

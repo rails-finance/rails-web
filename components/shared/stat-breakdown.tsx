@@ -27,6 +27,9 @@ export interface PanelRowBreakdown {
   panel: ReactNode;
 }
 
+/** "1 asset", "10 assets": the count in a C19 button's name. */
+export const assetsWords = (n: number) => `${n} ${n === 1 ? "asset" : "assets"}`;
+
 /** The C19 dropdown: anchored under its button (the bottom sheet under 640
  *  px), headed by the side's label and, where priced, its exact total with
  *  the receipt. Escape, a press outside or the sheet's close calls `onClose`. */
@@ -84,8 +87,9 @@ export function StatBreakdown({
   /** The button's `data-stat-breakdown-toggle`: the row's id. */
   id: string;
   label: string;
-  /** The figure on the button: the assets' USD total, or their count. */
-  figure: ReactNode;
+  /** The figure on the button: the assets' USD total. Null: the icons alone,
+   *  as a closed account's peaks read. */
+  figure: ReactNode | null;
   breakdown: PanelRowBreakdown;
 }) {
   const [open, setOpen] = useState(false);
@@ -111,7 +115,7 @@ export function StatBreakdown({
         aria-controls={open ? panelId : undefined}
         aria-label={[
           total ? `${label} ${formatUsdValue(total.usd)}` : label,
-          `${assets.length} assets`,
+          assetsWords(assets.length),
           "show breakdown",
         ].join(", ")}
         className={`-mx-1.5 -my-1 inline-flex max-w-full cursor-pointer flex-wrap items-center gap-x-1.5 rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-rb-200/70 focus-ring dark:hover:bg-rb-700/60 ${open ? "bg-rb-200/70 dark:bg-rb-700/60" : ""}`}
@@ -119,7 +123,7 @@ export function StatBreakdown({
         data-anatomy="C19"
       >
         <QuietTipsContext.Provider value={true}>
-          <ProvInert>{figure}</ProvInert>
+          {figure != null && <ProvInert>{figure}</ProvInert>}
           <span className="inline-flex shrink-0 items-center">
             <InlineAssetCluster assets={assets} size={16} overlap={5} />
           </span>

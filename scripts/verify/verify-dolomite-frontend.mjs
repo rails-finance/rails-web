@@ -138,28 +138,19 @@ await page.waitForTimeout(2500);
 const liqBody = await page.textContent("body");
 check("liquidated detail: outcome renders", /LIQUIDATED|Liquidated/.test(liqBody));
 check("liquidated detail: liquidation legs in the timeline", /Collateral seized|Liquidation/.test(liqBody));
-// The peaks: a side of two or more markets is a count whose button opens the
-// lines in a dropdown (C19, ui-jobs 803); a side of one shows its line in the
-// head. Each side is read where its line is drawn.
+// The peaks: each side states its markets' icons, and the C19 button they
+// make opens the peak lines in a dropdown (ui-jobs 803). Each side's line is
+// read in its dropdown.
 let peakWlfi = "";
 for (const side of ["peak-collateral", "peak-debt"]) {
   const toggle = page.locator(`[data-card-assets-toggle="${side}"]`).first();
-  let text;
-  if ((await toggle.count()) > 0) {
-    await toggle.click();
-    const panel = page.locator("[data-breakdown-panel]");
-    await panel.waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
-    text = (await panel.count()) > 0 ? await panel.innerText() : "";
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(300);
-  } else {
-    text =
-      (await page
-        .locator(`[data-card-head="${side}"]`)
-        .first()
-        .innerText()
-        .catch(() => "")) ?? "";
-  }
+  if ((await toggle.count()) === 0) continue;
+  await toggle.click();
+  const panel = page.locator("[data-breakdown-panel]");
+  await panel.waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
+  const text = (await panel.count()) > 0 ? await panel.innerText() : "";
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
   if (/WLFI/.test(text)) peakWlfi = side;
 }
 check("liquidated detail: peak WLFI line renders", peakWlfi !== "", peakWlfi ? `on ${peakWlfi}` : "no WLFI peak line");
