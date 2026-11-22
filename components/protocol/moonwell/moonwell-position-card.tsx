@@ -168,16 +168,7 @@ function AmountStack({ children }: { children: ReactNode }) {
 /** Per-market PEAK amounts (highest recorded), each traced to the lane's
  *  maximum (the supply balance at a row on supply, emitted accountBorrows on
  *  debt); no USD, the token amount only. */
-function PeakLines({
-  lines,
-  side,
-  iconSize,
-}: {
-  lines: MoonwellPeakAmount[];
-  side: "supply" | "debt";
-  /** The icon's size: a headline's default, 16 in an overlay. */
-  iconSize?: number;
-}) {
+function PeakLines({ lines, side }: { lines: MoonwellPeakAmount[]; side: "supply" | "debt" }) {
   const dep = useMoonwellDeployment();
   return (
     <AmountStack>
@@ -188,7 +179,7 @@ function PeakLines({
             symbol={r.symbol}
             address={r.address}
             exact={formatUnitsExact(r.amountRaw, r.decimals)}
-            iconSize={iconSize}
+            iconSize={16}
           />
         </Prov>
       ))}
@@ -366,10 +357,10 @@ export function useMoonwellCardSlots({
     const held = (lines: MoonwellPeakAmount[], side: "supply" | "debt") =>
       peaks && lines.length > 0
         ? assetsHead(
-            side === "supply" ? CARD_VOCAB.peakCollateral : CARD_VOCAB.peakDebt,
+            side === "supply" ? CARD_VOCAB.peakSupplied : CARD_VOCAB.peakDebt,
             lines.map((r) => ({ symbol: r.symbol, address: r.address })),
             <span className="text-sm font-semibold tabular-nums text-foreground">
-              <PeakLines lines={lines} side={side} iconSize={16} />
+              <PeakLines lines={lines} side={side} />
             </span>,
           )
         : {};

@@ -36,6 +36,8 @@ export const CARD_VOCAB = {
   /** Lifetime peaks on closed / liquidated cards. */
   peakCollateral: "Highest recorded collateral",
   peakSupply: "Highest recorded supply",
+  /** Every supplied reserve or market, collateral or not. */
+  peakSupplied: "Highest recorded supplied",
   peakDebt: "Highest recorded debt",
   /** Last-known state on terminal cards whose lane records no peak. */
   finalCollateral: "Final recorded collateral",

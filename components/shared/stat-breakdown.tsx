@@ -25,6 +25,10 @@ export interface PanelRowBreakdown {
   total?: { usd: number; info: Provenance };
   /** The overlay's body. */
   panel: ReactNode;
+  /** The overlay's heading and the button's name, where they differ from the
+   *  stat's label: a closed card's peaks ("Highest recorded supplied, not
+   *  collateral"). */
+  label?: string;
 }
 
 /** "1 asset", "10 assets": the count in a C19 button's name. */
@@ -82,7 +86,7 @@ export function StatBreakdown({
   id,
   label,
   figure,
-  breakdown: { assets, total, panel },
+  breakdown: { assets, total, panel, label: overlayLabel },
 }: {
   /** The button's `data-stat-breakdown-toggle`: the row's id. */
   id: string;
@@ -92,6 +96,7 @@ export function StatBreakdown({
   figure: ReactNode | null;
   breakdown: PanelRowBreakdown;
 }) {
+  const name = overlayLabel ?? label;
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement | null>(null);
   const panelId = useId();
@@ -114,7 +119,7 @@ export function StatBreakdown({
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         aria-label={[
-          total ? `${label} ${formatUsdValue(total.usd)}` : label,
+          total ? `${name} ${formatUsdValue(total.usd)}` : name,
           assetsWords(assets.length),
           "show breakdown",
         ].join(", ")}
@@ -130,7 +135,7 @@ export function StatBreakdown({
         </QuietTipsContext.Provider>
       </button>
       {open && (
-        <BreakdownOverlay id={panelId} label={label} total={total} anchor={() => button.current} onClose={close}>
+        <BreakdownOverlay id={panelId} label={name} total={total} anchor={() => button.current} onClose={close}>
           {panel}
         </BreakdownOverlay>
       )}

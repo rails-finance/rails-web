@@ -138,6 +138,18 @@ await page.waitForTimeout(2500);
 const liqBody = await page.textContent("body");
 check("liquidated detail: outcome renders", /LIQUIDATED|Liquidated/.test(liqBody));
 check("liquidated detail: liquidation legs in the timeline", /Collateral seized|Liquidation/.test(liqBody));
+// The head states the markets by their icons alone: no digit once the "+N"
+// chip's text is set aside.
+const collHeadText = await page
+  .locator('[data-card-head="peak-collateral"]')
+  .first()
+  .evaluate((h) => h.innerText.replace(/\+\d+/g, "").replace(/\s+/g, " ").trim())
+  .catch(() => null);
+check(
+  "liquidated detail: closed collateral head shows no figure",
+  collHeadText != null && !/\d/.test(collHeadText),
+  collHeadText ?? "no peak-collateral head",
+);
 // The peaks: each side states its markets' icons, and the C19 button they
 // make opens the peak lines in a dropdown (ui-jobs 803). Each side's line is
 // read in its dropdown.

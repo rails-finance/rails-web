@@ -176,16 +176,7 @@ function LegLines({ lines, side }: { lines: DolomiteBalanceAmount[]; side: "supp
 /** A closed card's per-market PEAK amounts (highest recorded PAR, the scaled
  *  balance, labeled so on hover), each traced; no USD (the oracle prices only
  *  the present). */
-function PeakLines({
-  lines,
-  side,
-  iconSize,
-}: {
-  lines: DolomitePeakAmount[];
-  side: "supply" | "debt";
-  /** The icon's size: a headline's default, 16 in an overlay. */
-  iconSize?: number;
-}) {
+function PeakLines({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply" | "debt" }) {
   return (
     <span className="flex flex-col gap-1">
       {lines.map((r) => (
@@ -205,7 +196,7 @@ function PeakLines({
                   ? formatUnitsExact(r.amountRaw, r.decimals)
                   : `${formatUnitsExact(r.amountRaw, r.decimals)} (par: multiply by the market's interest index for tokens)`
               }
-              iconSize={iconSize}
+              iconSize={16}
             />
           )}
         </Prov>
@@ -362,7 +353,7 @@ export function useDolomiteCardSlots({
             side === "supply" ? CARD_VOCAB.peakCollateral : CARD_VOCAB.peakDebt,
             lines.map((r) => ({ symbol: r.symbol, address: r.token ?? null })),
             <span className="text-sm font-semibold tabular-nums text-foreground">
-              <PeakLines lines={lines} side={side} iconSize={16} />
+              <PeakLines lines={lines} side={side} />
             </span>,
           )
         : {};

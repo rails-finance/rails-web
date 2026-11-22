@@ -279,16 +279,7 @@ function TokenStack({
  *  the scaled-delta reducer's largest running claim, valued at the index of
  *  the moment it stood. No USD: the peaks are maxima at different moments, so
  *  pricing them at one block would assert a portfolio that never existed. */
-function PeakLines({
-  reserves,
-  side,
-  iconSize,
-}: {
-  reserves: SparkReserveAmount[];
-  side: "supply" | "debt";
-  /** The icon's size: a headline's default, 16 in a panel row. */
-  iconSize?: number;
-}) {
+function PeakLines({ reserves, side }: { reserves: SparkReserveAmount[]; side: "supply" | "debt" }) {
   return (
     <span className="flex flex-col gap-1">
       {reserves.map((r) => (
@@ -302,7 +293,7 @@ function PeakLines({
                 symbol={r.symbol}
                 address={r.address}
                 exact={formatUnitsExact(r.amountRaw, r.decimals)}
-                iconSize={iconSize}
+                iconSize={16}
               />
             )}
           </Prov>
@@ -406,10 +397,11 @@ function closedPanel(peakOthers: SparkReserveAmount[]): PositionPanelColumns | u
         // carry no USD (PeakLines).
         value: null,
         breakdown: {
+          label: "Highest recorded supplied, not collateral",
           assets: peakOthers.map((r) => ({ symbol: r.symbol, address: r.address })),
           panel: (
             <span className="text-sm font-semibold tabular-nums text-foreground" data-spark-peak-breakdown="">
-              <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
+              <PeakLines reserves={peakOthers} side="supply" />
             </span>
           ),
         },
@@ -480,21 +472,24 @@ export function useSparkCardSlots({
     // switches read), or nothing was borrowed.
     const peakColl = v.peakSupplies.filter((r) => !isOther(r));
     const peaksRead = v.peakSupplies.length + v.peakBorrows.length > 0;
+    // Unread switches: every supply heads the side, named as supplied (as
+    // Aave V3's card does).
+    const switchesRead = notCollateral != null;
     const held = (reserves: SparkReserveAmount[], side: "supply" | "debt") =>
       reserves.length > 0
         ? assetsHead(
-            side === "supply" ? CARD_VOCAB.peakCollateral : CARD_VOCAB.peakDebt,
+            side === "debt" ? CARD_VOCAB.peakDebt : switchesRead ? CARD_VOCAB.peakCollateral : CARD_VOCAB.peakSupplied,
             reserves.map((r) => ({ symbol: r.symbol, address: r.address })),
             <span className="text-sm font-semibold tabular-nums text-foreground">
-              <PeakLines reserves={reserves} side={side} iconSize={16} />
+              <PeakLines reserves={reserves} side={side} />
             </span>,
           )
         : {};
     heads = [
       {
         id: "peak-collateral",
-        label: CARD_VOCAB.collateral,
-        value: peaksRead && notCollateral != null ? <PeakNone /> : null,
+        label: switchesRead ? CARD_VOCAB.collateral : "Supplied",
+        value: peaksRead && switchesRead ? <PeakNone /> : null,
         ...held(peakColl, "supply"),
       },
       {

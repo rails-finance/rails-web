@@ -2134,7 +2134,7 @@ L5:
     title: |-
       About this position
     intro: |-
-      This account repaid its debt and withdrew its collateral. The panel shows each reserve's highest recorded balance over its life.
+      This account repaid its debt and withdrew its collateral. The panel lists the reserves it held; a press on them opens each reserve's highest recorded balance over its life.
     detailsHeading: |-
       Key concepts:
     details:
@@ -2174,7 +2174,7 @@ L5:
     title: |-
       About this position
     intro: |-
-      Liquidation took collateral from this account after its health factor fell below 1. The panel shows each reserve's highest recorded balance over its life.
+      Liquidation took collateral from this account after its health factor fell below 1. The panel lists the reserves it held; a press on them opens each reserve's highest recorded balance over its life.
     detailsHeading: |-
       Key concepts:
     details:

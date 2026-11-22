@@ -463,7 +463,7 @@ export function useAaveV3CardSlots({
               }
             : {}),
         }
-      : peakHead("peak-supplied", "Supplied", "Highest recorded supplied", v.peakSupplies, dep.peakSupply);
+      : peakHead("peak-supplied", "Supplied", CARD_VOCAB.peakSupplied, v.peakSupplies, dep.peakSupply);
     const othersLines = (iconSize?: number) => (
       <span className="flex flex-col gap-1">
         {peakOthers.map((r) => (
@@ -497,6 +497,7 @@ export function useAaveV3CardSlots({
               // peaks carry no USD (ReserveAmounts).
               value: null,
               breakdown: {
+                label: "Highest recorded supplied, not collateral",
                 assets: peakOthers.map((r) => ({ symbol: r.symbol, address: r.address })),
                 panel: <span className="text-sm font-semibold tabular-nums text-foreground">{othersLines(16)}</span>,
               },
