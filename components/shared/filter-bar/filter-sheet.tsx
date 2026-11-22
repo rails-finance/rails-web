@@ -187,7 +187,11 @@ export function FilterSheet<F>({
   useEffect(() => {
     if (!panelOpen || !slot) return;
     let found: HTMLElement[] = [];
+    // A surface marks one wrapper for its toolbar. The walk up stops where it
+    // would take in another toolbar, so a toolbar whose surface marks none
+    // dims nothing.
     for (let at = slot.parentElement; at && found.length === 0; at = at.parentElement) {
+      if (at.querySelectorAll("[data-filter-sheet-slot]").length > 1) break;
       found = [...at.querySelectorAll<HTMLElement>("[data-filters-results]")];
       if (at.tagName === "MAIN") break;
     }

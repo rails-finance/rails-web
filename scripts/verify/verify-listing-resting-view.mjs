@@ -168,11 +168,11 @@ async function readPills(page, rowSel) {
 }
 
 /** What the page says its result set is. The pagination strip states the total
- *  ("Showing 1-20 of 216 Troves"); a single-page view draws no strip, and there
- *  the rendered row count IS the total. */
+ *  ("Showing 1–20 of 216 Troves"); a single-page view draws the count alone
+ *  ("12 Troves"), and there the rendered row count IS the total. */
 async function readTotal(page, rowSel, itemsPerPage) {
   const stated = await page.evaluate(() => {
-    const m = /Showing\s+[\d,]+-[\d,]+\s+of\s+([\d,]+)\s+/.exec(document.body.innerText ?? "");
+    const m = /Showing\s+[\d,]+[-–][\d,]+\s+of\s+([\d,]+)\s+/.exec(document.body.innerText ?? "");
     return m ? Number(m[1].replace(/,/g, "")) : null;
   });
   if (stated != null) return { total: stated, from: "the pagination strip" };
