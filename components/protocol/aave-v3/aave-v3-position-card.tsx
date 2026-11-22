@@ -431,8 +431,7 @@ export function useAaveV3CardSlots({
       // Many reserves: their count opens the peaks, so the head holds one line.
       ...(peaks && reserves.length > 1
         ? assetCountHead(
-            reserves.length,
-            loadedMarks(reserves),
+            reserves.map((r) => ({ symbol: r.symbol, address: r.address })),
             <span className="text-sm font-semibold tabular-nums text-foreground">
               <ReserveAmounts reserves={reserves} receipt={(r) => receipt(r.symbol)} iconSize={16} />
             </span>,

@@ -43,7 +43,7 @@ import type { PositionCardMetaProps } from "@/components/shared/position-card-me
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import type { AssetBreakdown } from "@/components/shared/asset-donut";
-import { TokenAmountNotLoaded, loadedMarks } from "@/components/shared/not-loaded";
+import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
@@ -495,8 +495,7 @@ export function useCompoundCardSlots({
         // after them under its caption, so the head holds one line.
         ...(peaks && plan.count != null
           ? assetCountHead(
-              plan.count,
-              loadedMarks(v.peak.collateral),
+              v.peak.collateral.map((c) => ({ symbol: c.symbol, address: c.address })),
               <div className="flex flex-col gap-1 text-sm font-semibold tabular-nums text-foreground">
                 {supplyLinesOf(16)}
               </div>,

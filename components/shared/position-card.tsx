@@ -167,24 +167,26 @@ export interface PositionCardHead {
    *  button, and it opens `panel`, the assets one line each, in the same
    *  dropdown. A listing card draws the count and the cluster alone. Built
    *  by `assetCountHead`. */
-  list?: { count: number; assets: AssetMark[]; panel: ReactNode };
+  list?: { count: number; panel: ReactNode };
   /** The side's USD total and its receipt: the breakdown's heading states it
    *  exact, and carries the receipt the headline (inside the button) cannot. */
   total?: { usd: number; info: Provenance };
 }
 
-/** A head's figure, icons and list for a side of `count` unpriced assets:
- *  "10 assets" with the cluster, opening `panel` (`PositionCardHead.list`). */
+/** A head's figure, icons and list for a side of unpriced assets: "10
+ *  assets" with the cluster, opening `panel` (`PositionCardHead.list`). The
+ *  count is `assets.length`, so the caller passes a mark for every asset the
+ *  panel lists, a reserve whose decimals did not load included, and the
+ *  cluster's icons and "+N" always add up to the count. */
 export function assetCountHead(
-  count: number,
   assets: AssetMark[],
   panel: ReactNode,
 ): Pick<PositionCardHead, "value" | "assets" | "list"> {
   return {
     // A count of the lines the overlay lists, each with its receipt.
-    value: <span data-prov-exempt="">{count} assets</span>,
+    value: <span data-prov-exempt="">{assets.length} assets</span>,
     assets: <InlineAssetCluster assets={assets} />,
-    list: { count, assets, panel },
+    list: { count: assets.length, panel },
   };
 }
 

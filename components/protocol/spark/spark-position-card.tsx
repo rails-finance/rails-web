@@ -495,9 +495,8 @@ export function useSparkCardSlots({
     const many = (reserves: SparkReserveAmount[], side: "supply" | "debt") =>
       reserves.length > 1
         ? assetCountHead(
-            reserves.length,
-            loadedMarks(reserves),
-            <span className="text-sm font-semibold tabular-nums text-foreground" data-spark-peak-breakdown="">
+            reserves.map((r) => ({ symbol: r.symbol, address: r.address })),
+            <span className="text-sm font-semibold tabular-nums text-foreground">
               <PeakLines reserves={reserves} side={side} iconSize={16} />
             </span>,
           )

@@ -479,7 +479,6 @@ export function useCompoundV2CardSlots({
       value: peakValue(lines, side),
       ...(lines.length > 1
         ? assetCountHead(
-            lines.length,
             lines.map(markOf),
             <span className="text-sm font-semibold tabular-nums text-foreground">{peakValue(lines, side, 16)}</span>,
           )

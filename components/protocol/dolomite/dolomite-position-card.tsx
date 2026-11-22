@@ -359,8 +359,7 @@ export function useDolomiteCardSlots({
     const many = (lines: DolomitePeakAmount[], side: "supply" | "debt") =>
       lines.length > 1
         ? assetCountHead(
-            lines.length,
-            loadedMarks(lines.map((r) => ({ ...r, address: r.token ?? null }))),
+            lines.map((r) => ({ symbol: r.symbol, address: r.token ?? null })),
             <span className="text-sm font-semibold tabular-nums text-foreground">
               <PeakLines lines={lines} side={side} iconSize={16} />
             </span>,

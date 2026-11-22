@@ -366,7 +366,6 @@ export function useMoonwellCardSlots({
     const many = (lines: MoonwellPeakAmount[], side: "supply" | "debt") =>
       peaks && lines.length > 1
         ? assetCountHead(
-            lines.length,
             lines.map((r) => ({ symbol: r.symbol, address: r.address })),
             <span className="text-sm font-semibold tabular-nums text-foreground">
               <PeakLines lines={lines} side={side} iconSize={16} />
