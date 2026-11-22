@@ -377,43 +377,6 @@ function Sheet<F>({
   // What the draft selects, as text: the count is read again when it changes.
   const draftKey = `${dimensions.map((d) => d.get(filters).join(",")).join("|")}|${(filters as { q?: string }).q ?? ""}`;
 
-  // The count each option of an `optionCounts` dimension would give with the
-  // draft's other filters ("Open 110,192"), read as the sheet opens and again,
-  // after a short pause, when another filter changes; an option whose read
-  // fails states none.
-  const othersKey = `${dimensions
-    .filter((d) => !d.optionCounts)
-    .map((d) => d.get(filters).join(","))
-    .join("|")}|${(filters as { q?: string }).q ?? ""}`;
-  const [optionCounts, setOptionCounts] = useState<Record<string, Record<string, number>>>({});
-  const optionCountsRead = useRef(false);
-  useEffect(() => {
-    const counted = dimensionsRef.current.filter((d) => d.optionCounts);
-    if (!countFor || counted.length === 0) return;
-    let cancelled = false;
-    setOptionCounts({});
-    const t = window.setTimeout(
-      () => {
-        const base = currentDraft();
-        for (const d of counted)
-          for (const o of d.options)
-            Promise.resolve()
-              .then(() => countFor(d.set(base, [o.value])))
-              .then(
-                (n) => !cancelled && setOptionCounts((was) => ({ ...was, [d.id]: { ...was[d.id], [o.value]: n } })),
-                () => {},
-              );
-      },
-      optionCountsRead.current ? COUNT_DELAY_MS : 0,
-    );
-    optionCountsRead.current = true;
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the other filters by their key
-  }, [othersKey]);
-
   // The draft's count, read after a short pause; null until it lands (or
   // when the read fails, and the button then names no figure).
   const [draftCount, setDraftCount] = useState<number | null>(null);
@@ -635,7 +598,7 @@ function Sheet<F>({
       ) : isToggle(dim) ? (
         <ToggleRow dim={dim} filters={filters} onChange={onChange} />
       ) : isSegmented(dim) ? (
-        <SegmentRow dim={dim} filters={filters} onChange={onChange} counts={optionCounts[dim.id]} />
+        <SegmentRow dim={dim} filters={filters} onChange={onChange} />
       ) : dim.cardinality === "range" ? (
         <RangeRow
           dim={dim}
@@ -902,13 +865,10 @@ function SegmentRow<F>({
   dim,
   filters,
   onChange,
-  counts,
 }: {
   dim: FilterDimension<F>;
   filters: F;
   onChange: (next: F) => void;
-  /** The count each option would give, by option value, as they land. */
-  counts?: Record<string, number>;
 }) {
   const cur = dim.get(filters);
   // A dimension resting on one of its options (a preset: "100+ holders" or
@@ -965,15 +925,6 @@ function SegmentRow<F>({
               data-filter-sheet-segment={s.value ?? "any"}
             >
               {s.label}
-              {s.value != null && counts?.[s.value] != null && (
-                <span
-                  className="ml-1.5 font-normal tabular-nums text-rb-500 dark:text-rb-400/75"
-                  data-option-count={counts[s.value]}
-                  data-prov-exempt=""
-                >
-                  {counts[s.value].toLocaleString("en-US")}
-                </span>
-              )}
             </button>
           );
         })}

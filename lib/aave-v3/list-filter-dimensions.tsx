@@ -141,10 +141,9 @@ export function aaveV3ListDimensions(
       cardinality: "single",
       param: "status",
       options: STATUS_CHOICE_OPTIONS,
-      // One choice of three in the filter panel, each with its count, and no
-      // pill in the row (ui-jobs 805).
+      // One choice of three in the filter panel, and no pill in the row
+      // (ui-jobs 805).
       segmented: true,
-      optionCounts: true,
       pill: false,
       get: (f) => [statusChoice(f)],
       defaultValues: (f) => [defaultStatusChoice(f)],
