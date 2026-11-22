@@ -21,6 +21,13 @@ export interface PaginationControlsProps {
   note?: string;
 }
 
+/** A listing's noun inside the count line. A listing that titles itself with
+ *  a common noun ("Positions", "Loans", "Deposits") reads it in lower case
+ *  mid-sentence; a lexicon term (Troves, LQTY stakes) keeps its capital. */
+function lineNoun(noun: string): string {
+  return /^(Positions?|Loans?|Deposits?)\b/.test(noun) ? noun[0].toLowerCase() + noun.slice(1) : noun;
+}
+
 /** The count of what a listing shows, under its results where there is no
  *  paging to carry it: one page of a server listing, and a listing filtered
  *  in memory. Nothing for an empty result, which the listing words. */
@@ -28,7 +35,7 @@ export function ResultCountLine({ total, noun, note }: { total: number; noun: st
   if (total <= 0) return null;
   return (
     <div className="mt-8 text-sm text-rb-500" data-anatomy="N3" data-result-line={total} data-prov-exempt="">
-      {total.toLocaleString("en-US")} {total === 1 ? noun.replace(/s$/, "") : noun}
+      {total.toLocaleString("en-US")} {lineNoun(total === 1 ? noun.replace(/s$/, "") : noun)}
       {note ? <> · {note}</> : null}
     </div>
   );
@@ -43,8 +50,7 @@ export function PaginationControls({
   noun = "positions",
   note,
 }: PaginationControlsProps) {
-  // One page: the count alone ("12 open positions"). The line under the
-  // results always states what is shown, with its noun (Miles, 22 Nov 2026).
+  // One page: the count alone ("12 open positions"; Miles, 22 Nov 2026).
   if (totalPages <= 1) return <ResultCountLine total={totalCount} noun={noun} note={note} />;
 
   const showingFrom = (currentPage - 1) * itemsPerPage + 1;
@@ -68,7 +74,7 @@ export function PaginationControls({
     >
       <div className={`text-sm text-rb-500 ${note ? "text-center sm:text-left" : "whitespace-nowrap"}`}>
         Showing {showingFrom.toLocaleString("en-US")}–{showingTo.toLocaleString("en-US")} of{" "}
-        {totalCount.toLocaleString("en-US")} {noun}
+        {totalCount.toLocaleString("en-US")} {lineNoun(noun)}
         {note ? <> · {note}</> : null}
       </div>
 

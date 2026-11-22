@@ -83,10 +83,10 @@ const errors = [];
 /** Rows currently rendered in the listing column. */
 const rowCount = (page) => page.locator('a[class*="listing-row"]').count();
 
-/** The "Showing 1-20 of 31,750 vaults" line. Null when a single page of results
- *  renders no pagination at all — then count the rows instead. */
+/** The "Showing 1–20 of 31,750 vaults" line. Null on a single page of results,
+ *  which draws the count alone ("12 vaults") — then count the rows instead. */
 async function total(page) {
-  const el = page.locator("text=/Showing [\\d,]+-[\\d,]+ of [\\d,]+ vaults/").first();
+  const el = page.locator("text=/Showing [\\d,]+[-–][\\d,]+ of [\\d,]+ vaults/").first();
   if ((await el.count()) === 0) return null;
   const m = (await el.innerText()).match(/of ([\d,]+) vaults/);
   return m ? Number(m[1].replace(/,/g, "")) : null;

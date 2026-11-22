@@ -318,7 +318,9 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
             {!pagination && filter != null && filter.countNode == null && (
               <ResultCountLine total={items.length} noun={filter.nounFor?.(filter.filters) ?? noun} />
             )}
-            {pagination && (
+            {/* On one page the strip is the count alone, which gives way to a count
+                line the page writes (Focus, Morpho's AIM), as the in-memory line does. */}
+            {pagination && (pagination.totalPages > 1 || filter?.countNode == null) && (
               <PaginationControls
                 currentPage={pagination.currentPage}
                 totalPages={pagination.totalPages}

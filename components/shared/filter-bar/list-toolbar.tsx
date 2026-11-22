@@ -3,8 +3,8 @@
 // ListToolbar — the shared listing-page filter strip (N1, ui-jobs 801): the
 // Filters button (N1.8.1) that opens every filter, one pill per filter group
 // that is set or rests on a default (N1.10, ui-jobs 681), Clear all, and at
-// the right the count (N1.6; drawn only where the editors' button cannot
-// state it), the search as an icon that opens into its field
+// the right a count line where the page writes one (N1.6; the plain count
+// is under the results, N3), the search as an icon that opens into its field
 // and stays open while it holds a query (N1.1), the sort (N1.3) and the ⋮
 // (N1.7). From sm one wrapping row: [Filters] [pills] [Clear all (two or more
 // set)] and, right-aligned as one group that wraps together, [count] [search]
@@ -172,14 +172,11 @@ export function ListToolbar<F extends BaseListFilters>({
   useFlip(rowRef, ordered.map((p) => p.name).join("|"));
 
   const editorCount = count ?? sheetCount;
-  // Where the editors' button states the count ("Show 110,192"), the row
-  // draws none (Miles, 21 Nov 2026): the figure stays for screen readers and
-  // its hook. A listing whose editors read "Apply" keeps it in the row.
-  const countInButton = countFor != null;
-  // Below sm the open search field takes the count's room in the line.
-  const countAside = search && searchOpen ? "max-sm:hidden" : "";
-  // A count line the page writes (chain data, with its receipt) stays: below
-  // sm it takes a line to itself over the open search field.
+  // The row draws no plain count: the line under the results states it with
+  // its noun (N3; Miles, 22 Nov 2026), and the figure stays here for screen
+  // readers and its hook. A count line the page writes (chain data, with its
+  // receipt) stays: below sm it takes a line to itself over the open search
+  // field.
   const searchLine = search && searchOpen && countNode != null;
   const countLine =
     countNode != null ? (
@@ -191,14 +188,7 @@ export function ListToolbar<F extends BaseListFilters>({
         {countNode}
       </span>
     ) : count ? (
-      <span
-        className={
-          countInButton ? "sr-only" : `min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED} ${countAside}`
-        }
-        data-anatomy="N1.6"
-        data-result-count={count.total}
-        data-prov-exempt=""
-      >
+      <span className="sr-only" data-anatomy="N1.6" data-result-count={count.total} data-prov-exempt="">
         {count.total.toLocaleString("en-US")}
         <span className="sr-only"> {count.total === 1 ? count.noun.replace(/s$/, "") : count.noun}</span>
       </span>
