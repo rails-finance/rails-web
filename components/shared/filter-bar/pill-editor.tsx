@@ -289,18 +289,20 @@ export function GroupEditor<F>({
   };
   const remove = () => leave(() => onChange(resetGroup(group, applied)));
   const removeLabel = locked ? "Reset to default" : isPhone ? "Remove filter" : "Remove";
-  const removeButton =
-    locked || appliedActive ? (
-      <button
-        type="button"
-        onClick={remove}
-        disabled={locked && !appliedActive}
-        className={`${QUIET_TEXT} disabled:cursor-default disabled:opacity-50 disabled:hover:text-rb-500`}
-        data-pill-editor-remove=""
-      >
-        {removeLabel}
-      </button>
-    ) : null;
+  // A locked single choice lists its resting option: picking it is the way
+  // back, so the editor draws no reset (Miles, 22 Nov 2026, ui-jobs 805).
+  const singleChoice = group.dims.every((d) => d.cardinality === "single");
+  const removeButton = (locked ? !singleChoice : appliedActive) ? (
+    <button
+      type="button"
+      onClick={remove}
+      disabled={locked && !appliedActive}
+      className={`${QUIET_TEXT} disabled:cursor-default disabled:opacity-50 disabled:hover:text-rb-500`}
+      data-pill-editor-remove=""
+    >
+      {removeLabel}
+    </button>
+  ) : null;
   const primary = (
     <button
       type="button"
