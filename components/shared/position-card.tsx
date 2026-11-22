@@ -179,16 +179,19 @@ export interface PositionCardHead {
  *  the panel lists, a reserve whose decimals did not load included, so the
  *  icons and "+N" add up to the lines. With `figure` (a closed account's
  *  peak, components/shared/closed-peak.tsx) the figure leads and the icons
- *  follow as a sample; its `total` heads the dropdown with the receipt. */
+ *  follow as a sample, its day on the `sub` line; its `total` heads the
+ *  dropdown with the receipt. */
 export function assetsHead(
   label: string,
   assets: AssetMark[],
   panel: ReactNode,
-  figure?: { figure: ReactNode; total?: PositionCardHead["total"] },
-): Pick<PositionCardHead, "value" | "assets" | "list" | "total"> {
+  figure?: { figure: ReactNode; sub?: ReactNode; total?: PositionCardHead["total"] },
+): Pick<PositionCardHead, "value" | "assets" | "list" | "total" | "sub"> {
   const cluster = <InlineAssetCluster assets={assets} />;
   return {
-    ...(figure ? { value: figure.figure, assets: cluster, total: figure.total } : { value: cluster }),
+    ...(figure
+      ? { value: figure.figure, assets: cluster, total: figure.total, ...(figure.sub ? { sub: figure.sub } : {}) }
+      : { value: cluster }),
     list: { label, count: assets.length, panel },
   };
 }

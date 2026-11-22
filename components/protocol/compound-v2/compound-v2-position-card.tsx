@@ -389,7 +389,10 @@ export function useCompoundV2CardSlots({
   flows,
 }: CompoundV2PositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
-  const peakOf = useClosedPeaks(flows, v.status !== "open");
+  const peakOf = useClosedPeaks(flows, v.status !== "open", {
+    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, address: underlyingOf(r.market) ?? null })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, address: underlyingOf(r.market) ?? null })),
+  });
   const marketBy = marketReadBy(v);
   const supplyLine = (r: CompoundV2SupplyAmount): UsdLine => ({
     market: r.market,
@@ -483,9 +486,8 @@ export function useCompoundV2CardSlots({
     // timeline (components/shared/closed-peak.tsx); a listing row with its
     // largest market's own peak amount.
     const figureOf = (lines: CompoundV2PeakAmount[], side: "supply" | "debt", label: string) => {
-      const symbols = new Set(lines.map((r) => r.symbol));
       return detail
-        ? peakOf(side === "supply" ? "collateral" : "debt", label, (s) => symbols.has(s))
+        ? peakOf(side === "supply" ? "collateral" : "debt", label)
         : largestAssetFigure(
             lines.map((r) => ({ symbol: r.symbol, amount: r.amount, usdNow: lineUsd(v, r.market, r.amount) })),
           );

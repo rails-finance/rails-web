@@ -363,7 +363,15 @@ export function useAaveV3CardSlots({
   const lane = useV3Pool();
   const dust = useDustOpen();
   const detail = receipts;
-  const peakOf = useClosedPeaks(flows, v.status !== "open");
+  // A closed side's assets as the heads list them: the collateral without
+  // the supplies that back no borrowing, where the switches are read.
+  const peakOf = useClosedPeaks(flows, v.status !== "open", {
+    collateral: (peaks && notCollateral != null
+      ? v.peakSupplies.filter((r) => notCollateral.has(r.address.toLowerCase()) !== true)
+      : v.peakSupplies
+    ).map((r) => ({ symbol: r.symbol, address: r.address })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, address: r.address })),
+  });
 
   const marketLabel = dep.marketLabel(v.market);
   // What the market label is, on hover (270 item 6: it carries information).
@@ -437,9 +445,8 @@ export function useAaveV3CardSlots({
       reserves: AaveV3ReserveAmount[],
       receipt: (symbol: string) => Provenance,
     ): PositionCardHead => {
-      const held = new Set(reserves.map((r) => r.symbol));
       const figure = detail
-        ? peakOf(side, label, (symbol) => held.has(symbol))
+        ? peakOf(side, label)
         : largestAssetFigure(
             reserves.map((r) => ({
               symbol: r.symbol,

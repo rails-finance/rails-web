@@ -305,7 +305,10 @@ export function useDolomiteCardSlots({
   flows,
 }: DolomitePositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
-  const peakOf = useClosedPeaks(flows, v.status !== "open");
+  const peakOf = useClosedPeaks(flows, v.status !== "open", {
+    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, address: r.token ?? null })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, address: r.token ?? null })),
+  });
   const usdOf = dustUsdOf(v);
   // Dust lines (under a cent) leave the icon stack and its "+N"; the panel puts
   // them behind the "N dust reserves hidden" control.
@@ -358,13 +361,8 @@ export function useDolomiteCardSlots({
     // largest market's own peak amount, where the peak is in tokens (a par
     // peak is no token amount).
     const figureOf = (lines: DolomitePeakAmount[], side: "supply" | "debt") => {
-      const symbols = new Set(lines.map((r) => r.symbol));
       return detail
-        ? peakOf(
-            side === "supply" ? "collateral" : "debt",
-            side === "supply" ? CARD_VOCAB.collateral : CARD_VOCAB.debt,
-            (s) => symbols.has(s),
-          )
+        ? peakOf(side === "supply" ? "collateral" : "debt", side === "supply" ? CARD_VOCAB.collateral : CARD_VOCAB.debt)
         : largestAssetFigure(
             lines
               .filter((r) => r.tokens)

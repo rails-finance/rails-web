@@ -303,7 +303,10 @@ export function useMoonwellCardSlots({
   const marketBy = marketReadBy(v);
   const { supplyProv, borrowProv, mSymbolOf } = useLineReceipts(serverReadOf(chain), marketBy);
   const detail = surface === "detail";
-  const peakOf = useClosedPeaks(flows, v.status !== "open");
+  const peakOf = useClosedPeaks(flows, v.status !== "open", {
+    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, address: r.address })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, address: r.address })),
+  });
 
   // The collateral column holds the entered markets; a supply the account
   // never entered is shown apart ("Supplied, not collateral").
@@ -364,11 +367,8 @@ export function useMoonwellCardSlots({
     // timeline (components/shared/closed-peak.tsx); a listing row with its
     // largest market's own peak amount.
     const figureOf = (lines: MoonwellPeakAmount[], side: "supply" | "debt") => {
-      const symbols = new Set(lines.map((r) => r.symbol));
       return detail
-        ? peakOf(side === "supply" ? "collateral" : "debt", side === "supply" ? SUPPLIED : CARD_VOCAB.debt, (s) =>
-            symbols.has(s),
-          )
+        ? peakOf(side === "supply" ? "collateral" : "debt", side === "supply" ? SUPPLIED : CARD_VOCAB.debt)
         : largestAssetFigure(
             lines.map((r) => ({ symbol: r.symbol, amount: r.amount, usdNow: lineUsd(v, r.address, r.amount) })),
           );

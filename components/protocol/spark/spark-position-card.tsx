@@ -430,8 +430,11 @@ export function useSparkCardSlots({
   flows,
 }: SparkPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
-  const peakOf = useClosedPeaks(flows, v.status !== "open");
   const isOther = (r: SparkReserveAmount) => notCollateral?.has(r.address.toLowerCase()) === true;
+  const peakOf = useClosedPeaks(flows, v.status !== "open", {
+    collateral: v.peakSupplies.filter((r) => !isOther(r)).map((r) => ({ symbol: r.symbol, address: r.address })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, address: r.address })),
+  });
   const collSupplies = v.supplies.filter((r) => !isOther(r));
   const otherSupplies = v.supplies.filter(isOther);
   const collUsd = totalUsd(v, collSupplies);
@@ -485,9 +488,8 @@ export function useSparkCardSlots({
     // timeline (components/shared/closed-peak.tsx); a listing row with its
     // largest asset's own peak amount.
     const figureOf = (reserves: SparkReserveAmount[], side: "supply" | "debt", label: string) => {
-      const symbols = new Set(reserves.map((r) => r.symbol));
       return detail
-        ? peakOf(side === "supply" ? "collateral" : "debt", label, (s) => symbols.has(s))
+        ? peakOf(side === "supply" ? "collateral" : "debt", label)
         : largestAssetFigure(
             reserves.map((r) => ({
               symbol: r.symbol,
