@@ -160,6 +160,20 @@ export function aaveV3ListDimensions(
       },
     },
     {
+      id: "ended",
+      label: "Closed by liquidation",
+      // Its own group, for its pill; in the panel it sits under Status.
+      group: "Closed by liquidation",
+      cardinality: "single",
+      param: "ended",
+      options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
+      // Offered with Closed, which it narrows.
+      available: (f) => statusChoice(f) === "closed",
+      get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
+      set: (f, v) => ({ ...f, ended: v }),
+      chipLabel: () => "Closed by liquidation",
+    },
+    {
       id: "market",
       label: "Market",
       group: "Market",
@@ -187,19 +201,6 @@ export function aaveV3ListDimensions(
       get: (f) => f.liquidations,
       set: (f, v) => ({ ...f, liquidations: v }),
       chipLabel: () => "Liquidated before",
-    },
-    {
-      id: "ended",
-      label: "Closed by liquidation",
-      group: "History",
-      cardinality: "single",
-      param: "ended",
-      options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
-      // Offered with Closed, which it narrows.
-      available: (f) => statusChoice(f) === "closed",
-      get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
-      set: (f, v) => ({ ...f, ended: v }),
-      chipLabel: () => "Closed by liquidation",
     },
     {
       id: "supplying",
