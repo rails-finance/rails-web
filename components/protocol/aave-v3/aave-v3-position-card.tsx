@@ -132,6 +132,15 @@ export interface AaveV3PositionView {
    *  none), by lowercased address; `priceBlock` for the rest (ui-jobs 743). */
   priceBlockByAddress?: Record<string, number | null>;
   atBlock?: number;
+  /** The listing row's newest event: the block the index's balances stand at
+   *  (mv_aave_v3_positions, refreshed about hourly). */
+  indexBlock?: number;
+  /** The position page holds the balances back: the event tail has an event
+   *  after `indexBlock` and the Pool read has not answered yet (ui-jobs 806). */
+  figuresHeld?: boolean;
+  /** The Pool read failed while the event tail is ahead of the index: the
+   *  balances shown are the index's, and the card names both blocks. */
+  indexTrails?: { indexBlock: number; tailBlock: number };
   /** rails-server's head read and the block it read at, where it answered the page's read. */
   readBy?: PositionHeadStamp & { block: number };
   /** The position page's live health factor (the Pool's getUserAccountData,
@@ -604,7 +613,7 @@ export function useAaveV3CardSlots({
             }
           />
         ),
-      pending: reserves.length > 0 && pending,
+      pending: v.figuresHeld === true || (reserves.length > 0 && pending),
       total: usd != null && usdInfo ? { usd, info: usdInfo } : undefined,
       assets: reserves.length > 0 && usd != null ? <InlineAssetCluster assets={loadedMarks(shown)} /> : undefined,
     };
@@ -635,17 +644,31 @@ export function useAaveV3CardSlots({
         }
       : null;
 
+  // A listing row draws no stat line: an account whose supplies back no
+  // borrowing heads them as such, where Collateral would show a dash (ui-jobs 806).
+  const othersHead = !detail && collSupplies.length === 0 && otherSupplies.length > 0;
   const heads = [
-    sideHead(
-      "collateral",
-      CARD_VOCAB.collateral,
-      collSupplies,
-      suppliesSplit.shown,
-      collUsd,
-      collPending,
-      "Collateral",
-      "supply",
-    ),
+    othersHead
+      ? sideHead(
+          "collateral",
+          "Supplied, not collateral",
+          otherSupplies,
+          othersSplit.shown,
+          otherUsd,
+          pricesPending && otherUsd == null,
+          "Supplied, not collateral",
+          "supply",
+        )
+      : sideHead(
+          "collateral",
+          CARD_VOCAB.collateral,
+          collSupplies,
+          suppliesSplit.shown,
+          collUsd,
+          collPending,
+          "Collateral",
+          "supply",
+        ),
     sideHead("debt", CARD_VOCAB.debt, v.borrows, borrowsSplit.shown, debtUsd, debtPending, "Borrowed", "debt"),
     ...(hfHead ? [hfHead] : []),
   ];
@@ -663,6 +686,11 @@ export function useAaveV3CardSlots({
     <div className="mb-2 text-xs text-rb-500">
       The Pool reads no debt{v.atBlock != null ? ` at block ${v.atBlock.toLocaleString("en-US")}` : ""}; the balances
       shown predate the account&rsquo;s latest events
+    </div>
+  ) : detail && v.indexTrails ? (
+    <div className="mb-2 text-xs text-rb-500" data-index-trails={v.indexTrails.indexBlock}>
+      Balances from the index at block {v.indexTrails.indexBlock.toLocaleString("en-US")}. The account has an event at
+      block {v.indexTrails.tailBlock.toLocaleString("en-US")}, and the Pool read did not answer.
     </div>
   ) : undefined;
 
@@ -1104,6 +1132,7 @@ export function viewFromSummary(row: AaveV3PositionRow): AaveV3PositionView {
     priceBlock: row.priceBlock ?? null,
     // A Base lender's row names the block its chain figures were read at.
     atBlock: row.chainBlock ?? undefined,
+    indexBlock: row.lastBlockNumber,
     // A listing view never carries a health factor (0018): the row's snapshot
     // HF is not read, and the position page's live read is the only one
     // the card shows.

@@ -695,10 +695,23 @@ export default function AaveV3PositionDetail({
   // account empty while the index still has it open (the index trails the
   // chain by its refresh), the page shows it closed: see v3ViewWithLiveRead.
   // Everything below that states what the account holds now reads `liveView`.
-  const liveView = useMemo<AaveV3PositionView | null>(
-    () => (view && chain ? v3ViewWithLiveRead(view, chain) : view),
-    [view, chain],
+  //
+  // The index's balances stand at the row's newest event, refreshed about
+  // hourly; the event tail is at the head. When the tail has an event after
+  // the row's block, the indexed balances are out of date (ui-jobs 806): the
+  // card holds them back until the read answers, takes the read's balances
+  // when it does, and names both blocks when it does not.
+  const tailBlock = useMemo(
+    () => aaveEvents.reduce<number | null>((m, e) => (m == null || e.blockNumber > m ? e.blockNumber : m), null),
+    [aaveEvents],
   );
+  const indexBehind = view?.indexBlock != null && tailBlock != null && tailBlock > view.indexBlock;
+  const liveView = useMemo<AaveV3PositionView | null>(() => {
+    if (view && chain) return v3ViewWithLiveRead(view, chain, indexBehind);
+    if (view && indexBehind && chainSettled && view.indexBlock != null && tailBlock != null)
+      return { ...view, indexTrails: { indexBlock: view.indexBlock, tailBlock } };
+    return view;
+  }, [view, chain, indexBehind, chainSettled, tailBlock]);
 
   // The card's prices: the market's oracle at the card's block (the Pool
   // read's), so the dollars, the health factor and the liquidation price
@@ -710,10 +723,12 @@ export default function AaveV3PositionDetail({
     block: number | null;
   } | null>(null);
   const heldKey = useMemo(() => {
-    if (!view || view.status !== "open" || !chainSettled) return null;
-    const held = [...new Set([...view.supplies, ...view.borrows].map((r) => r.address.toLowerCase()))].sort();
+    // The merged view's reserves: a read that replaced the index's balances
+    // may hold a reserve the index did not.
+    if (!liveView || liveView.status !== "open" || !chainSettled) return null;
+    const held = [...new Set([...liveView.supplies, ...liveView.borrows].map((r) => r.address.toLowerCase()))].sort();
     return held.length > 0 ? `${wallet}:${market}:${chain?.blockNumber ?? "head"}:${held.join(",")}` : null;
-  }, [view, chain, chainSettled, wallet, market]);
+  }, [liveView, chain, chainSettled, wallet, market]);
   useEffect(() => {
     if (!heldKey) return;
     let cancelled = false;
@@ -787,10 +802,13 @@ export default function AaveV3PositionDetail({
   });
   const flowFocus = useFlowFocusValue(focusRoot, flowTimeline);
   // The card's count counts transactions; its tip gives the events too.
-  const cardView = useMemo(
-    () => (pricedView && flowSeries ? { ...pricedView, eventTotal: flowSeries.totalEvents } : pricedView),
-    [pricedView, flowSeries],
-  );
+  const cardView = useMemo(() => {
+    const counted = pricedView && flowSeries ? { ...pricedView, eventTotal: flowSeries.totalEvents } : pricedView;
+    // Held: the card's heads pulse until the read answers.
+    return counted && indexBehind && !chainSettled
+      ? { ...counted, status: "open" as const, supplies: [], borrows: [], figuresHeld: true }
+      : counted;
+  }, [pricedView, flowSeries, indexBehind, chainSettled]);
 
   // The top row's price dropdown: the on-chain oracle
   // price of each reserve the account currently holds.

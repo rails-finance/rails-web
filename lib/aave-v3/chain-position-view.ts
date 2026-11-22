@@ -149,8 +149,16 @@ export function v3ViewFromChain(
  * closed card carries no current balances, so no indexed figure is shown under
  * a live label. A partial lag (both sides hold something) keeps the indexed
  * balances, and the card marks an HF the read could not give for the debt shown.
+ *
+ * `indexBehind`: the event tail holds an event after the index's block, so the
+ * indexed balances are known to be out of date (ui-jobs 806). The read's
+ * balances then replace them, at the read's block, whatever the index's status.
  */
-export function v3ViewWithLiveRead(view: AaveV3PositionView, chain: AaveV3PositionChainResponse): AaveV3PositionView {
+export function v3ViewWithLiveRead(
+  view: AaveV3PositionView,
+  chain: AaveV3PositionChainResponse,
+  indexBehind = false,
+): AaveV3PositionView {
   const live: AaveV3PositionView = {
     ...view,
     healthFactor: chain.healthFactor,
@@ -158,7 +166,15 @@ export function v3ViewWithLiveRead(view: AaveV3PositionView, chain: AaveV3Positi
     readBy: chain.head && { ...chain.head, block: chain.blockNumber },
   };
   const holdsNothing = chain.reserves.every((r) => r.supplyBalanceRaw === "0" && r.debtBalanceRaw === "0");
-  if (view.status !== "open" || !holdsNothing) return live;
+  if (indexBehind && !holdsNothing)
+    return {
+      ...live,
+      status: "open",
+      supplies: amounts(chain.reserves, (r) => r.supplyBalanceRaw),
+      borrows: amounts(chain.reserves, (r) => r.debtBalanceRaw),
+      atBlock: chain.blockNumber,
+    };
+  if ((view.status !== "open" && !indexBehind) || !holdsNothing) return live;
   return {
     ...live,
     status: view.liquidationCount > 0 ? "liquidated" : "closed",
