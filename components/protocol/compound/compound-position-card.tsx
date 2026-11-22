@@ -52,6 +52,7 @@ import { WalletPill } from "@/components/shared/wallet-pill";
 import { useDustLines } from "@/components/shared/dust-reserves";
 import { ExactSpan } from "@/components/shared/amount-text";
 import { formatUnitsExact, formatExactDecimal, formatUsdValue } from "@/lib/utils/format";
+import { compoundPeakSupplyHead } from "@/lib/compound/peak-supply-head";
 import { peakBaseProv, peakCollateralProv, type CompoundCoords } from "@/lib/compound/event-provenance";
 import { COMPOUND_INDEXED_VOCABULARY, type CompoundTowerVocabulary } from "@/lib/compound/economics";
 import { compoundPositionModal, type CompoundPositionDeployment } from "@/lib/compound/event-templates";
@@ -450,23 +451,28 @@ export function useCompoundCardSlots({
     const principalNote = vocab.baseAtLastEvent ? undefined : "principal only: accrued interest not included";
     // A wallet that only ever lent the base posted no collateral: its peak is
     // "supply" (the Aave V4 spoke-card grammar).
-    const supplyOnly = v.peak.collateral.length === 0 && v.peak.lentBase > 0;
-    const supplyLinesOf = (iconSize?: number): ReactNode[] => {
-      const lentLine =
-        v.peak.lentBase > 0 ? (
-          <TracedAmount
-            key="lent-base"
-            info={peakBaseProv(v.base.symbol, "lend", { ...peakCoords, asset: v.base.address })}
-            symbol={v.base.symbol}
-            amount={v.peak.lentBase}
-            address={v.base.address}
-            iconSize={iconSize}
-          />
-        ) : null;
-      const lines: ReactNode[] = [];
-      if (supplyOnly && lentLine) lines.push(lentLine);
-      for (const c of v.peak.collateral) {
-        lines.push(
+    const plan = compoundPeakSupplyHead(v.peak.collateral.length, v.peak.lentBase);
+    const supplyLinesOf = (iconSize?: number): ReactNode[] =>
+      plan.lines.map((line) => {
+        if (line.kind === "caption")
+          return (
+            <div key="lent-caption" className="mt-1 text-xs font-normal text-rb-500">
+              Highest supplied {v.base.symbol} (earns interest)
+            </div>
+          );
+        if (line.kind === "base")
+          return (
+            <TracedAmount
+              key="lent-base"
+              info={peakBaseProv(v.base.symbol, "lend", { ...peakCoords, asset: v.base.address })}
+              symbol={v.base.symbol}
+              amount={v.peak.lentBase}
+              address={v.base.address}
+              iconSize={iconSize}
+            />
+          );
+        const c = v.peak.collateral[line.index];
+        return (
           <TracedAmount
             key={c.address}
             info={peakCollateralProv(c.symbol, { ...peakCoords, asset: c.address })}
@@ -475,39 +481,22 @@ export function useCompoundCardSlots({
             address={c.address}
             unreadAddress={c.decimalsUnread ? c.address : undefined}
             iconSize={iconSize}
-          />,
+          />
         );
-      }
-      // The lent base is not collateral: under its own caption.
-      if (!supplyOnly && lentLine) {
-        lines.push(
-          <div key="lent-caption" className="mt-1 text-xs font-normal text-rb-500">
-            Highest supplied {v.base.symbol} (earns interest)
-          </div>,
-          lentLine,
-        );
-      }
-      return lines;
-    };
+      });
     const supplyLines = supplyLinesOf();
-    // The assets the lines name, in their order.
-    const supplyMarks = [
-      ...(supplyOnly && v.peak.lentBase > 0 ? [{ symbol: v.base.symbol, address: v.base.address }] : []),
-      ...loadedMarks(v.peak.collateral),
-      ...(!supplyOnly && v.peak.lentBase > 0 ? [{ symbol: v.base.symbol, address: v.base.address }] : []),
-    ];
-    const supplyCount = v.peak.collateral.length + (v.peak.lentBase > 0 ? 1 : 0);
     heads = [
       {
         id: "peak-collateral",
-        label: supplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
+        label: plan.label === "supply" ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
         value: supplyLines.length > 0 ? <div className="flex flex-col gap-1">{supplyLines}</div> : null,
         sub: noPeaksNote,
-        // Many assets: their count opens the peaks, so the head holds one line.
-        ...(peaks && supplyCount > 1
+        // Many collateral assets: their count opens the peaks, the lent base
+        // after them under its caption, so the head holds one line.
+        ...(peaks && plan.count != null
           ? assetCountHead(
-              supplyCount,
-              supplyMarks,
+              plan.count,
+              loadedMarks(v.peak.collateral),
               <div className="flex flex-col gap-1 text-sm font-semibold tabular-nums text-foreground">
                 {supplyLinesOf(16)}
               </div>,
