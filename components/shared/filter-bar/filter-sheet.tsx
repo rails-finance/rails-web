@@ -209,19 +209,7 @@ export function FilterSheet<F>({
     };
   }, [panelOpen, slot]);
   // The badge counts what the pills show set: groups off their default.
-  const active = activeGroupCount(
-    groupDimensions(
-      dimensions.filter((d) => d.pill !== false),
-      filters,
-    ),
-    filters,
-  );
-  // A dimension with no pill (Status) off its default: from sm the button
-  // carries a dot, as no pill says it; below sm the badge counts it.
-  const unpilled = dimensions.filter(
-    (d) => d.pill === false && (!d.available || d.available(filters)) && isDimensionActive(d, filters),
-  ).length;
-  const badge = active + unpilled;
+  const active = activeGroupCount(groupDimensions(dimensions, filters), filters);
 
   return (
     <>
@@ -243,7 +231,7 @@ export function FilterSheet<F>({
         aria-haspopup={inline ? undefined : "dialog"}
         aria-controls={open && inline ? regionId : undefined}
         aria-expanded={open}
-        aria-label={badge > 0 ? `Filters, ${badge} active` : "Filters"}
+        aria-label={active > 0 ? `Filters, ${active} active` : "Filters"}
         title="Filters"
         data-filter-sheet-open=""
         data-anatomy="N1.8.1"
@@ -251,22 +239,15 @@ export function FilterSheet<F>({
         <ListFilter className="w-[18px] h-[18px]" aria-hidden="true" />
         {/* Below sm the set pills can scroll out of sight, so the button
             counts them; from sm the pills beside it say it. */}
-        {badge > 0 && (
+        {active > 0 && (
           <span
             className="absolute -right-1 -top-1 inline-flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-teal-700 text-white dark:bg-teal-400 dark:text-rb-900 text-xs font-bold tabular-nums sm:hidden"
             aria-hidden="true"
-            data-filter-sheet-count={badge}
+            data-filter-sheet-count={active}
             data-prov-exempt
           >
-            {badge}
+            {active}
           </span>
-        )}
-        {unpilled > 0 && (
-          <span
-            className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-teal-700 ring-2 ring-background dark:bg-teal-400 max-sm:hidden"
-            aria-hidden="true"
-            data-filter-sheet-dot=""
-          />
         )}
       </button>
       {open && (

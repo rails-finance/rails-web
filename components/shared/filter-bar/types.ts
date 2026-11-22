@@ -87,9 +87,6 @@ export interface FilterDimension<F> {
   /** A single-choice dimension drawn in the filter panel as one segmented row
    *  whatever its option count (Status: Open / Closed / All, ui-jobs 805). */
   segmented?: boolean;
-  /** False: the dimension draws no pill in the toolbar's row in any state; the
-   *  filter panel is where it is read and changed (ui-jobs 805). */
-  pill?: false;
   /** One short line at the foot of the dimension's group panel (the price
    *  source a USD range is valued at). A group draws the first one it holds. */
   panelNote?: ReactNode;
