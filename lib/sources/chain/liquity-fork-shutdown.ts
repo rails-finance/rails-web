@@ -20,6 +20,18 @@ const inflight = new Map<string, Promise<Record<string, BranchShutdownLive>>>();
 
 const keyOf = (chainId: number, address: string) => `${chainId}:${address.toLowerCase()}`;
 
+/** Every branch that names a read holds a cached answer still good: a
+ *  readForkShutdown call now makes no chain read. */
+export function forkShutdownCached(cfg: LiquityForkConfig): boolean {
+  const chainId = cfg.chainId ?? MAINNET_CHAIN_ID;
+  const now = Date.now();
+  return Object.values(cfg.branches).every((b) => {
+    if (!b.shutdownRead) return true;
+    const hit = cache.get(keyOf(chainId, b.shutdownRead.address));
+    return hit != null && hit.until > now;
+  });
+}
+
 /** Every branch's live answer, by branch key. A branch whose catalog names no
  *  read is absent. A failed read answers `shutDown: null`. */
 export async function readForkShutdown(cfg: LiquityForkConfig): Promise<Record<string, BranchShutdownLive>> {

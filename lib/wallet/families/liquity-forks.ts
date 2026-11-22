@@ -8,6 +8,9 @@
 // fork's Stability Pool deposits come from its deposit listing's route for the
 // wallet (read-wallet.ts, readListingRows) with their stored figures: the
 // forks' deposit listings price nothing, so neither does the wallet page.
+// Beside the price read, each open Trove's branch shutdown: the catalog's
+// record with the live read (branch-shutdown.ts), which lib/wallet/trove-shutdown.ts
+// applies (ui-jobs 802).
 
 import { formerHoldOf, movedHistory } from "@/lib/wallet/moved-row";
 import { buildEbisuTroveRows, type EbisuTroveSummary, type RawEbisuTroveRow } from "@/lib/sources/api/ebisu-troves";
@@ -31,6 +34,8 @@ import type { WalletCard, WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, plural, scaled, storeStamp, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import type { FamilyModule, HeadResult } from "./module";
+import { walletBranchShutdowns, withShutdowns } from "./branch-shutdown";
+import { shutDownTrove } from "@/lib/wallet/trove-shutdown";
 
 type ForkSummary = EbisuTroveSummary | AsymmetryTroveSummary | BasedollarTroveSummary;
 type ForkKind = "ebisu" | "asymmetry" | "basedollar";
@@ -41,7 +46,7 @@ interface ForkSpec<R, S extends ForkSummary> {
   chain: ChainId;
   summaryChain: WalletSummaryRow["chain"];
   debtSymbol: string;
-  branches: LiquityForkBranchConfig[];
+  branches: Record<string, LiquityForkBranchConfig>;
   build: (raw: R[], prices?: LiquityForkPriceMap) => S[];
   mcr: (collateralType: string) => number | undefined;
 }
@@ -96,10 +101,20 @@ function forkModule<R, S extends ForkSummary>(spec: ForkSpec<R, S>): FamilyModul
     },
     async head(open): Promise<HeadResult> {
       if (open.length === 0) return { positions: open, reads: 0 };
-      const prices = await resolveLiquityForkPrices(spec.branches, spec.chain);
-      if (prices.size === 0) return { reads: 1, positions: open.map((p) => ({ ...p, headRead: "failed" })) };
+      const rowOf = (p: WalletPosition) => (p.card as unknown as { row: S }).row;
+      const [prices, shutdowns] = await Promise.all([
+        resolveLiquityForkPrices(Object.values(spec.branches), spec.chain),
+        walletBranchShutdowns(
+          spec.kind,
+          open.map((p) => rowOf(p).collateralType),
+        ),
+      ]);
+      const shut = (p: WalletPosition) => shutDownTrove(p, shutdowns.states.get(rowOf(p).collateralType));
+      // The price multicall, and the shutdown read where the cache did not answer.
+      const reads = 1 + shutdowns.reads;
+      if (prices.size === 0) return { reads, positions: open.map((p) => shut({ ...p, headRead: "failed" })) };
       return {
-        reads: 1,
+        reads,
         positions: open.map((p): WalletPosition => {
           // The builder values the row at its branch's price.
           const raw = (p.card as unknown as { row: S }).row;
@@ -107,7 +122,7 @@ function forkModule<R, S extends ForkSummary>(spec: ForkSpec<R, S>): FamilyModul
           const collateralUsd = s.collateralUsd ?? undefined;
           const cr = s.collateralRatio ?? undefined;
           const mcr = spec.mcr(s.collateralType);
-          return {
+          return shut({
             ...p,
             card: cardOf(s),
             collateralUsd,
@@ -127,7 +142,7 @@ function forkModule<R, S extends ForkSummary>(spec: ForkSpec<R, S>): FamilyModul
             headRead: "read",
             // The price read states no block; the Trove's figures are its last event's.
             readAt: now(),
-          };
+          });
         }),
       };
     },
@@ -164,7 +179,7 @@ export const ebisu = forkModule<RawEbisuTroveRow, EbisuTroveSummary>({
   chain: MAINNET_CHAIN_ID,
   summaryChain: "ethereum",
   debtSymbol: "ebUSD",
-  branches: Object.values(EBISU_BRANCHES),
+  branches: EBISU_BRANCHES,
   build: buildEbisuTroveRows,
   mcr: (c) => ebisuBranch(c)?.mcr,
 });
@@ -175,7 +190,7 @@ export const asymmetry = forkModule<RawAsymmetryTroveRow, AsymmetryTroveSummary>
   chain: MAINNET_CHAIN_ID,
   summaryChain: "ethereum",
   debtSymbol: "USDaf",
-  branches: Object.values(ASYMMETRY_BRANCHES),
+  branches: ASYMMETRY_BRANCHES,
   build: buildAsymmetryTroveRows,
   mcr: (c) => asymmetryBranch(c)?.mcr,
 });
@@ -186,7 +201,7 @@ export const basedollar = forkModule<RawBasedollarTroveRow, BasedollarTroveSumma
   chain: BASE_CHAIN_ID,
   summaryChain: "base",
   debtSymbol: "BD",
-  branches: Object.values(BASEDOLLAR_BRANCHES),
+  branches: BASEDOLLAR_BRANCHES,
   build: buildBasedollarTroveRows,
   mcr: (c) => basedollarBranch(c)?.mcr,
 });
@@ -208,7 +223,7 @@ function forkDepositModule(
     summaryFamily: fork,
     summaryKind: "deposits",
     async shape(rows) {
-      return rows.map((r): WalletPosition => {
+      const shaped = rows.map((r): WalletPosition => {
         const d = r.card as LiquityV2DepositRow<string>;
         const p: WalletPosition = {
           chain,
@@ -234,6 +249,8 @@ function forkDepositModule(
           },
         };
       });
+      // Each open deposit's branch state (ui-jobs 802).
+      return withShutdowns(fork, shaped, (p) => (p.card as { row: LiquityV2DepositRow<string> }).row.collateral_type);
     },
   };
 }

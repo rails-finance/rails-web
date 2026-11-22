@@ -34,6 +34,7 @@ import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, plural, scaled, storeStamp, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { FamilyModule, HeadResult } from "./module";
 import { depositClaim, stakeClaim, type DepositClaim } from "@/lib/wallet/deposit-claim";
+import { withShutdowns } from "./branch-shutdown";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -245,7 +246,7 @@ export const liquityV2Deposits: FamilyModule = {
   summaryFamily: "liquity-v2",
   summaryKind: "deposits",
   async shape(rows) {
-    return rows.map((r) => {
+    const shaped = rows.map((r) => {
       const d = r.card as LiquityV2DepositRow;
       return shapeDeposit(
         r,
@@ -256,6 +257,8 @@ export const liquityV2Deposits: FamilyModule = {
         "BOLD",
       );
     });
+    // Each open deposit's branch state (ui-jobs 802).
+    return withShutdowns("liquity-v2", shaped, (p) => (p.card as { row: LiquityV2DepositRow }).row.collateral_type);
   },
   head: liquityV2DepositHead(loadLiquityV2DepositFromChain),
 };

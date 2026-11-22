@@ -34,6 +34,7 @@ import type { OraclePricesData } from "@/types/api/oracle";
 import type { ArbitrumReadRow } from "@/components/shared/arbitrum-positions-listing";
 import type { CometCard } from "@/lib/compound-arbitrum/comet-cards";
 import type { WalletKind } from "@/lib/wallet/wallet-filters";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 
 /** "redeemed" is in the type for the families that end a position by
  *  redemption; no store states it as an ending yet (a fully redeemed Liquity
@@ -150,6 +151,13 @@ export interface WalletPosition {
   /** An Aave V3 Base account the chain has not been read for yet (open
    *  point 8): shown with a "not read" mark, outside the tiles and the sort. */
   notRead?: boolean;
+  /** A Liquity-family Trove's or Stability Pool deposit's branch shutdown
+   *  (ui-jobs 802): the catalog's record with the live read, from a Trove's
+   *  head read or a deposit's shaping (lib/wallet/families/branch-shutdown.ts).
+   *  Null where the branch reads live or unknown; absent where that read did
+   *  not run (a Trove head that failed or timed out), and the card takes the
+   *  catalog's record alone (`walletBranchState`). */
+  shutdown?: BranchShutdownState | null;
   headRead: HeadRead;
   readAtBlock?: number;
   /** Unix seconds. */
