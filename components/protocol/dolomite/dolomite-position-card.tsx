@@ -25,6 +25,7 @@
 // USD keys by MARKET ID (Dolomite's own key — symbols collide on this
 // roster), priced by the core's own getMarketPrice.
 
+import { largestAssetFigure, useClosedPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
 import { PositionNameId } from "@/components/shared/position-name-id";
 import { positionName, type PositionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
@@ -284,6 +285,9 @@ export interface DolomitePositionCardProps {
   /** The ⋮'s export shapes. `null`: the ⋮ holds the account's rows and the
    *  provenance row alone. */
   exports?: PositionCardExports | null;
+  /** The page's Lifetime flows timeline and its read: a closed card's peak
+   *  value per side (components/shared/closed-peak.tsx). */
+  flows?: ClosedPeakFlows;
 }
 
 /** The Dolomite account's slots for the shared position card: the three
@@ -298,8 +302,10 @@ export function useDolomiteCardSlots({
   viewHref,
   captions,
   exports,
+  flows,
 }: DolomitePositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
+  const peakOf = useClosedPeaks(flows, v.status !== "open");
   const usdOf = dustUsdOf(v);
   // Dust lines (under a cent) leave the icon stack and its "+N"; the panel puts
   // them behind the "N dust reserves hidden" control.
@@ -347,6 +353,29 @@ export function useDolomiteCardSlots({
   let heads: PositionCardHead[];
   let outcome: PositionCardOutcome | undefined;
   if (v.status !== "open") {
+    // The detail card leads with the side's peak value from the page's flows
+    // timeline (components/shared/closed-peak.tsx); a listing row with its
+    // largest market's own peak amount, where the peak is in tokens (a par
+    // peak is no token amount).
+    const figureOf = (lines: DolomitePeakAmount[], side: "supply" | "debt") => {
+      const symbols = new Set(lines.map((r) => r.symbol));
+      return detail
+        ? peakOf(
+            side === "supply" ? "collateral" : "debt",
+            side === "supply" ? CARD_VOCAB.collateral : CARD_VOCAB.debt,
+            (s) => symbols.has(s),
+          )
+        : largestAssetFigure(
+            lines
+              .filter((r) => r.tokens)
+              .map((r) => ({
+                symbol: r.symbol,
+                amount: r.amount,
+                usdNow: lineUsd(v, r.marketId, r.amount),
+                ...(r.decimalsUnread ? { decimalsUnread: true as const } : {}),
+              })),
+          );
+    };
     const held = (lines: DolomitePeakAmount[], side: "supply" | "debt") =>
       lines.length > 0
         ? assetsHead(
@@ -355,6 +384,7 @@ export function useDolomiteCardSlots({
             <span className="text-sm font-semibold tabular-nums text-foreground">
               <PeakLines lines={lines} side={side} />
             </span>,
+            figureOf(lines, side),
           )
         : {};
     heads = [

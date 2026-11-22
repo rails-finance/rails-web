@@ -685,6 +685,11 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                     chain={data}
                     exports={exports}
                     notCollateral={notCollateral}
+                    // A closed card's peak value per side reads the panel's timeline.
+                    flows={{
+                      read: timelineState === "failed" || timelineState === "unavailable" ? "failed" : flows.read,
+                      timeline: flows.timeline,
+                    }}
                     // The Explanation: the L1 prose about the face figures, then
                     // what is particular to THIS Pool — eMode, a supply that
                     // backs nothing (pre-3.2 accounting here), and the freeze.

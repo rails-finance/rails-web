@@ -138,16 +138,22 @@ await page.waitForTimeout(2500);
 const liqBody = await page.textContent("body");
 check("liquidated detail: outcome renders", /LIQUIDATED|Liquidated/.test(liqBody));
 check("liquidated detail: liquidation legs in the timeline", /Collateral seized|Liquidation/.test(liqBody));
-// The head states the markets by their icons alone: no digit once the "+N"
-// chip's text is set aside.
+// The head leads with the side's peak value, "Peak $1.2M · 3 Mar 2025" (one
+// day's sum from the Lifetime flows timeline), the icons beside it (ui-jobs
+// 803). The timeline is read after the card paints, so wait for the figure.
+await page
+  .locator('[data-card-head="peak-collateral"] [data-card-peak]')
+  .first()
+  .waitFor({ state: "visible", timeout: 60000 })
+  .catch(() => {});
 const collHeadText = await page
   .locator('[data-card-head="peak-collateral"]')
   .first()
-  .evaluate((h) => h.innerText.replace(/\+\d+/g, "").replace(/\s+/g, " ").trim())
+  .evaluate((h) => h.innerText.replace(/\s+/g, " ").trim())
   .catch(() => null);
 check(
-  "liquidated detail: closed collateral head shows no figure",
-  collHeadText != null && !/\d/.test(collHeadText),
+  "liquidated detail: closed collateral head states its peak value and day",
+  collHeadText != null && /Peak \$[\d.,]+[KMB]? · \d{1,2} [A-Z][a-z]{2} \d{4}/.test(collHeadText),
   collHeadText ?? "no peak-collateral head",
 );
 // The peaks: each side states its markets' icons, and the C19 button they

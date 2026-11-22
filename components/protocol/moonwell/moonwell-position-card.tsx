@@ -20,6 +20,7 @@
 // detail page's live Comptroller read — the listing card still asserts no
 // health column (the listing snapshot carries none).
 
+import { largestAssetFigure, useClosedPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
 import { positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { isEnteredIn, linesUsd, suppliedUsd } from "@/lib/moonwell/supply-totals";
@@ -278,6 +279,9 @@ export interface MoonwellPositionCardProps {
   captions?: MoonwellCardCaptions;
   /** The ⋮'s export shapes (`moonwellExports`). */
   exports?: PositionCardExports | null;
+  /** The page's Lifetime flows timeline and its read: a closed card's peak
+   *  value per side (components/shared/closed-peak.tsx). */
+  flows?: ClosedPeakFlows;
 }
 
 /** Moonwell's slots for the shared position card: the headlines, the panel,
@@ -292,12 +296,14 @@ export function useMoonwellCardSlots({
   viewHref,
   captions,
   exports,
+  flows,
 }: MoonwellPositionCardProps): PositionCardSlots {
   const dep = useMoonwellDeployment();
   const session = dep.session;
   const marketBy = marketReadBy(v);
   const { supplyProv, borrowProv, mSymbolOf } = useLineReceipts(serverReadOf(chain), marketBy);
   const detail = surface === "detail";
+  const peakOf = useClosedPeaks(flows, v.status !== "open");
 
   // The collateral column holds the entered markets; a supply the account
   // never entered is shown apart ("Supplied, not collateral").
@@ -354,6 +360,19 @@ export function useMoonwellCardSlots({
     // and debt (replayed MAX over the wallet's life, per asset; no USD) open
     // behind the press under the peak label (C19).
     const noPeaksNote = !peaks ? notRecordedNote("position") : undefined;
+    // The detail card leads with the side's peak value from the page's flows
+    // timeline (components/shared/closed-peak.tsx); a listing row with its
+    // largest market's own peak amount.
+    const figureOf = (lines: MoonwellPeakAmount[], side: "supply" | "debt") => {
+      const symbols = new Set(lines.map((r) => r.symbol));
+      return detail
+        ? peakOf(side === "supply" ? "collateral" : "debt", side === "supply" ? SUPPLIED : CARD_VOCAB.debt, (s) =>
+            symbols.has(s),
+          )
+        : largestAssetFigure(
+            lines.map((r) => ({ symbol: r.symbol, amount: r.amount, usdNow: lineUsd(v, r.address, r.amount) })),
+          );
+    };
     const held = (lines: MoonwellPeakAmount[], side: "supply" | "debt") =>
       peaks && lines.length > 0
         ? assetsHead(
@@ -362,6 +381,7 @@ export function useMoonwellCardSlots({
             <span className="text-sm font-semibold tabular-nums text-foreground">
               <PeakLines lines={lines} side={side} />
             </span>,
+            figureOf(lines, side),
           )
         : {};
     heads = [

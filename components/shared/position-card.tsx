@@ -49,7 +49,7 @@ import Link from "next/link";
 import { PositionCardStripSlot } from "@/components/shared/position-card-strip";
 import { PositionReadStamp } from "@/components/shared/position-read";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
-import { BreakdownOverlay, assetsWords } from "@/components/shared/stat-breakdown";
+import { BreakdownOverlay, assetsWords, peakWords } from "@/components/shared/stat-breakdown";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import type { AssetMark } from "@/lib/shared/asset-mark";
 import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
@@ -169,21 +169,26 @@ export interface PositionCardHead {
    *  Built by `assetsHead`. */
   list?: { label: string; count: number; panel: ReactNode };
   /** The side's USD total and its receipt: the breakdown's heading states it
-   *  exact, and carries the receipt the headline (inside the button) cannot. */
-  total?: { usd: number; info: Provenance };
+   *  exact, and carries the receipt the headline (inside the button) cannot.
+   *  `at`: a closed account's peak, stated "Peak $… · day" there. */
+  total?: { usd: number; info: Provenance; at?: string };
 }
 
-/** A head stated by its assets (`PositionCardHead.list`): the figure is
- *  their icons, opening `panel` under `label`. The caller passes a mark for
- *  every asset the panel lists, a reserve whose decimals did not load
- *  included, so the icons and "+N" add up to the lines. */
+/** A head stated by its assets (`PositionCardHead.list`): their icons,
+ *  opening `panel` under `label`. The caller passes a mark for every asset
+ *  the panel lists, a reserve whose decimals did not load included, so the
+ *  icons and "+N" add up to the lines. With `figure` (a closed account's
+ *  peak, components/shared/closed-peak.tsx) the figure leads and the icons
+ *  follow as a sample; its `total` heads the dropdown with the receipt. */
 export function assetsHead(
   label: string,
   assets: AssetMark[],
   panel: ReactNode,
-): Pick<PositionCardHead, "value" | "list"> {
+  figure?: { figure: ReactNode; total?: PositionCardHead["total"] },
+): Pick<PositionCardHead, "value" | "assets" | "list" | "total"> {
+  const cluster = <InlineAssetCluster assets={assets} />;
   return {
-    value: <InlineAssetCluster assets={assets} />,
+    ...(figure ? { value: figure.figure, assets: cluster, total: figure.total } : { value: cluster }),
     list: { label, count: assets.length, panel },
   };
 }
@@ -575,6 +580,7 @@ function HeadBody({
       aria-controls={toggle.open ? toggle.panelId : undefined}
       aria-label={[
         head.list ? head.list.label : head.total ? `${head.label} ${formatUsdValue(head.total.usd)}` : head.label,
+        head.list && head.total?.at ? peakWords(head.total.usd, head.total.at) : null,
         head.list ? assetsWords(head.list.count) : head.breakdown ? `${head.breakdown.assets.length} assets` : null,
         "show breakdown",
       ]

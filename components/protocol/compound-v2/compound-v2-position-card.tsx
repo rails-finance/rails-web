@@ -29,6 +29,7 @@
 // $14.4263): their lines carry the flag, and any USD headline they contribute
 // to says so in its receipt.
 
+import { largestAssetFigure, useClosedPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
 import { positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { headReadOf, serverReadOf, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
@@ -371,6 +372,9 @@ export interface CompoundV2PositionCardProps {
   /** The ⋮'s export shapes (`compoundV2Exports`). Absent: the ⋮ holds the
    *  account's rows and the provenance row alone. */
   exports?: PositionCardExports;
+  /** The page's Lifetime flows timeline and its read: a closed card's peak
+   *  value per side (components/shared/closed-peak.tsx). */
+  flows?: ClosedPeakFlows;
 }
 
 /** The Compound V2 slots for the shared position card. */
@@ -382,8 +386,10 @@ export function useCompoundV2CardSlots({
   explanation,
   viewHref,
   exports,
+  flows,
 }: CompoundV2PositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
+  const peakOf = useClosedPeaks(flows, v.status !== "open");
   const marketBy = marketReadBy(v);
   const supplyLine = (r: CompoundV2SupplyAmount): UsdLine => ({
     market: r.market,
@@ -473,6 +479,17 @@ export function useCompoundV2CardSlots({
   // liquidated outcome appears only here: an open survivor never reaches this
   // branch, however many liquidations its counters show.
   if (ended) {
+    // The detail card leads with the side's peak value from the page's flows
+    // timeline (components/shared/closed-peak.tsx); a listing row with its
+    // largest market's own peak amount.
+    const figureOf = (lines: CompoundV2PeakAmount[], side: "supply" | "debt", label: string) => {
+      const symbols = new Set(lines.map((r) => r.symbol));
+      return detail
+        ? peakOf(side === "supply" ? "collateral" : "debt", label, (s) => symbols.has(s))
+        : largestAssetFigure(
+            lines.map((r) => ({ symbol: r.symbol, amount: r.amount, usdNow: lineUsd(v, r.market, r.amount) })),
+          );
+    };
     const peakHead = (
       id: string,
       label: string,
@@ -488,6 +505,7 @@ export function useCompoundV2CardSlots({
             peakLabel,
             lines.map(markOf),
             <span className="text-sm font-semibold tabular-nums text-foreground">{peakValue(lines, side)}</span>,
+            figureOf(lines, side, label),
           )
         : {}),
     });

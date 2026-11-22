@@ -58,7 +58,7 @@ import { IndexNotice } from "@/components/shared/index-notice";
 import { AAVE_V3_FOLDER_REGISTER, AAVE_V3_TIMELINE_RUNS } from "@/lib/aave-v3/timeline-runs";
 import { fetchAaveV3GroupedTimeline, type AaveV3GroupedTimelineResponse } from "@/lib/api/fetch-aave-v3-timeline";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
-import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { aaveV3FlowSeriesTimeline, aaveV3FocusEvents, lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
 import { AAVE_V3_HEALTH_SOURCE } from "@/lib/aave-v3/flows-health";
@@ -786,6 +786,14 @@ export default function AaveV3PositionDetail({
     emode: switches?.emode ?? null,
   });
   const flowFocus = useFlowFocusValue(focusRoot, flowTimeline);
+  // A closed card's peak value per side reads the same day rows.
+  const peakFlows = useMemo(
+    () => ({
+      read: (flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading") as FlowsRead,
+      timeline: flowSeriesTimeline,
+    }),
+    [flowSeries, flowSeriesFailed, flowSeriesTimeline],
+  );
   // The card's count counts transactions; its tip gives the events too.
   const cardView = useMemo(
     () => (pricedView && flowSeries ? { ...pricedView, eventTotal: flowSeries.totalEvents } : pricedView),
@@ -881,6 +889,7 @@ export default function AaveV3PositionDetail({
                   pricesPending={heldKey == null ? !chainSettled : !cardPriced}
                   notCollateral={notCollateral}
                   exports={exports}
+                  flows={peakFlows}
                   // The Explanation is now pure layman prose about those same face
                   // figures — no secondary figure-strips. The LTV strip is absorbed
                   // into the risk slot above; the reserve rates live on the market

@@ -404,6 +404,8 @@ export default function MoonwellPositionView({
             <>
               {!onEventPage && liveView && cardView && (
                 <MoonwellPositionCard
+                  // A closed card's peak value per side reads the panel's timeline.
+                  flows={{ read: flows.read, timeline: flows.timeline }}
                   v={cardView}
                   surface="detail"
                   viewHref={tl.viewHref}

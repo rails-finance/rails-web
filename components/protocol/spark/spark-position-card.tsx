@@ -38,6 +38,7 @@ import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { TokenAmountNotLoaded, loadedMarks } from "@/components/shared/not-loaded";
+import { largestAssetFigure, useClosedPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { Icon } from "@/components/icons/icon";
@@ -382,6 +383,9 @@ export interface SparkPositionCardProps {
   viewHref?: () => string;
   /** The ⋮'s export shapes; `null` leaves the link and the provenance row. */
   exports?: PositionCardExports | null;
+  /** The page's Lifetime flows timeline and its read: a closed card's peak
+   *  value per side (components/shared/closed-peak.tsx). */
+  flows?: ClosedPeakFlows;
 }
 
 /** A closed card's panel: the peaks of reserves that never backed borrowing. */
@@ -423,8 +427,10 @@ export function useSparkCardSlots({
   explanation,
   viewHref,
   exports,
+  flows,
 }: SparkPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
+  const peakOf = useClosedPeaks(flows, v.status !== "open");
   const isOther = (r: SparkReserveAmount) => notCollateral?.has(r.address.toLowerCase()) === true;
   const collSupplies = v.supplies.filter((r) => !isOther(r));
   const otherSupplies = v.supplies.filter(isOther);
@@ -475,6 +481,23 @@ export function useSparkCardSlots({
     // Unread switches: every supply heads the side, named as supplied (as
     // Aave V3's card does).
     const switchesRead = notCollateral != null;
+    // The detail card leads with the side's peak value from the page's flows
+    // timeline (components/shared/closed-peak.tsx); a listing row with its
+    // largest asset's own peak amount.
+    const figureOf = (reserves: SparkReserveAmount[], side: "supply" | "debt", label: string) => {
+      const symbols = new Set(reserves.map((r) => r.symbol));
+      return detail
+        ? peakOf(side === "supply" ? "collateral" : "debt", label, (s) => symbols.has(s))
+        : largestAssetFigure(
+            reserves.map((r) => ({
+              symbol: r.symbol,
+              amount: r.amount,
+              usdNow: reserveUsd(v, r.address, r.amount),
+              ...(r.decimalsUnread ? { decimalsUnread: true as const } : {}),
+            })),
+          );
+    };
+    const supplyLabel = switchesRead ? CARD_VOCAB.collateral : "Supplied";
     const held = (reserves: SparkReserveAmount[], side: "supply" | "debt") =>
       reserves.length > 0
         ? assetsHead(
@@ -483,12 +506,13 @@ export function useSparkCardSlots({
             <span className="text-sm font-semibold tabular-nums text-foreground">
               <PeakLines reserves={reserves} side={side} />
             </span>,
+            figureOf(reserves, side, side === "supply" ? supplyLabel : CARD_VOCAB.debt),
           )
         : {};
     heads = [
       {
         id: "peak-collateral",
-        label: switchesRead ? CARD_VOCAB.collateral : "Supplied",
+        label: supplyLabel,
         value: peaksRead && switchesRead ? <PeakNone /> : null,
         ...held(peakColl, "supply"),
       },
