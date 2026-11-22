@@ -1,9 +1,9 @@
 "use client";
 
-// The timeline's filters on the listings' pills (N1.10, ui-jobs 735): one pill
-// per axis the history offers (Type, Asset, Version, Address), each with its
-// editor, and the filter sheet below sm, over the model in
-// timeline-filter-model.ts. The toolbar draws the Date pill.
+// The timeline's filters on the listings' pills (N1.10, ui-jobs 735, 801): one
+// pill per axis that is set (Type, Asset, Version, Address), each with its
+// editor, and the Filters button with its sheet, over the model in
+// timeline-filter-model.ts. The toolbar draws the Date.
 
 import { useRef, useState } from "react";
 import { FilterPill } from "@/components/shared/filter-bar/filter-pill";
@@ -38,17 +38,23 @@ export function TimelineAxisPills({
   model,
   count,
   countFor,
+  inert = false,
 }: {
+  /** True while the Filters panel is open in the page: the pills stand back. */
+  inert?: boolean;
   model: TimelineFilterModel;
   count?: { total: number; noun: string };
   countFor?: DraftCount;
 }) {
-  const [open, setOpen] = useState<string | null>(null);
+  const [openName, setOpen] = useState<string | null>(null);
+  const open = inert ? null : openName;
   const groups = groupDimensions(model.dimensions, model.filters);
   return (
     <>
       {groups.map((g) => {
         const pill = pillFor(g, model.filters);
+        // An unset axis has no pill: the Filters button reaches it.
+        if (pill.state === "unset") return null;
         return (
           <AxisPill
             key={pill.name}
@@ -58,6 +64,7 @@ export function TimelineAxisPills({
             model={model}
             count={count}
             countFor={countFor}
+            inert={inert}
           />
         );
       })}
@@ -72,7 +79,9 @@ function AxisPill({
   model,
   count,
   countFor,
+  inert,
 }: {
+  inert: boolean;
   pill: PillModel<TimelineFilters>;
   open: boolean;
   setOpen: (o: boolean) => void;
@@ -83,7 +92,7 @@ function AxisPill({
   const anchorRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   return (
-    <div ref={anchorRef} className="contents" data-timeline-axis={pill.dims[0].id}>
+    <div ref={anchorRef} className="contents" data-timeline-axis={pill.dims[0].id} inert={inert}>
       <FilterPill
         name={pill.name}
         anatomy={AXIS_ANATOMY[pill.dims[0].id as Axis]}
@@ -120,15 +129,20 @@ function AxisPill({
   );
 }
 
-/** The Filters button and its sheet, below sm. */
+/** The Filters button and its sheet. */
 export function TimelineFilterSheet({
   model,
   count,
   countFor,
+  slot,
+  onPanelOpenChange,
 }: {
+  onPanelOpenChange?: (open: boolean) => void;
   model: TimelineFilterModel;
   count?: { total: number; noun: string };
   countFor?: DraftCount;
+  /** Where the filters open from sm (FilterSheet `slot`). */
+  slot?: HTMLElement | null;
 }) {
   if (model.dimensions.length === 0) return null;
   return (
@@ -138,6 +152,8 @@ export function TimelineFilterSheet({
       onChange={model.onChange}
       count={count}
       countFor={countFor}
+      slot={slot}
+      onPanelOpenChange={onPanelOpenChange}
     />
   );
 }

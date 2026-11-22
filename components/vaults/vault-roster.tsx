@@ -437,7 +437,7 @@ export function VaultRoster({
       />
 
       {/* ── the funded vaults, one flat table ───────────────────────────── */}
-      <div data-skel-section={`${skel}-groups`}>
+      <div data-skel-section={`${skel}-groups`} data-filters-results="">
         {fundedShown.length === 0 ? (
           <p className="mb-6 text-[13px] text-rb-500">
             {blockNumber > 0 ? `No funded vault matches at block ${n(blockNumber)}.` : "No funded vault matches."}
@@ -449,7 +449,7 @@ export function VaultRoster({
 
       {/* ── the vaults that hold nothing: a reading, behind one disclosure ── */}
       {emptyRows.length > 0 && (!presetOn || emptyShown.length > 0) && (
-        <section className="mb-6" data-skel-section={`${skel}-empty`} data-empty-group>
+        <section className="mb-6" data-skel-section={`${skel}-empty`} data-empty-group data-filters-results="">
           <button
             type="button"
             onClick={() => setEmptyOpen((o) => !o)}

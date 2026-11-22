@@ -13,7 +13,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
-import { PaginationControls } from "@/components/shared/pagination-controls";
+import { PaginationControls, ResultCountLine } from "@/components/shared/pagination-controls";
 import { ChainTruthListLoadingSkeleton } from "@/components/shared/chain-truth-list-loading-skeleton";
 import { markNavStart } from "@/lib/perf/settle-marks";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -257,33 +257,36 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
       ) : (
         toolbar
       )}
-      {loading ? (
-        <ChainTruthListLoadingSkeleton />
-      ) : error ? (
-        // A real fetch failure, surfaced by the driver only when the config
-        // supplies a renderer. Owns its own styling; replaces the row column
-        // (and its pagination) so a failure never masquerades as "no matches".
-        error
-      ) : (
-        <>
-          {/* While a server-tier refetch is in flight (the memory tier re-filters
+      {/* What the toolbar narrows, loading, failed or drawn: an open filter
+          panel sets this back, dimmed and inert (FilterSheet). */}
+      <div data-filters-results="">
+        {loading ? (
+          <ChainTruthListLoadingSkeleton />
+        ) : error ? (
+          // A real fetch failure, surfaced by the driver only when the config
+          // supplies a renderer. Owns its own styling; replaces the row column
+          // (and its pagination) so a failure never masquerades as "no matches".
+          error
+        ) : (
+          <>
+            {/* While a server-tier refetch is in flight (the memory tier re-filters
                 synchronously, so `refreshing` is never set there), dim the column as
                 a hint — but DON'T make it inert. The rows on screen are still valid
                 and clickable; a `pointer-events: none` here froze hover + navigation
                 for the whole round trip. `aria-busy` carries the state for AT. */}
-          <div className={`transition-opacity ${refreshing ? "opacity-60" : ""}`} aria-busy={refreshing || undefined}>
-            {/* The band about the rows — inside the dimmed column with them,
+            <div className={`transition-opacity ${refreshing ? "opacity-60" : ""}`} aria-busy={refreshing || undefined}>
+              {/* The band about the rows — inside the dimmed column with them,
                 outside the keyed div below so it does not replay the fade. */}
-            {items.length > 0 && above}
-            {items.length > 0 ? (
-              // Keyed by `viewKey`: a facet/sort/page change swaps the key, React
-              // re-mounts the column, and the fresh mount replays the CSS entrance
-              // fade (`.ct-row`). Search text is excluded from the key upstream,
-              // so typing filters in place without replaying it.
-              <div key={viewKey ?? "list"} className="flex flex-col gap-3">
-                {items.map((item) => (
-                  <div key={keyFor(item)} className={animateEntrance ? "ct-row" : undefined}>
-                    {/* prefetch={true}: the detail segments are dynamic routes with
+              {items.length > 0 && above}
+              {items.length > 0 ? (
+                // Keyed by `viewKey`: a facet/sort/page change swaps the key, React
+                // re-mounts the column, and the fresh mount replays the CSS entrance
+                // fade (`.ct-row`). Search text is excluded from the key upstream,
+                // so typing filters in place without replaying it.
+                <div key={viewKey ?? "list"} className="flex flex-col gap-3">
+                  {items.map((item) => (
+                    <div key={keyFor(item)} className={animateEntrance ? "ct-row" : undefined}>
+                      {/* prefetch={true}: the detail segments are dynamic routes with
                           no loading.tsx boundary, and on Next 15.5 the default prefetch
                           skips those entirely — no RSC payload, no route chunks. That
                           cold start was the dominant leg of detail settle (§3.4 marks:
@@ -295,35 +298,43 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
                           does not run a dynamic route's data work to answer one. Do
                           not infer that from the code; measure it again if the
                           prefetch semantics move. */}
-                    {/* group/listing-row: the position card's frame keys its blue
+                      {/* group/listing-row: the position card's frame keys its blue
                           navigation hover border off this group. Detail pages render
                           the same cards outside any row Link, so the hover state never
                           fires there. */}
-                    <ListingRowLink href={hrefFor(item)}>{renderCard(item)}</ListingRowLink>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-rb-500">
-                {pagination ? `No ${noun} match these filters.` : `No ${noun} captured yet.`}
-                {emptyNote ? <p className="mt-1">{emptyNote}</p> : null}
-              </div>
+                      <ListingRowLink href={hrefFor(item)}>{renderCard(item)}</ListingRowLink>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-rb-500">
+                  {pagination ? `No ${noun} match these filters.` : `No ${noun} captured yet.`}
+                  {emptyNote ? <p className="mt-1">{emptyNote}</p> : null}
+                </div>
+              )}
+            </div>
+            {/* A listing filtered in memory has no paging: the count alone,
+                where the page writes no count line of its own. */}
+            {!pagination && filter != null && filter.countNode == null && (
+              <ResultCountLine total={items.length} noun={filter.nounFor?.(filter.filters) ?? noun} />
             )}
-          </div>
-          {pagination && (
-            <PaginationControls
-              currentPage={pagination.currentPage}
-              totalPages={pagination.totalPages}
-              totalCount={pagination.totalCount}
-              itemsPerPage={pagination.itemsPerPage}
-              onPageChange={pagination.onPageChange}
-              noun={pagination.countNoun ?? noun}
-              note={pagination.countNote}
-            />
-          )}
-        </>
-      )}
-      {!loading && !error && below}
+            {/* On one page the strip is the count alone, which gives way to a count
+                line the page writes (Focus, Morpho's AIM), as the in-memory line does. */}
+            {pagination && (pagination.totalPages > 1 || filter?.countNode == null) && (
+              <PaginationControls
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalCount={pagination.totalCount}
+                itemsPerPage={pagination.itemsPerPage}
+                onPageChange={pagination.onPageChange}
+                noun={pagination.countNoun ?? noun}
+                note={pagination.countNote}
+              />
+            )}
+          </>
+        )}
+        {!loading && !error && below}
+      </div>
     </div>
   );
 }

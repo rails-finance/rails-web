@@ -182,6 +182,8 @@ export function PolarisListing({
             passedOn.current = r.passedOn;
             return r;
           }),
+        // The same read, leaving `passedOn` to the applied page.
+        countDraft: (filters) => fetchPolarisListingPage(filters, 1).then((r) => r.total),
       })}
       onFilters={onFilters}
       renderAbove={({ items, total, filters }) => {

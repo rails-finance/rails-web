@@ -2582,3 +2582,10 @@ html[data-chain-focus] [data-chain-gate]:not([data-scope-ready]) {
     animation: none;
   }
 }
+
+/* What follows an open filter panel on the page (ui-jobs 801): dimmed as the
+   toolbar's row is; FilterSheet sets the attribute, and `inert` with it. */
+[data-filters-dimmed] {
+  opacity: 0.4;
+  transition: opacity 150ms;
+}

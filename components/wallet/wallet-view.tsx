@@ -342,11 +342,13 @@ export function WalletView({
   const byKind = kinds.length > 0;
   const focused = scoped.on && !scoped.peek;
   const filtered = focused || byKind || status != null;
-  const all = scoped.rows.filter(
-    (p) =>
-      (!byKind || (p.kind != null && kinds.includes(p.kind))) &&
-      (status == null || (status === "open") === (p.status === "open")),
-  );
+  const narrow = (k: WalletKind[], s: WalletStatus | undefined) =>
+    scoped.rows.filter(
+      (p) =>
+        (k.length === 0 || (p.kind != null && k.includes(p.kind))) &&
+        (s == null || (s === "open") === (p.status === "open")),
+    );
+  const all = narrow(kinds, status);
   const chosen = walletProtocol(read.protocol);
   // The heading counts the wallet's positions whatever the pills hold.
   const wallet = {
@@ -390,6 +392,7 @@ export function WalletView({
       status={status}
       setStatus={setStatus}
       shown={all.length}
+      countFor={(k, s) => narrow(k, s).length}
       navigate={navigate}
     />
   );
@@ -398,6 +401,8 @@ export function WalletView({
       className={`flex flex-col gap-7 transition-opacity ${reading ? "pointer-events-none opacity-50" : ""}`}
       aria-busy={reading || undefined}
       data-wallet-reading={reading ? "" : undefined}
+      // What the filter bar narrows: its open panel sets this back.
+      data-filters-results=""
     >
       {children}
     </div>
@@ -531,6 +536,11 @@ export function WalletView({
                 {sections.map((s) => (
                   <Section key={s.slug} s={s} />
                 ))}
+                {/* What the filter bar leaves shown, with its noun: the bar
+                    draws no count (ui-jobs 801; Miles, 22 Nov 2026). */}
+                <p className="text-sm text-rb-500" data-wallet-shown={all.length} data-prov-exempt="">
+                  {plural(all.length, status ? `${status} position` : "position")}
+                </p>
                 {trades}
               </>,
             )}

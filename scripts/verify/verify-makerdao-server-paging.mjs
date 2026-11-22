@@ -23,6 +23,7 @@
 //   BASE=http://localhost:3000 node scripts/verify/verify-makerdao-server-paging.mjs
 
 import { chromium } from "playwright";
+import { applyFilterSheet, leaveSheetRow, openFilterSheet, openSheetRow } from "./lib/listing-toolbar.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const LIST = "/ethereum/makerdao";
@@ -82,24 +83,35 @@ const errors = [];
 /** Rows currently rendered in the listing column. */
 const rowCount = (page) => page.locator('a[class*="listing-row"]').count();
 
-/** The "Showing 1-20 of 31,750 vaults" line. Null when a single page of results
- *  renders no pagination at all — then count the rows instead. */
+/** The "Showing 1–20 of 31,750 vaults" line. Null on a single page of results,
+ *  which draws the count alone ("12 vaults") — then count the rows instead. */
 async function total(page) {
-  const el = page.locator("text=/Showing [\\d,]+-[\\d,]+ of [\\d,]+ vaults/").first();
+  const el = page.locator("text=/Showing [\\d,]+[-–][\\d,]+ of [\\d,]+ vaults/").first();
   if ((await el.count()) === 0) return null;
   const m = (await el.innerText()).match(/of ([\d,]+) vaults/);
   return m ? Number(m[1].replace(/,/g, "")) : null;
 }
 
-/** Open a filter group's editor by its pill (N1.10, ui-jobs 681). */
-async function openGroup(page, label) {
-  await page.locator(`[data-filter-pill="${label}"] [data-pill-open]`).first().click();
-  await page.locator(`[data-pill-editor="${label}"]`).first().waitFor({ state: "visible", timeout: 5000 });
+/** Open a filter group's options: its pill's editor (N1.10, ui-jobs 681)
+ *  where the group is set, else the dimension `id` in the Filters sheet (an
+ *  unset group draws no pill, ui-jobs 801). */
+async function openGroup(page, label, id) {
+  const pill = page.locator(`[data-filter-pill="${label}"] [data-pill-open]`).first();
+  if ((await pill.count()) > 0) {
+    await pill.click();
+    await page.locator(`[data-pill-editor="${label}"]`).first().waitFor({ state: "visible", timeout: 5000 });
+    return;
+  }
+  await openFilterSheet(page);
+  await openSheetRow(page, id);
 }
+
+/** The open editor's or sheet view's option rows. */
+const OPTION = "[data-pill-editor] [data-pill-option], [data-filter-sheet-view] [data-filter-sheet-option]";
 
 /** Every option row in the open editor, as { label, meta }. */
 async function panelOptions(page) {
-  return page.locator("[data-pill-editor] [data-pill-option]").evaluateAll((els) =>
+  return page.locator(OPTION).evaluateAll((els) =>
     els.map((el) => {
       const spans = [...el.querySelectorAll("span")];
       const label = spans.find((s) => s.className.includes("flex-1"))?.textContent?.trim() ?? "";
@@ -143,7 +155,7 @@ async function main() {
   check(t != null && t >= FLOOR, "listing: the whole index is counted", `${t} vaults, floor ${FLOOR}`);
 
   // ---- 2. the collateral facet offers the whole roster ---------------------
-  await openGroup(page, "Collateral");
+  await openGroup(page, "Collateral", "ilks");
   const opts = await panelOptions(page);
   const labels = opts.map((o) => o.label);
   check(
@@ -176,10 +188,13 @@ async function main() {
 
   // ---- 3. picking one the old tier could not reach -------------------------
   let before = await hrefs(page);
-  // The editor stages the pick; its primary button applies it (an outside
-  // click would close it without applying).
-  await page.locator('[data-pill-editor] [data-pill-option]:has-text("GNO-A")').first().click();
-  await page.locator("[data-pill-editor] [data-pill-editor-apply]").first().click();
+  // The editor or sheet stages the pick; its primary button applies it (an
+  // outside click would close the editor without applying).
+  await page.locator(OPTION).filter({ hasText: "GNO-A" }).first().click();
+  if ((await page.locator("[data-filter-sheet]").count()) > 0) {
+    await leaveSheetRow(page);
+    await applyFilterSheet(page);
+  } else await page.locator("[data-pill-editor] [data-pill-editor-apply]").first().click();
   await settled(page, before);
 
   check(page.url().includes("ilk=GNO-A"), "pick: the selection is in the URL", page.url().split("?")[1] ?? "");

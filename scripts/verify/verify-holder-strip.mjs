@@ -46,6 +46,7 @@ import { chromium } from "playwright";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { openListingSearch } from "./lib/listing-toolbar.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -180,6 +181,8 @@ async function openListing(context, url, { route } = {}) {
  *  That is what lets the truncation case rewrite `pagination.total` on the
  *  wire. */
 async function searchWallet(page, placeholder, wallet) {
+  // The search rests as an icon until pressed (N1.1, ui-jobs 801).
+  await openListingSearch(page);
   const box = page.getByPlaceholder(placeholder);
   await box.click();
   await box.fill(wallet);
@@ -549,6 +552,7 @@ const walletBand = async (wallet) => {
 // ── typed search, and a wallet holding nothing ─────────────────────────────
 {
   const page = await openListing(context, `${BASE}/ethereum/liquity-v2`);
+  await openListingSearch(page);
   const box = page.getByPlaceholder("Address, ENS, or ID");
   await box.click();
   await box.fill(V2_WALLET);

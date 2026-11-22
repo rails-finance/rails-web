@@ -254,6 +254,7 @@
 // The filter arm (a note kind among the type options) was not broken.
 //
 import { chromium } from "playwright";
+import { closeFilterSheet, openFilterSheet, openSheetRow } from "./lib/listing-toolbar.mjs";
 import { createPublicClient, http, parseAbi, parseAbiItem, toEventSelector, getAddress } from "viem";
 import { mainnet } from "viem/chains";
 import fs from "node:fs";
@@ -801,6 +802,15 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
       // as uncovered figures — a reading this capture would have manufactured.
       await typeButton.first().click({ force: true, timeout: 4000 });
       await page.waitForTimeout(200);
+    } else if (await openFilterSheet(page, page.locator("[data-vault-timeline-rows]"))) {
+      // A Type that hides nothing draws no pill (ui-jobs 801): its options are
+      // the Filters sheet's Type view. Escape removes the sheet whole, its
+      // per-option counts with it.
+      if (await openSheetRow(page, "type")) {
+        const view = page.locator("[data-filter-sheet-view='type']");
+        filterOptionText = (await view.first().innerText()).replace(/\s+/g, " ");
+      }
+      await closeFilterSheet(page);
     }
   } catch {
     /* a dropdown that would not open leaves the text empty, which the check reads as "no note option" */

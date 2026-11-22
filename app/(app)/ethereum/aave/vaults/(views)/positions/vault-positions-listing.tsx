@@ -98,6 +98,9 @@ export function VaultPositionsListing({
         dimensions: (filters) => vaultPositionListDimensions(census, filters.status),
         itemsPerPage: VAULT_POSITION_ITEMS_PER_PAGE,
         fetchPage,
+        // fetchPage writes the census line and the overlay's block, and
+        // reads the chain: the editors read "Apply".
+        countDraft: false,
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

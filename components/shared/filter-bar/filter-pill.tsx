@@ -3,7 +3,7 @@
 /**
  * FilterPill (N1.10, ui-jobs 681): one editable pill of a listing's toolbar.
  * Three states, worked out in ./pill-model:
- *   unset   — dashed outline, muted, "+ Market"; the whole pill opens the editor.
+ *   unset   — not drawn (ui-jobs 801): the Filters button reaches the group.
  *   set     — tonal teal fill and border, muted label and bold value
  *             ("Status Open"); the main area opens the editor and a sibling ×
  *             removes the filter (two buttons side by side, never nested).
@@ -15,7 +15,7 @@
  */
 
 import type { ReactNode, Ref } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, X } from "lucide-react";
 import type { PillState } from "@/components/shared/filter-bar/pill-model";
 
 /** 44px on a phone, 40px from sm; fully rounded. */
@@ -30,7 +30,6 @@ const LABEL = PILL_MUTED;
 /** The set pill's tonal fill and border. */
 export const PILL_SET_TONE = "border border-teal-600/35 bg-teal-500/[0.06] dark:border-teal-400/30 dark:bg-teal-400/10";
 const PILL_SET = `${PILL_SET_TONE} hover:bg-teal-500/10 dark:hover:bg-teal-400/15`;
-const PILL_UNSET = `border border-dashed border-rb-400 dark:border-rb-500/60 ${PILL_MUTED} hover:text-foreground hover:border-rb-500`;
 /** The sort pill and the Filters button: a neutral filled pill. */
 export const PILL_NEUTRAL =
   "border border-rb-200 bg-rb-100 text-foreground hover:bg-rb-200 dark:border-rb-700 dark:bg-rb-800 dark:hover:bg-rb-700";
@@ -44,7 +43,7 @@ export interface FilterPillProps {
   pinned?: boolean;
   label: string;
   value: string;
-  /** The pill's accessible name: "Status Open", "Add Market filter". */
+  /** The pill's accessible name: "Status Open". */
   spoken: string;
   expanded: boolean;
   onOpen: () => void;
@@ -58,6 +57,8 @@ export interface FilterPillProps {
   /** Data hooks on the pill's main button (the timeline's Date pill keeps
    *  `data-date-control`). */
   openData?: Record<string, string>;
+  /** True while the Filters panel is open in the page: out of the Tab order. */
+  inert?: boolean;
 }
 
 export function FilterPill({
@@ -75,36 +76,18 @@ export function FilterPill({
   children,
   anatomy,
   openData,
+  inert,
 }: FilterPillProps) {
   const hooks = {
     "data-filter-pill": name,
     "data-pill-state": state,
     "data-anatomy": anatomy ? `N1.10 ${anatomy}` : "N1.10",
   };
-  if (state === "unset") {
-    return (
-      <div className="relative shrink-0" {...hooks}>
-        <button
-          ref={buttonRef}
-          type="button"
-          onClick={onOpen}
-          className={`${PILL_BASE} ${PILL_UNSET} ${FOCUS} gap-1.5 pl-3 pr-3.5`}
-          aria-haspopup="dialog"
-          aria-expanded={expanded}
-          aria-label={spoken}
-          data-pill-open=""
-          {...openData}
-        >
-          <Plus className="size-3.5" aria-hidden="true" />
-          {name}
-        </button>
-        {children}
-      </div>
-    );
-  }
+  // An unset group draws no pill: the Filters button reaches it (ui-jobs 801).
+  if (state === "unset") return null;
   if (pinned) {
     return (
-      <div className="relative shrink-0" {...hooks}>
+      <div className={`relative shrink-0 ${PANEL_OPEN_DIM}`} inert={inert} {...hooks}>
         <div className={`${PILL_BASE} ${PILL_SET_TONE} gap-1.5 px-3.5 text-foreground`}>
           {label && <span className={`shrink-0 ${LABEL}`}>{label}</span>}
           <span className="min-w-0 truncate font-semibold">{value}</span>
@@ -114,7 +97,7 @@ export function FilterPill({
   }
   const removable = !locked;
   return (
-    <div className="relative shrink-0" {...hooks}>
+    <div className={`relative shrink-0 ${PANEL_OPEN_DIM}`} inert={inert} {...hooks}>
       <div className={`${PILL_BASE} ${PILL_SET} text-foreground`}>
         <button
           ref={buttonRef}
@@ -177,7 +160,7 @@ export function FilterPillChip({
   removeData?: Record<string, string>;
 }) {
   return (
-    <div className="relative shrink-0" {...data}>
+    <div className={`relative shrink-0 ${PANEL_OPEN_DIM}`} {...data}>
       <div className={`${PILL_BASE} ${PILL_SET} text-foreground`}>
         <button
           type="button"
@@ -205,22 +188,30 @@ export function FilterPillChip({
   );
 }
 
-/** An unset pill's place, held empty: the box "+ {name}" takes, unseen and
- *  out of the accessibility tree, so the row does not move when the pill
- *  arrives (the timeline's Date pill while its page's panel reads, ui-jobs
- *  764). */
+/** A resting icon button's place, held empty, unseen and out of the
+ *  accessibility tree, so the row does not move when the button arrives (the
+ *  timeline's Date button while its page's panel reads, ui-jobs 764). */
 export function FilterPillReserve({ name }: { name: string }) {
-  return (
-    <span aria-hidden="true" className={`${PILL_BASE} invisible gap-1.5 border pl-3 pr-3.5`} data-pill-reserve={name}>
-      <Plus className="size-3.5" />
-      {name}
-    </span>
-  );
+  return <span aria-hidden="true" className="invisible size-11 shrink-0 sm:size-10" data-pill-reserve={name} />;
 }
 
-/** The sort as one pill: "↓ Recent activity ⌄" (N1.3). */
+/** While the Filters panel is open in the page (the toolbar's root carries
+ *  `data-filters-open` and the `toolbar` group), the row's other controls
+ *  stand back: dimmed and not pressable; the caller also sets `inert` on
+ *  them (ui-jobs 801). */
+export const PANEL_OPEN_DIM =
+  "transition-opacity group-data-[filters-open]/toolbar:pointer-events-none group-data-[filters-open]/toolbar:opacity-40";
+
+/** A round icon button of the toolbar row, in the neutral pill's tone: 44px
+ *  on a phone, 40px from sm (the search, the Filters button, the resting
+ *  sort and the timeline's resting Date; ui-jobs 801). */
+export const PILL_ICON_BUTTON = `${PILL_NEUTRAL} ${FOCUS} inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-colors sm:size-10`;
+
+/** The sort (N1.3): its arrow alone on the listing's resting sort, and
+ *  "↓ Collateral ⌄" on any other (ui-jobs 801). */
 export function SortPillButton({
   label,
+  named,
   order,
   spoken,
   expanded,
@@ -228,6 +219,8 @@ export function SortPillButton({
   buttonRef,
 }: {
   label: string;
+  /** False on the resting sort: the arrow stands alone. */
+  named: boolean;
   order: "asc" | "desc";
   spoken: string;
   expanded: boolean;
@@ -240,15 +233,16 @@ export function SortPillButton({
       ref={buttonRef}
       type="button"
       onClick={onOpen}
-      className={`${PILL_BASE} ${PILL_NEUTRAL} ${FOCUS} gap-1.5 px-3.5`}
+      className={named ? `${PILL_BASE} ${PILL_NEUTRAL} ${FOCUS} gap-1.5 px-3.5` : PILL_ICON_BUTTON}
       aria-haspopup="dialog"
       aria-expanded={expanded}
       aria-label={spoken}
-      data-sort-pill=""
+      title={named ? undefined : spoken}
+      data-sort-pill={named ? "named" : "arrow"}
     >
       <Arrow className="size-4" aria-hidden="true" />
-      <span>{label}</span>
-      <ChevronDown className="size-3.5 text-rb-500" aria-hidden="true" />
+      {named && <span>{label}</span>}
+      {named && <ChevronDown className="size-3.5 text-rb-500" aria-hidden="true" />}
     </button>
   );
 }

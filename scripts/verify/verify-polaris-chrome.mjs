@@ -14,8 +14,9 @@
 //      and page-table (a node fs check — a loading state cannot be caught
 //      reliably in the browser).
 //   3. Listing: the Market facet's two options each carry the stable's glyph
-//      (<img alt="USDp"> / <img alt="GOLDp">); picking one still writes
-//      ?market=usdp (the codec is untouched).
+//      (<img alt="USDp"> / <img alt="GOLDp">), read in the set pill's editor;
+//      picking USDp in the Filters sheet still writes ?market=usdp (the codec
+//      is untouched).
 //   4. usdp/175 and usdp/166: the liquidation's head reads "Liquidated" and
 //      one clause, "0.0211 claimable" (or "0.3231 claimed" once the owner has
 //      claimed), restating the timeline API's collSurplus at four places
@@ -29,8 +30,10 @@
 //      docs.polaris.finance, each answering 200 to a fetch from this script,
 //      and none is the testnet app.
 //   6. /sepolia/polaris/info says ENS names resolve on Ethereum mainnet.
-//   7. The bare listing's sort menu reads "Recent activity", and so does
-//      Liquity V2's, the one cross-explorer check that proves the sweep.
+//   7. The bare listing's sort reads "Recent activity", and so does Liquity
+//      V2's, the one cross-explorer check that proves the sweep. The resting
+//      sort draws its arrow alone (ui-jobs 801), so the words are its
+//      accessible name ("Sort: Recent activity, descending").
 //
 // THE EXPECTED VALUES ARE RESTATED HERE, never imported and never read off the
 // page: the head's figure is x.toFixed(4), and collSurplus comes from
@@ -45,6 +48,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { setFilterViaSheet } from "./lib/listing-toolbar.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -137,8 +141,12 @@ async function openPosition(url) {
 }
 
 // ── 3. the Market facet's glyphs ───────────────────────────────────────────
+// An unset Market draws no pill (ui-jobs 801) and the Filters sheet draws a
+// two-option facet as segments without glyphs, so the options are read in the
+// editor of the pill `?market=goldp` sets; the pick is made on the bare
+// listing through the Filters sheet.
 {
-  const page = await openListing(`${BASE}/sepolia/polaris`);
+  const page = await openListing(`${BASE}/sepolia/polaris?market=goldp`);
   await page
     .locator('[data-skel-section="listing-toolbar"] [data-filter-pill="Market"] [data-pill-open]')
     .first()
@@ -158,15 +166,15 @@ async function openPosition(url) {
     usdp?.imgAlts.includes("USDp") && goldp?.imgAlts.includes("GOLDp"),
     JSON.stringify(options),
   );
-  await menu
-    .filter({ hasText: /^USDp$/ })
-    .first()
-    .click();
-  // The editor stages the pick; its primary button writes it.
-  await page.locator("[data-pill-editor] [data-pill-editor-apply]").first().click();
-  await page.waitForURL(/[?&]market=usdp(&|$)/, { timeout: 15000 }).catch(() => {});
-  check("3b. picking USDp writes ?market=usdp", /[?&]market=usdp(&|$)/.test(page.url()), page.url());
   await page.close();
+  // The sheet stages the pick; its Show button writes it.
+  const bare = await openListing(`${BASE}/sepolia/polaris`);
+  await setFilterViaSheet(bare, "market", ["usdp"], {
+    scope: bare.locator('[data-skel-section="listing-toolbar"]'),
+  });
+  await bare.waitForURL(/[?&]market=usdp(&|$)/, { timeout: 15000 }).catch(() => {});
+  check("3b. picking USDp writes ?market=usdp", /[?&]market=usdp(&|$)/.test(bare.url()), bare.url());
+  await bare.close();
 }
 
 // ── 4. the claimable clause on the liquidation's head ──────────────────────
@@ -443,10 +451,10 @@ async function checkModal(name, { title, links }) {
   const page = await openListing(`${BASE}/sepolia/polaris`);
   const labels = await page
     .locator('[data-skel-section="listing-toolbar"] [data-sort-pill]')
-    .evaluateAll((els) => els.map((b) => (b.textContent ?? "").trim()));
+    .evaluateAll((els) => els.map((b) => b.getAttribute("aria-label") ?? ""));
   check(
     '7a. the bare listing\'s sort menu reads "Recent activity"',
-    labels.includes("Recent activity"),
+    labels.some((l) => l.includes("Recent activity")),
     labels.join(" | "),
   );
   await page.close();
@@ -456,10 +464,10 @@ async function checkModal(name, { title, links }) {
   const v2 = await openListing(`${BASE}/ethereum/liquity-v2`);
   const v2Labels = await v2
     .locator('[data-skel-section="listing-toolbar"] [data-sort-pill]')
-    .evaluateAll((els) => els.map((b) => (b.textContent ?? "").trim()));
+    .evaluateAll((els) => els.map((b) => b.getAttribute("aria-label") ?? ""));
   check(
     "7b. Liquity V2's sort menu reads \"Recent activity\" too, the sweep's one spelling",
-    v2Labels.includes("Recent activity") && !v2Labels.some((l) => /Latest Activity/i.test(l)),
+    v2Labels.some((l) => l.includes("Recent activity")) && !v2Labels.some((l) => /Latest Activity/i.test(l)),
     v2Labels.join(" | "),
   );
   await v2.close();
