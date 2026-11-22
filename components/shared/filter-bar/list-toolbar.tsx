@@ -140,6 +140,13 @@ export function ListToolbar<F extends BaseListFilters>({
     focusSearch.current = false;
     searchRef.current?.focus();
   }, [searchOpen]);
+  const searchIconRef = useRef<HTMLButtonElement>(null);
+  const focusSearchIcon = useRef(false);
+  useEffect(() => {
+    if (searchOpen || !focusSearchIcon.current) return;
+    focusSearchIcon.current = false;
+    searchIconRef.current?.focus();
+  }, [searchOpen]);
 
   const groups = groupDimensions(dimensions, filters);
   const pills = groups.map((g) => pillFor(g, filters));
@@ -281,6 +288,7 @@ export function ListToolbar<F extends BaseListFilters>({
           {search && !searchOpen && (
             <button
               type="button"
+              ref={searchIconRef}
               onClick={openSearch}
               className={PILL_ICON_BUTTON}
               aria-label={searchPlaceholder}
@@ -302,6 +310,13 @@ export function ListToolbar<F extends BaseListFilters>({
               onKeyDown={onSearchKeyDown}
               onFocus={() => setSearchOpened(true)}
               onBlur={() => setSearchOpened(false)}
+              // The ×, as a set pill's: the query goes and the field closes
+              // to its icon, which takes the focus.
+              onClear={() => {
+                focusSearchIcon.current = true;
+                setSearchOpened(false);
+                onChange({ ...filters, q: "" });
+              }}
               className="min-w-0 max-sm:flex-[1_1_0%] sm:w-[300px]"
             />
           )}
