@@ -3,7 +3,7 @@
 // Shared pagination strip for the server-driven listing tier (Spark, and the
 // larger chain-state protocols that page against the backend rather than filter
 // a fetched set in-memory). "Showing X–Y of N" plus first / prev / windowed page
-// numbers / next / last. Holds no state — the current page + total come from the
+// numbers / next / last; on one page, the count alone. Holds no state — the current page + total come from the
 // caller (URL-backed). Generic: no protocol-specific logic, so every server-
 // driven listing shares one control. (The reference tier keeps its own bespoke
 // AaveV4PaginationControls; this is the chain-state tier's shared equivalent.)
@@ -21,6 +21,19 @@ export interface PaginationControlsProps {
   note?: string;
 }
 
+/** The count of what a listing shows, under its results where there is no
+ *  paging to carry it: one page of a server listing, and a listing filtered
+ *  in memory. Nothing for an empty result, which the listing words. */
+export function ResultCountLine({ total, noun, note }: { total: number; noun: string; note?: string }) {
+  if (total <= 0) return null;
+  return (
+    <div className="mt-8 text-sm text-rb-500" data-anatomy="N3" data-result-line={total} data-prov-exempt="">
+      {total.toLocaleString("en-US")} {total === 1 ? noun.replace(/s$/, "") : noun}
+      {note ? <> · {note}</> : null}
+    </div>
+  );
+}
+
 export function PaginationControls({
   currentPage,
   totalPages,
@@ -30,17 +43,9 @@ export function PaginationControls({
   noun = "positions",
   note,
 }: PaginationControlsProps) {
-  // One page: the count alone, so the listing states what is shown where the
-  // toolbar draws no count (ui-jobs 805): "12 open positions".
-  if (totalPages <= 1) {
-    if (totalCount <= 0) return null;
-    return (
-      <div className="mt-8 text-sm text-rb-500" data-anatomy="N3" data-prov-exempt="">
-        {totalCount.toLocaleString("en-US")} {totalCount === 1 ? noun.replace(/s$/, "") : noun}
-        {note ? <> · {note}</> : null}
-      </div>
-    );
-  }
+  // One page: the count alone ("12 open positions"). The line under the
+  // results always states what is shown, with its noun (Miles, 22 Nov 2026).
+  if (totalPages <= 1) return <ResultCountLine total={totalCount} noun={noun} note={note} />;
 
   const showingFrom = (currentPage - 1) * itemsPerPage + 1;
   const showingTo = Math.min(currentPage * itemsPerPage, totalCount);
@@ -62,7 +67,7 @@ export function PaginationControls({
       data-prov-exempt=""
     >
       <div className={`text-sm text-rb-500 ${note ? "text-center sm:text-left" : "whitespace-nowrap"}`}>
-        Showing {showingFrom.toLocaleString("en-US")}-{showingTo.toLocaleString("en-US")} of{" "}
+        Showing {showingFrom.toLocaleString("en-US")}–{showingTo.toLocaleString("en-US")} of{" "}
         {totalCount.toLocaleString("en-US")} {noun}
         {note ? <> · {note}</> : null}
       </div>

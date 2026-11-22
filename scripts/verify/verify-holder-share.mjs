@@ -545,7 +545,7 @@ async function searchWallet(page, wallet) {
 /** What the page says its result set is — the pagination strip's own total. */
 async function statedTotal(page) {
   return page.evaluate(() => {
-    const m = /Showing\s+[\d,]+-[\d,]+\s+of\s+([\d,]+)\s+/.exec(document.body.innerText ?? "");
+    const m = /Showing\s+[\d,]+[-–][\d,]+\s+of\s+([\d,]+)\s+/.exec(document.body.innerText ?? "");
     return m ? Number(m[1].replace(/,/g, "")) : null;
   });
 }
