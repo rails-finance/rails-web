@@ -117,10 +117,10 @@ export interface ChainTruthListingProps<T, F extends BaseListFilters = BaseListF
   error?: ReactNode;
   /** Opt-in slot between the header block and the toolbar — e.g. a
    *  protocol-level stats band. Owns its own bottom margin. */
+  headerExtra?: ReactNode;
   /** In place of the rail header's head stamp: a stamp for a listing whose
    *  rows come from a read behind the head (Aave V3's refresh, ui-jobs 806). */
   stamp?: ReactNode;
-  headerExtra?: ReactNode;
   /** Opt-in slot ABOVE the row column and about the rows themselves — the
    *  holder strip a wallet search draws over its own positions. Rendered
    *  inside the dimmed column, because it states figures summed from the rows

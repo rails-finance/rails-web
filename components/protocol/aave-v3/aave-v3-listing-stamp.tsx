@@ -3,12 +3,11 @@
 // The Aave V3 listing's read stamp (ui-jobs 806): the refresh its rows come
 // from, in the rosters' form (components/vaults/roster-read-stamp.tsx, ui-jobs
 // 771). The rows are mv_aave_v3_wallet_markets and mv_aave_v3_positions,
-// refreshed about hourly, so the stamp states the newest event they hold
-// rather than the chain head. Its place holds a bar until the read answers,
+// refreshed about hourly, so the stamp states the newest event they hold:
+// its age, block or time, as the rosters' stamp does. Its place holds a bar until the read answers,
 // and a failed read draws nothing, as the head stamp does.
 
 import { useEffect, useState } from "react";
-import { Prov, type Provenance } from "@/components/shared/provenance";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 
@@ -16,21 +15,6 @@ interface Refresh {
   block: number;
   at: number;
 }
-
-const n = (v: number) => v.toLocaleString("en-US");
-const utc = (at: number) =>
-  new Date(at * 1000)
-    .toISOString()
-    .replace("T", " ")
-    .replace(/:\d\d\.\d+Z$/, " UTC");
-
-export const aaveV3RefreshProv = (r: Refresh): Provenance => ({
-  kind: "derived",
-  pclass: "state",
-  source: { block: r.block },
-  summary: `The rows on this listing hold the Aave V3 Pools' events through block ${n(r.block)} (${utc(r.at)}). The index refreshes them about hourly; a position's page reads its Pool at the head.`,
-  via: "rails-server · mv_aave_v3_wallet_markets, the newest row's last event",
-});
 
 export function AaveV3ListingStamp() {
   const [refresh, setRefresh] = useState<Refresh | null>(null);
@@ -56,9 +40,7 @@ export function AaveV3ListingStamp() {
     );
   return (
     <span className="inline-flex items-center" data-listing-refresh-block={refresh.block}>
-      <Prov info={aaveV3RefreshProv(refresh)}>
-        <ReadStamp block={refresh.block} at={refresh.at} label="Refreshed" />
-      </Prov>
+      <ReadStamp block={refresh.block} at={refresh.at} label="Newest event on this listing" />
     </span>
   );
 }

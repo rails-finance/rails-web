@@ -115,7 +115,7 @@ import {
 } from "@/lib/aave-v3/market-notes";
 import { loadAaveFamilyReserveRates, type ReserveRateLookup } from "@/lib/api/fetch-aave-family-reserve-rates";
 import type { MarketNote } from "@/lib/shared/market-note";
-import { v3ViewWithLiveRead } from "@/lib/aave-v3/chain-position-view";
+import { v3IndexLag, v3PageView } from "@/lib/aave-v3/chain-position-view";
 
 type AaveV3Event = BaseActivityEvent & { context: { protocol: "aave-v3"; data: AaveV3Context } };
 
@@ -699,19 +699,13 @@ export default function AaveV3PositionDetail({
   // The index's balances stand at the row's newest event, refreshed about
   // hourly; the event tail is at the head. When the tail has an event after
   // the row's block, the indexed balances are out of date (ui-jobs 806): the
-  // card holds them back until the read answers, takes the read's balances
-  // when it does, and names both blocks when it does not.
-  const tailBlock = useMemo(
-    () => aaveEvents.reduce<number | null>((m, e) => (m == null || e.blockNumber > m ? e.blockNumber : m), null),
-    [aaveEvents],
+  // page holds them back until the read answers, takes the read's balances
+  // when it does, and names both blocks when it does not (v3PageView).
+  const lag = useMemo(() => v3IndexLag(view, aaveEvents, servedFolders), [view, aaveEvents, servedFolders]);
+  const liveView = useMemo<AaveV3PositionView | null>(
+    () => v3PageView(view, chain, chainSettled, lag),
+    [view, chain, chainSettled, lag],
   );
-  const indexBehind = view?.indexBlock != null && tailBlock != null && tailBlock > view.indexBlock;
-  const liveView = useMemo<AaveV3PositionView | null>(() => {
-    if (view && chain) return v3ViewWithLiveRead(view, chain, indexBehind);
-    if (view && indexBehind && chainSettled && view.indexBlock != null && tailBlock != null)
-      return { ...view, indexTrails: { indexBlock: view.indexBlock, tailBlock } };
-    return view;
-  }, [view, chain, indexBehind, chainSettled, tailBlock]);
 
   // The card's prices: the market's oracle at the card's block (the Pool
   // read's), so the dollars, the health factor and the liquidation price
@@ -802,13 +796,10 @@ export default function AaveV3PositionDetail({
   });
   const flowFocus = useFlowFocusValue(focusRoot, flowTimeline);
   // The card's count counts transactions; its tip gives the events too.
-  const cardView = useMemo(() => {
-    const counted = pricedView && flowSeries ? { ...pricedView, eventTotal: flowSeries.totalEvents } : pricedView;
-    // Held: the card's heads pulse until the read answers.
-    return counted && indexBehind && !chainSettled
-      ? { ...counted, status: "open" as const, supplies: [], borrows: [], figuresHeld: true }
-      : counted;
-  }, [pricedView, flowSeries, indexBehind, chainSettled]);
+  const cardView = useMemo(
+    () => (pricedView && flowSeries ? { ...pricedView, eventTotal: flowSeries.totalEvents } : pricedView),
+    [pricedView, flowSeries],
+  );
 
   // The top row's price dropdown: the on-chain oracle
   // price of each reserve the account currently holds.

@@ -150,15 +150,17 @@ export function v3ViewFromChain(
  * a live label. A partial lag (both sides hold something) keeps the indexed
  * balances, and the card marks an HF the read could not give for the debt shown.
  *
- * `indexBehind`: the event tail holds an event after the index's block, so the
+ * `lag`: the event tail holds an event after the index's block, so the
  * indexed balances are known to be out of date (ui-jobs 806). The read's
- * balances then replace them, at the read's block, whatever the index's status.
+ * balances then replace them, at the read's block, whatever the index's status,
+ * and a liquidation after the index's block counts toward the outcome.
  */
 export function v3ViewWithLiveRead(
   view: AaveV3PositionView,
   chain: AaveV3PositionChainResponse,
-  indexBehind = false,
+  lag: V3IndexLag | null = null,
 ): AaveV3PositionView {
+  const indexBehind = lag != null;
   const live: AaveV3PositionView = {
     ...view,
     healthFactor: chain.healthFactor,
@@ -177,9 +179,58 @@ export function v3ViewWithLiveRead(
   if ((view.status !== "open" && !indexBehind) || !holdsNothing) return live;
   return {
     ...live,
-    status: view.liquidationCount > 0 ? "liquidated" : "closed",
+    status: view.liquidationCount > 0 || lag?.liquidatedSince ? "liquidated" : "closed",
     supplies: [],
     borrows: [],
     atBlock: chain.blockNumber,
   };
+}
+
+/** Where the event tail runs past the index row (ui-jobs 806). */
+export interface V3IndexLag {
+  /** The row's block: the newest event the index's balances stand at. */
+  indexBlock: number;
+  /** The newest event the tail holds, folders included. */
+  tailBlock: number;
+  /** A liquidation in the tail after `indexBlock`. */
+  liquidatedSince: boolean;
+}
+
+/** The tail's lead over the index row; null where the tail holds nothing after it. */
+export function v3IndexLag(
+  view: AaveV3PositionView | null,
+  events: BaseActivityEvent[],
+  folders: readonly { lastBlock: number; kind: string }[] | null | undefined,
+): V3IndexLag | null {
+  const indexBlock = view?.indexBlock;
+  if (indexBlock == null) return null;
+  let tailBlock = 0;
+  let liquidatedSince = false;
+  for (const e of events) {
+    if (!isAaveV3Event(e)) continue;
+    tailBlock = Math.max(tailBlock, e.blockNumber);
+    if (e.blockNumber > indexBlock && e.context.data.eventType === "liquidation") liquidatedSince = true;
+  }
+  for (const f of folders ?? []) {
+    tailBlock = Math.max(tailBlock, f.lastBlock);
+    if (f.lastBlock > indexBlock && f.kind === "liquidation") liquidatedSince = true;
+  }
+  return tailBlock > indexBlock ? { indexBlock, tailBlock, liquidatedSince } : null;
+}
+
+/** The position page's view (Ethereum): the live read merged over the index
+ *  row; with the tail ahead of the row, the balances held back until the read
+ *  answers (`figuresHeld`), or the index's with both blocks named where it
+ *  failed (`indexTrails`). */
+export function v3PageView(
+  view: AaveV3PositionView | null,
+  chain: AaveV3PositionChainResponse | null,
+  chainSettled: boolean,
+  lag: V3IndexLag | null,
+): AaveV3PositionView | null {
+  if (!view) return null;
+  if (chain) return v3ViewWithLiveRead(view, chain, lag);
+  if (!lag) return view;
+  if (!chainSettled) return { ...view, status: "open", supplies: [], borrows: [], figuresHeld: true };
+  return { ...view, indexTrails: { indexBlock: lag.indexBlock, tailBlock: lag.tailBlock } };
 }
