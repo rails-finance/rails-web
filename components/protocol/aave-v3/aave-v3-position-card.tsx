@@ -416,18 +416,18 @@ export function useAaveV3CardSlots({
   const explainer = { body: explanation ?? null, viewHref };
   const isOther = (r: AaveV3ReserveAmount) => notCollateral?.has(r.address.toLowerCase()) === true;
 
-  // Closed / liquidated: the account holds no open reserves, so the headline is
-  // what each asset held at its height — highest recorded per-reserve supply +
-  // debt (chain-state MAX over the account's life, per asset; no USD).
   // The Pool read failed while the event tail is ahead of the index row.
   const trailNotice =
     detail && v.indexTrails ? (
       <div className="mb-2 text-xs text-rb-500" data-index-trails={v.indexTrails.indexBlock}>
-        Balances from the index at block {v.indexTrails.indexBlock.toLocaleString("en-US")}. The account has an event at
-        block {v.indexTrails.tailBlock.toLocaleString("en-US")}, and the Pool read did not answer.
+        Balances from the index at block {v.indexTrails.indexBlock.toLocaleString("en-US")}. The account has a later
+        event at block {v.indexTrails.tailBlock.toLocaleString("en-US")}; the Pool read did not answer.
       </div>
     ) : undefined;
 
+  // Closed / liquidated: the account holds no open reserves, so the headline is
+  // what each asset held at its height — highest recorded per-reserve supply +
+  // debt (chain-state MAX over the account's life, per asset; no USD).
   if (v.status === "closed" || v.status === "liquidated") {
     const notRecorded = peaks ? undefined : notRecordedNote("position");
     const peakHead = (

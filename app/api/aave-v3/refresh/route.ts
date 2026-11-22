@@ -10,8 +10,8 @@ import { readerIpFromRequest } from "@/lib/api/reader-ip";
 // activity first) and no filter, answers it.
 //
 // Each server instance keeps an answer for a minute and a failure for fifteen
-// seconds, and concurrent stamps share one request in flight. The request is
-// the listing's own page query for one row, count included.
+// seconds; concurrent stamps share one request, the listing's page query for
+// one row, count included.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

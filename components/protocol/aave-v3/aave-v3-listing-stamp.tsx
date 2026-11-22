@@ -1,11 +1,11 @@
 "use client";
 
 // The Aave V3 listing's read stamp (ui-jobs 806): the refresh its rows come
-// from, in the rosters' form (components/vaults/roster-read-stamp.tsx, ui-jobs
-// 771). The rows are mv_aave_v3_wallet_markets and mv_aave_v3_positions,
-// refreshed about hourly, so the stamp states the newest event they hold:
-// its age, block or time, as the rosters' stamp does. Its place holds a bar until the read answers,
-// and a failed read draws nothing, as the head stamp does.
+// from. The rows are mv_aave_v3_wallet_markets and mv_aave_v3_positions,
+// refreshed about hourly, so the stamp states the newest event they hold, in
+// the rosters' form (components/vaults/roster-read-stamp.tsx, ui-jobs 771):
+// its age, block or time. Its place holds a bar until the read answers, and a
+// failed read draws nothing, as the head stamp does.
 
 import { useEffect, useState } from "react";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
