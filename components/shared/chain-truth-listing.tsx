@@ -13,7 +13,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
-import { PaginationControls } from "@/components/shared/pagination-controls";
+import { PaginationControls, ResultCountLine } from "@/components/shared/pagination-controls";
 import { ChainTruthListLoadingSkeleton } from "@/components/shared/chain-truth-list-loading-skeleton";
 import { markNavStart } from "@/lib/perf/settle-marks";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -313,6 +313,11 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
                 </div>
               )}
             </div>
+            {/* A listing filtered in memory has no paging: the count alone,
+                where the page writes no count line of its own. */}
+            {!pagination && filter != null && filter.countNode == null && (
+              <ResultCountLine total={items.length} noun={filter.nounFor?.(filter.filters) ?? noun} />
+            )}
             {pagination && (
               <PaginationControls
                 currentPage={pagination.currentPage}

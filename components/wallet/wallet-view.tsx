@@ -536,6 +536,11 @@ export function WalletView({
                 {sections.map((s) => (
                   <Section key={s.slug} s={s} />
                 ))}
+                {/* What the filter bar leaves shown, with its noun: the bar
+                    draws no count (ui-jobs 801; Miles, 22 Nov 2026). */}
+                <p className="text-sm text-rb-500" data-wallet-shown={all.length} data-prov-exempt="">
+                  {plural(all.length, status ? `${status} position` : "position")}
+                </p>
                 {trades}
               </>,
             )}
