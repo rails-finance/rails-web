@@ -13,8 +13,10 @@
 // flows read the life's day rows (/stability-pool/flows/daily). Under
 // `event/<id>` the page draws one operation on the shared event page (P4).
 // What each liquidation did to the deposit between its touches
-// (/stability-pool/liquidations, Liquity V2's only) is a note row per closed
-// stretch and a section of the "Since its last touch" row (sp-liquidations.tsx).
+// (/stability-pool/liquidations) is a note row per closed stretch and a
+// section of the "Since its last touch" row (sp-liquidations.tsx). On Ebisu,
+// whose admin withdrew the pools' collateral (`coll_withdrawn_at_block`), the
+// newest place that shows gains carries one line saying so.
 // A fork's shut-down branch (ui-jobs 608, 612) reads "Shut down" on the card
 // with one line on the shutdown and the pools' collateral.
 
@@ -45,13 +47,22 @@ import { LiquityV2DepositEventCard } from "@/components/protocol/liquity/sp-even
 import { LiquityV2DepositFlowsNote, liquityV2DepositFlowsContent } from "@/components/protocol/liquity/sp-flows-note";
 import { LiquityV2DepositSinceTouchRow } from "@/components/protocol/liquity/sp-since-touch";
 import { SpOpenStretchLiquidations } from "@/components/protocol/liquity/sp-liquidations";
-import { spBranchCheck, spLiquidationNotes, spNotesOnRows } from "@/lib/liquity-v2/sp-liquidations";
+import {
+  spBranchCheck,
+  spLiquidationNotes,
+  spNotesOnRows,
+  statedWithdrawalBlock,
+} from "@/lib/liquity-v2/sp-liquidations";
 import { fetchLiquityV2DepositChain, type LiquityV2DepositChain } from "@/lib/api/fetch-liquity-v2-sp-chain";
 import { spPoolOf, spWalletHref, type SpDeployment } from "@/lib/liquity-v2/sp-deployment";
-import type { SpBranch } from "@/lib/liquity-v2/sp-routes";
 import { useBranchShutdown } from "@/hooks/useBranchShutdown";
 import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
-import { shutdownDateProv, shutdownDay, withdrawalDateProv } from "@/lib/shared/liquity-family-shutdown";
+import {
+  recordedShutdown,
+  shutdownDateProv,
+  shutdownDay,
+  withdrawalDateProv,
+} from "@/lib/shared/liquity-family-shutdown";
 import { liquityFamilyTerms } from "@/lib/liquity/ltv";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { depositLifetime, depositNow, depositNowFromChain, priceUnits } from "@/lib/liquity-v2/sp-math";
@@ -145,12 +156,12 @@ export function SpDepositPage({
   // (/stability-pool/liquidations). Any answer but a 200 — the route absent
   // on the api, a 503 before the capture has a tip or while the branch's
   // replay does not hold — leaves the page as it is without it. A deployment
-  // that serves no such route (the forks) reads nothing.
-  const [liqRead, setLiqRead] = useState<LiquityV2DepositLiquidationsResponse | null>(null);
+  // whose record says it serves no such route reads nothing.
+  const [liqRead, setLiqRead] = useState<LiquityV2DepositLiquidationsResponse<string> | null>(null);
   useEffect(() => {
     if (!dep.liquidations) return;
     let cancelled = false;
-    readLiquityV2Sp<LiquityV2DepositLiquidationsResponse>(
+    readLiquityV2Sp<LiquityV2DepositLiquidationsResponse<string>>(
       "stability-pool/liquidations",
       { collateralType: branch, wallet: depositor },
       api,
@@ -163,9 +174,15 @@ export function SpDepositPage({
     // `api` is the deployment's, fixed for the page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branch, depositor, dep.liquidations]);
+  // The admin's withdrawal the page states: the answer's block where the
+  // catalog's record names the same one (statedWithdrawalBlock).
+  const withdrawnAt = statedWithdrawalBlock(
+    liqRead?.coll_withdrawn_at_block,
+    recordedShutdown(dep.id, branch)?.withdrawal?.block,
+  );
   const liqNotes = useMemo(
-    () => (liqRead ? spLiquidationNotes(branch as SpBranch, coll.pool, liqRead) : NO_NOTES),
-    [liqRead, branch, coll.pool],
+    () => (liqRead ? spLiquidationNotes(branch, coll.pool, liqRead, dep, withdrawnAt) : NO_NOTES),
+    [liqRead, branch, coll.pool, dep, withdrawnAt],
   );
   // The open stretch, where it starts at the touch the timeline holds as newest.
   const openStretch =
@@ -224,7 +241,7 @@ export function SpDepositPage({
   const rowById = useMemo(() => new Map(listed.map((r) => [r.event_key, r])), [listed]);
   // Each liquidations note between two touches the page holds, under its
   // closing touch.
-  const liqNotesShown = useMemo(() => spNotesOnRows(liqNotes, (k) => rowById.has(k)), [liqNotes, rowById]);
+  const liqNotesOnRows = useMemo(() => spNotesOnRows(liqNotes, (k) => rowById.has(k)), [liqNotes, rowById]);
   const events = useMemo(() => listed.map((r) => spTimelineEvent(r, dep.chainId)), [listed, dep.chainId]);
   const olderCount = Math.max(0, total - listed.length);
   const lastTouch = listed.length > 0 ? listed[listed.length - 1] : null;
@@ -236,6 +253,18 @@ export function SpDepositPage({
   // two agree on the last touch; the card's headlines are the chain's alone.
   const now = useMemo(() => (lifetime && chain && open ? depositNow(lifetime, chain) : null), [lifetime, chain, open]);
   const cardNow = useMemo(() => (chain && open ? depositNowFromChain(chain) : null), [chain, open]);
+
+  // The admin's withdrawal of the pool's collateral (Ebisu): one line, beside
+  // the newest gains the page shows. The "Since its last touch" row's section
+  // where it draws with liquidations, else the newest closed stretch's note.
+  const withdrawn = withdrawnAt != null;
+  const openWithLiqs = Boolean(now && lifetime && chain && openStretch && openStretch.liquidations.length > 0);
+  const liqNotesShown = useMemo(() => {
+    if (!withdrawn || openWithLiqs) return liqNotesOnRows;
+    let at = -1;
+    liqNotesOnRows.forEach((n, i) => n.stretch.liquidations.length > 0 && (at = i));
+    return at < 0 ? liqNotesOnRows : liqNotesOnRows.map((n, i) => (i === at ? { ...n, withdrawalLine: true } : n));
+  }, [liqNotesOnRows, withdrawn, openWithLiqs]);
 
   // Set on mount, so the server's render and the first client render agree.
   const [nowSec, setNowSec] = useState<number | null>(null);
@@ -427,10 +456,13 @@ export function SpDepositPage({
                           liquidations={
                             openStretch && liqRead ? (
                               <SpOpenStretchLiquidations
-                                branch={branch as SpBranch}
+                                dep={dep}
+                                branch={branch}
                                 stretch={openStretch}
                                 servedThru={liqRead.served_thru_block}
                                 check={spBranchCheck(liqRead)}
+                                withdrawalLine={withdrawn && openWithLiqs}
+                                withdrawnAtBlock={liqRead.coll_withdrawn_at_block}
                               />
                             ) : undefined
                           }

@@ -8,9 +8,7 @@
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import type { SpLiquidationsNote } from "@/lib/shared/market-note";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
-import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
-import { LIQUITY_V2_SP, spPool, type SpDeployment } from "./sp-deployment";
-import type { SpBranch } from "./sp-routes";
+import { LIQUITY_V2_SP, SP_DEPLOYMENTS, spPool, type SpDeployment } from "./sp-deployment";
 import type { TxTrove } from "./tx-troves-words";
 
 const via = (dep: SpDeployment) => `GET ${dep.chainApi}`;
@@ -227,135 +225,138 @@ export function spFeedProv(branch: string, stale: boolean, dep: SpDeployment = L
 //    StabilityPool.sol's integer arithmetic, from the deposit's last touch's
 //    snapshot. The collateral is valued at the Liquidation log's _price. ─────
 
-const LIQ_VIA = "GET /api/liquity-v2/stability-pool/liquidations";
-
 /** One liquidation: its block and transaction, for `source`. */
 export interface SpLiqCoords {
   block: string;
   txHash: string;
 }
 
-const replay = (branch: SpBranch, summary: string, at: SpLiqCoords | null, extra: Partial<Provenance> = {}) =>
-  ({
-    kind: "derived",
-    pclass: "indexed",
-    summary,
-    contract: pool(branch),
-    via: LIQ_VIA,
-    ...(at ? { source: { block: at.block, txHash: at.txHash } } : {}),
-    ...extra,
-  }) satisfies Provenance;
+/** The receipts for one deployment (Liquity V2 or a fork): its
+ *  contracts, its stablecoin and its route. The amounts are read in 1e18
+ *  (lib/liquity-v2/sp-decimals.ts). */
+export function spLiqProvFor(dep: SpDeployment) {
+  const LIQ_VIA = `GET ${dep.api}/stability-pool/liquidations`;
+  const S = dep.stable.symbol;
+  const replay = (branch: string, summary: string, at: SpLiqCoords | null, extra: Partial<Provenance> = {}) =>
+    ({
+      kind: "derived",
+      pclass: "indexed",
+      summary,
+      contract: pool(branch, dep),
+      via: LIQ_VIA,
+      ...(at ? { source: { block: at.block, txHash: at.txHash } } : {}),
+      ...extra,
+    }) satisfies Provenance;
 
-export const spLiqProv = {
-  boldLost: (b: SpBranch, at: SpLiqCoords) =>
-    replay(
-      b,
-      "BOLD burned — the deposit's compounded BOLD before this liquidation less after it, replayed from the pool's P and scale at this Liquidation log.",
-      at,
-      { formula: "compounded before − compounded after" },
-    ),
-  collGained: (b: SpBranch, at: SpLiqCoords) =>
-    replay(
-      b,
-      `${b} gained — the deposit's ${b} gain after this liquidation less before it, replayed from the pool's S at this Liquidation log.`,
-      at,
-      { formula: "collateral gain after − collateral gain before" },
-    ),
-  price: (b: SpBranch, at: SpLiqCoords) => ({
-    kind: "chain" as const,
-    pclass: "emitted" as const,
-    summary: `${b} block price — the Liquidation log's _price: the BOLD per ${b} the branch liquidated at in this block.`,
-    contract: { name: `Liquity V2 ${b} TroveManager`, address: LIQUITY_V2_BRANCHES[b.toLowerCase()].troveManager },
-    source: { block: at.block, txHash: at.txHash },
-    via: LIQ_VIA,
-  }),
-  value: (b: SpBranch, at: SpLiqCoords, coll: string, price: string) =>
-    replay(
-      b,
-      `${b} gained, in BOLD — the ${b} this liquidation paid the deposit, valued at the liquidation's block price.`,
-      at,
-      {
-        formula: `${b} gained × _price, rounded down to 18 decimals`,
-        inputs: [
-          { label: `${b} gained`, value: coll, kind: "derived", pclass: "indexed" },
-          { label: `_price, BOLD per ${b}`, value: price, kind: "chain", pclass: "emitted" },
-        ],
-      },
-    ),
-  net: (b: SpBranch, at: SpLiqCoords, value: string, lost: string) =>
-    replay(b, `Net, in BOLD — the ${b} gained valued at the liquidation's block price, less the BOLD burned.`, at, {
-      formula: `${b} gained in BOLD − BOLD burned`,
-      inputs: [
-        { label: `${b} gained, in BOLD`, value, kind: "derived", pclass: "indexed" },
-        { label: "BOLD burned", value: lost, kind: "derived", pclass: "indexed" },
-      ],
+  return {
+    boldLost: (b: string, at: SpLiqCoords) =>
+      replay(
+        b,
+        `${S} burned — the deposit's compounded ${S} before this liquidation less after it, replayed from the pool's P and scale at this Liquidation log.`,
+        at,
+        { formula: "compounded before − compounded after" },
+      ),
+    collGained: (b: string, at: SpLiqCoords) =>
+      replay(
+        b,
+        `${b} gained — the deposit's ${b} gain after this liquidation less before it, replayed from the pool's S at this Liquidation log.`,
+        at,
+        { formula: "collateral gain after − collateral gain before" },
+      ),
+    price: (b: string, at: SpLiqCoords) => ({
+      kind: "chain" as const,
+      pclass: "emitted" as const,
+      summary: `${b} block price — the Liquidation log's _price: the ${S} per ${b} the branch liquidated at in this block.`,
+      contract: { name: `${dep.name} ${b} TroveManager`, address: spPool(dep, b)?.troveManager ?? "" },
+      source: { block: at.block, txHash: at.txHash },
+      via: LIQ_VIA,
     }),
-  /** A stretch's sum of one column. */
-  /** A column's sum over the period: between the two touches, or since the
-   *  last touch for the open period. `column` is plural, `one` singular. */
-  sum: (b: SpBranch, head: string, column: string, one: string, count: number, open = false) =>
-    replay(
-      b,
-      `${head} — ${count === 1 ? `the 1 liquidation's ${one}` : `the sum of the ${count} liquidations' ${column}`} ${open ? "since the last touch" : "between the two touches"}.`,
-      null,
-      { formula: `Σ ${one}` },
-    ),
-  /** The closing touch's own figures, from its DepositOperation. */
-  touchLoss: (b: SpBranch, txHash: string, block: string) =>
-    spTouchProv(
-      "BOLD burned at the touch — the closing DepositOperation's depositLossSinceLastOperation: the deposit liquidations used since the touch before.",
-      txHash,
-      block,
-      b,
-    ),
-  touchGain: (b: SpBranch, txHash: string, block: string) =>
-    spTouchProv(
-      `${b} paid in at the touch — the closing DepositOperation's ethGainSinceLastOperation: the ${b} liquidations paid the deposit since the touch before.`,
-      txHash,
-      block,
-      b,
-    ),
-  /** The open period's end: the newest block the index has read the pool to. */
-  servedThru: (b: SpBranch, block: string) =>
-    replay(
-      b,
-      "Latest block the index has read — the newest block the index has read the branch pool's touches and liquidations to: the route's served_thru_block.",
-      null,
-      { source: { block } },
-    ),
-  /** A compounding touch's deposit change, where a loss landed with it. */
-  depositChange: (
-    b: string,
-    txHash: string,
-    block: string,
-    before: string,
-    after: string,
-    dep: SpDeployment = LIQUITY_V2_SP,
-  ) => ({
-    kind: "derived" as const,
-    pclass: "indexed" as const,
-    summary:
-      "Deposit change — the deposit after this touch less the deposit before it: the yield the touch kept less the loss since the last touch.",
-    formula: "deposit after − deposit before",
-    inputs: [
-      { label: "deposit before", value: before, kind: "derived" as const, pclass: "indexed" as const },
-      { label: "deposit after", value: after, kind: "derived" as const, pclass: "indexed" as const },
-    ],
-    contract: pool(b, dep),
-    source: { block, txHash },
-    via: `GET ${dep.api}/stability-pool/timeline`,
-  }),
-};
+    value: (b: string, at: SpLiqCoords, coll: string, price: string) =>
+      replay(
+        b,
+        `${b} gained, in ${S} — the ${b} this liquidation paid the deposit, valued at the liquidation's block price.`,
+        at,
+        {
+          formula: `${b} gained × _price, rounded down to 18 decimals`,
+          inputs: [
+            { label: `${b} gained`, value: coll, kind: "derived", pclass: "indexed" },
+            { label: `_price, ${S} per ${b}`, value: price, kind: "chain", pclass: "emitted" },
+          ],
+        },
+      ),
+    net: (b: string, at: SpLiqCoords, value: string, lost: string) =>
+      replay(b, `Net, in ${S} — the ${b} gained valued at the liquidation's block price, less the ${S} burned.`, at, {
+        formula: `${b} gained in ${S} − ${S} burned`,
+        inputs: [
+          { label: `${b} gained, in ${S}`, value, kind: "derived", pclass: "indexed" },
+          { label: `${S} burned`, value: lost, kind: "derived", pclass: "indexed" },
+        ],
+      }),
+    /** A stretch's sum of one column. */
+    /** A column's sum over the period: between the two touches, or since the
+     *  last touch for the open period. `column` is plural, `one` singular. */
+    sum: (b: string, head: string, column: string, one: string, count: number, open = false) =>
+      replay(
+        b,
+        `${head} — ${count === 1 ? `the 1 liquidation's ${one}` : `the sum of the ${count} liquidations' ${column}`} ${open ? "since the last touch" : "between the two touches"}.`,
+        null,
+        { formula: `Σ ${one}` },
+      ),
+    /** The closing touch's own figures, from its DepositOperation. */
+    touchLoss: (b: string, txHash: string, block: string) =>
+      spTouchProv(
+        `${S} burned at the touch — the closing DepositOperation's depositLossSinceLastOperation: the deposit liquidations used since the touch before.`,
+        txHash,
+        block,
+        b,
+        dep,
+      ),
+    touchGain: (b: string, txHash: string, block: string) =>
+      spTouchProv(
+        `${b} paid in at the touch — the closing DepositOperation's ethGainSinceLastOperation: the ${b} liquidations paid the deposit since the touch before.`,
+        txHash,
+        block,
+        b,
+        dep,
+      ),
+    /** The open period's end: the newest block the index has read the pool to. */
+    servedThru: (b: string, block: string) =>
+      replay(
+        b,
+        "Latest block the index has read — the newest block the index has read the branch pool's touches and liquidations to: the route's served_thru_block.",
+        null,
+        { source: { block } },
+      ),
+    /** A compounding touch's deposit change, where a loss landed with it. */
+    depositChange: (b: string, txHash: string, block: string, before: string, after: string) => ({
+      kind: "derived" as const,
+      pclass: "indexed" as const,
+      summary:
+        "Deposit change — the deposit after this touch less the deposit before it: the yield the touch kept less the loss since the last touch.",
+      formula: "deposit after − deposit before",
+      inputs: [
+        { label: "deposit before", value: before, kind: "derived" as const, pclass: "indexed" as const },
+        { label: "deposit after", value: after, kind: "derived" as const, pclass: "indexed" as const },
+      ],
+      contract: pool(b, dep),
+      source: { block, txHash },
+      via: `GET ${dep.api}/stability-pool/timeline`,
+    }),
+  };
+}
 
 /** A closed period's figure, for a line that lists the note: the net, or,
  *  where no liquidation falls between the touches, the BOLD the closing touch
  *  wrote as burned. */
 export function spLiquidationsNoteProv(note: SpLiquidationsNote): Provenance {
-  const b = note.branch as SpBranch;
+  const dep = SP_DEPLOYMENTS[note.deployment ?? "liquity-v2"];
+  const P = spLiqProvFor(dep);
+  const S = dep.stable.symbol;
+  const b = note.branch;
   const n = note.stretch.liquidations.length;
   const to = note.stretch.to;
-  if (n === 0 && to) return spLiqProv.touchLoss(b, to.tx_hash, to.block_number);
-  return spLiqProv.sum(b, "Net between the touches", "nets in BOLD", "net in BOLD", n);
+  if (n === 0 && to) return P.touchLoss(b, to.tx_hash, to.block_number);
+  return P.sum(b, "Net between the touches", `nets in ${S}`, `net in ${S}`, n);
 }
 
 /** A Trove the deposit's transaction acted on (ui-jobs 751): the branch

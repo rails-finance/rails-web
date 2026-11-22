@@ -118,3 +118,101 @@ test("the index and the chain, both scaled, agree: the index-lag line stays away
   };
   assert.notEqual(depositNow(depositLifetime(position), chain), null);
 });
+
+test("a liquidations answer: collateral to 1e18, the 1e(36 − d) price to 1e18, the value unchanged", () => {
+  // Ebisu LBTC, block 23,823,314: the wire's figures (rails-server 8536cc5c).
+  const liq = {
+    coll_gained: "53374",
+    pool_coll_sent: "5000000",
+    price: "900964683868400000000000000000000",
+    coll_gained_value: "480880000000000000000",
+    bold_lost: "1",
+    net: "0",
+  };
+  const a = scaleSpAnswer({
+    coll_decimals: 8,
+    coll_withdrawn_at_block: "26238016",
+    units: { bold: "1e18 BOLD", coll: "1e8 LBTC", price: "1e28 BOLD per LBTC" },
+    totals: { coll_gained: "53374", coll_gained_value: "1", bold_lost: "1", net: "0", liquidations: 1 },
+    stretches: [
+      {
+        to: { coll_gain_since: "53374", deposit_loss: "9" },
+        totals: { coll_gained: "53374" },
+        residual: { bold_lost: "0", coll_gained: "-2" },
+        liquidations: [{ ...liq }],
+      },
+    ],
+    since_last_touch: { to: null, totals: { coll_gained: "7" }, residual: null, liquidations: [{ ...liq }] },
+  });
+  const l = a.stretches[0].liquidations[0];
+  assert.equal(l.coll_gained, "533740000000000");
+  assert.equal(l.pool_coll_sent, "50000000000000000");
+  assert.equal(l.price, "90096468386840000000000");
+  assert.equal(l.coll_gained_value, liq.coll_gained_value);
+  // coll × price / 1e18 is the same stablecoin figure before and after.
+  assert.equal(
+    (BigInt(l.coll_gained) * BigInt(l.price)) / BigInt(10) ** BigInt(18),
+    (BigInt(liq.coll_gained) * BigInt(liq.price)) / BigInt(10) ** BigInt(18),
+  );
+  assert.equal(a.stretches[0].to.coll_gain_since, "533740000000000");
+  assert.equal(a.stretches[0].to.deposit_loss, "9");
+  assert.equal(a.stretches[0].residual.coll_gained, "-20000000000");
+  assert.equal(a.since_last_touch.totals.coll_gained, "70000000000");
+  assert.equal(a.totals.coll_gained, "533740000000000");
+  // Twice is once.
+  assert.deepEqual(scaleSpAnswer(structuredClone(a)), a);
+});
+
+const { statedWithdrawalBlock, closedAfterWithdrawal, spLiquidationNotes } = await import(
+  ROOT + "lib/liquity-v2/sp-liquidations.ts"
+);
+
+test("the page states the withdrawal only where the record names the answer's block", () => {
+  assert.equal(statedWithdrawalBlock("26238016", 26238016), 26238016);
+  // A record that differs, or none, states nothing and hides nothing.
+  assert.equal(statedWithdrawalBlock("26238017", 26238016), undefined);
+  assert.equal(statedWithdrawalBlock("26238016", undefined), undefined);
+  assert.equal(statedWithdrawalBlock(undefined, 26238016), undefined);
+});
+
+test("only a stretch closed at or after the withdrawal block loses its unsettled mark", () => {
+  const stretch = (toBlock) => ({
+    from: { event_key: "a", block_number: "100", block_timestamp: "1", tx_hash: "0x1", deposit: "1" },
+    to: {
+      event_key: "b",
+      block_number: String(toBlock),
+      block_timestamp: "2",
+      tx_hash: "0x2",
+      deposit_loss: "1",
+      coll_gain_since: "0",
+    },
+    liquidations: [],
+    totals: { bold_lost: "0", coll_gained: "0", coll_gained_value: "0", net: "0" },
+    residual: { bold_lost: "1", coll_gained: "0" },
+    reconciles: false,
+  });
+  const read = {
+    coll_withdrawn_at_block: "26238016",
+    branch_check: { deposits: "1", closed_stretches: "3", unreconciled: "0" },
+    stretches: [stretch(26238015), stretch(26238016), stretch(26238020)],
+  };
+  const dep = { id: "ebisu", stable: { symbol: "ebUSD", address: "0x" } };
+  const stated = spLiquidationNotes(
+    "LBTC",
+    "0xpool",
+    read,
+    dep,
+    statedWithdrawalBlock(read.coll_withdrawn_at_block, 26238016),
+  );
+  assert.deepEqual(stated.map(closedAfterWithdrawal), [false, true, true]);
+  assert.equal(stated[0].unitLabel, "ebUSD");
+  // No record to state the withdrawal: nothing is exempt.
+  const unstated = spLiquidationNotes(
+    "LBTC",
+    "0xpool",
+    read,
+    dep,
+    statedWithdrawalBlock(read.coll_withdrawn_at_block, undefined),
+  );
+  assert.deepEqual(unstated.map(closedAfterWithdrawal), [false, false, false]);
+});

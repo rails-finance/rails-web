@@ -18,7 +18,7 @@ import { formatCompact } from "@/lib/shared/format-compact";
 import { LIQUITY_V2_SP, spPoolOf, type SpDeployment } from "@/lib/liquity-v2/sp-deployment";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { big, exactUnits, units } from "@/lib/liquity-v2/sp-math";
-import { spCompoundProv, spLiqProv, spTouchProv } from "@/lib/liquity-v2/sp-provenance";
+import { spCompoundProv, spLiqProvFor, spTouchProv } from "@/lib/liquity-v2/sp-provenance";
 import type { ChainTruthDelta } from "@/components/shared/chain-truth-event";
 import { DEPOSIT_TOUCH_TIP } from "@/lib/liquity-v2/touch-words";
 import { spEventLabel, spEventSentences, spSenderSentence } from "@/lib/liquity-v2/sp-event-prose";
@@ -214,13 +214,12 @@ export function LiquityV2DepositEventCard({
         exact: exactUnits(bold),
         display: keptText(mag),
         prov: lossToo
-          ? spLiqProv.depositChange(
+          ? spLiqProvFor(dep).depositChange(
               row.collateral_type,
               row.tx_hash,
               row.block_number,
               exactUnits(big(row.deposit_before)),
               exactUnits(big(row.deposit_after)),
-              dep,
             )
           : spCompoundProv(
               "yield",

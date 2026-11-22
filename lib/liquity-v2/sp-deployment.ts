@@ -117,7 +117,7 @@ const fork = (
   chainApi: `/api/chain/${id}/stability-pool`,
   stable,
   pools: pools(branches, addresses),
-  liquidations: false,
+  liquidations: true,
   docs,
 });
 
