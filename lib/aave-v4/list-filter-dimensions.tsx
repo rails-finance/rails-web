@@ -264,7 +264,8 @@ export function aaveV4ListDimensions(
   const state: SerializableDimension<AaveV4ListFilters> = {
     id: "state",
     label: "Health",
-    group: "Status",
+    // Its own pill, apart from Status.
+    group: "Health",
     cardinality: "single",
     param: "state",
     options: [{ value: "liquidatable", label: "Liquidatable" }],
