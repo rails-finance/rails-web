@@ -138,9 +138,10 @@ async function copyLink(page) {
   return text;
 }
 
-/** Hide the first option of the axis pill named by `label` (its old menu
- *  name, scripts/verify/lib/timeline-pills.mjs); returns the option's label, or null
- *  when the wallet has no such pill. */
+/** Hide the first option of the axis named by `label` (its old menu name,
+ *  scripts/verify/lib/timeline-pills.mjs, which opens the axis's pill or its
+ *  row in the Filters sheet); returns the option's label, or null when the
+ *  wallet has no such axis. */
 const hideFirstOption = (page, label) => hideOption(page, label, 0);
 
 // ── 1. Clean load, clean link ────────────────────────────────────────────

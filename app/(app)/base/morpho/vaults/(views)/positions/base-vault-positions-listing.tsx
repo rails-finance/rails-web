@@ -118,6 +118,9 @@ export function BaseVaultPositionsListing({
         dimensions: (filters) => baseVaultPositionListDimensions(census, filters.status),
         itemsPerPage: BASE_VAULT_POSITION_ITEMS_PER_PAGE,
         fetchPage,
+        // fetchPage writes the census line and the overlay's block, and
+        // reads the chain: the editors read "Apply".
+        countDraft: false,
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

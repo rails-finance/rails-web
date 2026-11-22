@@ -14,6 +14,13 @@
 // section's figures. While a protocol's listing read did not answer
 // (read-wallet.ts, readListingRows), its section and the wallet state no
 // total.
+//
+// An open Trove on a branch whose pool the admin emptied after its shutdown
+// (lib/wallet/trove-shutdown.ts; ui-jobs 802) states no collateral dollars, so
+// its section states no collateral total, as with an unpriced deposit; the
+// band carries its collateral as "Recorded collateral" in its token, and the
+// note names it once per branch. A Trove on a shut-down branch states no
+// buffer, so the risk sort and "Closest to liquidation" leave it out.
 
 import type { HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
@@ -28,6 +35,8 @@ import { scaled } from "@/lib/wallet/summary-row";
 import { formatUsdValue } from "@/lib/utils/format";
 import { walletProtocol } from "@/lib/wallet/wallet-filters";
 import type { WalletPosition } from "@/lib/wallet/types";
+import { onEmptiedBranch, recordedCollateralLeg } from "@/lib/wallet/trove-shutdown";
+import { SP_DEPLOYMENTS, spPool, type SpDeploymentId } from "@/lib/liquity-v2/sp-deployment";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
 
@@ -356,6 +365,14 @@ const zeroDebt = (name: string): SectionFigure => ({
   },
 });
 
+/** The emptied Troves' recorded collateral, each branch named once: "the
+ *  stcUSD Trove's recorded collateral", "the stcUSD Troves' …" for several. */
+function shutNames(emptied: WalletPosition[]): string[] {
+  const byMarket = new Map<string, number>();
+  for (const p of emptied) if (p.market) byMarket.set(p.market, (byMarket.get(p.market) ?? 0) + 1);
+  return [...byMarket].map(([m, n]) => (n > 1 ? `the ${m}s' recorded collateral` : `the ${m}'s recorded collateral`));
+}
+
 /** One section per protocol, in the order of their riskiest open position;
  *  sections without a ranked buffer after, by collateral; sections with no
  *  open position last, by their latest close. */
@@ -379,18 +396,29 @@ export function walletSections(
     const open = [...ranked, ...dust, ...notRead];
     const closed = mine.filter((p) => p.status !== "open").sort((a, b) => closedAt(b) - closedAt(a));
     const unread = open.filter(unreadAtHead).length;
-    const liquity = slug === "liquity-v2" ? liquityV2Section(mine) : null;
+    // An open Trove on an emptied branch leaves the collateral dollars: its
+    // recorded collateral is the band's own leg (ui-jobs 802).
+    const emptied = open.filter(onEmptiedBranch);
+    const priced = open.filter((p) => !onEmptiedBranch(p));
+    const liquity = slug === "liquity-v2" ? liquityV2Section(mine.filter((p) => !onEmptiedBranch(p))) : null;
     let band: HolderStripProps;
     let collateral: SectionFigure | undefined;
     let debt: SectionFigure | undefined;
     if (liquity) {
       ({ band, collateral, debt } = liquity);
+      // The emptied Troves still count among the section's positions.
+      if (emptied.length > 0)
+        band = {
+          ...band,
+          counts: { ...band.counts, open: band.counts.open + emptied.length },
+          positions: (band.positions ?? 0) + emptied.length,
+        };
     } else if (slug === "liquity-v1") {
-      collateral = sumOfCards(name, open, "collateralUsd");
+      collateral = sumOfCards(name, priced, "collateralUsd");
       debt = sumOfCards(name, open, "debtUsd");
       band = liquityV1Band(mine);
     } else {
-      collateral = sumOfCards(name, open, "collateralUsd");
+      collateral = sumOfCards(name, priced, "collateralUsd");
       debt = sumOfCards(name, open, "debtUsd");
       const st = (s: string) => closed.filter((p) => p.status === s).length;
       const legs: HolderLeg[] = [];
@@ -403,6 +431,18 @@ export function walletSections(
         truncated: false,
         positions: mine.filter((p) => p.status !== "moved").length,
       };
+    }
+    // The emptied Troves' recorded collateral, after the dollar total.
+    const recordedNames = shutNames(emptied);
+    if (emptied.length > 0) {
+      // A section total covers every open position or none (Miles, 18 Nov
+      // 2026): with an emptied branch's Trove the section states no
+      // collateral total, as with an unpriced deposit.
+      collateral = undefined;
+      const dep = SP_DEPLOYMENTS[slug as SpDeploymentId];
+      const leg = recordedCollateralLeg(slug, emptied, dep ? (c) => spPool(dep, c)?.collateralAddr : undefined);
+      const rest = band.legs.filter((l) => l.id !== "collateral");
+      band = { ...band, legs: [...(leg ? [leg] : []), ...rest] };
     }
     // The section's heading and cards state the counts; the band carries
     // no sentence repeating them (Miles, 18 Nov 2026).
@@ -425,11 +465,19 @@ export function walletSections(
       // "Total collateral" never reads as owing nothing.
       const missing = collateral == null ? "collateral" : "debt";
       const field = missing === "collateral" ? "collateralUsd" : "debtUsd";
-      const lacking = open.filter((p) => !stated(p, field) && !(field === "debtUsd" && owesNothingUnread(p)));
-      // Unpriced deposits are named (a fork's deposit states no dollars).
+      const lacking = (field === "collateralUsd" ? priced : open).filter(
+        (p) => !stated(p, field) && !(field === "debtUsd" && owesNothingUnread(p)),
+      );
+      // Unpriced deposits are named (a fork's deposit states no dollars),
+      // each market once, after the emptied Troves' recorded collateral.
+      const deposits = lacking.every((p) => p.kind === "deposits" && p.market);
+      const names = [
+        ...(field === "collateralUsd" ? recordedNames : []),
+        ...(deposits ? [...new Set(lacking.map((p) => `the ${p.market} deposit`))] : []),
+      ];
       const named =
-        lacking.length > 0 && lacking.every((p) => p.kind === "deposits" && p.market)
-          ? `${andList(lacking.map((p) => `the ${p.market} deposit`))} ${lacking.length === 1 ? "states" : "state"} no dollars`
+        deposits && names.length > 0
+          ? `${andList(names)} ${names.length === 1 ? "states" : "state"} no dollars`
           : `an open position's ${missing} states no dollars`;
       band = { ...band, note: `No ${missing} total: ${named}.` };
     }
@@ -456,6 +504,17 @@ export function walletSections(
     if (tier(a) === 1) return (b.collateral?.usd ?? -1) - (a.collateral?.usd ?? -1);
     return closedAt(b.closed[0]) - closedAt(a.closed[0]);
   });
+}
+
+/** The "Closest to liquidation" tile's position (W2): the smallest buffer
+ *  any section ranks that states its risk figure. A Trove on a shut-down
+ *  branch states neither (lib/wallet/trove-shutdown.ts), so it is never the
+ *  one; undefined where no position states one. */
+export function closestToLiquidation(sections: WalletSection[]): WalletPosition | undefined {
+  return sections
+    .flatMap((s) => s.ranked)
+    .filter((p) => p.buffer != null && p.riskFigure)
+    .sort(byRisk)[0];
 }
 
 /** One total over the sections: each section's figure as its band states it,

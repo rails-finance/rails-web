@@ -1,15 +1,21 @@
 "use client";
 
-// ListToolbar — the shared listing-page filter strip (N1): the search, one
-// editable pill per filter group (N1.10, ui-jobs 681), the sort pill (N1.3),
-// the ⋮ (N1.7), and the count (N1.6) with Clear all. From sm one wrapping
-// row: [search] [set pills] [unset pills] [Clear all (two or more set)] and,
-// right-aligned as one group that wraps together, [count] [sort] [⋮]. Below
-// sm: the search alone; one pill row that scrolls sideways and never wraps,
-// led by the Filters button (N1.8.1); then Reset at the left and the count,
-// sort and ⋮ at the right. A page passes its dimension registry and param
-// object; the toolbar holds no filter state beyond which editor is open and
-// the order the pills were set in.
+// ListToolbar — the shared listing-page filter strip (N1, ui-jobs 801): the
+// Filters button (N1.8.1) that opens every filter, one pill per filter group
+// that is set or rests on a default (N1.10, ui-jobs 681), Clear all, and at
+// the right a count line where the page writes one (N1.6; the plain count
+// is under the results, N3), the search as an icon that opens into its field
+// and stays open while it holds a query (N1.1), the sort (N1.3) and the ⋮
+// (N1.7). From sm one wrapping row: [Filters] [pills] [Clear all (two or more
+// set)] and, right-aligned as one group that wraps together, [count] [search]
+// [sort] [⋮]. Below sm: one row that scrolls sideways and never wraps, led by
+// the Filters button; then Reset at the left and the count, the search, the
+// sort and ⋮ at the right, the open search field taking the count's room.
+// From sm the Filters button
+// opens its panel under the row, and while it is open the row's other
+// controls are dimmed and inert. A page passes its dimension registry and
+// param object; the toolbar holds no filter state beyond which editor is
+// open and the order the pills were set in.
 
 import {
   useEffect,
@@ -22,7 +28,8 @@ import {
 import { useHydrated } from "@/hooks/useHydrated";
 import { SearchBox } from "@/components/shared/front-door-search";
 import { FilterSheet } from "@/components/shared/filter-bar/filter-sheet";
-import { FilterPill, PILL_MUTED } from "@/components/shared/filter-bar/filter-pill";
+import { Search } from "lucide-react";
+import { FilterPill, PANEL_OPEN_DIM, PILL_ICON_BUTTON, PILL_MUTED } from "@/components/shared/filter-bar/filter-pill";
 import { GroupEditor } from "@/components/shared/filter-bar/pill-editor";
 import { SortPill, type SortOption } from "@/components/shared/filter-bar/sort-control";
 import {
@@ -115,10 +122,31 @@ export function ListToolbar<F extends BaseListFilters>({
   // `?find=1` (the guided way in's "Is a protocol's site down?", ui-jobs 478)
   // lands with the cursor in the search, once the field answers typing.
   const searchRef = useRef<HTMLInputElement>(null);
+  // The search is an icon until it is pressed, and a field while it has the
+  // cursor or a query (ui-jobs 801).
+  const [searchOpened, setSearchOpened] = useState(false);
+  const searchOpen = searchOpened || filters.q !== "";
+  const focusSearch = useRef(false);
+  const openSearch = () => {
+    focusSearch.current = true;
+    setSearchOpened(true);
+  };
   useEffect(() => {
     if (!hydrated) return;
-    if (new URLSearchParams(window.location.search).get("find") === "1") searchRef.current?.focus();
+    if (new URLSearchParams(window.location.search).get("find") === "1") openSearch();
   }, [hydrated]);
+  useEffect(() => {
+    if (!searchOpen || !focusSearch.current) return;
+    focusSearch.current = false;
+    searchRef.current?.focus();
+  }, [searchOpen]);
+  const searchIconRef = useRef<HTMLButtonElement>(null);
+  const focusSearchIcon = useRef(false);
+  useEffect(() => {
+    if (searchOpen || !focusSearchIcon.current) return;
+    focusSearchIcon.current = false;
+    searchIconRef.current?.focus();
+  }, [searchOpen]);
 
   const groups = groupDimensions(dimensions, filters);
   const pills = groups.map((g) => pillFor(g, filters));
@@ -128,55 +156,58 @@ export function ListToolbar<F extends BaseListFilters>({
   const setNow = fixed.filter((n) => pills.find((p) => p.name === n)!.state !== "unset");
   const appliedRef = useRef<string[]>([]);
   appliedRef.current = nextAppliedOrder(appliedRef.current, setNow);
-  const ordered = orderPills(pills, appliedRef.current);
+  // An unset group has no pill: the Filters button reaches it.
+  const ordered = orderPills(pills, appliedRef.current).filter((p) => p.state !== "unset");
   const active = activeGroupCount(groups, filters);
 
   const [openPill, setOpenPill] = useState<string | null>(null);
+  // Where the filters open from sm: under the row, above the results.
+  const [sheetSlot, setSheetSlot] = useState<HTMLDivElement | null>(null);
+  // While that panel is open it holds the focus: the row's other controls
+  // are inert and dimmed, and an open pill editor closes (ui-jobs 801).
+  const [panelOpen, setPanelOpen] = useState(false);
+  const onPanelOpenChange = (o: boolean) => {
+    setPanelOpen(o);
+    if (o) setOpenPill(null);
+  };
   const rowRef = useRef<HTMLDivElement>(null);
   useFlip(rowRef, ordered.map((p) => p.name).join("|"));
 
   const editorCount = count ?? sheetCount;
+  // The row draws no plain count: the line under the results states it with
+  // its noun (N3; Miles, 22 Nov 2026), and the figure stays here for screen
+  // readers and its hook. A count line the page writes (chain data, with its
+  // receipt) stays: below sm it takes a line to itself over the open search
+  // field.
+  const searchLine = search && searchOpen && countNode != null;
   const countLine =
     countNode != null ? (
       <span
-        className={`min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED}`}
+        className={`min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED} ${searchLine ? "max-sm:basis-full" : ""}`}
         data-anatomy="N1.6"
         data-prov-exempt=""
       >
         {countNode}
       </span>
     ) : count ? (
-      <span
-        className={`min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED}`}
-        data-anatomy="N1.6"
-        data-result-count={count.total}
-        data-prov-exempt=""
-      >
-        {count.total.toLocaleString("en-US")}{" "}
-        <CountNoun noun={count.total === 1 ? count.noun.replace(/s$/, "") : count.noun} />
+      <span className="sr-only" data-anatomy="N1.6" data-result-count={count.total} data-prov-exempt="">
+        {count.total.toLocaleString("en-US")}
+        <span className="sr-only"> {count.total === 1 ? count.noun.replace(/s$/, "") : count.noun}</span>
       </span>
     ) : null;
 
   return (
-    <div className="mb-6 flex flex-col" data-skel-section={skel} data-anatomy="N1" {...ctrlWaking(hydrated)}>
+    <div
+      className="group/toolbar mb-6 flex flex-col"
+      data-skel-section={skel}
+      data-anatomy="N1"
+      data-filters-open={panelOpen ? "" : undefined}
+      {...ctrlWaking(hydrated)}
+    >
       <div className="flex flex-wrap items-center gap-2">
-        {/* The shared search's look (H15); the listing's own behaviour: the
-            query filters this explorer, family identifiers included. */}
-        {search && (
-          <SearchBox
-            value={filters.q}
-            onChange={(q) => onChange({ ...filters, q })}
-            placeholder={searchPlaceholder}
-            size="pill"
-            anatomy="N1.1 H15"
-            inputRef={searchRef}
-            onKeyDown={onSearchKeyDown}
-            className="max-sm:basis-full sm:min-w-[220px] sm:flex-[0_1_300px]"
-          />
-        )}
         {/* Below sm one sideways-scrolling row with a fade at its right edge;
             from sm its pills join the wrapping row (display: contents). */}
-        <div className="relative max-sm:-mx-4 max-sm:mt-1 max-sm:min-w-0 max-sm:basis-[calc(100%+2rem)] sm:contents">
+        <div className="relative max-sm:-mx-4 max-sm:min-w-0 max-sm:basis-[calc(100%+2rem)] sm:contents">
           <div
             ref={rowRef}
             className="flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:contents [&::-webkit-scrollbar]:hidden"
@@ -191,8 +222,14 @@ export function ListToolbar<F extends BaseListFilters>({
               countPending={countPending}
               countFor={countFor}
               nounFor={nounFor}
+              slot={sheetSlot}
+              onPanelOpenChange={onPanelOpenChange}
             />
-            {chipsLead != null && <div className="flex shrink-0 items-center">{chipsLead}</div>}
+            {chipsLead != null && (
+              <div className={`flex shrink-0 items-center ${PANEL_OPEN_DIM}`} inert={panelOpen}>
+                {chipsLead}
+              </div>
+            )}
             {ordered.map((pill) => (
               <PillSlot
                 key={pill.name}
@@ -204,6 +241,7 @@ export function ListToolbar<F extends BaseListFilters>({
                 count={editorCount}
                 countFor={countFor}
                 nounFor={nounFor}
+                inert={panelOpen}
               />
             ))}
             {/* Room past the last pill, so the fade never covers it. */}
@@ -217,7 +255,10 @@ export function ListToolbar<F extends BaseListFilters>({
         {/* Clear all (two or more set) after the pills; below sm, Reset at the
             left of the count's line. */}
         {active > 0 && (
-          <div className={`order-1 flex min-h-11 items-center sm:min-h-10 ${active < 2 ? "sm:hidden" : ""}`}>
+          <div
+            className={`order-1 flex min-h-11 items-center sm:min-h-10 ${active < 2 ? "sm:hidden" : ""} ${PANEL_OPEN_DIM}`}
+            inert={panelOpen}
+          >
             <button
               type="button"
               onClick={() => onChange(resetAll(groups, filters))}
@@ -235,8 +276,50 @@ export function ListToolbar<F extends BaseListFilters>({
         {/* Below sm the count gives way first: it wraps under its figure
             beside the sort, where a 343px row cannot hold all three on one
             line. */}
-        <div className="order-1 ml-auto flex min-h-11 min-w-0 items-center gap-3 sm:min-h-10 sm:shrink-0">
+        <div
+          className={`order-1 ml-auto flex min-h-11 min-w-0 items-center gap-3 sm:min-h-10 sm:shrink-0 ${search && searchOpen ? "max-sm:flex-1" : ""} ${searchLine ? "max-sm:basis-full max-sm:flex-wrap" : ""} ${PANEL_OPEN_DIM}`}
+          inert={panelOpen}
+        >
           {countLine}
+          {/* The search, at the right before the sort (Miles, 21 Nov 2026):
+              an icon until pressed, then the shared search's field (H15),
+              which opens leftward; the listing's own behaviour: the query
+              filters this explorer, family identifiers included. */}
+          {search && !searchOpen && (
+            <button
+              type="button"
+              ref={searchIconRef}
+              onClick={openSearch}
+              className={PILL_ICON_BUTTON}
+              aria-label={searchPlaceholder}
+              title={searchPlaceholder}
+              data-search-open=""
+              data-anatomy="N1.1"
+            >
+              <Search className="w-[18px] h-[18px]" aria-hidden="true" />
+            </button>
+          )}
+          {search && searchOpen && (
+            <SearchBox
+              value={filters.q}
+              onChange={(q) => onChange({ ...filters, q })}
+              placeholder={searchPlaceholder}
+              size="pill"
+              anatomy="N1.1 H15"
+              inputRef={searchRef}
+              onKeyDown={onSearchKeyDown}
+              onFocus={() => setSearchOpened(true)}
+              onBlur={() => setSearchOpened(false)}
+              // The ×, as a set pill's: the query goes and the field closes
+              // to its icon, which takes the focus.
+              onClear={() => {
+                focusSearchIcon.current = true;
+                setSearchOpened(false);
+                onChange({ ...filters, q: "" });
+              }}
+              className="min-w-0 max-sm:flex-[1_1_0%] sm:w-[300px]"
+            />
+          )}
           {sortOptions.length > 0 && (
             <SortPill
               options={sortOptions}
@@ -262,20 +345,8 @@ export function ListToolbar<F extends BaseListFilters>({
           )}
         </div>
       </div>
+      <div ref={setSheetSlot} data-filter-sheet-slot="" />
     </div>
-  );
-}
-
-/** The count's noun; below sm its last word alone ("open positions" reads
- *  "positions"), so the count fits beside the sort. */
-function CountNoun({ noun }: { noun: string }) {
-  const cut = noun.lastIndexOf(" ");
-  if (cut < 0) return <>{noun}</>;
-  return (
-    <>
-      <span className="max-sm:hidden">{noun.slice(0, cut + 1)}</span>
-      {noun.slice(cut + 1)}
-    </>
   );
 }
 
@@ -289,7 +360,10 @@ function PillSlot<F>({
   count,
   countFor,
   nounFor,
+  inert,
 }: {
+  /** True while the Filters panel is open in the page. */
+  inert: boolean;
   pill: PillModel<F>;
   open: boolean;
   setOpen: (open: boolean) => void;
@@ -316,7 +390,7 @@ function PillSlot<F>({
     if (at == null || at === document.body || anchorRef.current?.contains(at)) buttonRef.current?.focus();
   });
   return (
-    <div ref={anchorRef} className="contents">
+    <div ref={anchorRef} className="contents" inert={inert}>
       <FilterPill
         name={pill.name}
         state={pill.state}

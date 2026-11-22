@@ -53,6 +53,7 @@ import { chromium } from "playwright";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { openListingSearch, setFilterViaSheet } from "./lib/listing-toolbar.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -534,7 +535,8 @@ async function openListing(ctx, url) {
 /** Type into the listing's own search box and let the driver's 300 ms debounce
  *  push the URL — the path a reader takes to a wallet view. */
 async function searchWallet(page, wallet) {
-  const box = page.locator('[data-skel-section="listing-toolbar"] input').first();
+  // The search rests as an icon until pressed (N1.1, ui-jobs 801).
+  const box = await openListingSearch(page, page.locator('[data-skel-section="listing-toolbar"]'));
   await box.click();
   await box.fill(wallet);
   await page.waitForTimeout(4000);
@@ -543,7 +545,7 @@ async function searchWallet(page, wallet) {
 /** What the page says its result set is — the pagination strip's own total. */
 async function statedTotal(page) {
   return page.evaluate(() => {
-    const m = /Showing\s+[\d,]+-[\d,]+\s+of\s+([\d,]+)\s+/.exec(document.body.innerText ?? "");
+    const m = /Showing\s+[\d,]+[-–][\d,]+\s+of\s+([\d,]+)\s+/.exec(document.body.innerText ?? "");
     return m ? Number(m[1].replace(/,/g, "")) : null;
   });
 }
@@ -561,7 +563,8 @@ async function statedTotal(page) {
 }
 {
   const page = await openListing(context, `${BASE}/ethereum/liquity-v2`);
-  const box = page.locator('[data-skel-section="listing-toolbar"] input').first();
+  // The search rests as an icon until pressed (N1.1, ui-jobs 801).
+  const box = await openListingSearch(page, page.locator('[data-skel-section="listing-toolbar"]'));
   await box.click();
   await box.fill(V2_WALLET);
   await page.waitForURL((u) => u.pathname.startsWith("/wallet/"), { timeout: 60000 }).catch(() => {});
@@ -587,11 +590,13 @@ const SPARK_EVERY_STATUS = "?status=open,closed,liquidated";
   info("F3 fixtures (Spark)", `${openTotal} open of ${everyTotal} positions in all`);
 
   const page = await openListing(context, `${BASE}/ethereum/spark`);
-  await page.getByRole("button", { name: "Remove Status: Open" }).first().click();
+  // Status rests on Open, a default pill with no ×: every status is ticked
+  // in the Filters panel.
+  await setFilterViaSheet(page, "status", ["open", "closed", "liquidated"]);
   await page.waitForTimeout(3500);
   const cleared = await page.evaluate(() => location.search);
   check(
-    "F3. Spark: clearing Status still writes an explicit `?status=` — the open-only explorers are untouched",
+    "F3. Spark: every Status ticked in the Filters panel writes an explicit `?status=` — the open-only explorers are untouched",
     cleared === SPARK_EVERY_STATUS,
     `"${cleared}"`,
   );

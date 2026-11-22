@@ -8,7 +8,10 @@
 // the OPEN pill, and keeps AT RISK; under the card, the read's freshness (H6's
 // form). Nothing inside the card changes, except that a Stability Pool
 // deposit's card states its head read (the deposit now, the collateral owed)
-// where the read answered.
+// where the read answered, a Trove's card takes its branch's shutdown from the
+// head read (no ratio; an emptied pool's "pool holds 0"), and a fork deposit
+// on an emptied branch states the withdrawal under its collateral gain
+// (ui-jobs 802).
 
 import Link from "next/link";
 import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
@@ -31,7 +34,7 @@ import { FluidPositionCard, viewFromSummary as fluidView } from "@/components/pr
 import { MakerVaultCard, viewFromSummary as makerView } from "@/components/protocol/makerdao/makerdao-vault-card";
 import { LiquityPositionCard, viewFromForkSummary } from "@/components/protocol/liquity-family/liquity-position-card";
 import { liquityV2TroveCard } from "@/lib/liquity-v2/listing-cards";
-import { forkDepositListingCard } from "@/lib/liquity-fork/deposit-card";
+import { forkDepositWalletCard } from "@/lib/liquity-fork/deposit-card";
 import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
 import {
   LiquityV1PositionCard,
@@ -47,10 +50,14 @@ import { ArbitrumReadCard, CometReadCard } from "@/components/shared/arbitrum-po
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletCard, WalletPosition } from "@/lib/wallet/types";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
+import { walletBranchState } from "@/lib/wallet/trove-shutdown";
 
 const BASE_LANE: CompoundCardLane = { chainId: BASE_CHAIN_ID, source: "sweep" };
 
-function FamilyCard({ card }: { card: WalletCard }) {
+/** `state`: the position's branch shutdown as the card draws it
+ *  (`walletBranchState`). */
+function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownState | null }) {
   switch (card.kind) {
     case "aave-v3":
       return card.lane === "base" ? (
@@ -100,7 +107,7 @@ function FamilyCard({ card }: { card: WalletCard }) {
     case "makerdao":
       return <MakerVaultCard v={makerView(card.row)} surface="listing" />;
     case "liquity-v2":
-      return liquityV2TroveCard(card.row, card.prices);
+      return liquityV2TroveCard(card.row, card.prices, state);
     case "liquity-v2-deposit":
       return (
         <LiquityV2DepositCard
@@ -108,6 +115,8 @@ function FamilyCard({ card }: { card: WalletCard }) {
           surface="listing"
           now={card.head ? liquityV2DepositNow(card.head) : null}
           nowBlock={card.head?.blockNumber}
+          shutdown={state}
+          onWallet
         />
       );
     case "liquity-v1":
@@ -145,12 +154,38 @@ function FamilyCard({ card }: { card: WalletCard }) {
           surface="listing"
           v={viewFromForkSummary(card.kind, card.row)}
           compact
+          shutdown={state}
         />
       );
     case "fork-deposit":
-      return forkDepositListingCard(SP_DEPLOYMENTS[card.fork])(card.row);
+      return forkDepositWalletCard(SP_DEPLOYMENTS[card.fork])(card.row, state);
   }
 }
+
+/** A Liquity-family Trove's or deposit's branch, for its shutdown state. */
+function branchOf(c: WalletCard): { protocol: string; branch: string } | null {
+  switch (c.kind) {
+    case "liquity-v2":
+      return { protocol: "liquity-v2", branch: c.row.collateralType };
+    case "liquity-v2-deposit":
+      return { protocol: "liquity-v2", branch: c.row.collateral_type };
+    case "ebisu":
+    case "asymmetry":
+    case "basedollar":
+      return { protocol: c.kind, branch: c.row.collateralType };
+    case "fork-deposit":
+      return { protocol: c.fork, branch: c.row.collateral_type };
+    default:
+      return null;
+  }
+}
+
+/** The branch state the card draws: the wallet read's, else the catalog's
+ *  record (a head read that failed or timed out). */
+const stateOf = (p: WalletPosition): BranchShutdownState | null => {
+  const b = branchOf(p.card);
+  return b ? walletBranchState(b.protocol, b.branch, p.status, p.shutdown) : null;
+};
 
 /** A position is AT RISK past its family's liquidation line, or where the
  *  family says it can be liquidated. */
@@ -196,7 +231,7 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
           data-anatomy="N2"
           aria-label={`${p.familyName} on ${chain}${p.market ? `, ${p.market}` : ""}`}
         >
-          <FamilyCard card={p.card} />
+          <FamilyCard card={p.card} state={stateOf(p)} />
         </Link>
       </PositionCardEdgeContext.Provider>
     </div>

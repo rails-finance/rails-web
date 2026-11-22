@@ -132,7 +132,7 @@ const pill = (f, name) =>
     f,
   );
 
-test("an unset pill is dashed and names its filter", () => {
+test("an unset group has no value and names its filter", () => {
   const p = pill(base, "Market");
   assert.equal(p.state, "unset");
   assert.equal(p.locked, false);

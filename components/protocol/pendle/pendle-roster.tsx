@@ -500,51 +500,54 @@ export function PendleRosterTable({
           onSearchKeyDown={onSearchKeyDown}
         />
 
-        {/* The chosen sort's note, below sm where no header carries it. */}
-        {SORT_NOTE[sort] && (
-          <p className="mb-3 text-[12px] text-rb-500 sm:hidden" data-mobile-sort-note="">
-            {SORT_NOTE[sort]}
-          </p>
-        )}
+        {/* What the toolbar narrows: its open filter panel sets this back. */}
+        <div data-filters-results="">
+          {/* The chosen sort's note, below sm where no header carries it. */}
+          {SORT_NOTE[sort] && (
+            <p className="mb-3 text-[12px] text-rb-500 sm:hidden" data-mobile-sort-note="">
+              {SORT_NOTE[sort]}
+            </p>
+          )}
 
-        {wallet && <WalletRow typed={typed} kind={wallet} lookup={lookup} />}
+          {wallet && <WalletRow typed={typed} kind={wallet} lookup={lookup} />}
 
-        {shown.length === 0 ? (
-          wallet ? null : (
-            <p className="text-[13px] text-rb-500">No market matches.</p>
-          )
-        ) : (
-          <DataTable
-            caption="Pendle markets on Ethereum; liquidity and PT price are in each market's asset"
-            tableClassName="min-w-[720px] text-sm"
-            stacked
-            rowHeight="one"
-            data-pendle-table=""
-          >
-            <DataTableHead>
-              {COLUMNS.map((c) => (
-                <DataTableHeader
-                  key={c.key}
-                  label={c.label}
-                  align={c.numeric ? "right" : "left"}
-                  sticky={c.key === "market" ? "sm:sticky sm:left-0" : ""}
-                  sort={{
-                    dir: c.key === sort ? dir : null,
-                    onSort: () => press(c.key),
-                    describedBy: SORT_NOTE[c.key] ? `pendle-sort-note-${c.key}` : undefined,
-                  }}
-                  data-sort-key={c.key}
-                  after={headerTip(c.key)}
-                />
-              ))}
-            </DataTableHead>
-            <DataTableBody>
-              {shown.map((m) => (
-                <Row key={m.tokens.market.address} m={m} block={roster.block} at={at} />
-              ))}
-            </DataTableBody>
-          </DataTable>
-        )}
+          {shown.length === 0 ? (
+            wallet ? null : (
+              <p className="text-[13px] text-rb-500">No market matches.</p>
+            )
+          ) : (
+            <DataTable
+              caption="Pendle markets on Ethereum; liquidity and PT price are in each market's asset"
+              tableClassName="min-w-[720px] text-sm"
+              stacked
+              rowHeight="one"
+              data-pendle-table=""
+            >
+              <DataTableHead>
+                {COLUMNS.map((c) => (
+                  <DataTableHeader
+                    key={c.key}
+                    label={c.label}
+                    align={c.numeric ? "right" : "left"}
+                    sticky={c.key === "market" ? "sm:sticky sm:left-0" : ""}
+                    sort={{
+                      dir: c.key === sort ? dir : null,
+                      onSort: () => press(c.key),
+                      describedBy: SORT_NOTE[c.key] ? `pendle-sort-note-${c.key}` : undefined,
+                    }}
+                    data-sort-key={c.key}
+                    after={headerTip(c.key)}
+                  />
+                ))}
+              </DataTableHead>
+              <DataTableBody>
+                {shown.map((m) => (
+                  <Row key={m.tokens.market.address} m={m} block={roster.block} at={at} />
+                ))}
+              </DataTableBody>
+            </DataTable>
+          )}
+        </div>
       </div>
     </ProvSection>
   );

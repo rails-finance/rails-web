@@ -32,7 +32,7 @@ import {
   type RefObject,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { RailsMark } from "@/components/nav/rails-mark";
 import { NAV_BUTTON, ctrlWaking } from "@/lib/shared/ui-grammar";
 import { useHydrated } from "@/hooks/useHydrated";
@@ -147,6 +147,9 @@ export interface SearchBoxProps {
   describedBy?: string;
   onKeyDown?: (e: ReactKeyboardEvent<HTMLInputElement>) => void;
   onBlur?: () => void;
+  /** Given, the field draws a × at its right end while it holds a query, as a
+   *  set filter pill does (N1.10; ui-jobs 801); a press runs this. */
+  onClear?: () => void;
   /** The field as an ARIA combobox over a listbox of suggestions (ui-jobs 482). */
   combobox?: { expanded: boolean; listId: string; activeId?: string };
 }
@@ -168,9 +171,11 @@ export function SearchBox({
   describedBy,
   onKeyDown,
   onBlur,
+  onClear,
   combobox,
 }: SearchBoxProps) {
   const glyph = GLYPH[size];
+  const clearable = onClear != null && value !== "";
   return (
     <div className={`relative ${className}`} data-anatomy={anatomy || undefined}>
       {/* The glow is the canvas's; the wallet panel's field has none (ui-jobs 514). */}
@@ -217,8 +222,19 @@ export function SearchBox({
         // A hairline in light mode: on the white canvas the raised field is a
         // shade off the page and needs an edge to read as a field; in dark the
         // surface decides (EDGE).
-        className={`w-full ${size === "lg" ? HERO_FIELD : size === "pill" ? "rounded-full" : "rounded-md"} border border-rb-300 bg-raised ${SURFACE[surface].field} ${(SURFACE[surface].glyph ? FIELD : FIELD_PLAIN)[size]} text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+        className={`w-full ${size === "lg" ? HERO_FIELD : size === "pill" ? "rounded-full" : "rounded-md"} border border-rb-300 bg-raised ${SURFACE[surface].field} ${(SURFACE[surface].glyph ? FIELD : FIELD_PLAIN)[size]} ${clearable ? "pr-10!" : ""} text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
       />
+      {clearable && (
+        <button
+          type="button"
+          onClick={onClear}
+          className="absolute inset-y-0 right-1 z-10 flex w-9 items-center justify-center rounded-full text-rb-500 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-rb-400/75"
+          aria-label="Clear search"
+          data-search-clear=""
+        >
+          <X className="size-3.5" aria-hidden="true" />
+        </button>
+      )}
     </div>
   );
 }

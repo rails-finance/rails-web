@@ -3,21 +3,22 @@
 // TimelineToolbar — the shared strip above a position timeline, in the
 // listings' filter-bar style (ui-jobs 735): the heading line (the tenure, with
 // Sync to chart, the 30-day projection's switch and Display at its right), then
-// the pill row: one N1.10 pill per axis the history offers (Type, Asset,
-// Version, Address; timeline-filter-bar.tsx), the Date pill where the page has
-// a date axis (`tl.datesAxis`; a timeline the Lifetime flows chart ties to
-// has none, `timelineDates` in lib/shared/timeline-dates.ts, and draws the
+// the pill row (ui-jobs 801): the Filters button, one N1.10 pill per axis that
+// is set (Type, Asset, Version, Address; timeline-filter-bar.tsx), the Date
+// where the page has a date axis, a round calendar button at rest and a pill
+// once set (`tl.datesAxis`; a timeline the Lifetime flows chart ties to has
+// none, `timelineDates` in lib/shared/timeline-dates.ts, and draws the
 // chart's cut as a set pill in its slot), Clear all, and the count at the
-// row's right end. Below sm the pills scroll sideways behind the filter
-// sheet's button and the count takes the line under them. The Date pill
-// opens the navigator panel (the month grid) under the strip. Driven by a
+// row's right end. Below sm the row scrolls sideways and the count takes the
+// line under it. The Date opens the navigator panel (the month grid) under
+// the strip. Driven by a
 // useTimelineEvents() state object, so a page wires it in one line. The
 // copy-link control that puts the current VIEW on the clipboard
 // (`tl.viewHref`) is in the position card's Explanation pane — see
 // `CopyViewLink` in `provenance-info-tabs.tsx`.
 
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
@@ -33,7 +34,14 @@ import { lifetimeFiguresKnown } from "@/lib/shared/timeline-opening-balance";
 import { loadedDaysStatement, segmentStatement } from "@/lib/shared/timeline-segments";
 import { TimelineNavigatorPanel, type TimelineMonthReach } from "@/components/shared/timeline-navigator";
 import { useHydrated } from "@/hooks/useHydrated";
-import { FilterPill, FilterPillReserve, PILL_MUTED } from "@/components/shared/filter-bar/filter-pill";
+import { CalendarDays } from "lucide-react";
+import {
+  FilterPill,
+  FilterPillReserve,
+  PANEL_OPEN_DIM,
+  PILL_ICON_BUTTON,
+  PILL_MUTED,
+} from "@/components/shared/filter-bar/filter-pill";
 import {
   clearTimelineFilters,
   draftAxesView,
@@ -596,6 +604,10 @@ export function TimelineToolbar({
   // window on the site — it carries the most JS, so it is the last thing to come
   // alive (measured 1.8s at 4× CPU on slow 4G).
   const hydrated = useHydrated();
+  // Where the filters open from sm: under the row, above the events.
+  const [sheetSlot, setSheetSlot] = useState<HTMLDivElement | null>(null);
+  // While that panel is open the row's other controls stand back (ui-jobs 801).
+  const [panelOpen, setPanelOpen] = useState(false);
 
   // The axes as the listings' pills (ui-jobs 735); see timeline-filter-bar.tsx.
   const model = timelineFilterModel(tl);
@@ -726,32 +738,75 @@ export function TimelineToolbar({
         // [Clear all] and the count at the right end. Below sm the pills
         // scroll sideways behind the Filters button, and Reset and the count
         // take the line under them, at its left as the listings set it.
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <div
+          className="group/toolbar flex flex-wrap items-center gap-x-2 gap-y-1"
+          data-filters-open={panelOpen ? "" : undefined}
+        >
           <div className="relative max-sm:-mx-4 max-sm:min-w-0 max-sm:basis-[calc(100%+2rem)] sm:contents">
             <div
               className="flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:contents [&::-webkit-scrollbar]:hidden"
               data-pill-row=""
               data-anatomy="N1.2"
             >
-              <TimelineFilterSheet model={model} count={draftBase} countFor={countFor} />
-              <TimelineAxisPills model={model} count={draftBase} countFor={countFor} />
-              {tl.datesAxis && (
+              <TimelineFilterSheet
+                model={model}
+                count={draftBase}
+                countFor={countFor}
+                slot={sheetSlot}
+                onPanelOpenChange={(o) => {
+                  setPanelOpen(o);
+                  // One editor at a time: the Date navigator closes.
+                  if (o && tl.heatmapOpen) tl.toggleHeatmap();
+                }}
+              />
+              <TimelineAxisPills model={model} count={draftBase} countFor={countFor} inert={panelOpen} />
+              {/* At rest the Date is a round icon button (ui-jobs 801), in the
+                  pill's wrapper so its hooks stand where a pill's do. */}
+              {tl.datesAxis && !filterActive && (
+                <div
+                  className={`relative shrink-0 ${PANEL_OPEN_DIM}`}
+                  inert={panelOpen}
+                  data-filter-pill="Date"
+                  data-pill-state="unset"
+                  data-anatomy="N1.10 L1.7"
+                >
+                  <button
+                    type="button"
+                    onClick={tl.toggleHeatmap}
+                    className={PILL_ICON_BUTTON}
+                    aria-haspopup="dialog"
+                    aria-expanded={datePanelOpen}
+                    aria-label="Add Date filter"
+                    title="Date"
+                    data-pill-open=""
+                    data-date-control=""
+                  >
+                    <CalendarDays className="w-[18px] h-[18px]" aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+              {tl.datesAxis && filterActive && (
                 <FilterPill
                   name="Date"
                   anatomy="L1.7"
                   openData={{ "data-date-control": "" }}
-                  state={filterActive ? "set" : "unset"}
+                  state="set"
+                  inert={panelOpen}
                   locked={false}
                   label="Date"
                   value={dateLabel}
-                  spoken={filterActive ? `Date ${dateLabel}` : "Add Date filter"}
+                  spoken={`Date ${dateLabel}`}
                   expanded={datePanelOpen}
                   onOpen={tl.toggleHeatmap}
                   onRemove={clearDate}
                 />
               )}
               {!tl.datesAxis && datesHeld && <FilterPillReserve name="Date" />}
-              {!tl.datesAxis && cutPill}
+              {!tl.datesAxis && cutPill != null && (
+                <div className="contents" inert={panelOpen}>
+                  {cutPill}
+                </div>
+              )}
               <span className="w-6 shrink-0 sm:hidden" aria-hidden="true" />
             </div>
             <div
@@ -759,7 +814,10 @@ export function TimelineToolbar({
               aria-hidden="true"
             />
           </div>
-          <div className="flex min-h-11 min-w-0 flex-1 items-center gap-3 sm:min-h-10">
+          <div
+            className={`flex min-h-11 min-w-0 flex-1 items-center gap-3 sm:min-h-10 ${PANEL_OPEN_DIM}`}
+            inert={panelOpen}
+          >
             {/* As the listings draw it (N1.13): from sm "Clear all" once two
                 pills are set, below sm "Reset" once one is. */}
             {setCount > 0 && (
@@ -776,6 +834,7 @@ export function TimelineToolbar({
             )}
             <span className="min-w-0 sm:ml-auto">{countNode}</span>
           </div>
+          <div ref={setSheetSlot} className="basis-full empty:hidden" data-filter-sheet-slot="" />
         </div>
       )}
 

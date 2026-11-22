@@ -518,10 +518,18 @@ export function WithdrawalLine({
   /** The answer's coll_withdrawn_at_block: the record must name the same. */
   answerBlock: string | null | undefined;
 }) {
+  const w = recordedShutdown(dep.id, branch)?.withdrawal;
+  if (!w || statedWithdrawalBlock(answerBlock, w.block) == null) return null;
+  return <WithdrawalWords dep={dep} branch={branch} />;
+}
+
+/** The withdrawal line's words from the catalog's record alone: the wallet
+ *  page's deposit card, which holds no liquidations answer (ui-jobs 802). */
+export function WithdrawalWords({ dep, branch }: { dep: SpDeployment; branch: string }) {
   const rec = recordedShutdown(dep.id, branch);
   const w = rec?.withdrawal;
   const prov = rec ? withdrawalDateProv(dep.id, branch, rec) : null;
-  if (!w || !prov || statedWithdrawalBlock(answerBlock, w.block) == null) return null;
+  if (!w || !prov) return null;
   return (
     <span data-sp-coll-withdrawn={w.block}>
       The admin withdrew the branch&rsquo;s collateral at block{" "}

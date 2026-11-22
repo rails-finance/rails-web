@@ -1,10 +1,10 @@
 "use client";
 
-// SortPill — the listing's sort as one pill (N1.3, ui-jobs 681): "↓ Recent
-// activity ⌄", opening an editor with the sort keys and Ascending /
-// Descending. A pick applies at once, as the sort always has. State-free: it
-// reads sortBy/sortOrder and reports changes; the caller owns where that state
-// lives (URL param object).
+// SortPill — the listing's sort (N1.3, ui-jobs 681, 801): the arrow alone on
+// Recent activity and "↓ Collateral ⌄" on any other sort, opening an editor
+// with the sort keys and Ascending / Descending. A pick applies at once.
+// State-free: it reads sortBy/sortOrder and reports changes; the caller owns
+// where that state lives (URL param object).
 
 import { useRef, useState } from "react";
 import { Check } from "lucide-react";
@@ -58,6 +58,7 @@ export function SortPill({ options, sortBy, sortOrder, onChange }: SortPillProps
     <div className="relative shrink-0" ref={anchorRef} data-anatomy="N1.3">
       <SortPillButton
         label={current}
+        named={current !== RECENT_ACTIVITY_LABEL}
         order={sortOrder}
         spoken={sortSpoken(current, sortOrder)}
         expanded={open}

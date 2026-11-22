@@ -71,6 +71,7 @@
 //   registry, and the section for each is what says so. Reverted.
 
 import { chromium } from "playwright";
+import { openListingSearch } from "./lib/listing-toolbar.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 
@@ -167,11 +168,11 @@ async function readPills(page, rowSel) {
 }
 
 /** What the page says its result set is. The pagination strip states the total
- *  ("Showing 1-20 of 216 Troves"); a single-page view draws no strip, and there
- *  the rendered row count IS the total. */
+ *  ("Showing 1–20 of 216 Troves"); a single-page view draws the count alone
+ *  ("12 Troves"), and there the rendered row count IS the total. */
 async function readTotal(page, rowSel, itemsPerPage) {
   const stated = await page.evaluate(() => {
-    const m = /Showing\s+[\d,]+-[\d,]+\s+of\s+([\d,]+)\s+/.exec(document.body.innerText ?? "");
+    const m = /Showing\s+[\d,]+[-–][\d,]+\s+of\s+([\d,]+)\s+/.exec(document.body.innerText ?? "");
     return m ? Number(m[1].replace(/,/g, "")) : null;
   });
   if (stated != null) return { total: stated, from: "the pagination strip" };
@@ -242,7 +243,8 @@ const describeChips = (chips) =>
  *  check is about to assert. */
 async function search(page, text, rowSel) {
   const before = rowSel ? await page.locator(rowSel).count() : null;
-  const box = page.locator('[data-skel-section="listing-toolbar"] input').first();
+  // The search rests as an icon until pressed (N1.1, ui-jobs 801).
+  const box = await openListingSearch(page, page.locator('[data-skel-section="listing-toolbar"]'));
   await box.click();
   await box.fill(text);
   await page.waitForTimeout(1600);
