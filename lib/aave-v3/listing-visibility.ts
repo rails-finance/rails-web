@@ -53,8 +53,8 @@ export function aaveV3StatusBuckets(f: AaveV3VisibilityInput): string[] | undefi
   return statusBuckets(statusChoice(f), endedByLiquidation(f));
 }
 
-/** The count line's noun: Status draws no pill, so the line under the results names what is
- *  shown ("open positions", "closed positions", "positions" for All). */
+/** The count line's noun names what is shown ("open positions", "closed positions",
+ *  "positions" for All). */
 export function aaveV3CountLine(f: AaveV3VisibilityInput): { noun: string } {
   return { noun: statusNoun(statusChoice(f), "positions") };
 }

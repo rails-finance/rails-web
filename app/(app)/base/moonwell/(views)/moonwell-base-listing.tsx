@@ -9,6 +9,7 @@
 // Comptroller, as on Ethereum: every balance a chain read at the block the row
 // names, every dollar the Comptroller's own oracle at that block.
 
+import { moonwellCountLine } from "@/lib/moonwell/listing-visibility";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MoonwellPositionSummary } from "@/lib/sources/api/moonwell-positions";
 import { fetchMoonwellPositions } from "@/lib/api/fetch-moonwell-positions";
@@ -123,6 +124,7 @@ export function MoonwellBaseListing({
       <ChainTruthListingPage<MoonwellPositionSummary, MoonwellListFilters, MoonwellBaseRosterState>
         title="Moonwell Positions"
         noun="positions"
+        countLine={moonwellCountLine}
         basePath="/base/moonwell"
         defaults={MOONWELL_BASE_LIST_DEFAULTS}
         sortOptions={MOONWELL_BASE_SORT_OPTIONS}
@@ -141,6 +143,11 @@ export function MoonwellBaseListing({
               data: r.data,
               total: r.pagination.total,
             })),
+          // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+          countDraft: (filters) =>
+            fetchMoonwellPositions({ ...moonwellBaseFiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+              (r) => r.pagination.total,
+            ),
         })}
         headerExtra={<MoonwellBorrowFrozenNote className="mt-3" />}
         onFilters={onFilters}

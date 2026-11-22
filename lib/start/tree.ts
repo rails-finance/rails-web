@@ -5,6 +5,7 @@
 import raw from "@/lib/start/start-tree.json";
 import { assetCategory, type AssetCategory } from "@/lib/shared/asset-categories";
 import { isPairKey, PAIRS, type PairKey } from "@/lib/uniswap/pairs";
+import type { LiquidatedSpec } from "@/lib/start/liquidated-link";
 
 export type GroupKey = "eth" | "btc" | "stablecoins";
 export type ResultsKey = "borrow" | "near-liquidation" | "liquidated";
@@ -80,7 +81,7 @@ interface Tree {
       line: string;
       sorts: { sortBy: string; sortOrder: "asc" | "desc" }[];
     };
-    liquidated: { heading: string; line: string; history: { param: string; value: string }[]; status: string };
+    liquidated: LiquidatedSpec;
   };
   collateral: Record<string, WrittenCollateral>;
   notAnswered: Record<string, string>;

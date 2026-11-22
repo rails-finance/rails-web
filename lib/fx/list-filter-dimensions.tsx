@@ -12,8 +12,10 @@
 // events ever), the Maker ilk pattern with a fixed catalog.
 //
 // Facets that ship LIVE (backend + proxy honor the params):
-//   • Status — open / closed / liquidated. Open/closed come off the settled
-//     sweep (chain_closed); liquidated = ever liquidated (n_liquidations > 0).
+//   • Status — Open, Closed or All (ui-jobs 805), off the settled sweep
+//     (chain_closed).
+//   • Liquidated before — the ever-liquidated fact, sent as status=liquidated;
+//     it stands with All alone (lib/fx/listing-visibility.ts).
 //   • Pool   — wstETH pool / WBTC pool (multi, OR).
 //   • Size   — Debt in fxUSD (minDebt / maxDebt, the settled debt as a token
 //     amount: the listing reads no USD price for fxUSD) and Collateral in USD
@@ -34,12 +36,14 @@ import type { FetchFxPositionsParams } from "@/lib/api/fetch-fx-positions";
 import type { FxPositionSort } from "@/lib/sources/api/fx-positions";
 import { FX_POOLS, FX_POOL_KEYS, isFxPoolKey, parseFxPositionSlug, type FxPoolKey } from "@/lib/fx/asset-catalog";
 import {
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  isAllStatuses,
-  sameStatusSet,
+  defaultStatusChoice,
+  FX_LIQUIDATED_BEFORE,
+  fxStatusFacets,
+  liquidatedBefore,
+  readFxStatusParam,
+  statusChoice,
 } from "@/lib/fx/listing-visibility";
+import { STATUS_CHOICE_OPTIONS, type StatusChoice } from "@/lib/shared/status-choice";
 import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 
@@ -59,8 +63,11 @@ const FX_TX_TOP = 300;
 const FX_SIZE_NOTE = "Debt in fxUSD; collateral at the pool oracle's minimum price.";
 
 export interface FxListFilters extends BaseListFilters {
-  /** open / closed / liquidated — multi (OR). Lifecycle over the settled sweep. */
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
+  /** "" | "liquidated" — positions liquidated at least once; with All only.
+   *  URL param `liq`. */
+  liquidations: string[];
   /** Pool keys the position must belong to (multi, OR). */
   pools: string[];
   /** Debt range in fxUSD, one encodeRange value (`1000-50000`, `-0` for no
@@ -74,14 +81,13 @@ export interface FxListFilters extends BaseListFilters {
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
 // listing-visibility.ts resolves it per context — the open positions on the bare directory,
-// every status once the search names an identity. Because the default is contextual rather
-// than a selection it draws no chip and no Reset link, and a cleared selection resolves back
-// to what the context rests on.
+// every status once the search names an identity.
 export const FX_LIST_DEFAULTS: FxListFilters = {
   q: "",
   sortBy: "lastActivity",
   sortOrder: "desc",
   status: [],
+  liquidations: [],
   pools: [],
   debt: [],
   coll: [],
@@ -101,11 +107,12 @@ export const FX_SORT_OPTIONS: SortOption[] = [
 
 const FX_SORT_VALUES = new Set<string>(FX_SORT_OPTIONS.map((o) => o.value));
 
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Ever liquidated" },
-];
+const LIQUIDATION_OPTIONS: FilterOptionDef[] = [{ value: FX_LIQUIDATED_BEFORE, label: "Liquidated before" }];
+
+/** The `status` field for a choice: [] where it is the resting one. */
+function storedChoice(f: FxListFilters, choice: StatusChoice): string[] {
+  return choice === defaultStatusChoice(f) ? [] : [choice];
+}
 
 // One chip per pool (the whole two-pool catalog), carrying the collateral
 // token's glyph — the Maker ilk-chip grammar.
@@ -121,16 +128,22 @@ export function fxListDimensions(): SerializableDimension<FxListFilters>[] {
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses. Open and Closed
+      // turn "Liquidated before" off.
       set: (f, v) => {
-        const sel = canonicalStatuses(v);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
+        const read = readFxStatusParam(v);
+        const choice = read.choice ?? defaultStatusChoice(f);
+        return {
+          ...f,
+          status: storedChoice(f, choice),
+          liquidations: choice !== "all" ? [] : read.liquidatedBefore ? [FX_LIQUIDATED_BEFORE] : f.liquidations,
+        };
       },
     },
     {
@@ -152,6 +165,19 @@ export function fxListDimensions(): SerializableDimension<FxListFilters>[] {
       top: FX_SIZE_TOP,
       debtUnit: "fxUSD",
     }),
+    {
+      id: "liquidations",
+      label: "Liquidated before",
+      group: "History",
+      cardinality: "single",
+      param: "liq",
+      options: LIQUIDATION_OPTIONS,
+      get: (f) => (liquidatedBefore(f) ? [FX_LIQUIDATED_BEFORE] : []),
+      // The API ORs it with the open and closed facets, so it moves Status to All.
+      set: (f, v) =>
+        v.length > 0 ? { ...f, liquidations: v, status: storedChoice(f, "all") } : { ...f, liquidations: [] },
+      chipLabel: () => "Liquidated before",
+    },
     transactionsDimension<FxListFilters>({
       get: (f) => f.tx,
       set: (f, tx) => ({ ...f, tx }),
@@ -182,8 +208,8 @@ export function fxFiltersToFetchParams(filters: FxListFilters, page: number): Fe
     positionId: parsed.positionId,
     owner: parsed.owner,
     pools: pools.length > 0 ? pools : undefined,
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // All maps to no status filter, or to `liquidated` with "Liquidated before".
+    status: fxStatusFacets(filters),
     ...sizeBounds(filters, { debt: "unit", coll: "usd" }),
     ...transactionBounds(filters.tx),
     sortBy,

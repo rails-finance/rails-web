@@ -14,7 +14,8 @@
 // dimensions seam (decision 0009), the same shape Morpho and Aave V4 use.
 //
 // How a selection reaches the backend:
-//   • Status              → `status` (CSV, OR within).
+//   • Status              → `status`: Open, Closed or All, with "Closed by
+//     liquidation" (`ended`) narrowing Closed (ui-jobs 805).
 //   • Collateral type     → `ilks` (CSV of ilk names, as the chain writes them).
 //   • Free text           → matched against the roster's ilk names and their
 //                           display symbols, then sent as that same `ilks` CSV.
@@ -49,12 +50,12 @@ import { ilkToCollateralSymbol } from "@/lib/makerdao/asset-catalog";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import {
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  isAllStatuses,
-  sameStatusSet,
+  defaultStatusChoice,
+  endedByLiquidation,
+  makerStatusBuckets,
+  statusChoice,
 } from "@/lib/makerdao/listing-visibility";
+import { ENDED_BY_LIQUIDATION, readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** The backend caps `limit` at 500; 20 is the page size the whole tier uses. */
 export const MAKER_ITEMS_PER_PAGE = 20;
@@ -67,7 +68,11 @@ const MAKER_TX_TOP = 3000;
 const MAKER_SIZE_NOTE = "Debt in DAI; collateral at the latest indexed price.";
 
 export interface MakerListFilters extends BaseListFilters {
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
+  /** "" | "liquidated" — with Closed, the vaults that ended by liquidation.
+   *  URL param `ended`. */
+  ended: string[];
   ilks: string[];
   /** Debt range in DAI, one encodeRange value (`1000-50000`, `-0` for no
    *  debt) or [] for no bound. URL param `debt`. */
@@ -80,14 +85,13 @@ export interface MakerListFilters extends BaseListFilters {
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
 // listing-visibility.ts resolves it per context — the open vaults on the bare directory,
-// every status once the search names an identity. Because the default is contextual rather
-// than a selection it draws no chip and no Reset link, and a cleared selection resolves back
-// to what the context rests on.
+// every status once the search names an identity.
 export const MAKER_LIST_DEFAULTS: MakerListFilters = {
   q: "",
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
+  ended: [],
   ilks: [],
   debt: [],
   coll: [],
@@ -114,12 +118,6 @@ const SORT_TO_BACKEND: Record<string, MakerVaultSort> = {
   collateral: "collateralUsd",
   debt: "debtDai",
 };
-
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated" },
-];
 
 /** What the driver hands the registry: the roster once it has settled, and
  *  whether it ever will. `loading` and `unavailable` are kept apart because they
@@ -170,17 +168,36 @@ export function makerListDimensions(
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses.
       set: (f, v) => {
-        const sel = canonicalStatuses(v);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
+        const read = readStatusParam(v);
+        const choice = read.choice ?? defaultStatusChoice(f);
+        return {
+          ...f,
+          status: choice === defaultStatusChoice(f) ? [] : [choice],
+          ended: choice !== "closed" ? [] : read.endedByLiquidation ? [ENDED_BY_LIQUIDATION] : f.ended,
+        };
       },
+    },
+    {
+      id: "ended",
+      label: "Closed by liquidation",
+      // Its own group, for its pill; in the panel it sits under Status.
+      group: "Closed by liquidation",
+      cardinality: "single",
+      param: "ended",
+      options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
+      // Offered with Closed, which it narrows.
+      available: (f) => statusChoice(f) === "closed",
+      get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
+      set: (f, v) => ({ ...f, ended: v }),
+      chipLabel: () => "Closed by liquidation",
     },
     {
       id: "ilks",
@@ -276,8 +293,8 @@ export function makerFiltersToFetchParams(
   const target = makerSearchTarget(filters.q);
 
   const base: FetchMakerVaultsParams = {
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // All maps to no status filter; Closed asks for closed and liquidated.
+    status: makerStatusBuckets(filters) as FetchMakerVaultsParams["status"],
     sortBy: SORT_TO_BACKEND[filters.sortBy] ?? SORT_TO_BACKEND.recent,
     sortOrder: filters.sortOrder === "asc" ? "asc" : "desc",
     limit: MAKER_ITEMS_PER_PAGE,

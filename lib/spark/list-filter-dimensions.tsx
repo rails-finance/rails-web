@@ -11,8 +11,9 @@
 // <ChainTruthListing> server-body wires the toolbar + pagination.
 //
 // Facets that ship LIVE (backend + proxy honor the params):
-//   • Status   — open / closed / liquidated (lifecycle), over mv_spark_wallets,
-//     resting on a CONTEXTUAL default (lib/spark/listing-visibility.ts).
+//   • Status   — Open / Closed / All (ui-jobs 805), over mv_spark_wallets,
+//     resting on a CONTEXTUAL default (lib/spark/listing-visibility.ts), and
+//     Closed by liquidation with Closed.
 //   • Size: Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts),
 //     sent as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd. The Debt range
 //     replaces the old Position dropdown: its `?state=borrowing` reads as at
@@ -40,12 +41,12 @@ import type { FetchSparkPositionsParams } from "@/lib/api/fetch-spark-positions"
 import type { SparkPositionSort } from "@/lib/sources/api/spark-positions";
 import { SPARK_CATALOG } from "@/lib/spark/asset-catalog";
 import {
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  isAllStatuses,
-  sameStatusSet,
+  sparkStatusBuckets,
+  defaultStatusChoice,
+  endedByLiquidation,
+  statusChoice,
 } from "@/lib/spark/listing-visibility";
+import { ENDED_BY_LIQUIDATION, readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** The Transactions slider's top: the round number above the busiest listed
  *  wallet (27,023 transactions, 16 Oct 2026). */
@@ -55,10 +56,11 @@ const SPARK_TX_TOP = 30000;
 export const SPARK_ITEMS_PER_PAGE = 20;
 
 export interface SparkListFilters extends BaseListFilters {
-  /** open / closed / liquidated — multi (OR). Lifecycle over mv_spark_wallets.
-   *  RAW intent: empty is "no opinion" and resolves to the contextual default
-   *  (listing-visibility.ts). */
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
+  /** "" | "liquidated" — with Closed, the positions that ended by liquidation.
+   *  URL param `ended`. */
+  ended: string[];
   /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
    *  debt) or [] for no bound. URL param `debt`, read from `state` too. */
   debt: string[];
@@ -76,14 +78,13 @@ export interface SparkListFilters extends BaseListFilters {
 
 // No status is written into the page defaults: an empty `status` is "no opinion",
 // and listing-visibility.ts resolves it per context — the open wallets on the
-// bare directory, every status once the search names a holder. Because the
-// default is contextual rather than a selection it draws no chip and no Reset
-// link, and a cleared selection resolves back to what the context rests on.
+// bare directory, every status once the search names an holder.
 export const SPARK_LIST_DEFAULTS: SparkListFilters = {
   q: "",
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
+  ended: [],
   debt: [],
   coll: [],
   liquidations: [],
@@ -98,12 +99,6 @@ export const SPARK_SORT_OPTIONS: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },
   { value: "debt", label: "Debt" },
   { value: "coll", label: "Collateral" },
-];
-
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated" },
 ];
 
 /** The Size panel's price line. */
@@ -121,17 +116,36 @@ export function sparkListDimensions(): SerializableDimension<SparkListFilters>[]
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses (ui-jobs 805).
       set: (f, v) => {
-        const sel = canonicalStatuses(v);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
+        const read = readStatusParam(v);
+        const choice = read.choice ?? defaultStatusChoice(f);
+        return {
+          ...f,
+          status: choice === defaultStatusChoice(f) ? [] : [choice],
+          ended: choice !== "closed" ? [] : read.endedByLiquidation ? [ENDED_BY_LIQUIDATION] : f.ended,
+        };
       },
+    },
+    {
+      id: "ended",
+      label: "Closed by liquidation",
+      // Its own group, for its pill; in the panel it sits under Status.
+      group: "Closed by liquidation",
+      cardinality: "single",
+      param: "ended",
+      options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
+      // Offered with Closed, which it narrows.
+      available: (f) => statusChoice(f) === "closed",
+      get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
+      set: (f, v) => ({ ...f, ended: v }),
+      chipLabel: () => "Closed by liquidation",
     },
     ...sizeDimensions<SparkListFilters>({
       getDebt: (f) => f.debt,
@@ -163,7 +177,7 @@ export function sparkListDimensions(): SerializableDimension<SparkListFilters>[]
     },
     {
       id: "liquidations",
-      label: "History",
+      label: "Liquidated before",
       group: "History",
       cardinality: "single",
       param: "liq",
@@ -186,8 +200,8 @@ export function sparkFiltersToFetchParams(filters: SparkListFilters, page: numbe
   const wallet = filters.q.trim();
   return {
     wallet: wallet ? wallet : undefined,
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // All maps to no status filter; Closed asks for closed and liquidated.
+    status: sparkStatusBuckets(filters) as FetchSparkPositionsParams["status"],
     // The old Position dropdown's flags, for the two Debt ranges it maps to.
     hasDebt: filters.debt[0] === "1-" ? true : undefined,
     noDebt: filters.debt[0] === "-0" ? true : undefined,

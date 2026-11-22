@@ -8,9 +8,10 @@
 // and no in-memory predicate.
 //
 // What is offered, and what deliberately is not:
-//   • Status   — open / closed / liquidated, the route's own derivation from
-//                the chain read (anything held → open) and the liquidation
-//                record.
+//   • Status   — Open, Closed or All (ui-jobs 805) over the route's own
+//                open / closed / liquidated, derived from the chain read
+//                (anything held → open) and the liquidation record. "Closed
+//                by liquidation" (`ended`) narrows Closed.
 //   • Size     — Debt and Collateral ranges in the market's loan token
 //                (lib/shared/size-dimensions.ts), sent as minDebt / maxDebt /
 //                minColl / maxColl; collateral is valued at the market's stored
@@ -59,12 +60,12 @@ import type { FetchMorphoPositionsParams } from "@/lib/api/fetch-morpho-position
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { BASE_TOKEN_ADDRESSES } from "@/lib/shared/token-addresses.base";
 import {
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  isAllStatuses,
-  sameStatusSet,
+  defaultStatusChoice,
+  endedByLiquidation,
+  morphoBaseStatusBuckets,
+  statusChoice,
 } from "@/lib/morpho-base/listing-visibility";
+import { ENDED_BY_LIQUIDATION, readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 export const MORPHO_BASE_POSITIONS_ROUTE = "/api/morpho-base/positions";
 
@@ -86,8 +87,11 @@ const MORPHO_BASE_SIZE_NOTE =
   "Debt and collateral in the market's loan asset, collateral at the market's stored oracle price.";
 
 export interface MorphoBaseListFilters extends BaseListFilters {
-  /** open / closed / liquidated — multi (OR). */
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
+  /** "" | "liquidated" — with Closed, the positions that ended by liquidation.
+   *  URL param `ended`. */
+  ended: string[];
   /** Debt range in the loan token, one encodeRange value or [] for no bound.
    *  URL param `debt`, read from the old `state` too. */
   debt: string[];
@@ -107,14 +111,13 @@ export interface MorphoBaseListFilters extends BaseListFilters {
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
 // listing-visibility.ts resolves it per context — the open positions on the bare directory,
-// every status once the search names an identity. Because the default is contextual rather
-// than a selection it draws no chip and no Reset link, and a cleared selection resolves back
-// to what the context rests on.
+// every status once the search names an identity.
 export const MORPHO_BASE_LIST_DEFAULTS: MorphoBaseListFilters = {
   q: "",
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
+  ended: [],
   debt: [],
   collValue: [],
   liquidations: [],
@@ -213,12 +216,6 @@ function tokenOptions(roster: FilterOptionDef[], selected: string[]): FilterOpti
   return [...roster, ...extra];
 }
 
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated" },
-];
-
 const LIQUIDATION_OPTIONS: FilterOptionDef[] = [{ value: "liquidated", label: "Liquidated before" }];
 
 export function morphoBaseListDimensions(
@@ -251,17 +248,36 @@ export function morphoBaseListDimensions(
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses.
       set: (f, v) => {
-        const sel = canonicalStatuses(v);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
+        const read = readStatusParam(v);
+        const choice = read.choice ?? defaultStatusChoice(f);
+        return {
+          ...f,
+          status: choice === defaultStatusChoice(f) ? [] : [choice],
+          ended: choice !== "closed" ? [] : read.endedByLiquidation ? [ENDED_BY_LIQUIDATION] : f.ended,
+        };
       },
+    },
+    {
+      id: "ended",
+      label: "Closed by liquidation",
+      // Its own group, for its pill; in the panel it sits under Status.
+      group: "Closed by liquidation",
+      cardinality: "single",
+      param: "ended",
+      options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
+      // Offered with Closed, which it narrows.
+      available: (f) => statusChoice(f) === "closed",
+      get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
+      set: (f, v) => ({ ...f, ended: v }),
+      chipLabel: () => "Closed by liquidation",
     },
     ...sizeDimensions<MorphoBaseListFilters>({
       getDebt: (f) => f.debt,
@@ -277,7 +293,7 @@ export function morphoBaseListDimensions(
     }),
     {
       id: "liquidations",
-      label: "History",
+      label: "Liquidated before",
       group: "History",
       cardinality: "single",
       param: "liq",
@@ -317,8 +333,8 @@ export function morphoBaseFiltersToFetchParams(
     market: target.market,
     loan: filters.loanTokens.length > 0 ? filters.loanTokens.join(",") : undefined,
     coll: filters.collateralTokens.length > 0 ? filters.collateralTokens.join(",") : undefined,
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // All maps to no status filter; Closed asks for closed and liquidated.
+    status: morphoBaseStatusBuckets(filters) as FetchMorphoPositionsParams["status"],
     // The old Position dropdown's flags for the two Debt ranges it maps to.
     hasDebt: filters.debt[0] === "1-" ? true : undefined,
     noDebt: filters.debt[0] === "-0" ? true : undefined,

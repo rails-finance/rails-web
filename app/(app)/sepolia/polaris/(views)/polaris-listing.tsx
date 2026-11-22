@@ -35,10 +35,10 @@ import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { HolderStrip } from "@/components/shared/holder-strip";
-import { fetchPolarisListingPage } from "@/lib/polaris/listing-fetch";
+import { countPolarisListing, fetchPolarisListingPage } from "@/lib/polaris/listing-fetch";
 import { polarisHolderStrip } from "@/lib/polaris/holder-strip";
 import { namesHolder, parsePolarisSearch } from "@/lib/polaris/search";
-import { isAllStatuses } from "@/lib/polaris/listing-visibility";
+import { polarisCountLine, statusChoice } from "@/lib/polaris/listing-visibility";
 import type { PolarisUsdValuation } from "@/lib/sources/api/polaris-positions";
 import { polarisUsdSourceNote } from "@/lib/polaris/usd-source-note";
 import {
@@ -164,6 +164,7 @@ export function PolarisListing({
     <ChainTruthListingPage<PolarisPositionSummary, PolarisListFilters, PolarisUsdValuation | null>
       title="Polaris positions"
       noun="Positions"
+      countLine={polarisCountLine}
       basePath={POLARIS_BASE_PATH}
       defaults={POLARIS_LIST_DEFAULTS}
       sortOptions={polarisSortOptions}
@@ -182,8 +183,8 @@ export function PolarisListing({
             passedOn.current = r.passedOn;
             return r;
           }),
-        // The same read, leaving `passedOn` to the applied page.
-        countDraft: (filters) => fetchPolarisListingPage(filters, 1).then((r) => r.total),
+        // A draft's total, one row asked, leaving `passedOn` to the applied page.
+        countDraft: countPolarisListing,
       })}
       onFilters={onFilters}
       renderAbove={({ items, total, filters }) => {
@@ -200,7 +201,7 @@ export function PolarisListing({
         // its kind unsaid.
         const strip =
           namesHolder(filters.q) &&
-          isAllStatuses(filters) &&
+          statusChoice(filters) === "all" &&
           filters.market.length === 0 &&
           filters.debt.length === 0 &&
           filters.coll.length === 0 &&

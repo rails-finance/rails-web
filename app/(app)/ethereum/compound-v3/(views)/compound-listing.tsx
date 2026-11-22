@@ -4,6 +4,7 @@
 // server-driven strategy and hands them to the shared ChainTruthListingPage driver
 // with the SSR first-paint data from page.tsx.
 
+import { compoundCountLine } from "@/lib/compound/listing-visibility";
 import { useCallback, useRef } from "react";
 import type { CompoundPositionSummary } from "@/lib/sources/api/compound-positions";
 import { fetchCompoundPositions } from "@/lib/api/fetch-compound-positions";
@@ -49,6 +50,7 @@ export function CompoundListing({ initialItems, initialTotal, initialKey, initia
     <ChainTruthListingPage<CompoundPositionSummary, CompoundListFilters>
       title="Compound V3 Accounts"
       noun="accounts"
+      countLine={compoundCountLine}
       basePath="/ethereum/compound-v3"
       defaults={COMPOUND_LIST_DEFAULTS}
       sortOptions={COMPOUND_SORT_OPTIONS}
@@ -64,6 +66,11 @@ export function CompoundListing({ initialItems, initialTotal, initialKey, initia
             data: r.data,
             total: r.pagination.total,
           })),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchCompoundPositions({ ...compoundFiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       onFilters={onFilters}
       initialItems={initialItems}
