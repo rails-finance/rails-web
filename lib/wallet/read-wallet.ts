@@ -47,6 +47,7 @@ import { withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/l
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
+import { apiHop } from "@/lib/wallet/api-hop";
 import { kindOfRow, WALLET_PROTOCOLS } from "@/lib/wallet/wallet-filters";
 
 /** The whole read's budget, the summary route's time included. */
@@ -202,7 +203,10 @@ export async function readListingRows(
   ];
   const settled = await Promise.allSettled(
     reads.map(async (r) => {
-      const page = await withBudget(budgetMs, (own) => r.read(AbortSignal.any([signal, own])));
+      const page = await withBudget(budgetMs, (own) => {
+        const both = AbortSignal.any([signal, own]);
+        return apiHop(() => r.read(both), both);
+      });
       if (page.total > page.rows.length) throw new Error(`answered ${page.rows.length} of ${page.total} rows`);
       return page.rows;
     }),
@@ -232,21 +236,31 @@ export async function readListingRows(
  * (family, positionId).
  */
 export async function readSummary(address: string, signal: AbortSignal, readerIp?: string): Promise<Summary> {
-  const listing = readListingRows(address, signal, readerIp);
   const base = process.env.RAILS_API_URL?.replace(/\/$/, "");
   if (!base) throw new Error("RAILS_API_URL is not set");
+  // The summary's first page takes the first slot to the api host, ahead of
+  // the listing reads (ui-jobs 813); each page is retried once on a reset
+  // connection.
+  const pageAt = (offset: number) =>
+    apiHop(async () => {
+      const res = await fetch(
+        `${base}/api/wallet/${address}/positions?limit=${PAGE}&offset=${offset}&former=${WALLET_FORMER_FAMILIES}`,
+        {
+          ...createAuthFetchOptions({ signal }, readerIp),
+          cache: "no-store",
+        },
+      );
+      if (!res.ok) throw new Error(`/api/wallet/${address}/positions answered ${res.status}`);
+      return (await res.json()) as WalletSummaryAnswer;
+    }, signal);
+  const firstPage = pageAt(0);
+  const listing = readListingRows(address, signal, readerIp);
+  // Settled beside the summary, so a failed summary leaves no rejection unheard.
+  listing.catch(() => {});
   let first: WalletSummaryAnswer | null = null;
   const rows: WalletSummaryRow[] = [];
   for (let offset = 0; offset < MAX_ROWS; offset += PAGE) {
-    const res = await fetch(
-      `${base}/api/wallet/${address}/positions?limit=${PAGE}&offset=${offset}&former=${WALLET_FORMER_FAMILIES}`,
-      {
-        ...createAuthFetchOptions({ signal }, readerIp),
-        cache: "no-store",
-      },
-    );
-    if (!res.ok) throw new Error(`/api/wallet/${address}/positions answered ${res.status}`);
-    const page = (await res.json()) as WalletSummaryAnswer;
+    const page = offset === 0 ? await firstPage : await pageAt(offset);
     first ??= page;
     rows.push(...page.rows);
     if (rows.length >= page.total || page.rows.length < PAGE) break;
