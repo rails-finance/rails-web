@@ -1446,7 +1446,7 @@ export const positionDebtProv = (sym: string, atBlockNum?: number): Provenance =
 export const aaveV3PeakSupplyProv = (sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `The highest supplied ${sym} balance this position recorded — ${SCALED_ROSTER.supply} The divided amounts are added up in order and the largest running total is multiplied back by the reserve's liquidity index as it stood at that event. It is the balance the aToken reported then, interest to that moment included. The index kept climbing between events, so the true high-water mark can sit a little above a figure read at event boundaries.`,
+  summary: `The peak supplied ${sym} balance this position recorded — ${SCALED_ROSTER.supply} The divided amounts are added up in order and the largest running total is multiplied back by the reserve's liquidity index as it stood at that event. It is the balance the aToken reported then, interest to that moment included. The index kept climbing between events, so the true high-water mark can sit a little above a figure read at event boundaries.`,
   contract: POOL,
   via: `${V3_INDEX_VIA} · max running Σ scaled deltas × liquidity index accrued to the peak event`,
 });

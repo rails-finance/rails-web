@@ -56,9 +56,8 @@ export function liquityV1PositionToMarkdown(args: LiquityV1PositionMarkdownArgs)
   lines.push(
     terminal
       ? `> Snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
-          `This Trove life is ${view.status} — no balances remain. The figures below are the life's HIGHEST ` +
-          `recorded balances (each the largest of the absolute values TroveUpdated emitted for it — its own ` +
-          `lifetime maximum) and its replayed event record. Liquity V1 charges no ongoing interest, so every ` +
+          `This Trove life is ${view.status} — no balances remain. The figures below are the life's peak ` +
+          `balances (each the largest absolute value TroveUpdated emitted for it) and its replayed event record. Liquity V1 charges no ongoing interest, so every ` +
           `recorded debt figure was an exact obligation. Not financial advice.`
       : `> Point-in-time snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
           `Trove state is emitted ABSOLUTE by the protocol (TroveUpdated debt/coll); the risk figures are the ` +

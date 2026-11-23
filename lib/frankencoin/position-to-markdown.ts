@@ -76,7 +76,7 @@ export function frankencoinPositionToMarkdown(args: FrankencoinPositionMarkdownA
   if (view.status === "closed") {
     if (view.peakCollateral != null && view.peakCollateral > 0)
       lines.push(`- **Peak collateral:** ${amt(view.peakCollateral)} ${sym}`);
-    if (view.peakMinted != null && view.peakMinted > 0) lines.push(`- **Peak mint:** ${amt(view.peakMinted)} ZCHF`);
+    if (view.peakMinted != null && view.peakMinted > 0) lines.push(`- **Peak debt:** ${amt(view.peakMinted)} ZCHF`);
     if ((view.peakCollateral ?? 0) > 0 || (view.peakMinted ?? 0) > 0) lines.push("");
   } else {
     lines.push(`## Position now`);

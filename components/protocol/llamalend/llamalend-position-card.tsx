@@ -288,8 +288,8 @@ export function useLlamalendCardSlots({
   let outcome: PositionCardOutcome | undefined;
   if (!open) {
     // The values are the LAST emitted absolutes (usually zero on an unwound
-    // position) — never claim the shared default "Highest recorded": the API
-    // carries no peak figures. A closed loan holds nothing: the Controller
+    // position) — never claim the shared "Peak" labels: the API carries no
+    // peak figures. A closed loan holds nothing: the Controller
     // withdraws the collateral when the debt reaches 0, so an unstated
     // collateral here is 0.
     heads = [

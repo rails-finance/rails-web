@@ -479,7 +479,7 @@ export function useCompoundCardSlots({
         if (line.kind === "caption")
           return (
             <div key="lent-caption" className="mt-1 text-xs font-normal text-rb-500">
-              Highest supplied {v.base.symbol} (earns interest)
+              Peak supplied {v.base.symbol} (earns interest)
             </div>
           );
         if (line.kind === "base")
