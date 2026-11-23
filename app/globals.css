@@ -247,9 +247,10 @@
   --card-border-hover: oklch(0.997 calc(0.0041 * var(--paper-chroma)) var(--paper-hue));
   --card-border-drag: oklch(0.8642 calc(0.0226 * var(--paper-chroma)) var(--paper-hue));
   --sidebar-header-hover: oklch(0.9432 calc(0.0111 * var(--paper-chroma)) var(--paper-hue));
-  /* The one scrim behind every window and sheet (H16.1's): white at 80% in
-     light, rb-950 at 85% in dark, never blurred (ui-jobs 770). */
-  --backdrop-bg: rgb(255 255 255 / 0.8);
+  /* The one scrim behind every window and sheet (H16.1's): rb-950 at 45% in
+     light, so a white sheet stands off the page, and at 85% in dark; never
+     blurred (ui-jobs 770, 810). */
+  --backdrop-bg: color-mix(in oklab, var(--color-rb-950) 45%, transparent);
   --panel-shadow: -8px 0 30px oklch(0.2518 calc(0.0251 * var(--paper-chroma)) var(--paper-hue) / 0.15);
   --facehash-ring: oklch(0.967 calc(0.0082 * var(--paper-chroma)) var(--paper-hue));
   /* The mono facehash (H20): outlined in light, filled in dark (ui-jobs 509). */

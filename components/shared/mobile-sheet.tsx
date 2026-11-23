@@ -292,12 +292,17 @@ export function MobileSheet({
         tabIndex={-1}
         // The live sheet gets a hairline top edge: over its faint scrim, a
         // dark sheet over a dark page has nothing else to mark where
-        // the list ends and the menu begins. In dark mode the sheet wears the
-        // desktop dropdown's near-black (.overlay-panel) so it lifts off the
-        // rb-800 cards beneath it. A sticky search row inside wears the sheet's
-        // surface: `.overlay-search` is drawn for the desktop popover's.
-        className={`absolute inset-x-0 bottom-0 flex flex-col rounded-t-2xl bg-raised dark:bg-rb-900 [&_.overlay-search]:bg-raised! dark:[&_.overlay-search]:bg-rb-900! p-6 shadow-xl transition-transform duration-300 focus:outline-none ${
-          live ? "max-h-[50vh] border-t border-rb-300 dark:border-rb-700" : "max-h-[75vh]"
+        // the list ends and the menu begins. In dark mode the live sheet wears
+        // the desktop dropdown's near-black (.overlay-panel) so it lifts off
+        // the undimmed rb-800 cards beneath it; the modal sheet sits over the
+        // full scrim, so it takes rb-800 with an rb-600 top edge to stand
+        // off the near-black page (ui-jobs 810). A sticky search row inside
+        // wears the sheet's surface: `.overlay-search` is drawn for the
+        // desktop popover's.
+        className={`absolute inset-x-0 bottom-0 flex flex-col rounded-t-2xl bg-raised [&_.overlay-search]:bg-raised! p-6 shadow-xl transition-transform duration-300 focus:outline-none ${
+          live
+            ? "max-h-[50vh] border-t border-rb-300 dark:border-rb-700 dark:bg-rb-900 dark:[&_.overlay-search]:bg-rb-900!"
+            : "max-h-[75vh] dark:border-t dark:border-rb-600 dark:bg-rb-800 dark:[&_.overlay-search]:bg-rb-800!"
         } ${visible ? "translate-y-0" : "translate-y-full"} ${dismiss ? "pt-2" : ""}`}
         style={{
           paddingBottom: "max(24px, env(safe-area-inset-bottom))",
