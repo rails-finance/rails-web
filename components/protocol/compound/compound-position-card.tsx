@@ -53,6 +53,8 @@ import { useDustLines } from "@/components/shared/dust-reserves";
 import { ExactSpan } from "@/components/shared/amount-text";
 import { formatUnitsExact, formatExactDecimal, formatUsdValue } from "@/lib/utils/format";
 import { compoundPeakSupplyHead } from "@/lib/compound/peak-supply-head";
+import { mainAssetFigure } from "@/components/shared/closed-peak";
+import { pickMainAsset } from "@/lib/shared/main-asset";
 import { peakBaseProv, peakCollateralProv, type CompoundCoords } from "@/lib/compound/event-provenance";
 import { COMPOUND_INDEXED_VOCABULARY, type CompoundTowerVocabulary } from "@/lib/compound/economics";
 import { compoundPositionModal, type CompoundPositionDeployment } from "@/lib/compound/event-templates";
@@ -449,9 +451,55 @@ export function useCompoundCardSlots({
     // On the Base sweep the peak is the base's replayed PRINCIPAL; on Ethereum
     // each row is the chain's balance, interest included.
     const principalNote = vocab.baseAtLastEvent ? undefined : "principal only: accrued interest not included";
-    // A wallet that only ever lent the base posted no collateral: its peak is
-    // "supply" (the Aave V4 spoke-card grammar).
+    // Every closed head is "Peak <side>" (CARD_VOCAB), its face the shared
+    // closed face (components/shared/closed-peak.tsx): "Peak collateral"
+    // leads with the collateral asset picked by value (two or more) or the
+    // one asset, "Peak supplied" with the lent base where no collateral was
+    // posted, "Peak debt" with the borrowed base. The lent base on a
+    // borrower's card is a captioned line in the collateral dropdown.
     const plan = compoundPeakSupplyHead(v.peak.collateral.length, v.peak.lentBase);
+    const baseMark = { symbol: v.base.symbol, address: v.base.address };
+    const lendProv = peakBaseProv(v.base.symbol, "lend", { ...peakCoords, asset: v.base.address });
+    const collProv = (c: (typeof v.peak.collateral)[number]) =>
+      peakCollateralProv(c.symbol, { ...peakCoords, asset: c.address });
+    const pick =
+      plan.lead?.kind === "pick"
+        ? pickMainAsset(
+            v.peak.collateral.map((c) => ({ ...c, key: c.address })),
+            v.priceByAddress,
+          )
+        : null;
+    const one = plan.lead?.kind === "collateral" ? v.peak.collateral[plan.lead.index] : null;
+    const supplyFigure = pick
+      ? mainAssetFigure({
+          main: { ...pick.main, exact: formatUnitsExact(pick.main.amountRaw, pick.main.decimals) },
+          receipt: collProv(pick.main),
+          block: v.priceBlock,
+          skipped: pick.skipped,
+          side: "supply",
+        })
+      : one && !one.decimalsUnread
+        ? mainAssetFigure({
+            main: { ...one, exact: formatUnitsExact(one.amountRaw, one.decimals) },
+            receipt: collProv(one),
+            block: v.priceBlock,
+            skipped: 0,
+            side: "supply",
+            ranked: false,
+          })
+        : plan.lead?.kind === "base"
+          ? mainAssetFigure({
+              main: { ...baseMark, amount: v.peak.lentBase },
+              receipt: lendProv,
+              block: v.priceBlock,
+              skipped: 0,
+              side: "supply",
+              ranked: false,
+            })
+          : undefined;
+    // The asset the face leads with carries its figure's receipt in the
+    // dropdown too.
+    const leadAddress = pick?.main.address ?? one?.address ?? null;
     const supplyLinesOf = (iconSize?: number): ReactNode[] =>
       plan.lines.map((line) => {
         if (line.kind === "caption")
@@ -464,7 +512,7 @@ export function useCompoundCardSlots({
           return (
             <TracedAmount
               key="lent-base"
-              info={peakBaseProv(v.base.symbol, "lend", { ...peakCoords, asset: v.base.address })}
+              info={plan.lead?.kind === "base" && supplyFigure ? supplyFigure.info : lendProv}
               symbol={v.base.symbol}
               amount={v.peak.lentBase}
               address={v.base.address}
@@ -475,7 +523,7 @@ export function useCompoundCardSlots({
         return (
           <TracedAmount
             key={c.address}
-            info={peakCollateralProv(c.symbol, { ...peakCoords, asset: c.address })}
+            info={supplyFigure && c.address === leadAddress ? supplyFigure.info : collProv(c)}
             symbol={c.symbol}
             amount={c.amount}
             address={c.address}
@@ -484,45 +532,59 @@ export function useCompoundCardSlots({
           />
         );
       });
-    const supplyLines = supplyLinesOf();
     heads = [
       {
         id: "peak-collateral",
-        label: plan.label === "supply" ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
-        value: supplyLines.length > 0 ? <div className="flex flex-col gap-1">{supplyLines}</div> : null,
+        label: plan.label === "supplied" ? CARD_VOCAB.headSupplied : CARD_VOCAB.headCollateral,
+        value: null,
         sub: noPeaksNote,
-        // Two or more collateral assets: the head states them as the account
-        // families' closed heads do, under the open card's label, and their
-        // peaks, the lent base after them under its caption, open behind the
-        // press under the peak label (C19).
-        ...(peaks && plan.count != null
-          ? {
-              label: CARD_VOCAB.headCollateral,
-              ...assetsHead(
-                CARD_VOCAB.peakCollateral,
-                v.peak.collateral.map((c) => ({ symbol: c.symbol, address: c.address })),
-                <div className="flex flex-col gap-1 text-sm font-semibold tabular-nums text-foreground">
-                  {supplyLinesOf(16)}
-                </div>,
-              ),
-            }
+        ...(peaks && plan.lines.length > 0
+          ? assetsHead(
+              plan.label === "supplied" ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
+              plan.label === "supplied"
+                ? [baseMark]
+                : v.peak.collateral.map((c) => ({ symbol: c.symbol, address: c.address })),
+              <div className="flex flex-col gap-1 text-sm font-semibold tabular-nums text-foreground">
+                {supplyLinesOf(16)}
+              </div>,
+              supplyFigure,
+            )
           : {}),
       },
     ];
-    if (!peaks || v.peak.borrowedBase > 0)
+    if (!peaks || v.peak.borrowedBase > 0) {
+      const debtProv = peakBaseProv(v.base.symbol, "borrow", { ...peakCoords, asset: v.base.address });
+      const debtFigure = mainAssetFigure({
+        main: { ...baseMark, amount: v.peak.borrowedBase },
+        receipt: debtProv,
+        block: v.priceBlock,
+        skipped: 0,
+        side: "debt",
+        ranked: false,
+      });
       heads.push({
         id: "peak-debt",
-        label: PEAK_BORROW_BALANCE,
-        value: peaks ? (
-          <TracedAmount
-            info={peakBaseProv(v.base.symbol, "borrow", { ...peakCoords, asset: v.base.address })}
-            symbol={v.base.symbol}
-            amount={v.peak.borrowedBase}
-            address={v.base.address}
-          />
-        ) : null,
+        label: CARD_VOCAB.headDebt,
+        value: null,
         sub: noPeaksNote ?? principalNote,
+        ...(peaks
+          ? assetsHead(
+              PEAK_BORROW_BALANCE,
+              [baseMark],
+              <div className="text-sm font-semibold tabular-nums text-foreground">
+                <TracedAmount
+                  info={debtFigure.info}
+                  symbol={v.base.symbol}
+                  amount={v.peak.borrowedBase}
+                  address={v.base.address}
+                  iconSize={16}
+                />
+              </div>,
+              debtFigure,
+            )
+          : {}),
       });
+    }
     outcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: outcomeDates(v) ?? (v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined),

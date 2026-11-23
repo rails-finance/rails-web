@@ -12,17 +12,12 @@
 //   collateral ratio, pooled lenders a health factor. The label must describe
 //   the figure it sits over — a card whose native figure is the inverse (a
 //   debt ratio) converts it or keeps its own label; it never borrows this one.
-// - Terminal cards name a lifetime peak by how many assets a side can hold.
-//   A side of one asset (a Trove, a vault, Compound V3's single-collateral,
-//   lent and borrowed sides, and the rest) is headed "Highest recorded …".
-//   An account family's side of many assets (Aave V3, SparkLend, Moonwell,
-//   Compound V2, Dolomite, Compound V3's multi-collateral side) is headed
-//   "Peak <side>" ("Peak supplied", "Peak debt", "Peak collateral"): its
-//   largest asset's highest recorded balance (ui-jobs 803), while "Highest
-//   recorded …" names one asset's maximum in its dropdown's lines. "Peak
-//   value" is the side's assets valued together on their highest day.
-//   "Final recorded …" is a last-known state that is not a peak; "not
-//   recorded" has one sentence.
+// - Terminal cards name a lifetime maximum "Peak <side>" ("Peak supplied",
+//   "Peak debt", "Peak collateral"; Miles, 23 Nov 2026), and a last-known
+//   state that is not a peak "Final recorded …"; "not recorded" has one
+//   sentence. "Peak value" is the side's assets valued together on their
+//   highest day. Surfaces still reading "Highest recorded" are listed in
+//   ui-jobs 809.
 //
 // Labels here are the column HEADERS (12px, sentence case). Tower segment
 // names ("Borrowed (all time)") and mode-pill words ("Borrowing", "Supply

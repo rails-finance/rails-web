@@ -221,15 +221,20 @@ export function mainAssetFigure(o: {
   /** Assets the pick passed over (`pickMainAsset`). */
   skipped: number;
   side: "supply" | "debt";
+  /** False for a side that holds one asset: no pick, so no ranking row. */
+  ranked?: boolean;
 }): { figure: ReactNode; main: AssetMark; state: string; also: string; info: Provenance } {
   const { main } = o;
-  const info: Provenance = {
-    ...o.receipt,
-    inputs: [
-      ...(o.receipt.inputs ?? []),
-      { label: "shown first", value: main.symbol, kind: "derived", note: rankingWords(o.block, o.skipped, true) },
-    ],
-  };
+  const ranked = o.ranked !== false;
+  const info: Provenance = ranked
+    ? {
+        ...o.receipt,
+        inputs: [
+          ...(o.receipt.inputs ?? []),
+          { label: "shown first", value: main.symbol, kind: "derived", note: rankingWords(o.block, o.skipped, true) },
+        ],
+      }
+    : o.receipt;
   return {
     figure: (
       <span data-card-largest="">
@@ -244,7 +249,9 @@ export function mainAssetFigure(o: {
       </span>
     ),
     main: { symbol: main.symbol, address: main.address },
-    state: `${formatCompact(main.amount)} ${main.symbol}, ${rankingWords(o.block, o.skipped, false)}`,
+    state: ranked
+      ? `${formatCompact(main.amount)} ${main.symbol}, ${rankingWords(o.block, o.skipped, false)}`
+      : `${formatCompact(main.amount)} ${main.symbol}`,
     also: o.side === "debt" ? "Also borrowed" : "Also supplied",
     info,
   };
