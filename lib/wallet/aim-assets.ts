@@ -4,7 +4,10 @@
 // carries; the full form is a per-family extractor (item 560).
 //
 //   morpho, morpho-base    loan + collateral token addresses
-//   moonwell-base          each supplied and borrowed market's underlying address
+//   moonwell-base, moonwell  each supplied and borrowed market's underlying address
+//   euler-v2               the asset of the pair's vault, where the head read names it
+//   sky-savings            USDS
+//   llamalend              the market's collateral and borrowed symbols
 //   compound-v2            each supplied, borrowed and peak market's symbol
 //   compound-v3            base token + each collateral line's address
 //   spark                  each supplied and borrowed reserve's address (peaks for a closed one)
@@ -42,6 +45,7 @@ export function walletPositionAssetKeys(p: WalletPosition): string[] {
       addresses.push(c.row.loanToken, c.row.collateralToken);
       break;
     case "moonwell-base":
+    case "moonwell":
       for (const r of [...c.row.supplies, ...c.row.borrows]) addresses.push(r.address);
       break;
     case "compound-v2":
@@ -85,6 +89,17 @@ export function walletPositionAssetKeys(p: WalletPosition): string[] {
     case "asymmetry":
     case "basedollar":
       symbols.push(c.row.collateralType, FORK_DEBT[c.kind]);
+      break;
+    case "euler-v2": {
+      const r = c.row.read;
+      addresses.push((r?.deposit ?? r?.loan)?.asset.address);
+      break;
+    }
+    case "sky-savings":
+      symbols.push("USDS");
+      break;
+    case "llamalend":
+      symbols.push(c.row.collateralSymbol, c.row.borrowedSymbol);
       break;
     default:
       break;

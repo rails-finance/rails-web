@@ -59,6 +59,12 @@ import { MOONWELL_BASE_LISTED_IDENTITY } from "@/lib/moonwell-base/listed-identi
 import { SEAMLESS_CARD_DEPLOYMENT } from "@/lib/seamless/position-provenance";
 import { makeListedMorphoReceipts } from "@/lib/morpho/listed-card-provenance";
 import { MORPHO_BASE_POSITIONS_ROUTE } from "@/lib/morpho-base/routes";
+import { EulerWalletCard } from "@/components/protocol/euler/euler-wallet-card";
+import { SkySavingsPositionCard } from "@/components/protocol/sky-savings/sky-savings-position-card";
+import {
+  LlamalendPositionCard,
+  viewFromSummary as llamalendView,
+} from "@/components/protocol/llamalend/llamalend-position-card";
 import { ArbitrumReadCard, CometReadCard } from "@/components/shared/arbitrum-positions-listing";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
@@ -142,6 +148,14 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
           notCollateral={notCollateralOf(card.row)}
         />
       );
+    case "moonwell":
+      return <MoonwellPositionCard v={moonwellView(card.row)} surface="listing" />;
+    case "euler-v2":
+      return <EulerWalletCard row={card.row} />;
+    case "sky-savings":
+      return <SkySavingsPositionCard p={card.row} asOf={card.asOf} surface="listing" />;
+    case "llamalend":
+      return <LlamalendPositionCard v={llamalendView(card.row)} surface="listing" />;
     case "morpho-arbitrum":
       return <ArbitrumReadCard row={card.row} family="morpho" />;
     case "spark":

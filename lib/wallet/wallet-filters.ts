@@ -44,6 +44,9 @@ export const WALLET_PROTOCOLS: WalletProtocol[] = [
   { slug: "compound-v2", name: "Compound V2", kinds: ["loans", "deposits"] },
   { slug: "moonwell", name: "Moonwell", kinds: ["loans", "deposits"] },
   { slug: "seamless", name: "Seamless", kinds: ["loans", "deposits"] },
+  { slug: "euler-v2", name: "Euler V2", kinds: ["loans", "deposits"] },
+  { slug: "sky-savings", name: "Sky Savings", kinds: ["deposits"] },
+  { slug: "llamalend", name: "LlamaLend", kinds: ["loans"] },
 ];
 
 export const walletProtocol = (slug: string | null | undefined): WalletProtocol | undefined =>
@@ -112,7 +115,11 @@ export function kindOfRow(row: WalletSummaryRow): WalletKind {
   if (kinds.length === 1) return kinds[0];
   // A Trove protocol's deposits carry their kind (listing-summary-rows.ts).
   if (kinds.includes("troves")) return "troves";
-  const owed = positive(row.debt?.amount) || positive(row.peakDebt) || positive(row.debtUsd) || owedIn(row.card);
+  // An Euler V2 pair states no amount: its vault is the account's controller
+  // where the account borrows from it.
+  const controller = (row.card as { controller?: unknown } | null)?.controller === true;
+  const owed =
+    positive(row.debt?.amount) || positive(row.peakDebt) || positive(row.debtUsd) || owedIn(row.card) || controller;
   return owed ? "loans" : "deposits";
 }
 

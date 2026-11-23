@@ -1,4 +1,7 @@
-// Moonwell on Base, for the wallet view (decision 0071; SERVER-ONLY). One row
+// Moonwell on Base and on Ethereum, for the wallet view (decision 0071;
+// SERVER-ONLY). Both write the slug 'moonwell', so the modules are per chain.
+//
+// Base. One row
 // per wallet (mig 513): the card is the Base listing row, built from the
 // summary row's `card` by the listing's builder against the market roster.
 // The roster is what the Base listing resolves its rows against: the
@@ -13,13 +16,15 @@
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import {
   buildMoonwellPositionRows,
+  type MoonwellListingRoster,
   type MoonwellPositionSummary,
   type RawMoonwellWalletRow,
 } from "@/lib/sources/api/moonwell-positions";
+import { MOONWELL_MARKET_BY_KEY } from "@/lib/moonwell/asset-catalog";
 import { rosterFromMarketState, type RawMoonwellBaseMarketState } from "@/lib/moonwell-base/listing-roster";
-import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
-import { historyBase, plural, storeStamp } from "@/lib/wallet/summary-row";
+import { amountText, historyBase, plural, storeStamp } from "@/lib/wallet/summary-row";
 import type { FamilyModule, HeadResult } from "./module";
 
 const USD_SOURCE = "Moonwell Base Comptroller's oracle at the sweep's block";
@@ -124,6 +129,117 @@ export const moonwellBase: FamilyModule = {
           usdSource: USD_SOURCE,
           usdOwnOracle: usd.collateralUsd != null,
           liquidatable: shortfallOf(raw.get(p.positionId)),
+          headRead: "stored",
+        };
+      }),
+    };
+  },
+};
+
+// ── Moonwell, Ethereum ─────────────────────────────────────────────────────
+//
+// One row per wallet (mig 518): the card is the Ethereum listing row, built
+// by the listing's builder against the four-market catalog. A closed row's
+// peaks need the catalog alone. The head read is the listing's read of the
+// four markets' state (resolveMoonwellMarketState: rails-server's head routes
+// first, then its stored snapshot), made once for the wallet's open row: the
+// exchange rates turn the stored mTokens into the underlying they are worth,
+// and the Comptroller's oracle prices both sides. The debt is the emitted
+// accountBorrows at the wallet's last event in each market, as on the
+// listing, so the open position's head is "stored".
+
+const ETHEREUM_USD_SOURCE = "Moonwell Comptroller's oracle, debt at the wallet's last event in each market";
+
+/** The four catalog markets with no market state: enough for a closed row's
+ *  peaks, which name a market and an amount. */
+function catalogRoster(): MoonwellListingRoster {
+  const roster: MoonwellListingRoster = new Map();
+  for (const m of Object.values(MOONWELL_MARKET_BY_KEY))
+    roster.set(m.key, {
+      key: m.key,
+      symbol: m.symbol,
+      mSymbol: m.mSymbol,
+      underlying: m.underlying,
+      decimals: m.decimals,
+      exchangeRate: null,
+      priceUsd: null,
+      borrowApr: null,
+      supplyApr: null,
+    });
+  return roster;
+}
+
+/** "76.1 WETH +2": the largest peak by amount and how many more. */
+function peakText(legs: { symbol: string; amount: number }[]): string | undefined {
+  const held = legs.filter((l) => l.amount > 0).sort((a, b) => b.amount - a.amount);
+  if (held.length === 0) return undefined;
+  return `${amountText(held[0].amount, held[0].symbol)}${held.length > 1 ? ` +${held.length - 1}` : ""}`;
+}
+
+export const moonwellEthereum: FamilyModule = {
+  id: "moonwell",
+  name: "Moonwell",
+  chain: MAINNET_CHAIN_ID,
+  summaryChain: "ethereum",
+  summaryFamily: "moonwell",
+  async shape(rows) {
+    // An open card is rebuilt with the market state in `head`.
+    const cards = await buildMoonwellPositionRows(
+      rows.map((r) => r.card as RawMoonwellWalletRow),
+      catalogRoster(),
+    );
+    return rows.map((r, i): WalletPosition => {
+      const s = cards[i];
+      const base: WalletPosition = {
+        chain: MAINNET_CHAIN_ID,
+        family: "moonwell",
+        familyName: "Moonwell",
+        positionId: r.positionId,
+        href: r.href,
+        status: r.status,
+        card: { kind: "moonwell", row: s },
+        headRead: "none",
+        ...storeStamp(r),
+      };
+      if (r.status === "open") return base;
+      const supply = peakText(s.peakSupplies);
+      const debt = peakText(s.peakBorrows);
+      return {
+        ...base,
+        history: {
+          ...historyBase(r),
+          size: supply || debt ? [supply ?? "nothing supplied", debt].filter(Boolean).join(" / ") : undefined,
+          sizeNote: supply || debt ? "peak" : undefined,
+          result: (r.liquidationCount ?? 0) > 0 ? plural(r.liquidationCount!, "liquidation") : undefined,
+        },
+      };
+    });
+  },
+  async head(open, _address, signal, _apiMs, { rows }): Promise<HeadResult> {
+    if (open.length === 0) return { positions: open, reads: 0 };
+    signal.throwIfAborted();
+    // No roster passed: the builder reads the four markets' state once.
+    const raw = new Map(rows.map((r) => [r.positionId, r.card as RawMoonwellWalletRow]));
+    const cards = await buildMoonwellPositionRows(open.map((p) => raw.get(p.positionId)!));
+    signal.throwIfAborted();
+    const read = cards[0]?.marketRead;
+    // The reads that answered: the live read's block and its Multicall, or
+    // the stored snapshot's one call.
+    const reads = read?.stored ? 1 : read ? 2 : 0;
+    if (!read) return { reads, positions: open.map((p) => ({ ...p, headRead: "failed" })) };
+    return {
+      reads,
+      positions: open.map((p, i): WalletPosition => {
+        const s = cards[i];
+        const usd = dollarsOf(s);
+        return {
+          ...p,
+          card: { kind: "moonwell", row: s },
+          ...usd,
+          usdSource: ETHEREUM_USD_SOURCE,
+          usdOwnOracle: usd.collateralUsd != null,
+          // The debt is the store's at the wallet's last event: the card keeps
+          // the store's stamp, and a section holding it states no total (rule 743).
           headRead: "stored",
         };
       }),

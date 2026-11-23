@@ -33,7 +33,10 @@ import { readLiquityV1Staking, type LiquityV1StakeListResponse } from "@/lib/sou
 import { aaveV3Base, aaveV3Ethereum, seamless, spark } from "@/lib/wallet/families/aave";
 import { compoundV3Base, compoundV3Ethereum } from "@/lib/wallet/families/compound";
 import { compoundV2 } from "@/lib/wallet/families/compound-v2";
-import { moonwellBase } from "@/lib/wallet/families/moonwell";
+import { moonwellBase, moonwellEthereum } from "@/lib/wallet/families/moonwell";
+import { eulerV2Base } from "@/lib/wallet/families/euler-base";
+import { skySavings } from "@/lib/wallet/families/sky-savings";
+import { llamalend } from "@/lib/wallet/families/llamalend";
 import { morphoBase } from "@/lib/wallet/families/morpho-base";
 import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/families/ethereum-single";
 import { aaveV3Arbitrum, compoundV3Arbitrum, morphoArbitrum } from "@/lib/wallet/families/arbitrum";
@@ -88,6 +91,10 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   compoundV2,
   moonwellBase,
   seamless,
+  moonwellEthereum,
+  eulerV2Base,
+  skySavings,
+  llamalend,
 ];
 
 /** The families the page reads, by chain, in one sentence for the empty

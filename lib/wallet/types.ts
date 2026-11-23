@@ -16,6 +16,9 @@ import type { AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
 import type { CompoundPositionSummary } from "@/lib/sources/api/compound-positions";
 import type { CompoundV2PositionSummary } from "@/lib/sources/api/compound-v2-positions";
 import type { MoonwellPositionSummary } from "@/lib/sources/api/moonwell-positions";
+import type { LlamalendPositionSummary } from "@/lib/sources/api/llamalend-positions";
+import type { SkyAsOf, SkyPosition } from "@/lib/sky-savings/types";
+import type { EulerWalletCardRow } from "@/lib/euler/wallet-card";
 import type { MorphoBaseVaultOwnerNote } from "@/lib/morpho-base/vault-owner-note";
 import type { MorphoPositionSummary } from "@/lib/sources/api/morpho-positions";
 import type { SparkPositionSummary } from "@/lib/sources/api/spark-positions";
@@ -68,6 +71,16 @@ export type WalletCard =
   | { kind: "compound-v2"; row: CompoundV2PositionSummary }
   | { kind: "moonwell-base"; row: MoonwellPositionSummary }
   | { kind: "seamless"; row: AaveV3PositionRow }
+  /** Moonwell on Ethereum: the Ethereum listing's row. */
+  | { kind: "moonwell"; row: MoonwellPositionSummary }
+  /** One Euler V2 Base (sub-account, vault) pair: the explorer's wallet read
+   *  of it where the head read found it, the stored pair otherwise. */
+  | { kind: "euler-v2"; row: EulerWalletCardRow }
+  /** A Sky Savings holder: the listing's row and the sealed block its figures
+   *  are at; `asOf` null on a closed holder, whose figures stand from its
+   *  last event. */
+  | { kind: "sky-savings"; row: SkyPosition; asOf: SkyAsOf | null }
+  | { kind: "llamalend"; row: LlamalendPositionSummary }
   | { kind: "morpho-arbitrum"; row: ArbitrumReadRow }
   | { kind: "spark"; row: SparkPositionSummary }
   | { kind: "fluid"; row: FluidPositionSummary }
@@ -175,7 +188,8 @@ export interface WalletPosition {
    *  catalog's record alone (`walletBranchState`). */
   shutdown?: BranchShutdownState | null;
   /** A stored open position the head read finds holding nothing (a Morpho
-   *  Base pair repaid and withdrawn since the sweep): the head read's block.
+   *  Base pair repaid and withdrawn since the sweep, an Euler V2 Base pair
+   *  the wallet read no longer finds): the head read's block.
    *  The card keeps the sweep's figures and its stamp says so. */
   closedSince?: { block: number };
   headRead: HeadRead;

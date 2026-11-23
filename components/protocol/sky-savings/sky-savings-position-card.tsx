@@ -30,8 +30,10 @@ import type { SkyAsOf, SkyPosition } from "@/lib/sky-savings/types";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { positionLink } from "@/lib/shared/position-link";
 
-const worthHead = (p: SkyPosition, asOf: SkyAsOf): PositionCardHead => {
+const worthHead = (p: SkyPosition, asOf: SkyAsOf | null): PositionCardHead => {
   const v = p.value ? units(p.value.raw) : 0;
+  // An open holder with no worth read (the wallet view's stored card) draws a dash.
+  if (!asOf && p.status === "open") return { id: "worth", label: "Worth", tier: "amount", value: null };
   return {
     id: "worth",
     label: "Worth",
@@ -39,7 +41,7 @@ const worthHead = (p: SkyPosition, asOf: SkyAsOf): PositionCardHead => {
     labelTip:
       "What the sUSDS held redeems for in USDS at the page's block: the share count times the share price, rounded down as the contract rounds it.",
     value:
-      p.value && v > 0 ? (
+      p.value && v > 0 && asOf ? (
         <Prov info={valueProv(asOf.block, p.value.raw, p.shares.raw, asOf.chi)}>
           <AssetAmount value={v} symbol={USDS.symbol} address={USDS.address} exact={exact(p.value.raw)} />
         </Prov>
@@ -48,12 +50,14 @@ const worthHead = (p: SkyPosition, asOf: SkyAsOf): PositionCardHead => {
   };
 };
 
-const earnedHead = (p: SkyPosition, asOf: SkyAsOf): PositionCardHead => {
+/** `asOf` null: a closed holder's figure, which stands from its last event. */
+const earnedHead = (p: SkyPosition, asOf: SkyAsOf | null): PositionCardHead => {
   const label = "Interest earned";
   const labelTip =
     "What the position is worth now, plus every USDS amount that left it, less every USDS amount that came in.";
   if (!p.earned) return { id: "earned", label, labelTip, tier: "amount", value: null };
-  const yearly = skyYearlyEarnings(p, asOf);
+  const yearly = asOf ? skyYearlyEarnings(p, asOf) : null;
+  const block = asOf?.block ?? p.activity.lastBlock;
   const e = units(p.earned.raw);
   return {
     id: "earned",
@@ -62,7 +66,7 @@ const earnedHead = (p: SkyPosition, asOf: SkyAsOf): PositionCardHead => {
     tier: "amount",
     value: (
       <span title={`${withRealMinus(exact(p.earned.raw))} ${USDS.symbol}`}>
-        <Prov info={earnedProv(asOf.block, p.earned.raw, p.value?.raw ?? "0", p.usdsIn.raw, p.usdsOut.raw)}>
+        <Prov info={earnedProv(block, p.earned.raw, p.value?.raw ?? "0", p.usdsIn.raw, p.usdsOut.raw)}>
           <AssetAmount
             value={e}
             symbol={USDS.symbol}
@@ -74,7 +78,7 @@ const earnedHead = (p: SkyPosition, asOf: SkyAsOf): PositionCardHead => {
       </span>
     ),
     sub:
-      yearly != null && p.value ? (
+      yearly != null && p.value && asOf ? (
         <Prov
           info={yearlyProv(asOf.block, p.value.raw, asOf.ssr, pctString(asOf.ssrAnnual))}
           value={yearly.toFixed(2)}
@@ -129,7 +133,10 @@ function SkyMenuRows({ holder }: { holder: string }) {
 
 export interface SkySavingsPositionCardProps {
   p: SkyPosition;
-  asOf: SkyAsOf;
+  /** Null on the wallet view's card where no sealed block was read: a closed
+   *  holder's, or an open one whose read did not answer. The card then states
+   *  no Savings rate. */
+  asOf: SkyAsOf | null;
   surface?: "listing" | "detail";
   explanation?: ReactNode;
   /** A line at the card's foot: the block the gate checked the page against. */
@@ -147,14 +154,14 @@ export function skySavingsCardSlots({
   // A position that holds nothing keeps its figures (the interest it earned)
   // and wears the Closed tag; a live one wears none.
   const status = p.status === "open" ? null : { word: "Closed", tone: "muted" as const };
-  const heads = [worthHead(p, asOf), earnedHead(p, asOf), rateHead(asOf)];
+  const heads = [worthHead(p, asOf), earnedHead(p, asOf), ...(asOf ? [rateHead(asOf)] : [])];
   const counters = {
     lastActivityAt: p.activity.lastTimestamp ?? null,
     eventCount: p.activity.events,
     eventCountNoun: "event",
     ...(detail ? { order: "age-last" as const } : {}),
   };
-  if (!detail) {
+  if (!detail || !asOf) {
     return {
       surface: "listing",
       status,
