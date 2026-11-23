@@ -5,7 +5,7 @@
 // wallet heading (`components/shared/wallet-positions-menu.tsx`) reads it. Client-safe: the
 // read is `readWalletCounts` in lib/wallet/read-wallet.ts.
 
-export type WalletCountsChain = "ethereum" | "base" | "arbitrum";
+export type WalletCountsChain = "ethereum" | "base" | "arbitrum" | "arc";
 
 /** One position as the wallet view lists it: its chain, family, id, status and
  *  page. An Arbitrum Compound V3 row is one position per Comet held, as on

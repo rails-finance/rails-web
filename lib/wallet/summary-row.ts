@@ -6,7 +6,7 @@
 import type { WalletKind } from "./wallet-filters";
 
 export interface WalletSummaryRow {
-  chain: "ethereum" | "base" | "arbitrum";
+  chain: "ethereum" | "base" | "arbitrum" | "arc";
   family: string;
   /** Set on a row the wallet read shapes from a protocol listing
    *  (lib/wallet/listing-summary-rows.ts): a deposit beside the protocol's

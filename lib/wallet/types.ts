@@ -13,6 +13,8 @@
 import type { ChainId } from "@/lib/shared/chains";
 import type { ProvClass } from "@/components/shared/provenance";
 import type { AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
+import type { AaveV4SpokePositionRow } from "@/lib/api/fetch-aave-v4-spoke-positions";
+import type { ArcWalletRead } from "@/lib/aave-v4-arc/types";
 import type { CompoundPositionSummary } from "@/lib/sources/api/compound-positions";
 import type { MorphoPositionSummary } from "@/lib/sources/api/morpho-positions";
 import type { SparkPositionSummary } from "@/lib/sources/api/spark-positions";
@@ -47,6 +49,9 @@ export type WalletPositionStatus = "open" | "closed" | "liquidated" | "redeemed"
 export type WalletCard =
   | { kind: "aave-v3"; lane: "ethereum" | "base"; row: AaveV3PositionRow }
   | { kind: "aave-v3-arbitrum"; row: ArbitrumReadRow }
+  | { kind: "aave-v4"; lane: "ethereum" | "base"; row: AaveV4SpokePositionRow }
+  /** One spoke of the Arc wallet read, as stored at its block. */
+  | { kind: "aave-v4"; lane: "arc"; read: ArcWalletRead }
   | { kind: "compound-v3"; lane: "ethereum" | "base"; row: CompoundPositionSummary }
   /** One Comet of the wallet's stored read; no `comet` on a read that found
    *  nothing held. */

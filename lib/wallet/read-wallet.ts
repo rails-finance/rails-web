@@ -31,6 +31,7 @@ import { readLiquityV1Sp, type LiquityV1DepositListResponse } from "@/lib/source
 import { readLiquityV2Sp, type LiquityV2DepositListResponse } from "@/lib/sources/api/liquity-v2-sp";
 import { readLiquityV1Staking, type LiquityV1StakeListResponse } from "@/lib/sources/api/liquity-v1-staking";
 import { aaveV3Base, aaveV3Ethereum, spark } from "@/lib/wallet/families/aave";
+import { aaveV4Arc, aaveV4Base, aaveV4Ethereum } from "@/lib/wallet/families/aave-v4";
 import { compoundV3Base, compoundV3Ethereum } from "@/lib/wallet/families/compound";
 import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/families/ethereum-single";
 import { aaveV3Arbitrum, compoundV3Arbitrum, morphoArbitrum } from "@/lib/wallet/families/arbitrum";
@@ -62,6 +63,9 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   aaveV3Ethereum,
   aaveV3Base,
   aaveV3Arbitrum,
+  aaveV4Ethereum,
+  aaveV4Base,
+  aaveV4Arc,
   compoundV3Ethereum,
   compoundV3Base,
   compoundV3Arbitrum,
@@ -85,7 +89,7 @@ export const WALLET_FAMILIES: FamilyModule[] = [
 
 /** The families the page reads, by chain, in one sentence for the empty
  *  state: "Aave V3, … and Asymmetry on Ethereum; … on Base; …". The Arbitrum
- *  rows are written when Rails reads the wallet there, which the sentence says. */
+ *  and Arc rows are written when Rails reads the wallet there, which the sentence says. */
 export function walletFamiliesLine(): string {
   const byChain = new Map<WalletSummaryRow["chain"], string[]>();
   for (const f of WALLET_FAMILIES) {
@@ -98,6 +102,7 @@ export function walletFamiliesLine(): string {
     ethereum: "on Ethereum",
     base: "on Base",
     arbitrum: "on Arbitrum where Rails has read the wallet",
+    arc: "on Arc where Rails has read the wallet",
   };
   return [...byChain].map(([chain, names]) => `${list(names)} ${where[chain]}`).join("; ");
 }

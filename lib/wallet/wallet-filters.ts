@@ -31,6 +31,7 @@ export interface WalletProtocol {
  *  whatever its chains. */
 export const WALLET_PROTOCOLS: WalletProtocol[] = [
   { slug: "aave-v3", name: "Aave V3", kinds: ["loans", "deposits"], arbitrum: true },
+  { slug: "aave-v4", name: "Aave V4", kinds: ["loans", "deposits"] },
   { slug: "compound-v3", name: "Compound V3", kinds: ["loans", "deposits"], arbitrum: true },
   { slug: "morpho", name: "Morpho Blue", kinds: ["loans", "deposits"], arbitrum: true },
   { slug: "liquity-v2", name: "Liquity V2", kinds: ["troves", "deposits"] },
