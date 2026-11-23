@@ -3,7 +3,7 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { pickMainAsset } from "../../lib/shared/main-asset.ts";
+import { pickMainAsset, splitSupplied } from "../../lib/shared/main-asset.ts";
 
 const WETH = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
@@ -51,4 +51,20 @@ test("two markets sharing a symbol stay apart by key", () => {
     { symbol: "WBTC", key: "cwbtc2", amount: 2 },
   ];
   assert.equal(pickMainAsset(markets, { cwbtc: 60000, cwbtc2: 60000 }).key, "cwbtc2");
+});
+
+test("the supplied dropdown: collateral first, then the not-collateral supplies, each in order", () => {
+  const peaks = ["WETH", "USDC", "WBTC", "DAI"];
+  const other = new Set(["USDC", "DAI"]);
+  assert.deepEqual(
+    splitSupplied(peaks, (p) => other.has(p)),
+    { first: ["WETH", "WBTC"], others: ["USDC", "DAI"] },
+  );
+  // Switches unread: one list, as given.
+  assert.deepEqual(splitSupplied(peaks), { first: peaks, others: [] });
+  // Every supply backed nothing: the first group is empty.
+  assert.deepEqual(
+    splitSupplied(["USDC"], () => true),
+    { first: [], others: ["USDC"] },
+  );
 });

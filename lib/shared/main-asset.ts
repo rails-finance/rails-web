@@ -35,3 +35,12 @@ export function pickMainAsset<T extends MainAssetCandidate>(
   }
   return best;
 }
+
+/** A closed account's supplied peaks in its dropdown's order: those that
+ *  backed borrowing first, then the supplies that backed none (listed under
+ *  "Supplied, not collateral"), each group in the side's order. Where the
+ *  collateral switches are unread (`isOther` absent), one list as given. */
+export function splitSupplied<T>(peaks: readonly T[], isOther?: (p: T) => boolean): { first: T[]; others: T[] } {
+  if (!isOther) return { first: [...peaks], others: [] };
+  return { first: peaks.filter((p) => !isOther(p)), others: peaks.filter(isOther) };
+}

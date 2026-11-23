@@ -26,13 +26,12 @@ import {
   type PositionCardOutcome,
   type PositionCardSlots,
   type PositionCardStatus,
-  type PositionPanelColumns,
   type PositionPanelRow,
   assetsHead,
 } from "@/components/shared/position-card";
 import { formatDate, formatDateRange, formatDuration } from "@/lib/date";
 import { useMountedNow } from "@/hooks/useMountedNow";
-import { TipLabel } from "@/components/shared/tip-label";
+import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
 import type { SparkLife } from "@/lib/spark/lives";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
@@ -45,7 +44,7 @@ import {
   withPeaks,
   type ClosedPeakFlows,
 } from "@/components/shared/closed-peak";
-import { pickMainAsset } from "@/lib/shared/main-asset";
+import { pickMainAsset, splitSupplied } from "@/lib/shared/main-asset";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { Icon } from "@/components/icons/icon";
@@ -395,33 +394,6 @@ export interface SparkPositionCardProps {
   flows?: ClosedPeakFlows;
 }
 
-/** A closed card's panel: the peaks of reserves that never backed borrowing. */
-function closedPanel(peakOthers: SparkReserveAmount[]): PositionPanelColumns | undefined {
-  if (peakOthers.length === 0) return undefined;
-  return [
-    [
-      {
-        id: "peak-not-collateral",
-        label: "Supplied, not collateral",
-        tip: PEAK_NOT_COLLATERAL_TIP,
-        // The assets' icons open their peaks, as the heads do. The peaks
-        // carry no USD (PeakLines).
-        value: null,
-        breakdown: {
-          label: "Highest recorded supplied, not collateral",
-          assets: peakOthers.map((r) => ({ symbol: r.symbol, address: r.address })),
-          panel: (
-            <span className="text-sm font-semibold tabular-nums text-foreground" data-spark-peak-breakdown="">
-              <PeakLines reserves={peakOthers} side="supply" />
-            </span>
-          ),
-        },
-      },
-    ],
-    [],
-  ];
-}
-
 /** SparkLend's slots for the shared position card. */
 export function useSparkCardSlots({
   v,
@@ -439,7 +411,8 @@ export function useSparkCardSlots({
   const detail = surface === "detail";
   const isOther = (r: SparkReserveAmount) => notCollateral?.has(r.address.toLowerCase()) === true;
   const peakOf = useClosedPeaks(flows, v.status !== "open", {
-    collateral: v.peakSupplies.filter((r) => !isOther(r)).map((r) => ({ symbol: r.symbol, key: r.address })),
+    // The supply side's peak counts every supplied reserve, as the face does.
+    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, key: r.address })),
     debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, key: r.address })),
   });
   const collSupplies = v.supplies.filter((r) => !isOther(r));
@@ -484,13 +457,12 @@ export function useSparkCardSlots({
     // The wallet holds no open reserves, so each side states the assets it
     // held, and their peaks, each at a different moment, open behind the
     // press under the peak label (C19). Where the peaks are read, a side the
-    // account never held reads "None": no supply backed borrowing (the
-    // switches read), or nothing was borrowed.
-    const peakColl = v.peakSupplies.filter((r) => !isOther(r));
+    // account never held reads "None". The face holds every supplied peak
+    // under "Supplied", as the listing row does, so it never moves when the
+    // collateral switches land; read, they order the supply dropdown: the
+    // collateral peaks first, then the supplies that backed no borrowing
+    // under "Supplied, not collateral".
     const peaksRead = v.peakSupplies.length + v.peakBorrows.length > 0;
-    // Unread switches: every supply heads the side, named as supplied (as
-    // Aave V3's card does).
-    const switchesRead = notCollateral != null;
     // Each side leads with its main asset at its highest recorded balance,
     // the same on the listing row and the position page (both read the
     // listing's prices, `pickMainAsset`).
@@ -508,25 +480,41 @@ export function useSparkCardSlots({
           })
         : undefined;
     };
-    const supplyLabel = switchesRead ? CARD_VOCAB.collateral : "Supplied";
+    const { first, others } = splitSupplied(v.peakSupplies, notCollateral != null ? isOther : undefined);
+    const panelOf = (side: "supply" | "debt") =>
+      side === "debt" ? (
+        <span className="text-sm font-semibold tabular-nums text-foreground">
+          <PeakLines reserves={v.peakBorrows} side="debt" />
+        </span>
+      ) : (
+        <span className="flex flex-col gap-3 text-sm font-semibold tabular-nums text-foreground">
+          {first.length > 0 && <PeakLines reserves={first} side="supply" />}
+          {others.length > 0 && (
+            <span className="flex flex-col gap-1" data-spark-peak-breakdown="">
+              <span className="text-xs font-medium text-rb-500">
+                <HeadingTip text="Supplied, not collateral" tip={PEAK_NOT_COLLATERAL_TIP} />
+              </span>
+              <PeakLines reserves={others} side="supply" />
+            </span>
+          )}
+        </span>
+      );
     const held = (reserves: SparkReserveAmount[], side: "supply" | "debt") =>
       reserves.length > 0
         ? assetsHead(
-            side === "debt" ? CARD_VOCAB.peakDebt : switchesRead ? CARD_VOCAB.peakCollateral : CARD_VOCAB.peakSupplied,
+            side === "debt" ? CARD_VOCAB.peakDebt : CARD_VOCAB.peakSupplied,
             reserves.map((r) => ({ symbol: r.symbol, address: r.address })),
-            <span className="text-sm font-semibold tabular-nums text-foreground">
-              <PeakLines reserves={reserves} side={side} />
-            </span>,
+            panelOf(side),
             figureOf(reserves, side),
           )
         : {};
     heads = withPeaks(
       [
         {
-          id: "peak-collateral",
-          label: supplyLabel,
-          value: peaksRead && switchesRead ? <PeakNone /> : null,
-          ...held(peakColl, "supply"),
+          id: "peak-supplied",
+          label: "Supplied",
+          value: peaksRead ? <PeakNone /> : null,
+          ...held(v.peakSupplies, "supply"),
         },
         {
           id: "peak-debt",
@@ -654,7 +642,7 @@ export function useSparkCardSlots({
     learnMore: ended ? sparkPositionModal(v.status) : sparkPositionModal(v.status, v.borrows.length > 0),
     menu: { leading: () => <SparkMenuRows wallet={v.wallet} />, exports: exports ?? null },
   };
-  if (outcome) return { ...detailCommon, outcome, panel: closedPanel(v.peakSupplies.filter(isOther)) };
+  if (outcome) return { ...detailCommon, outcome };
 
   // ── Each side's reserve rows, and the panel: the supply side's values on
   //    the left, the debt's and its risk on the right. A side whose total is
