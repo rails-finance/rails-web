@@ -631,8 +631,8 @@ export function useAaveV3CardSlots({
   // The health factor: the position page's live read. Omitted on every
   // listing view and on a deployment with no live HF receipt — an unasserted
   // layer, per the chain-state charter; pending on a page still reading. A
-  // read wallet with no debt reads "No debt" (HF is undefined, ∞ in protocol
-  // terms) — but only when the card shows no debt either. The balances are
+  // read wallet with no debt draws a dash, as Debt does (HF is undefined, ∞ in
+  // protocol terms) — but only when the card shows no debt either. The balances are
   // the index's, which trails the live read: a debt the read no longer finds
   // gets a dash and the reason in the notice.
   const hfProv = dep.healthFactor;
@@ -645,7 +645,6 @@ export function useAaveV3CardSlots({
           label: ratioLabel("pooled"),
           labelTip: detail && ratioLabel("pooled") === "Health factor" ? HF_TIP : undefined,
           pending: !hfRead,
-          // No debt: a dash, as the Debt head draws (ui-jobs 806).
           value: !hfRead ? null : noDebtRead ? null : v.healthFactor == null ? null : (
             <Prov info={hfProv(v.market, v.atBlock, v.readBy)}>{hfLabel(v.healthFactor)}</Prov>
           ),
@@ -959,7 +958,7 @@ export function useAaveV3CardSlots({
                     )}
                   </span>
                 ))}
-                {/* The dollars under the amounts, in the headline's green (ui-jobs 806). */}
+                {/* The dollars under the amounts, in the headline's green. */}
                 {otherUsd != null && otherInfo && (
                   <Prov info={otherInfo}>
                     <span className="text-xs font-bold tabular-nums text-green-400">{formatUsdValue(otherUsd)}</span>
