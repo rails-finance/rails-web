@@ -68,6 +68,7 @@ import { AAVE_V3_ARBITRUM_SYMBOL_BY_ADDR } from "@/lib/aave-v3-arbitrum/asset-ca
 import { COMPOUND_ARBITRUM_DEPLOYMENT } from "@/lib/compound-arbitrum/asset-catalog";
 import { COLLATERAL_PARAM as COMPOUND_ARBITRUM_COLLATERAL_PARAM } from "@/lib/compound-arbitrum/comet-cards";
 import { COLLATERAL_PARAM, collateralOptions } from "@/lib/shared/collateral-facet";
+import { liquidatedLink } from "@/lib/start/liquidated-link";
 import { MORPHO_ARBITRUM_MARKETS } from "@/lib/morpho-arbitrum/market-catalog";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -234,10 +235,6 @@ function dimsOf(id: string): AnyDims {
   }
 }
 
-function offers(dims: AnyDims, param: string, value: string): boolean {
-  return dims.some((d) => d.param === param && (d.options ?? []).some((o) => o.value === value));
-}
-
 /** Chain order (Ethereum, Base, Arbitrum…), then roster order. Testnets are
  *  left out of every results page. */
 function candidates(): ProtocolEntry[] {
@@ -267,26 +264,11 @@ function nearLiquidation(): ResultRow[] {
 }
 
 function liquidated(): ResultRow[] {
-  const spec = TREE.results.liquidated;
   const rows: ResultRow[] = [];
   for (const entry of candidates()) {
     if (!LISTINGS[entry.id]) continue;
-    const dims = dimsOf(entry.id);
-    const status = dims.find((d) => d.param === "status");
-    const history = spec.history.find((h) => offers(dims, h.param, h.value));
-    if (history) {
-      // Every status, so a position liquidated and then closed is listed too.
-      const params: Record<string, string> = { [history.param]: history.value };
-      if (status?.options?.length) params.status = status.options.map((o) => o.value).join(",");
-      rows.push({ entry, href: withParams(entry, params), applied: true, source: "the listing's liquidation filter" });
-    } else if (status && offers(dims, "status", spec.status)) {
-      rows.push({
-        entry,
-        href: withParams(entry, { status: spec.status }),
-        applied: true,
-        source: "the listing's status filter",
-      });
-    }
+    const link = liquidatedLink(dimsOf(entry.id), TREE.results.liquidated);
+    if (link) rows.push({ entry, href: withParams(entry, link.params), applied: true, source: link.source });
   }
   return rows;
 }

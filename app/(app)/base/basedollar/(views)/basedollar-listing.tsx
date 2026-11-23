@@ -6,10 +6,15 @@
 // collateral ratio, no USD (interpreted layers, off by default). Holds the
 // presentation config + the in-memory strategy and hands them to the shared
 // ChainTruthListingPage driver with the SSR first-paint data from page.tsx.
+// The count names the Status choice ("open Troves"); the in-memory tier draws
+// the listing's noun, so the noun follows the filters (ui-jobs 805).
 
+import { useState } from "react";
 import type { BasedollarTroveSummary } from "@/lib/sources/api/basedollar-troves";
 import { fetchBasedollarTroves } from "@/lib/api/fetch-basedollar-troves";
 import { ChainTruthListingPage, memoryStrategy } from "@/components/shared/chain-truth-listing-page";
+import { decodeListFilters } from "@/lib/shared/list-filter";
+import { troveCountLine } from "@/lib/liquity-v2/listing-visibility";
 import { BasedollarPositionCard, viewFromSummary } from "@/components/protocol/basedollar/basedollar-position-card";
 import {
   basedollarListDimensions,
@@ -27,10 +32,21 @@ export interface BasedollarListingProps {
 }
 
 export function BasedollarListing({ initialItems, initialTotal, initialKey, initialSearch }: BasedollarListingProps) {
+  const [noun, setNoun] = useState(
+    () =>
+      troveCountLine(
+        decodeListFilters(
+          basedollarListDimensions([]),
+          new URLSearchParams(initialSearch ?? ""),
+          BASEDOLLAR_LIST_DEFAULTS,
+        ),
+      ).noun,
+  );
   return (
     <ChainTruthListingPage<BasedollarTroveSummary, BasedollarListFilters>
       title="Basedollar Troves"
-      noun="Troves"
+      noun={noun}
+      onFilters={(f) => setNoun(troveCountLine(f).noun)}
       basePath="/base/basedollar"
       defaults={BASEDOLLAR_LIST_DEFAULTS}
       sortOptions={BASEDOLLAR_SORT_OPTIONS}

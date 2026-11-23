@@ -6,16 +6,17 @@
 // `matches` predicate — the backend is the filter.
 //
 // Facets:
-//   • Status  — open / closed / denied, the API's WHOLE lifecycle vocabulary,
-//     resting on a CONTEXTUAL default (lib/frankencoin/listing-visibility.ts).
-//     `denied` is the governance veto during the init window (an indexed fact
-//     — PositionDenied is not head-observable). There is deliberately NO
+//   • Status  — Open / Closed / All (ui-jobs 805), resting on a CONTEXTUAL
+//     default (lib/frankencoin/listing-visibility.ts). Closed takes in
+//     `denied`, the governance veto during the init window (an indexed fact
+//     — PositionDenied is not head-observable), and the Denied switch
+//     (`?ended=denied`) narrows Closed to it. There is deliberately NO
 //     `expired` facet: expiration is a constructor fact no event carries, so
 //     the zero-RPC serving tier cannot filter on it — expiry renders from the
 //     chain overlay on the detail page instead. ⚠️ The backend silently
 //     ignores unknown status values, and a csv that reduces to nothing
-//     returns the UNFILTERED set — the fetch-params mapper sanitizes to the
-//     known three so a stale URL can never widen the query.
+//     returns the UNFILTERED set — the fetch sends only the buckets
+//     listing-visibility.ts names, so a stale URL can never widen the query.
 //   • Hub     — V1 / V2. The two MintingHubs run side by side; every live
 //     position is V2 today, but V1 holds the richer challenge history.
 //   • History — Challenged before / Challenge succeeded (the orthogonal
@@ -52,12 +53,14 @@ import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filt
 import type { FetchFrankencoinPositionsParams } from "@/lib/api/fetch-frankencoin-positions";
 import type { FrankencoinPositionSort } from "@/lib/sources/api/frankencoin-positions";
 import {
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  isAllStatuses,
-  sameStatusSet,
+  defaultStatusChoice,
+  ENDED_DENIED,
+  endedDenied,
+  frankencoinStatusBuckets,
+  readFrankencoinStatusParam,
+  statusChoice,
 } from "@/lib/frankencoin/listing-visibility";
+import { setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const FRANKENCOIN_ITEMS_PER_PAGE = 20;
@@ -74,8 +77,11 @@ const FRANKENCOIN_SIZE_TOP = 10_000_000;
 const FRANKENCOIN_SIZE_NOTE = "Debt in ZCHF; Frankencoin states no market price for collateral.";
 
 export interface FrankencoinListFilters extends BaseListFilters {
-  /** open / closed / denied — multi (OR); the API's whole vocabulary. */
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
+  /** "" | "denied" — with Closed, the positions denied in their init window.
+   *  URL param `ended`. */
+  ended: string[];
   /** "" | "v1" | "v2" — the hub generation. */
   hub: string[];
   /** "" | "challenged" | "challenge-succeeded" — the orthogonal challenge
@@ -92,14 +98,13 @@ export interface FrankencoinListFilters extends BaseListFilters {
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
 // listing-visibility.ts resolves it per context — the open positions on the bare directory,
-// every status once the search names an identity. Because the default is contextual rather
-// than a selection it draws no chip and no Reset link, and a cleared selection resolves back
-// to what the context rests on.
+// every status once the search names an identity.
 export const FRANKENCOIN_LIST_DEFAULTS: FrankencoinListFilters = {
   q: "",
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
+  ended: [],
   hub: [],
   challenges: [],
   debt: [],
@@ -113,13 +118,6 @@ export const FRANKENCOIN_SORT_OPTIONS: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },
   { value: "debt", label: "Debt" },
   { value: "coll", label: "Collateral" },
-];
-
-// The API's whole vocabulary — NO "expired" (see the header note).
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-  { value: "denied", label: "Denied" },
 ];
 
 const HUB_OPTIONS: FilterOptionDef[] = [
@@ -170,17 +168,35 @@ export function frankencoinListDimensions(
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses (ui-jobs 805).
       set: (f, v) => {
-        const sel = canonicalStatuses(v);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
+        const { choice, denied } = readFrankencoinStatusParam(v);
+        const s = setStatusChoice({ choice, switchOn: denied }, defaultStatusChoice(f), f.ended, {
+          value: ENDED_DENIED,
+          narrows: "closed",
+        });
+        return { ...f, ...s };
       },
+    },
+    {
+      id: "denied",
+      label: "Denied",
+      // Its own group, for its pill; in the panel it sits under Status.
+      group: "Denied",
+      cardinality: "single",
+      param: "ended",
+      options: [{ value: ENDED_DENIED, label: "Denied" }],
+      // Offered with Closed, which it narrows.
+      available: (f) => statusChoice(f) === "closed",
+      get: (f) => (endedDenied(f) ? [ENDED_DENIED] : []),
+      set: (f, v) => ({ ...f, ended: v }),
+      chipLabel: () => "Denied",
     },
     {
       id: "collateral",
@@ -241,12 +257,8 @@ export function frankencoinFiltersToFetchParams(
   const owner = filters.q.trim();
   return {
     owner: owner ? owner : undefined,
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    // `effectiveStatuses` reduces to the backend's own vocabulary on the way —
-    // it silently drops unknown values, and a csv that reduces to nothing
-    // returns the UNFILTERED set, so a stale "expired" chip must never reach
-    // the wire.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // Undefined for All; otherwise only the backend's own buckets (see the header note).
+    status: frankencoinStatusBuckets(filters),
     hub: hub === "v1" || hub === "v2" ? hub : undefined,
     collateralTokens: filters.collateral.length > 0 ? filters.collateral : undefined,
     everChallenged: filters.challenges.includes("challenged") ? true : undefined,

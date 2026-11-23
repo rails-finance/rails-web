@@ -16,6 +16,7 @@
 // URL it keeps in sync is that page's own (lib/morpho-base/list-filter-
 // dimensions.tsx, "fixed to one market").
 
+import { morphoBaseCountLine } from "@/lib/morpho-base/listing-visibility";
 import { useCallback, useRef } from "react";
 import type { MorphoPositionSummary } from "@/lib/sources/api/morpho-positions";
 import { fetchMorphoPositions } from "@/lib/api/fetch-morpho-positions";
@@ -91,6 +92,7 @@ export function MorphoBaseListing({
       // On a market page the section heading above the listing names it.
       titleHidden={market != null}
       noun="positions"
+      countLine={morphoBaseCountLine}
       basePath={market ? market.path : "/base/morpho"}
       defaults={market ? morphoBaseMarketDefaults(market.loanToken) : MORPHO_BASE_LIST_DEFAULTS}
       sortOptions={morphoBaseSortOptions}
@@ -116,6 +118,15 @@ export function MorphoBaseListing({
             data: r.data,
             total: r.pagination.total,
           })),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchMorphoPositions({
+            ...(market
+              ? morphoBaseMarketFetchParams(filters, 1, market.id)
+              : morphoBaseFiltersToFetchParams(filters, 1)),
+            limit: 1,
+            offset: 0,
+          }).then((r) => r.pagination.total),
         // The Debt/Collateral sort only means anything once loanTokens has
         // narrowed to exactly one address (morphoBaseSortOptions gates the
         // menu on the same test); if the facet widens or clears while one of

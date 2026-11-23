@@ -5,64 +5,69 @@
 // status. The argument for it is written once, on the pilot —
 // lib/liquity-v2/listing-visibility.ts.
 //
-// Status is a MULTI-SELECT over open / closed / liquidated, serialized as one comma-separated
-// `status` URL param.
+// Status is ONE CHOICE of three (ui-jobs 805; lib/shared/status-choice.ts): Open, Closed or All,
+// one `status` URL value. /api/fx/positions has no row status: `open` and `closed` are facets of
+// the settled sweep, and `liquidated` is the ever-liquidated fact, OR-joined with them
+// (rails-server api/src/routes/fx.ts). So Closed sends `closed` alone, and there is no "Closed by
+// liquidation" switch. "Liquidated before" (`liq`) is asked as `liquidated` and stands only with
+// All: choosing it moves Status to All, and choosing Open or Closed turns it off.
 //
 // `status` on the filter object carries RAW user intent: [] is "no opinion" and resolves here
-// at read time, a concrete set is an explicit choice. The default is never written into the
-// filter object, so clearing a selection returns to whatever the current context rests on, and
-// an identity search relaxes the view without the reader touching the Status facet. Because the
-// default is contextual rather than a selection it draws NO chip and NO Reset link (the shared
-// driver hides a dimension sitting on its `defaultValues`) and the bare directory URL stays
-// clean.
+// at read time, one value is an explicit choice. The default is never written into the filter
+// object, so an identity search relaxes the view without the reader touching Status, and the
+// bare directory URL stays clean.
 
 import { namesIdentity } from "@/lib/fx/search";
+import { readStatusParam, statusNoun, type StatusChoice } from "@/lib/shared/status-choice";
 
-/** The lifecycle buckets the Status facet exposes. */
-export type FxStatusBucket = "open" | "closed" | "liquidated";
-
-/** Canonical order — used for stable URL/chip serialization and set compares. */
-export const ALL_FX_STATUS_BUCKETS: FxStatusBucket[] = ["open", "closed", "liquidated"];
-
-export function isFxStatusBucket(v: string): v is FxStatusBucket {
-  return (ALL_FX_STATUS_BUCKETS as string[]).includes(v);
-}
-
-/** Reduce an arbitrary token list to valid buckets, deduped, in canonical order. */
-export function canonicalStatuses(values: string[]): FxStatusBucket[] {
-  const set = new Set(values.filter(isFxStatusBucket));
-  return ALL_FX_STATUS_BUCKETS.filter((b) => set.has(b));
-}
-
-/** Order-independent equality of two bucket selections. */
-export function sameStatusSet(a: FxStatusBucket[], b: FxStatusBucket[]): boolean {
-  if (a.length !== b.length) return false;
-  const bs = new Set(b);
-  return a.every((x) => bs.has(x));
-}
+/** The "Liquidated before" switch's one value, in the filters and in the URL (`?liq=liquidated`). */
+export const FX_LIQUIDATED_BEFORE = "liquidated";
 
 /** Just the filter fields visibility depends on — structural, so the page's FxListFilters
  *  satisfies it without an import cycle. */
 export interface FxVisibilityInput {
   status?: string[];
+  liquidations?: string[];
   q?: string;
 }
 
 /** The contextual default: the open positions while the search box names no identity, every
  *  status once it does. */
-export function defaultStatuses(f: FxVisibilityInput): FxStatusBucket[] {
-  return namesIdentity(f.q) ? [...ALL_FX_STATUS_BUCKETS] : ["open"];
+export function defaultStatusChoice(f: FxVisibilityInput): StatusChoice {
+  return namesIdentity(f.q) ? "all" : "open";
 }
 
-/** The selection actually in effect: an explicit non-empty choice wins; an empty selection
- *  resolves to the contextual default (zero buckets is not a view). */
-export function effectiveStatuses(f: FxVisibilityInput): FxStatusBucket[] {
-  const sel = canonicalStatuses(f.status ?? []);
-  return sel.length > 0 ? sel : defaultStatuses(f);
+/** A `status` param's values as the choice, and whether they turn on "Liquidated before". The
+ *  old list's `liquidated` was the ever-liquidated fact: alone it is All with the switch on, and
+ *  beside another status it is All. */
+export function readFxStatusParam(values: string[]): { choice: StatusChoice | null; liquidatedBefore: boolean } {
+  const v = values.map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (v.includes("liquidated") && !v.includes("all")) {
+    const alone = v.every((s) => s === "liquidated");
+    return { choice: "all", liquidatedBefore: alone };
+  }
+  return { choice: readStatusParam(v).choice, liquidatedBefore: false };
 }
 
-/** True when the effective selection is the full set — "show everything", which maps to NO
- *  server-side status filter. */
-export function isAllStatuses(f: FxVisibilityInput): boolean {
-  return effectiveStatuses(f).length === ALL_FX_STATUS_BUCKETS.length;
+/** The choice in effect: an explicit one wins; none resolves to the contextual default. */
+export function statusChoice(f: FxVisibilityInput): StatusChoice {
+  return readFxStatusParam(f.status ?? []).choice ?? defaultStatusChoice(f);
+}
+
+/** "Liquidated before", in effect only with All. */
+export function liquidatedBefore(f: FxVisibilityInput): boolean {
+  return statusChoice(f) === "all" && (f.liquidations ?? []).includes(FX_LIQUIDATED_BEFORE);
+}
+
+/** The status facets the API is asked for; undefined for no status filter. */
+export function fxStatusFacets(f: FxVisibilityInput): ("open" | "closed" | "liquidated")[] | undefined {
+  const choice = statusChoice(f);
+  if (choice === "open") return ["open"];
+  if (choice === "closed") return ["closed"];
+  return liquidatedBefore(f) ? ["liquidated"] : undefined;
+}
+
+/** The count line's noun names what is shown ("open positions", "closed positions", "positions" for All). */
+export function fxCountLine(f: FxVisibilityInput): { noun: string } {
+  return { noun: statusNoun(statusChoice(f), "positions") };
 }

@@ -5,6 +5,7 @@
 // The driver owns the toolbar, pagination, debounced search and the fetch
 // lifecycle; this file is just the Spark-specific config.
 
+import { sparkCountLine } from "@/lib/spark/listing-visibility";
 import type { SparkPositionSummary } from "@/lib/sources/api/spark-positions";
 import { fetchSparkPositions } from "@/lib/api/fetch-spark-positions";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
@@ -30,6 +31,7 @@ export function SparkListing({ initialItems, initialTotal, initialKey, initialSe
     <ChainTruthListingPage<SparkPositionSummary, SparkListFilters>
       title="SparkLend Positions"
       noun="positions"
+      countLine={sparkCountLine}
       basePath="/ethereum/spark"
       defaults={SPARK_LIST_DEFAULTS}
       sortOptions={SPARK_SORT_OPTIONS}
@@ -53,6 +55,11 @@ export function SparkListing({ initialItems, initialTotal, initialKey, initialSe
             data: r.data,
             total: r.pagination.total,
           })),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchSparkPositions({ ...sparkFiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

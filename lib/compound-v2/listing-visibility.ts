@@ -4,65 +4,60 @@
 // shows the positions still open; a search naming a holder shows every status. The argument for
 // it is written once, on the pilot — lib/liquity-v2/listing-visibility.ts.
 //
-// Status is a MULTI-SELECT over the lifecycle vocabulary the index answers with — open / closed
-// / liquidated — serialized as one comma-separated `status` URL param. (Ever-liquidated is the
-// orthogonal History facet; this axis is the lifecycle.)
+// Status is ONE CHOICE of three (ui-jobs 805; lib/shared/status-choice.ts): Open, Closed or All,
+// one `status` URL value. The index's `liquidated` names a CLOSED position that was liquidated, and
+// its `closed` leaves those out, so Closed asks for closed and liquidated together; the "Closed by
+// liquidation" switch (`ended`) narrows Closed to the liquidated ones. An open position liquidated
+// before stays `open` and is found by the Liquidated before switch (`hasLiquidations`).
 //
 // `status` on the filter object carries RAW user intent: [] is "no opinion" and resolves here
-// at read time, a concrete set is an explicit choice. The default is never written into the
-// filter object, so clearing a selection returns to whatever the current context rests on, and
-// an identity search relaxes the view without the reader touching the Status facet. Because the
-// default is contextual rather than a selection it draws NO chip and NO Reset link (the shared
-// driver hides a dimension sitting on its `defaultValues`) and the bare directory URL stays
-// clean.
+// at read time, one value is an explicit choice. The default is never written into the filter
+// object, so an identity search relaxes the view without the reader touching Status, and the
+// bare directory URL stays clean.
+//
+// Relative imports of modules with no imports of their own, so the unit test reads this file
+// (scripts/test/compound-v2-status-choice.test.mjs).
 
-import { namesIdentity } from "@/lib/compound-v2/search";
+import { namesIdentity } from "./search";
+import {
+  ENDED_BY_LIQUIDATION,
+  readStatusParam,
+  statusBuckets,
+  statusNoun,
+  type StatusChoice,
+} from "../shared/status-choice";
 
-/** The lifecycle buckets the Status facet exposes. */
-export type CompoundV2StatusBucket = "open" | "closed" | "liquidated";
-
-/** Canonical order — used for stable URL/chip serialization and set compares. */
-export const ALL_COMPOUND_V2_STATUS_BUCKETS: CompoundV2StatusBucket[] = ["open", "closed", "liquidated"];
-
-export function isCompoundV2StatusBucket(v: string): v is CompoundV2StatusBucket {
-  return (ALL_COMPOUND_V2_STATUS_BUCKETS as string[]).includes(v);
-}
-
-/** Reduce an arbitrary token list to valid buckets, deduped, in canonical order. */
-export function canonicalStatuses(values: string[]): CompoundV2StatusBucket[] {
-  const set = new Set(values.filter(isCompoundV2StatusBucket));
-  return ALL_COMPOUND_V2_STATUS_BUCKETS.filter((b) => set.has(b));
-}
-
-/** Order-independent equality of two bucket selections. */
-export function sameStatusSet(a: CompoundV2StatusBucket[], b: CompoundV2StatusBucket[]): boolean {
-  if (a.length !== b.length) return false;
-  const bs = new Set(b);
-  return a.every((x) => bs.has(x));
-}
-
-/** Just the filter fields visibility depends on — structural, so the page's
- *  CompoundV2ListFilters satisfies it without an import cycle. */
+/** Just the filter fields visibility depends on — structural, so the page's CompoundV2ListFilters
+ *  satisfies it without an import cycle. */
 export interface CompoundV2VisibilityInput {
   status?: string[];
+  ended?: string[];
   q?: string;
 }
 
 /** The contextual default: the open positions while the search box names no identity, every
  *  status once it does. */
-export function defaultStatuses(f: CompoundV2VisibilityInput): CompoundV2StatusBucket[] {
-  return namesIdentity(f.q) ? [...ALL_COMPOUND_V2_STATUS_BUCKETS] : ["open"];
+export function defaultStatusChoice(f: CompoundV2VisibilityInput): StatusChoice {
+  return namesIdentity(f.q) ? "all" : "open";
 }
 
-/** The selection actually in effect: an explicit non-empty choice wins; an empty selection
- *  resolves to the contextual default (zero buckets is not a view). */
-export function effectiveStatuses(f: CompoundV2VisibilityInput): CompoundV2StatusBucket[] {
-  const sel = canonicalStatuses(f.status ?? []);
-  return sel.length > 0 ? sel : defaultStatuses(f);
+/** The choice in effect: an explicit one wins; none resolves to the contextual default. */
+export function statusChoice(f: CompoundV2VisibilityInput): StatusChoice {
+  return readStatusParam(f.status ?? []).choice ?? defaultStatusChoice(f);
 }
 
-/** True when the effective selection is the full set — "show everything", which maps to NO
- *  server-side status filter. */
-export function isAllStatuses(f: CompoundV2VisibilityInput): boolean {
-  return effectiveStatuses(f).length === ALL_COMPOUND_V2_STATUS_BUCKETS.length;
+/** The "Closed by liquidation" switch, which narrows Closed alone. */
+export function endedByLiquidation(f: CompoundV2VisibilityInput): boolean {
+  return statusChoice(f) === "closed" && (f.ended ?? []).includes(ENDED_BY_LIQUIDATION);
+}
+
+/** The lifecycle buckets the API is asked for; undefined for no status filter. */
+export function compoundV2StatusBuckets(f: CompoundV2VisibilityInput): string[] | undefined {
+  return statusBuckets(statusChoice(f), endedByLiquidation(f));
+}
+
+/** The count line's noun names what is shown ("open positions", "closed positions",
+ *  "positions" for All). */
+export function compoundV2CountLine(f: CompoundV2VisibilityInput): { noun: string } {
+  return { noun: statusNoun(statusChoice(f), "positions") };
 }

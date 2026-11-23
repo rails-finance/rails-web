@@ -15,7 +15,9 @@
 // LiquidatePosition row that took collateral or repaid at least 0.000001
 // fxUSD (rails-web lib/fx/row-figures.ts, fxLiquidationMoved; rails-server
 // services/fx-liquidation-counts.ts). Checked on the twelve positions the
-// pool-wide Liquidate reached, and the "Liquidated" filter lists all twelve.
+// pool-wide Liquidate reached, and the "Liquidated before" filter
+// (`?liq=liquidated` on the page, `status=liquidated` on the route) lists all
+// twelve.
 //
 // Wire only, no browser. Timeline reads carry `recent` so the Vercel Firewall's
 // timeline rule does not apply (lib/host.mjs).
@@ -95,7 +97,7 @@ function fxCounted(d) {
   const listed = new Map(liquidated.data.map((r) => [Number(r.positionId), r]));
   const missing = named.filter((id) => !listed.has(id));
   check(
-    "f(x): the Liquidated filter lists all twelve positions the pool-wide Liquidate reached",
+    "f(x): the Liquidated before filter lists all twelve positions the pool-wide Liquidate reached",
     missing.length === 0,
     missing.join(","),
   );

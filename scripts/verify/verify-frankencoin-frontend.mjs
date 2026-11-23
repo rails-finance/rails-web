@@ -118,7 +118,7 @@ async function textOf(path, waitFor, { expectPath = path.split("?")[0] } = {}) {
 }
 
 // The shared listing-row anchor, used to make the status claim per ROW instead
-// of page-wide — the filter chip prints "Status: Denied" too, so a page-wide
+// of page-wide — the filter chip prints "Denied" too, so a page-wide
 // match for the word would pass on a listing that ignored the param.
 const ROW = 'a[class~="group/listing-row"]';
 const countRows = () => page.locator(ROW).count();
@@ -215,34 +215,35 @@ const noDollar = (name, text) => {
   const restingDenied = await countDeniedRows();
   const restingRows = await countRows();
 
-  // D. status filter drives the backend — denied rows only.
+  // D. Closed with the Denied switch (`?status=closed&ended=denied`, ui-jobs
+  // 805) drives the backend — denied rows only.
   //
   // ⚠️ `5f9b4e1e` made a denied position a TERMINAL card: it carries the shared
   // CLOSED pill and an `Outcome / Denied` row, not a DENIED lifecycle pill. So
   // the old `/\bDENIED\b/` assertion was testing retired copy. Its obvious
-  // replacement is worse than useless: the words "Status: Denied" are printed
-  // by the filter CHIP itself, so a page-wide search for "Denied" passes on a
+  // replacement is worse than useless: the word "Denied" is printed by the
+  // switch's filter CHIP itself, so a page-wide search for "Denied" passes on a
   // listing that ignored the param entirely. The claim is made per ROW instead,
   // and paired with the resting listing so it is a CHANGE of set, not a state:
   // every row on the filtered page is denied, at least one row is there to
   // check, and the unfiltered page has none.
-  await textOf(`${EXPLORER}?status=denied`, `${ROW}`);
+  await textOf(`${EXPLORER}?status=closed&ended=denied`, `${ROW}`);
   const deniedRows = await countRows();
   const deniedOutcomes = await countDeniedRows();
-  check("status=denied: the filtered listing renders rows at all", deniedRows > 0, `${deniedRows} rows`);
+  check("Closed + Denied: the filtered listing renders rows at all", deniedRows > 0, `${deniedRows} rows`);
   check(
-    "status=denied: EVERY row is a denied outcome",
+    "Closed + Denied: EVERY row is a denied outcome",
     deniedRows > 0 && deniedOutcomes === deniedRows,
     `${deniedOutcomes}/${deniedRows} rows carry Outcome · Denied`,
   );
   check(
-    "status=denied changes the set (the resting listing carries no denied rows)",
+    "Closed + Denied changes the set (the resting listing carries no denied rows)",
     restingRows > 0 && restingDenied === 0,
     `resting: ${restingDenied}/${restingRows} denied`,
   );
 
   // D. hub filter + the wire-casing regression: V1 rows must read Hub V1.
-  const v1 = await textOf(`${EXPLORER}?hub=v1&status=open,closed,denied`, "text=Hub V1");
+  const v1 = await textOf(`${EXPLORER}?hub=v1&status=all`, "text=Hub V1");
   check("hub=v1 filter renders Hub V1 rows (wire casing normalized)", /Hub V1/.test(v1) && !/Hub V2/.test(v1));
 
   // E. the 5-slice challenge position's detail page.

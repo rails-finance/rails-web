@@ -395,14 +395,12 @@ try {
   check("listing: market pair identity on rows", /\/ crvUSD/.test(body));
   check("listing: no page errors", pageErrors.length === 0, pageErrors.join(" | "));
 
-  await page.goto(`${BASE}${EXPLORER}?status=liquidated`, { waitUntil: "networkidle", timeout: 180000 });
+  // Closed with the "Closed by liquidation" switch (ui-jobs 805).
+  await page.goto(`${BASE}${EXPLORER}?status=closed&ended=liquidated`, { waitUntil: "networkidle", timeout: 180000 });
   body = await page.textContent("body");
   // The closed-card outcome pill renders "Liquidated" (mixed case — asserted
   // against the actual render, not an assumed all-caps).
-  check(
-    "listing: status=liquidated filter renders Liquidated cards",
-    /Liquidated/.test(body) && !/\bOPEN\b/.test(body),
-  );
+  check("listing: Closed by liquidation renders Liquidated cards", /Liquidated/.test(body) && !/\bOPEN\b/.test(body));
 
   // The soft-liq subject, found at run time — see findSoftLiq(). Everything
   // from here to the end of section 3 asserts against the chain read it

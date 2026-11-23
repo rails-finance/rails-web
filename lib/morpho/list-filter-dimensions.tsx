@@ -17,7 +17,8 @@
 // well-defined whether or not the roster has landed.
 //
 // How a selection reaches the backend:
-//   • Status            → `status` (CSV, OR within).
+//   • Status            → `status`: Open, Closed or All, with "Closed by
+//     liquidation" (`ended`) narrowing Closed (ui-jobs 805).
 //   • Market picks, and free text matched against roster labels → `market`
 //     (CSV of market ids, capped — see MORPHO_MARKET_CSV_CAP).
 //   • Loan / Collateral → `loan` / `coll` (CSV of ERC-20 ADDRESSES). Not market
@@ -51,12 +52,12 @@ import { shortMarketId } from "@/lib/morpho/asset-catalog";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 import {
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  isAllStatuses,
-  sameStatusSet,
+  defaultStatusChoice,
+  endedByLiquidation,
+  morphoStatusBuckets,
+  statusChoice,
 } from "@/lib/morpho/listing-visibility";
+import { ENDED_BY_LIQUIDATION, setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** The backend caps `limit` at 500; 20 keeps the page light and the grid familiar. */
 export const MORPHO_ITEMS_PER_PAGE = 20;
@@ -82,7 +83,11 @@ const MORPHO_DEBT_TOP = 250_000_000;
 const MORPHO_SIZE_NOTE = "Debt in the market's loan asset; pick a loan asset to compare like with like.";
 
 export interface MorphoListFilters extends BaseListFilters {
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
+  /** "" | "liquidated" — with Closed, the positions that ended by liquidation.
+   *  URL param `ended`. */
+  ended: string[];
   /** 0x-prefixed market ids, as a position row carries them. */
   markets: string[];
   /** Loan token SYMBOLS; mapped to addresses through the roster. */
@@ -97,14 +102,13 @@ export interface MorphoListFilters extends BaseListFilters {
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
 // listing-visibility.ts resolves it per context — the open positions on the bare directory,
-// every status once the search names an identity. Because the default is contextual rather
-// than a selection it draws no chip and no Reset link, and a cleared selection resolves back
-// to what the context rests on.
+// every status once the search names an identity.
 export const MORPHO_LIST_DEFAULTS: MorphoListFilters = {
   q: "",
   sortBy: "lastActivity",
   sortOrder: "desc",
   status: [],
+  ended: [],
   markets: [],
   loanAssets: [],
   collateralAssets: [],
@@ -120,12 +124,6 @@ export const MORPHO_SORT_OPTIONS: SortOption[] = [
   { value: "lastActivity", label: RECENT_ACTIVITY_LABEL },
   { value: "created", label: "First seen" },
   { value: "events", label: "Event count" },
-];
-
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated" },
 ];
 
 /** What the driver hands the registry: the roster once it has settled, and
@@ -190,17 +188,28 @@ export function morphoListDimensions(
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
-      set: (f, v) => {
-        const sel = canonicalStatuses(v);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
-      },
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses (ui-jobs 805).
+      set: (f, v) => ({ ...f, ...setStatusChoice(v, defaultStatusChoice(f), f.ended) }),
+    },
+    {
+      id: "ended",
+      label: "Closed by liquidation",
+      // Its own group, for its pill; in the panel it sits under Status.
+      group: "Closed by liquidation",
+      cardinality: "single",
+      param: "ended",
+      options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
+      // Offered with Closed, which it narrows.
+      available: (f) => statusChoice(f) === "closed",
+      get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
+      set: (f, v) => ({ ...f, ended: v }),
+      chipLabel: () => "Closed by liquidation",
     },
     {
       id: "markets",
@@ -374,8 +383,8 @@ export function morphoFiltersToFetchParams(
 
   const base: FetchMorphoPositionsParams = {
     user: target.wallet,
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // All maps to no status filter; Closed asks for closed and liquidated.
+    status: morphoStatusBuckets(filters) as FetchMorphoPositionsParams["status"],
     ...sizeBounds(filters, { debt: "unit" }),
     ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as MorphoPositionSort,
@@ -468,11 +477,12 @@ export function reconcileMorphoFacets(
 // The same listing on one market's own page (/ethereum/morpho/markets/<loan>/
 // <id>). The market rides every fetch as the one `market` id the route has
 // always taken, so no roster is needed, and the facets that pick markets or
-// tokens are not offered — only Status. The search box takes a wallet.
+// tokens are not offered — only Status and its "Closed by liquidation" switch.
+// The search box takes a wallet.
 
-/** The registry on a market's page: Status alone. */
+/** The registry on a market's page: Status and its switch. */
 export function morphoMarketDimensions(filters: MorphoListFilters): SerializableDimension<MorphoListFilters>[] {
-  return morphoListDimensions(filters, undefined).filter((d) => d.id === "status");
+  return morphoListDimensions(filters, undefined).filter((d) => d.id === "status" || d.id === "ended");
 }
 
 /** The fetch, with the market fixed. Null — nothing asked, the empty state
@@ -490,8 +500,8 @@ export function morphoMarketFetchParams(
   return {
     user: target.wallet,
     market: id,
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // All maps to no status filter; Closed asks for closed and liquidated.
+    status: morphoStatusBuckets(filters) as FetchMorphoPositionsParams["status"],
     sortBy: filters.sortBy as MorphoPositionSort,
     sortOrder: filters.sortOrder,
     limit: MORPHO_ITEMS_PER_PAGE,

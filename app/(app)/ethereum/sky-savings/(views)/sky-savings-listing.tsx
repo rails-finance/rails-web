@@ -21,6 +21,7 @@ import {
   type SkyListRow,
 } from "@/lib/sky-savings/listing";
 import { SKY_BASE_PATH, skyPositionHref } from "@/lib/sky-savings/constants";
+import { skyCountLine, statusChoice } from "@/lib/sky-savings/listing-visibility";
 
 export interface SkySavingsListingProps {
   initialItems?: SkyListRow[];
@@ -62,6 +63,7 @@ export function SkySavingsListing({ initialItems, initialTotal, initialKey, init
     <ChainTruthListingPage<SkyListRow, SkyListFilters>
       title="Sky Savings positions"
       noun="positions"
+      countLine={skyCountLine}
       basePath={SKY_BASE_PATH}
       defaults={SKY_LIST_DEFAULTS}
       sortOptions={skySortOptions}
@@ -72,8 +74,7 @@ export function SkySavingsListing({ initialItems, initialTotal, initialKey, init
         if (!c) return null;
         const n = (v: number) => v.toLocaleString("en-US");
         // The open list's count, where it is the holders less the contracts.
-        const openList =
-          !filters.q && (filters.status.length === 0 || (filters.status.length === 1 && filters.status[0] === "open"));
+        const openList = !filters.q && statusChoice(filters) === "open";
         const listed = openList && c.excluded > 0 && total === c.holdersOpen - c.excluded;
         return (
           <p className="mb-3 text-xs leading-relaxed text-rb-500">
@@ -95,6 +96,9 @@ export function SkySavingsListing({ initialItems, initialTotal, initialKey, init
         dimensions: skyListDimensions(),
         itemsPerPage: SKY_ITEMS_PER_PAGE,
         fetchPage: (filters, page) => fetchSkyListingPage(filters, page),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchSkyListingPage(filters, 1, undefined, undefined, undefined, 1).then((r) => r.total),
       })}
       onFilters={onFilters}
       renderError={(err) => (err instanceof SkyGateError ? <SkyGateStatement reason={err.reason} gate={null} /> : null)}

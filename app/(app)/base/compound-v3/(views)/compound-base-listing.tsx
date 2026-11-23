@@ -8,6 +8,7 @@
 // A row is one (Comet, account) pair, as on Ethereum, and opens that pair's
 // market page (lib/compound-base/routes.ts).
 
+import { compoundCountLine } from "@/lib/compound/listing-visibility";
 import { useCallback, useRef } from "react";
 import type { CompoundPositionSummary } from "@/lib/sources/api/compound-positions";
 import { fetchCompoundPositions } from "@/lib/api/fetch-compound-positions";
@@ -61,6 +62,7 @@ export function CompoundBaseListing({
     <ChainTruthListingPage<CompoundPositionSummary, CompoundListFilters>
       title="Compound V3 Accounts"
       noun="accounts"
+      countLine={compoundCountLine}
       basePath="/base/compound-v3"
       defaults={COMPOUND_BASE_LIST_DEFAULTS}
       sortOptions={COMPOUND_BASE_SORT_OPTIONS}
@@ -84,6 +86,11 @@ export function CompoundBaseListing({
             data: r.data,
             total: r.pagination.total,
           })),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchCompoundPositions({ ...compoundBaseFiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       onFilters={onFilters}
       initialItems={initialItems}

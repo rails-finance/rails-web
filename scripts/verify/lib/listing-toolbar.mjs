@@ -11,7 +11,8 @@
 // a panel in the page under the row (`data-filter-sheet="inline"`). Inside
 // both: `[data-filter-sheet-row="<id>"]` per dimension (a drill-in button, or
 // a `role="switch"` for a one-option dimension), `[data-filter-sheet-segments]`
-// for a two-option one, `[data-filter-sheet-range]` for a range, the open
+// for a two-option one and for Status (`[data-filter-sheet-segment="open|closed|all"]`,
+// ui-jobs 805), `[data-filter-sheet-range]` for a range, the open
 // sub-view `[data-filter-sheet-view="<id>"]` with `[data-filter-sheet-option]`
 // rows, and `[data-filter-sheet-show]`. Edits are staged until Show.
 //

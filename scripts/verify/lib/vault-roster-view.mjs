@@ -128,7 +128,8 @@ export async function checkRosterView({ page, base, route, scope, check, tag }) 
   }
 
   // "Every vault" in the pill's editor writes ?show=all and draws every row;
-  // its "Reset to default" returns.
+  // picking the preset in the same editor returns (a locked single choice
+  // draws no reset, ui-jobs 805).
   await openShown();
   await page.locator('[data-pill-editor="Shown"] [data-pill-option="all"]').first().click();
   await page.locator('[data-pill-editor="Shown"] [data-pill-editor-apply]').first().click();
@@ -142,10 +143,11 @@ export async function checkRosterView({ page, base, route, scope, check, tag }) 
     `${page.url()} → ${lifted} of ${allFunded.length}, pill ${await pillState()}`,
   );
   await openShown();
-  await page.locator('[data-pill-editor="Shown"] [data-pill-editor-remove]').first().click();
+  await page.locator('[data-pill-editor="Shown"] [data-pill-option="used"]').first().click();
+  await page.locator('[data-pill-editor="Shown"] [data-pill-editor-apply]').first().click();
   await page.waitForTimeout(500);
   check(
-    `${tag}g the pill's Reset to default restores the preset and drops the param`,
+    `${tag}g picking the preset in the Shown pill restores it and drops the param`,
     !new URL(page.url()).searchParams.has("show") &&
       (await shownCount()).shown === want.size &&
       (await pillState()) === "default",
