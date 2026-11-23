@@ -297,8 +297,8 @@ export function MobileSheet({
         // the undimmed rb-800 cards beneath it; the modal sheet sits over the
         // full scrim, so it takes rb-800 with an rb-600 top edge to stand
         // off the near-black page (ui-jobs 810). A sticky search row inside
-        // wears the sheet's surface: `.overlay-search` is drawn for the
-        // desktop popover's.
+        // takes the sheet's surface, since `.overlay-search` is drawn for
+        // the desktop popover.
         className={`absolute inset-x-0 bottom-0 flex flex-col rounded-t-2xl bg-raised [&_.overlay-search]:bg-raised! p-6 shadow-xl transition-transform duration-300 focus:outline-none ${
           live
             ? "max-h-[50vh] border-t border-rb-300 dark:border-rb-700 dark:bg-rb-900 dark:[&_.overlay-search]:bg-rb-900!"
