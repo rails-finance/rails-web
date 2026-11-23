@@ -39,13 +39,11 @@ export function AaveV3BaseListing({ initialItems, initialTotal, initialKey, init
       defaults={AAVE_V3_BASE_LIST_DEFAULTS}
       sortOptions={AAVE_V3_BASE_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"
-      // No replay lane behind a listing row: a closed row's "highest recorded"
-      // says so rather than dashing as if nothing was ever held.
+      // A closed row's face reads its per-reserve peaks, as on Ethereum.
       renderCard={(p) => (
         <AaveV3PositionCard
           v={viewFromSummary(p)}
           deployment={AAVE_V3_BASE_CARD_DEPLOYMENT}
-          peaks={false}
           notCollateral={notCollateralOf(p)}
         />
       )}
