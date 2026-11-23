@@ -25,7 +25,7 @@
 // USD keys by MARKET ID (Dolomite's own key — symbols collide on this
 // roster), priced by the core's own getMarketPrice.
 
-import { largestAssetFigure, useClosedPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
+import { useClosedPeaks, withPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
 import { PositionNameId } from "@/components/shared/position-name-id";
 import { positionName, type PositionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
@@ -356,25 +356,6 @@ export function useDolomiteCardSlots({
   let heads: PositionCardHead[];
   let outcome: PositionCardOutcome | undefined;
   if (v.status !== "open") {
-    // The detail card leads with the side's peak value from the page's flows
-    // timeline (components/shared/closed-peak.tsx); a listing row with its
-    // largest market's own peak amount, where the peak is in tokens (a par
-    // peak is no token amount).
-    const figureOf = (lines: DolomitePeakAmount[], side: "supply" | "debt") => {
-      return detail
-        ? peakOf(side === "supply" ? "collateral" : "debt", side === "supply" ? CARD_VOCAB.collateral : CARD_VOCAB.debt)
-        : largestAssetFigure(
-            lines
-              .filter((r) => r.tokens)
-              .map((r) => ({
-                symbol: r.symbol,
-                address: r.token ?? null,
-                amount: r.amount,
-                usdNow: lineUsd(v, r.marketId, r.amount),
-                ...(r.decimalsUnread ? { decimalsUnread: true as const } : {}),
-              })),
-          );
-    };
     const held = (lines: DolomitePeakAmount[], side: "supply" | "debt") =>
       lines.length > 0
         ? assetsHead(
@@ -383,23 +364,26 @@ export function useDolomiteCardSlots({
             <span className="text-sm font-semibold tabular-nums text-foreground">
               <PeakLines lines={lines} side={side} />
             </span>,
-            figureOf(lines, side),
           )
         : {};
-    heads = [
-      {
-        id: "peak-collateral",
-        label: CARD_VOCAB.collateral,
-        value: null,
-        ...held(v.peakSupplies, "supply"),
-      },
-      {
-        id: "peak-debt",
-        label: CARD_VOCAB.debt,
-        value: null,
-        ...held(v.peakBorrows, "debt"),
-      },
-    ];
+    heads = withPeaks(
+      [
+        {
+          id: "peak-collateral",
+          label: CARD_VOCAB.collateral,
+          value: null,
+          ...held(v.peakSupplies, "supply"),
+        },
+        {
+          id: "peak-debt",
+          label: CARD_VOCAB.debt,
+          value: null,
+          ...held(v.peakBorrows, "debt"),
+        },
+      ],
+      peakOf,
+      detail,
+    );
     outcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: outcomeDates(v) ?? (v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined),

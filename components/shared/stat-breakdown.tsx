@@ -31,9 +31,6 @@ export interface PanelRowBreakdown {
   label?: string;
 }
 
-/** "Peak $1,234,567.89 · 3 Mar 2025": a closed account's peak, exact. */
-export const peakWords = (usd: number, at: string) => `Peak ${formatUsdValue(usd)} · ${at}`;
-
 /** "1 asset", "10 assets": the count in a C19 button's name. */
 export const assetsWords = (n: number) => `${n} ${n === 1 ? "asset" : "assets"}`;
 
@@ -50,8 +47,7 @@ export function BreakdownOverlay({
 }: {
   id: string;
   label: string;
-  /** `at`: a closed account's peak, stated "Peak $… · day". */
-  total?: { usd: number; info: Provenance; at?: string };
+  total?: { usd: number; info: Provenance };
   anchor: () => HTMLElement | null;
   onClose: () => void;
   children: ReactNode;
@@ -62,7 +58,7 @@ export function BreakdownOverlay({
     <span className="contents" onClick={(e) => e.stopPropagation()}>
       <AnchoredPanel
         id={id}
-        label={total ? `${label} ${total.at ? peakWords(total.usd, total.at) : formatUsdValue(total.usd)}` : label}
+        label={total ? `${label} ${formatUsdValue(total.usd)}` : label}
         anchor={anchor}
         onClose={onClose}
         fit={420}
@@ -76,9 +72,7 @@ export function BreakdownOverlay({
           <span className={OVERLAY_HEADING}>{label}</span>
           {total && (
             <Prov info={total.info} echo>
-              <span className="text-sm font-semibold tabular-nums text-foreground">
-                {total.at ? peakWords(total.usd, total.at) : formatUsdValue(total.usd)}
-              </span>
+              <span className="text-sm font-semibold tabular-nums text-foreground">{formatUsdValue(total.usd)}</span>
             </Prov>
           )}
         </p>

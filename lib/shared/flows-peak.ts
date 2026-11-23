@@ -24,22 +24,27 @@ export interface SidePeakResult {
   /** Assets that left a day with no dollar figure, where any did. */
   unpriced: string[];
   /** Held rows of the side that `keep` matched none of, by symbol: a key the
-   *  card and the timeline spell differently shows here. */
+   *  card and the timeline spell differently shows here, as do assets the
+   *  card leaves out on purpose. */
   unmatched: string[];
+  /** The timeline's events stated a balance on the side for one of the
+   *  card's assets: the evidence that the side was held, at a close or
+   *  within a day. A day row states the balance after the day's last event,
+   *  so a side opened and emptied within a day is stated at 0. */
+  stated: boolean;
 }
 
 const cents = (v: number) => Math.round(v * 100) / 100;
 
 /** What a side's head states: its peak; no dollar figure, where every day it
  *  held something had an unpriced asset; held within a day, where the
- *  timeline has days but no day's close holds a balance above zero for the
- *  card's assets (a side opened and emptied between two closes); or nothing
- *  recorded, where the timeline has no days, or its rows for the side are
- *  assets the card does not list. */
-export function peakState(r: SidePeakResult, days: number): "peak" | "unpriced" | "within-day" | "not-recorded" {
+ *  timeline's events state a balance for one of the card's assets on the
+ *  side (`SidePeakResult.stated`) but no day's close holds it; or nothing
+ *  recorded, where they state none. */
+export function peakState(r: SidePeakResult): "peak" | "unpriced" | "within-day" | "not-recorded" {
   if (r.peak) return "peak";
   if (r.unpriced.length > 0) return "unpriced";
-  return days > 0 && r.unmatched.length === 0 ? "within-day" : "not-recorded";
+  return r.stated ? "within-day" : "not-recorded";
 }
 
 /** One asset a closed side lists: its symbol, and its key in the timeline
@@ -70,12 +75,22 @@ export function sidePeaks(
   heldAt: readonly (readonly FlowAssetHeld[])[],
   startDay: number,
   keep: Partial<Record<FlowSide, (row: FlowAssetHeld) => boolean>> = {},
+  /** The balances the timeline's events stated (its day rows' `balances`),
+   *  any amount: a side's evidence of being held. */
+  stated: readonly { side: FlowSide; asset: string; symbol: string }[] = [],
 ): Record<FlowSide, SidePeakResult> {
   const sides: FlowSide[] = ["collateral", "debt"];
   const out: Record<FlowSide, SidePeakResult> = {
-    collateral: { peak: null, unpriced: [], unmatched: [] },
-    debt: { peak: null, unpriced: [], unmatched: [] },
+    collateral: { peak: null, unpriced: [], unmatched: [], stated: false },
+    debt: { peak: null, unpriced: [], unmatched: [], stated: false },
   };
+  // A stated balance counts where `keep` takes its asset: one the card
+  // leaves out on purpose is no evidence for the side.
+  for (const b of stated) {
+    const k = keep[b.side];
+    if (!out[b.side].stated && (!k || k({ side: b.side, symbol: b.symbol, asset: b.asset, amount: 0, usd: 0 })))
+      out[b.side].stated = true;
+  }
   const unpriced = { collateral: new Set<string>(), debt: new Set<string>() };
   const unmatched = { collateral: new Set<string>(), debt: new Set<string>() };
   for (let stop = 0; stop < heldAt.length; stop++) {

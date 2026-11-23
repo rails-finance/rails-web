@@ -29,7 +29,14 @@
 // $14.4263): their lines carry the flag, and any USD headline they contribute
 // to says so in its receipt.
 
-import { largestAssetFigure, useClosedPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
+import {
+  mainAssetFigure,
+  rankingWords,
+  useClosedPeaks,
+  withPeaks,
+  type ClosedPeakFlows,
+} from "@/components/shared/closed-peak";
+import { pickMainAsset } from "@/lib/shared/main-asset";
 import { positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { headReadOf, serverReadOf, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
@@ -482,15 +489,29 @@ export function useCompoundV2CardSlots({
   // liquidated outcome appears only here: an open survivor never reaches this
   // branch, however many liquidations its counters show.
   if (ended) {
-    // The detail card leads with the side's peak value from the page's flows
-    // timeline (components/shared/closed-peak.tsx); a listing row with its
-    // largest market's own peak amount.
-    const figureOf = (lines: CompoundV2PeakAmount[], side: "supply" | "debt", label: string) => {
-      return detail
-        ? peakOf(side === "supply" ? "collateral" : "debt", label)
-        : largestAssetFigure(
-            lines.map((r) => ({ ...markOf(r), amount: r.amount, usdNow: lineUsd(v, r.market, r.amount) })),
-          );
+    // Each side leads with its main market at its highest recorded balance,
+    // the same on the listing row and the position page (both read the
+    // listing's prices, keyed by market, `pickMainAsset`).
+    const figureOf = (lines: CompoundV2PeakAmount[], side: "supply" | "debt") => {
+      const main = pickMainAsset(
+        lines.map((r) => ({ ...r, key: r.market })),
+        v.priceByMarket,
+      );
+      return main
+        ? mainAssetFigure({
+            main: {
+              ...markOf(main),
+              amount: main.amount,
+              exact: formatUnitsExact(main.amountRaw, main.decimals),
+            },
+            receipt:
+              side === "supply"
+                ? peakSupplyProv(main.symbol, ctokenOf(main.market))
+                : peakDebtProv(main.symbol, ctokenOf(main.market)),
+            ranking: rankingWords(null),
+            side: side,
+          })
+        : undefined;
     };
     const peakHead = (
       id: string,
@@ -507,14 +528,18 @@ export function useCompoundV2CardSlots({
             peakLabel,
             lines.map(markOf),
             <span className="text-sm font-semibold tabular-nums text-foreground">{peakValue(lines, side)}</span>,
-            figureOf(lines, side, label),
+            figureOf(lines, side),
           )
         : {}),
     });
-    const heads: PositionCardHead[] = [
-      peakHead("peak-collateral", SUPPLIED, CARD_VOCAB.peakSupplied, v.peakSupplies, "supply"),
-      peakHead("peak-debt", CARD_VOCAB.debt, CARD_VOCAB.peakDebt, v.peakBorrows, "debt"),
-    ];
+    const heads: PositionCardHead[] = withPeaks(
+      [
+        peakHead("peak-collateral", SUPPLIED, CARD_VOCAB.peakSupplied, v.peakSupplies, "supply"),
+        peakHead("peak-debt", CARD_VOCAB.debt, CARD_VOCAB.peakDebt, v.peakBorrows, "debt"),
+      ],
+      peakOf,
+      detail,
+    );
     const outcome: PositionCardOutcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: outcomeDates(v) ?? [{ at: v.lastActivityAt }],

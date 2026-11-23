@@ -138,23 +138,14 @@ await page.waitForTimeout(2500);
 const liqBody = await page.textContent("body");
 check("liquidated detail: outcome renders", /LIQUIDATED|Liquidated/.test(liqBody));
 check("liquidated detail: liquidation legs in the timeline", /Collateral seized|Liquidation/.test(liqBody));
-// The head leads with the side's peak value, "$1.2M" (one day's sum from the
-// Lifetime flows timeline), the icons beside it and "Peak · 3 Mar 2025" under
-// it (ui-jobs 803). The timeline is read after the card paints, so wait for
-// the figure.
-await page
-  .locator('[data-card-head="peak-collateral"] [data-card-peak]')
-  .first()
-  .waitFor({ state: "visible", timeout: 60000 })
-  .catch(() => {});
-const collHeadText = await page
-  .locator('[data-card-head="peak-collateral"]')
-  .first()
-  .evaluate((h) => h.innerText.replace(/\s+/g, " ").trim())
-  .catch(() => null);
+// A closed Dolomite head states its markets by their icons (ui-jobs 803): the
+// listing row holds par peaks and the position page token peaks, so neither
+// surface leads with one market's amount, and no dollar figure stands there.
+const collHead = page.locator('[data-card-head="peak-collateral"]').first();
+const collHeadText = await collHead.evaluate((h) => h.innerText.replace(/\s+/g, " ").trim()).catch(() => null);
 check(
-  "liquidated detail: closed collateral head states its peak value and day",
-  collHeadText != null && /\$[\d.,]+[KMB]?.*Peak · \d{1,2} [A-Z][a-z]{2} \d{4}/.test(collHeadText),
+  "liquidated detail: closed collateral head shows its markets, no dollar figure",
+  collHeadText != null && !/\$/.test(collHeadText) && (await collHead.locator("[data-card-assets-toggle]").count()) > 0,
   collHeadText ?? "no peak-collateral head",
 );
 // The peaks: each side states its markets' icons, and the C19 button they
@@ -168,6 +159,14 @@ for (const side of ["peak-collateral", "peak-debt"]) {
   const panel = page.locator("[data-breakdown-panel]");
   await panel.waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
   const text = (await panel.count()) > 0 ? await panel.innerText() : "";
+  // The dropdown states the side's peak value, or why there is none, under
+  // its heading (ui-jobs 803).
+  if (side === "peak-collateral")
+    check(
+      "liquidated detail: the collateral dropdown carries the peak line",
+      (await panel.locator("[data-card-peak-line]").count()) > 0,
+      text.slice(0, 120),
+    );
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
   if (/WLFI/.test(text)) peakWlfi = side;

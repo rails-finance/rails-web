@@ -49,9 +49,10 @@ import Link from "next/link";
 import { PositionCardStripSlot } from "@/components/shared/position-card-strip";
 import { PositionReadStamp } from "@/components/shared/position-read";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
-import { BreakdownOverlay, assetsWords, peakWords } from "@/components/shared/stat-breakdown";
+import { BreakdownOverlay, assetsWords } from "@/components/shared/stat-breakdown";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
-import type { AssetMark } from "@/lib/shared/asset-mark";
+import { withoutFirst, type AssetMark } from "@/lib/shared/asset-mark";
+import { PeakLine, type PeakHeadFigure } from "@/components/shared/closed-peak";
 import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
 import {
   PositionCardEdgeContext,
@@ -162,22 +163,25 @@ export interface PositionCardHead {
    *  the icon cluster opens their breakdown in a popover (a bottom sheet on
    *  a phone), one side at a time (`asset-donut.tsx`). */
   breakdown?: AssetBreakdown;
-  /** A side stated by its assets alone (a closed account's peaks): the
-   *  figure is the icon cluster, and on a detail card it is the C19 button
-   *  that opens `panel`, the assets one line each, in the same dropdown,
-   *  headed `label` (the peak label). A listing card draws the icons alone.
-   *  Built by `assetsHead`. */
+  /** A side stated by its assets (a closed account's peaks): on a detail
+   *  card the figure and its small line are the C19 button that opens
+   *  `panel`, the assets one line each, in the same dropdown, headed `label`
+   *  (the peak label). A listing card draws them with no button. Built by
+   *  `assetsHead`. */
   list?: { label: string; count: number; panel: ReactNode };
   /** A small line under the figure, inside the C19 button where there is one:
-   *  a closed account's peak day and its icons at 16 px (`assetsHead`). */
+   *  a closed account's other assets at 16 px (`assetsHead`). */
   below?: ReactNode;
-  /** Why a side shows no figure ("not recorded", "loading"): the C19
-   *  button's name carries it where there is no total. */
+  /** Words the C19 button's name carries where there is no total: a closed
+   *  side's figure and why its asset leads. */
   state?: string;
+  /** A closed account side's one-day peak value (components/shared/closed-
+   *  peak.tsx), on a detail card: its dropdown states it under the heading
+   *  (`PeakLine`); the face does not. */
+  peak?: PeakHeadFigure;
   /** The side's USD total and its receipt: the breakdown's heading states it
-   *  exact, and carries the receipt the headline (inside the button) cannot.
-   *  `at`: a closed account's peak, stated "Peak $… · day" there. */
-  total?: { usd: number; info: Provenance; at?: string };
+   *  exact, and carries the receipt the headline (inside the button) cannot. */
+  total?: { usd: number; info: Provenance };
 }
 
 /** A head stated by its assets (`PositionCardHead.list`), opening `panel`
@@ -186,42 +190,30 @@ export interface PositionCardHead {
  *  up to the lines.
  *
  *  Without `figure`, the icons are the figure. With it (a closed account's
- *  head, components/shared/closed-peak.tsx) the figure leads and a small line
- *  under it carries `note` and the icons at 16 px: every asset beside a peak
- *  in dollars, which no single asset is; the others beside `main`, the asset
- *  the figure is in, which draws its icon. A null figure (no dollar
- *  figure) reads as a dash, `note` saying why. `total` heads the dropdown
- *  with the receipt. */
+ *  main asset, components/shared/closed-peak.tsx) the figure leads with its
+ *  icon and a small line under it reads `also` ("Also supplied") with the
+ *  other assets at 16 px, `main` left out once (`withoutFirst`). */
 export function assetsHead(
   label: string,
   assets: AssetMark[],
   panel: ReactNode,
-  figure?: {
-    figure: ReactNode | null;
-    note?: ReactNode;
-    main?: AssetMark;
-    total?: PositionCardHead["total"];
-    state?: string;
-  },
-): Pick<PositionCardHead, "value" | "list" | "total" | "below" | "state"> {
+  figure?: { figure: ReactNode; main: AssetMark; state?: string; also?: string },
+): Pick<PositionCardHead, "value" | "list" | "below" | "state"> {
   const list = { label, count: assets.length, panel };
   if (!figure) return { value: <InlineAssetCluster assets={assets} />, list };
-  const main = figure.main;
-  // The main asset leaves the small line once: two markets sharing its
-  // symbol and address (cWBTC and cWBTC2) keep the other.
-  const mainAt = main ? assets.findIndex((a) => a.symbol === main.symbol && a.address === main.address) : -1;
-  const rest = assets.filter((_, i) => i !== mainAt);
-  const below =
-    figure.note != null || rest.length > 0 ? (
-      <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5" data-card-below="">
-        {figure.note}
-        {rest.length > 0 && <InlineAssetCluster assets={rest} size={16} overlap={5} />}
-      </span>
-    ) : undefined;
+  const rest = withoutFirst(assets, figure.main);
   return {
-    value: figure.figure ?? <span className="text-rb-400">—</span>,
-    ...(below ? { below } : {}),
-    ...(figure.total ? { total: figure.total } : {}),
+    value: figure.figure,
+    ...(rest.length > 0
+      ? {
+          below: (
+            <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5" data-card-below="">
+              {figure.also}
+              <InlineAssetCluster assets={rest} size={16} overlap={5} />
+            </span>
+          ),
+        }
+      : {}),
     ...(figure.state ? { state: figure.state } : {}),
     list,
   };
@@ -618,7 +610,6 @@ function HeadBody({
       aria-controls={toggle.open ? toggle.panelId : undefined}
       aria-label={[
         head.list ? head.list.label : head.total ? `${head.label} ${formatUsdValue(head.total.usd)}` : head.label,
-        head.list && head.total?.at ? peakWords(head.total.usd, head.total.at) : null,
         head.list && !head.total ? (head.state ?? null) : null,
         head.list ? assetsWords(head.list.count) : head.breakdown ? `${head.breakdown.assets.length} assets` : null,
         "show breakdown",
@@ -725,7 +716,10 @@ function useHeadPanels(heads: PositionCardHead[], detail: boolean) {
       onClose={close}
     >
       {openHead.list ? (
-        openHead.list.panel
+        <>
+          {openHead.peak && <PeakLine peak={openHead.peak} />}
+          {openHead.list.panel}
+        </>
       ) : openHead.breakdown ? (
         <AssetBreakdownPanel
           key={openHead.id}

@@ -38,7 +38,14 @@ import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { TokenAmountNotLoaded, loadedMarks } from "@/components/shared/not-loaded";
-import { largestAssetFigure, useClosedPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
+import {
+  mainAssetFigure,
+  rankingWords,
+  useClosedPeaks,
+  withPeaks,
+  type ClosedPeakFlows,
+} from "@/components/shared/closed-peak";
+import { pickMainAsset } from "@/lib/shared/main-asset";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { Icon } from "@/components/icons/icon";
@@ -484,21 +491,22 @@ export function useSparkCardSlots({
     // Unread switches: every supply heads the side, named as supplied (as
     // Aave V3's card does).
     const switchesRead = notCollateral != null;
-    // The detail card leads with the side's peak value from the page's flows
-    // timeline (components/shared/closed-peak.tsx); a listing row with its
-    // largest asset's own peak amount.
-    const figureOf = (reserves: SparkReserveAmount[], side: "supply" | "debt", label: string) => {
-      return detail
-        ? peakOf(side === "supply" ? "collateral" : "debt", label)
-        : largestAssetFigure(
-            reserves.map((r) => ({
-              symbol: r.symbol,
-              address: r.address,
-              amount: r.amount,
-              usdNow: reserveUsd(v, r.address, r.amount),
-              ...(r.decimalsUnread ? { decimalsUnread: true as const } : {}),
-            })),
-          );
+    // Each side leads with its main asset at its highest recorded balance,
+    // the same on the listing row and the position page (both read the
+    // listing's prices, `pickMainAsset`).
+    const figureOf = (reserves: SparkReserveAmount[], side: "supply" | "debt") => {
+      const main = pickMainAsset(
+        reserves.map((r) => ({ ...r, key: r.address })),
+        v.priceByAddress,
+      );
+      return main
+        ? mainAssetFigure({
+            main: { ...main, exact: formatUnitsExact(main.amountRaw, main.decimals) },
+            receipt: side === "supply" ? sparkPeakSupplyProv(main.symbol) : sparkPeakBorrowProv(main.symbol),
+            ranking: rankingWords(null),
+            side: side,
+          })
+        : undefined;
     };
     const supplyLabel = switchesRead ? CARD_VOCAB.collateral : "Supplied";
     const held = (reserves: SparkReserveAmount[], side: "supply" | "debt") =>
@@ -509,23 +517,27 @@ export function useSparkCardSlots({
             <span className="text-sm font-semibold tabular-nums text-foreground">
               <PeakLines reserves={reserves} side={side} />
             </span>,
-            figureOf(reserves, side, side === "supply" ? supplyLabel : CARD_VOCAB.debt),
+            figureOf(reserves, side),
           )
         : {};
-    heads = [
-      {
-        id: "peak-collateral",
-        label: supplyLabel,
-        value: peaksRead && switchesRead ? <PeakNone /> : null,
-        ...held(peakColl, "supply"),
-      },
-      {
-        id: "peak-debt",
-        label: CARD_VOCAB.debt,
-        value: peaksRead ? <PeakNone /> : null,
-        ...held(v.peakBorrows, "debt"),
-      },
-    ];
+    heads = withPeaks(
+      [
+        {
+          id: "peak-collateral",
+          label: supplyLabel,
+          value: peaksRead && switchesRead ? <PeakNone /> : null,
+          ...held(peakColl, "supply"),
+        },
+        {
+          id: "peak-debt",
+          label: CARD_VOCAB.debt,
+          value: peaksRead ? <PeakNone /> : null,
+          ...held(v.peakBorrows, "debt"),
+        },
+      ],
+      peakOf,
+      detail,
+    );
     outcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: [{ at: v.status === "liquidated" && outcomeAt != null ? outcomeAt : v.lastActivityAt }],

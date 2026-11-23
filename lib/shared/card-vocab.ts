@@ -16,9 +16,9 @@
 //   recorded …" for a last-known state that is not a peak; "not recorded" has
 //   one sentence.
 // - "Peak" is a side's one-day sum: its held assets valued together on the
-//   day they were worth the most (a closed account card's head, ui-jobs
-//   803). "Highest recorded" is one asset's lifetime maximum (the lines the
-//   head's dropdown lists).
+//   day they were worth the most (the line under a closed account card's
+//   dropdown heading, ui-jobs 803). "Highest recorded" is one asset's
+//   lifetime maximum (the dropdown's lines and the face's figure).
 //
 // Labels here are the column HEADERS (12px, sentence case). Tower segment
 // names ("Borrowed (all time)") and mode-pill words ("Borrowing", "Supply

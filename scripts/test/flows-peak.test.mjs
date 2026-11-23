@@ -74,19 +74,50 @@ test("keep matching no row: no peak, the timeline's symbols named", () => {
   assert.deepEqual(out.debt.unmatched, ["0xdac17f"]);
 });
 
+const said = (side, symbol, asset = `0x${symbol.toLowerCase()}`) => ({ side, symbol, asset });
+
 test("the states split by cause", () => {
   const priced = [[row("collateral", "WETH", 1, 2000)]];
-  assert.equal(peakState(sidePeaks(priced, 0).collateral, priced.length), "peak");
+  assert.equal(peakState(sidePeaks(priced, 0).collateral), "peak");
   const unpriced = [[row("collateral", "XYZ", 10, 0, null)]];
-  assert.equal(peakState(sidePeaks(unpriced, 0).collateral, unpriced.length), "unpriced");
-  // Days on record, none whose close holds a balance above zero for the side.
-  const within = [[], [row("collateral", "WETH", 0, 0)]];
-  assert.equal(peakState(sidePeaks(within, 0).collateral, within.length), "within-day");
-  // No days at all: nothing recorded.
-  assert.equal(peakState(sidePeaks([], 0).debt, 0), "not-recorded");
-  // Held rows the card's assets do not match: nothing recorded for them.
-  const other = [[row("collateral", "WETH", 1, 2000)]];
-  assert.equal(peakState(sidePeaks(other, 0, { collateral: () => false }).collateral, other.length), "not-recorded");
+  assert.equal(peakState(sidePeaks(unpriced, 0).collateral), "unpriced");
+  // No days, nothing stated: nothing recorded.
+  assert.equal(peakState(sidePeaks([], 0).debt), "not-recorded");
+});
+
+test("a side its events stated but no close held: held within a day", () => {
+  // WETH supplied and withdrawn on day 0: the day row states it at 0.
+  const heldAt = [[], []];
+  const out = sidePeaks(heldAt, 0, {}, [said("collateral", "WETH")]);
+  assert.equal(peakState(out.collateral), "within-day");
+});
+
+test("a side with no event balances: not recorded", () => {
+  const heldAt = [[], []];
+  const out = sidePeaks(heldAt, 0, {}, [said("collateral", "WETH")]);
+  assert.equal(peakState(out.debt), "not-recorded");
+});
+
+test("Aave's collateral held within a day beside a supply left out on purpose", () => {
+  // USDC backs no borrowing: the card keeps it off the collateral head.
+  const heldAt = [[row("collateral", "USDC", 5000, 5000)]];
+  const keep = { collateral: keepByKey([{ symbol: "WETH", key: "0xweth" }]) };
+  const out = sidePeaks(heldAt, 0, keep, [said("collateral", "WETH"), said("collateral", "USDC")]);
+  assert.equal(out.collateral.peak, null);
+  assert.equal(peakState(out.collateral), "within-day");
+  // The left-out supply alone is no evidence for the head.
+  const only = sidePeaks(heldAt, 0, keep, [said("collateral", "USDC")]);
+  assert.equal(peakState(only.collateral), "not-recorded");
+});
+
+test("a timeline that drops a side's balances: not recorded", () => {
+  // A cToken replay states debt only where the row read it: none here.
+  const heldAt = [[row("collateral", "DAI", 100, 100)]];
+  const out = sidePeaks(heldAt, 0, { debt: keepByKey([{ symbol: "USDC", key: "cusdc" }]) }, [
+    said("collateral", "DAI", "cdai"),
+  ]);
+  assert.equal(out.collateral.peak.usd, 100);
+  assert.equal(peakState(out.debt), "not-recorded");
 });
 
 test("two markets sharing a symbol stay apart by their key", () => {

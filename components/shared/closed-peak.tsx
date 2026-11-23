@@ -1,27 +1,39 @@
 "use client";
 
-// A closed account card's peak value per side (rails-ops ui-jobs 803): the
-// figure "$1.2M" with "Peak · 3 Mar 2025" on the small line under it, the
-// side's held assets summed on the day they were worth the most, each valued
+// A closed account card's head per side (rails-ops ui-jobs 803), the same on
+// the listing row and the position page: the side's main asset
+// (`pickMainAsset`, lib/shared/main-asset.ts) at its highest recorded balance
+// in its own token, drawn as an open card draws "0.11" with its icon
+// (`AssetAmount`, `mainAssetFigure` below). The small line under it reads
+// "Also supplied" or "Also borrowed" with the side's other assets
+// (`assetsHead`, components/shared/position-card.tsx). The figure's receipt
+// is the asset's highest-recorded receipt with one row stating why it leads;
+// the C19 button's name carries the same statement.
+//
+// The side's one-day peak value lives in the position page's dropdown alone:
+// `useClosedPeaks` computes it into `PositionCardHead.peak` (`withPeaks`), and
+// `PeakLine` draws it under the dropdown's heading.
+//
+// The peak value per side, as `useClosedPeaks` gives it: a figure "$1.2M"
+// and a note "Peak · 3 Mar 2025", the side's held assets summed on the day they were worth the most, each valued
 // as the Lifetime flows panel values that day (lib/shared/flows-peak.ts). It
 // reads the flows timeline the page holds for that panel, so the card makes
 // no read; it takes the page's flow model where the page passes one, else
 // builds it once per timeline, and both sides come from one pass over its
 // days. Rows match the card's assets by the timeline's key (a reserve's
 // address, a market), else by symbol. The figure's receipt is the panel's
-// held-figure receipt for that day (`heldDayProv`); inside the card's C19
-// button it stays inert, and the dropdown's heading carries it.
+// held-figure receipt for that day (`heldDayProv`).
 //
-// The small line states why a side has no figure, by cause:
+// Where a side has no peak, the note says why, by cause:
 //   - the read is running: a placeholder bar in the figure's place;
 //   - the read failed: "Unavailable" (the Trove card's word for a read that
 //     did not answer, components/trove/TroveDetailsBand.tsx);
 //   - every held day had an unpriced asset: "price unavailable"
 //     (`unavailableWords`), its receipt naming the assets;
-//   - the timeline has days but no day's close holds the side: "held within
-//     a day";
-//   - the timeline has no days, or none of the card's assets: "not
-//     recorded" (`NOT_RECORDED`, lib/shared/card-vocab.ts).
+//   - the timeline's events stated a balance for one of the side's assets
+//     but no day's close holds it: "held within a day";
+//   - they stated none: "not recorded" (`NOT_RECORDED`,
+//     lib/shared/card-vocab.ts).
 // Never a $0.
 
 import { useCallback, useMemo, type ReactNode } from "react";
@@ -35,8 +47,9 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { unavailableWords } from "@/components/shared/position-card-panel";
-import { formatCompactUsd } from "@/lib/shared/format-compact";
+import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { AssetAmount } from "@/components/shared/asset-amount";
+import type { AssetMark } from "@/lib/shared/asset-mark";
 import { formatUsdValue } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 
@@ -109,10 +122,18 @@ export function useClosedPeaks(
     // The card's name for each asset, for the receipt's rows.
     const nameOf = new Map<string, string>();
     for (const a of [...coll, ...debt]) if (a.key) nameOf.set(a.key.toLowerCase(), a.symbol);
-    const out = sidePeaks(model.heldAt, Math.round(model.start / DAY_MS), {
-      collateral: keepByKey(coll),
-      debt: keepByKey(debt),
-    });
+    // Each side and asset the timeline's events stated a balance for, once:
+    // a side's evidence of being held, at a close or within a day.
+    const stated = new Map<string, { side: FlowSide; asset: string; symbol: string }>();
+    for (const d of timeline?.days ?? [])
+      for (const b of d.balances)
+        stated.set(`${b.side}:${b.asset}`, { side: b.side, asset: b.asset, symbol: b.symbol });
+    const out = sidePeaks(
+      model.heldAt,
+      Math.round(model.start / DAY_MS),
+      { collateral: keepByKey(coll), debt: keepByKey(debt) },
+      [...stated.values()],
+    );
     for (const side of ["collateral", "debt"] as const) {
       const p = out[side].peak;
       if (p) p.rows = p.rows.map((r) => ({ ...r, symbol: nameOf.get(r.asset?.toLowerCase() ?? "") ?? r.symbol }));
@@ -127,8 +148,8 @@ export function useClosedPeaks(
           card: card.map((a) => a.symbol),
         });
     }
-    return { out, days: model.heldAt.length };
-  }, [model, key]);
+    return { out };
+  }, [model, timeline, key]);
   return useCallback(
     (side, label) => {
       if (!closed || !has || read === "withheld") return undefined;
@@ -147,7 +168,7 @@ export function useClosedPeaks(
           ? words(NOT_RECORDED, "data-card-not-recorded")
           : { figure: <SkeletonBar width={96} figure />, state: "loading" };
       const result = peaks.out[side];
-      const state = peakState(result, peaks.days);
+      const state = peakState(result);
       if (state === "unpriced")
         return words(unavailableWords(true), "data-card-unavailable", {
           kind: "derived",
@@ -192,33 +213,81 @@ export function useClosedPeaks(
   );
 }
 
-/** A listing row's figure for a closed side: its largest asset's highest
- *  recorded amount with that asset's icon, as an open card draws "0.11"
- *  with its icon (`AssetAmount`), and no USD; `main` names the asset, so the
- *  small line under it lists only the others. A listing holds no flows
- *  timeline, so no peak day; "largest" is by the row's current prices (each
- *  amount × its price now), since raw balances across decimals do not
- *  compare. An asset with no price now, or whose decimals did not load, is
- *  not a candidate; none left, no figure. */
-export function largestAssetFigure(
-  assets: readonly {
-    symbol: string;
-    address: string | null;
-    amount: number;
-    usdNow: number | null;
-    decimalsUnread?: true;
-  }[],
-): (PeakHeadFigure & { main: { symbol: string; address: string | null } }) | undefined {
-  let best: (typeof assets)[number] | undefined;
-  for (const a of assets)
-    if (!a.decimalsUnread && a.usdNow != null && (!best || a.usdNow > (best.usdNow as number))) best = a;
-  if (!best) return undefined;
+/** How the main asset was picked, in the receipt and the button's name:
+ *  "largest by value at the oracle price, block 21,345,678". */
+export const rankingWords = (block: number | null | undefined) =>
+  block != null
+    ? `largest by value at the oracle price, block ${block.toLocaleString("en-US")}`
+    : "largest by value at the latest oracle price";
+
+export function mainAssetFigure(o: {
+  main: { symbol: string; address: string | null; amount: number; exact?: string };
+  /** The asset's highest-recorded receipt (the dropdown line's). */
+  receipt: Provenance;
+  ranking: string;
+  side: "supply" | "debt";
+}): { figure: ReactNode; main: AssetMark; state: string; also: string } {
+  const { main } = o;
+  const info: Provenance = {
+    ...o.receipt,
+    inputs: [
+      ...(o.receipt.inputs ?? []),
+      { label: "shown first", value: main.symbol, kind: "derived", note: o.ranking },
+    ],
+  };
   return {
     figure: (
       <span data-card-largest="">
-        <AssetAmount value={best.amount} symbol={best.symbol} address={best.address ?? undefined} />
+        <Prov info={info}>
+          <AssetAmount
+            value={main.amount}
+            symbol={main.symbol}
+            address={main.address ?? undefined}
+            {...(main.exact ? { exact: main.exact } : {})}
+          />
+        </Prov>
       </span>
     ),
-    main: { symbol: best.symbol, address: best.address },
+    main: { symbol: main.symbol, address: main.address },
+    state: `${formatCompact(main.amount)} ${main.symbol}, largest by value`,
+    also: o.side === "debt" ? "Also borrowed" : "Also supplied",
   };
+}
+
+/** A detail card's closed heads with their one-day peak value in
+ *  `PositionCardHead.peak`, for the dropdown's `PeakLine`. */
+export function withPeaks<H extends { id: string; label: string }>(
+  heads: H[],
+  peakOf: (side: FlowSide, label: string) => PeakHeadFigure | undefined,
+  detail: boolean,
+): (H & { peak?: PeakHeadFigure })[] {
+  if (!detail) return heads;
+  return heads.map((h) =>
+    h.id.startsWith("peak-") ? { ...h, peak: peakOf(h.id === "peak-debt" ? "debt" : "collateral", h.label) } : h,
+  );
+}
+
+/** The position page's dropdown line for a closed side's peak, under the
+ *  dropdown's heading: "Peak value $2.9M · 1 Oct 2026" with its receipt, or
+ *  the state's words in its place ("price unavailable" with its receipt,
+ *  "held within a day", "not recorded"), or the placeholder bar while the
+ *  timeline is read. The face never draws it. */
+export function PeakLine({ peak }: { peak: PeakHeadFigure }) {
+  return (
+    <p className="-mt-1 mb-3 text-xs text-rb-500" data-card-peak-line="">
+      {peak.total ? (
+        <>
+          Peak value{" "}
+          <span data-card-peak="">
+            <RevealTip tip={formatUsdValue(peak.total.usd)}>
+              <Prov info={peak.total.info}>{formatCompactUsd(peak.total.usd)}</Prov>
+            </RevealTip>
+          </span>{" "}
+          · <span data-card-peak-day="">{peak.total.at}</span>
+        </>
+      ) : (
+        (peak.note ?? peak.figure)
+      )}
+    </p>
+  );
 }

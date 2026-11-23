@@ -41,7 +41,14 @@ import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
-import { largestAssetFigure, useClosedPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
+import {
+  mainAssetFigure,
+  rankingWords,
+  useClosedPeaks,
+  withPeaks,
+  type ClosedPeakFlows,
+} from "@/components/shared/closed-peak";
+import { pickMainAsset } from "@/lib/shared/main-asset";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { TokenFigure } from "@/components/shared/token-figure";
@@ -432,30 +439,29 @@ export function useAaveV3CardSlots({
   // debt (chain-state MAX over the account's life, per asset; no USD).
   if (v.status === "closed" || v.status === "liquidated") {
     const notRecorded = peaks ? undefined : notRecordedNote("position");
-    // Each side states the assets it held; their peaks, each at a different
-    // moment, open behind the press under the peak label (C19).
-    // The detail card leads with the side's peak value from the page's flows
-    // timeline (components/shared/closed-peak.tsx); a listing row with its
-    // largest asset's own peak amount.
+    // Each side leads with its main asset at its highest recorded balance,
+    // the same on the listing row and the position page (both read the
+    // listing's prices, `pickMainAsset`); the other assets sit on the small
+    // line, and every peak opens behind the press under the peak label (C19).
     const peakHead = (
       id: string,
       label: string,
       peakLabel: string,
-      side: "collateral" | "debt",
       reserves: AaveV3ReserveAmount[],
       receipt: (symbol: string) => Provenance,
     ): PositionCardHead => {
-      const figure = detail
-        ? peakOf(side, label)
-        : largestAssetFigure(
-            reserves.map((r) => ({
-              symbol: r.symbol,
-              address: r.address,
-              amount: r.amount,
-              usdNow: reserveUsd(v, r.address, r.amount),
-              ...(r.decimalsUnread ? { decimalsUnread: true as const } : {}),
-            })),
-          );
+      const main = pickMainAsset(
+        reserves.map((r) => ({ ...r, key: r.address })),
+        v.priceByAddress,
+      );
+      const figure = main
+        ? mainAssetFigure({
+            main: { ...main, exact: formatUnitsExact(main.amountRaw, main.decimals) },
+            receipt: receipt(main.symbol),
+            ranking: rankingWords(v.priceBlock),
+            side: id === "peak-debt" ? "debt" : "supply",
+          })
+        : undefined;
       return {
         id,
         label,
@@ -485,14 +491,7 @@ export function useAaveV3CardSlots({
     const peakOthers = split ? v.peakSupplies.filter(isOther) : [];
     const supplyHead = split
       ? {
-          ...peakHead(
-            "peak-collateral",
-            CARD_VOCAB.collateral,
-            CARD_VOCAB.peakCollateral,
-            "collateral",
-            peakColl,
-            dep.peakSupply,
-          ),
+          ...peakHead("peak-collateral", CARD_VOCAB.collateral, CARD_VOCAB.peakCollateral, peakColl, dep.peakSupply),
           ...(peakColl.length === 0 && v.peakSupplies.length > 0
             ? {
                 value: (
@@ -503,7 +502,7 @@ export function useAaveV3CardSlots({
               }
             : {}),
         }
-      : peakHead("peak-supplied", "Supplied", CARD_VOCAB.peakSupplied, "collateral", v.peakSupplies, dep.peakSupply);
+      : peakHead("peak-supplied", "Supplied", CARD_VOCAB.peakSupplied, v.peakSupplies, dep.peakSupply);
     const othersLines = (iconSize?: number) => (
       <span className="flex flex-col gap-1">
         {peakOthers.map((r) => (
@@ -546,10 +545,11 @@ export function useAaveV3CardSlots({
     const common = {
       name,
       status,
-      heads: [
-        supplyHead,
-        peakHead("peak-debt", CARD_VOCAB.debt, CARD_VOCAB.peakDebt, "debt", v.peakBorrows, dep.peakDebt),
-      ],
+      heads: withPeaks(
+        [supplyHead, peakHead("peak-debt", CARD_VOCAB.debt, CARD_VOCAB.peakDebt, v.peakBorrows, dep.peakDebt)],
+        peakOf,
+        detail,
+      ),
       identity,
       counters,
       outcome: {
