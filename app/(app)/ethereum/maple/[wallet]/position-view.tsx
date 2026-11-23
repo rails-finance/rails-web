@@ -550,9 +550,7 @@ export default function MaplePositionView({
             transfers, with this escrow named as the counterparty.
           </p>
         </ContractIdentityCard>
-        {custody != null && custody.length > 0 && (
-          <MapleCustodyCard infra={infra} wallet={wallet} holdings={custody} viewHref={tl.viewHref} />
-        )}
+        {custody != null && custody.length > 0 && <MapleCustodyCard infra={infra} wallet={wallet} holdings={custody} />}
         <ProvInspectorLayer />
       </div>
     );
@@ -598,7 +596,6 @@ export default function MaplePositionView({
                 <MaplePositionCard
                   v={view}
                   surface="detail"
-                  viewHref={tl.viewHref}
                   exports={exports}
                   captions={captions ?? undefined}
                   cancelledRequests={cancelledRequests}

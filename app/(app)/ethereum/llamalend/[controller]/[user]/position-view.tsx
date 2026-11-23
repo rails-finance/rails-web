@@ -435,7 +435,6 @@ export default function LlamalendPositionView({
               <LlamalendPositionCard
                 v={liveView}
                 surface="detail"
-                viewHref={tl.viewHref}
                 // The health from the live read is the third headline; the
                 // converted amount, the soft-liquidation multiple, what the AMM
                 // sold and lost and the band figures are panel rows, all inside

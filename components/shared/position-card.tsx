@@ -1129,9 +1129,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             {slots.band}
             {slots.foot}
             <SectionExplainer
-              // No copy-this-view link in the pane: the ⋮ carries Copy
-              // Position (ui-jobs 807).
-              slot={{ ...slots.explainer, viewHref: undefined }}
+              slot={slots.explainer}
               rowExtra={
                 slots.readStatus || counters ? (
                   <span className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-3 self-center">

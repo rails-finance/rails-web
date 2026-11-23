@@ -306,8 +306,6 @@ export interface AaveV4SpokeCardProps {
   pagePath?: string;
   /** The ⋮'s export shapes (`aaveV4Exports`). */
   exports?: PositionCardExports | null;
-  /** The (i) pane's copy-this-view link. */
-  viewHref?: () => string;
   /** A foot line (Base: the oracle prices and the reserves' pause state). */
   foot?: ReactNode;
 }
@@ -324,7 +322,6 @@ export function useAaveV4SpokeCardSlots({
   riskPremium,
   pagePath,
   exports,
-  viewHref,
   foot,
 }: AaveV4SpokeCardProps): PositionCardSlots {
   const { session } = useAaveV4Deployment();
@@ -363,7 +360,6 @@ export function useAaveV4SpokeCardSlots({
         <AaveV4PositionExplanation spoke={spoke} embedded externalActivity={externalActivity} />
       )
     ) : null,
-    viewHref,
   };
   const learnMore = showInfo ? aaveV4PositionModal(spoke.name, spoke.wasLiquidated) : null;
   const menu = {
@@ -613,7 +609,6 @@ export function AaveV4SpokeCardSelector({
   riskPremium,
   exports,
   pagePath,
-  viewHref,
   foot,
   ...rest
 }: AaveV4SpokeCardSelectorProps) {
@@ -653,7 +648,6 @@ export function AaveV4SpokeCardSelector({
               riskPremium={mine ? riskPremium : undefined}
               exports={mine ? exports : undefined}
               pagePath={mine ? pagePath : undefined}
-              viewHref={mine ? viewHref : undefined}
               foot={mine ? foot : undefined}
             />
           </div>

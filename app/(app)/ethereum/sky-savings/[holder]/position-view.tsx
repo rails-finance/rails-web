@@ -222,7 +222,6 @@ export default function SkySavingsPositionView({
           p={position}
           asOf={asOf}
           surface="detail"
-          viewHref={tl.viewHref}
           foot={checked}
           explanation={
             <SkySavingsPositionExplanation position={position} asOf={asOf} totals={totals} firstAt={firstAt} />

@@ -408,7 +408,6 @@ export default function MoonwellPositionView({
                   flows={{ read: flows.read, timeline: flows.timeline }}
                   v={cardView}
                   surface="detail"
-                  viewHref={tl.viewHref}
                   captions={captions ?? undefined}
                   // Credit remaining and the credit limit come from the live
                   // Comptroller read, inside the card's receipts scope.

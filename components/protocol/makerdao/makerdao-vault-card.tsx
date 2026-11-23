@@ -212,8 +212,6 @@ export interface MakerVaultCardProps {
   /** The card's Explanation section (the V4/trove "About this position" home):
    *  narration bullets describing the vault NOW. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes (`makerdaoExports`). Absent: the ⋮ holds the
    *  vault's rows and the provenance row alone. */
   exports?: PositionCardExports;
@@ -224,7 +222,6 @@ export function makerVaultCardSlots({
   v,
   surface = "listing",
   explanation,
-  viewHref,
   exports,
 }: MakerVaultCardProps): PositionCardSlots {
   const detail = surface === "detail";
@@ -293,7 +290,7 @@ export function makerVaultCardSlots({
   };
   const detailCommon = {
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: makerPositionModal(v.status, !!v.lse),
     menu,
   };

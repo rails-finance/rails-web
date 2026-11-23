@@ -327,8 +327,6 @@ export interface AaveV3PositionCardProps {
   receipts?: boolean;
   /** The card's (i) Explanation. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** Detail-page figures (accrued interest, borrow rate) — computed from the
    *  event stream + live Pool read (computeAaveV3CardCaptions). */
   captions?: AaveV3CardCaptions;
@@ -366,7 +364,6 @@ export function useAaveV3CardSlots({
   v,
   receipts = false,
   explanation,
-  viewHref,
   captions,
   chain,
   hfPending = false,
@@ -456,7 +453,7 @@ export function useAaveV3CardSlots({
     leading: () => <AaveV3MenuRows pagePath={pagePathOf(dep.session, v)} />,
     exports: exports ?? null,
   };
-  const explainer = { body: explanation ?? null, viewHref };
+  const explainer = { body: explanation ?? null };
   const isOther = (r: AaveV3ReserveAmount) => notCollateral?.has(r.address.toLowerCase()) === true;
 
   // The Pool read failed while the event tail is ahead of the index row.

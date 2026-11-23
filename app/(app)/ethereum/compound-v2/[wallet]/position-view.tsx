@@ -525,7 +525,6 @@ export default function CompoundV2PositionView({
                   flows={{ read: flows.read, timeline: flows.timeline }}
                   v={cardView}
                   surface="detail"
-                  viewHref={tl.viewHref}
                   captions={captions ?? undefined}
                   // The risk headline and the panel's line rows come from the live
                   // Comptroller read, inside the card's receipts scope.

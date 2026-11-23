@@ -24,7 +24,6 @@ export function BasedollarPositionCard({
   v,
   receipts = false,
   explanation,
-  viewHref,
   live,
   compact,
   surplus,
@@ -37,8 +36,6 @@ export function BasedollarPositionCard({
   receipts?: boolean;
   /** The card's Explanation section (live narration + risk strips). */
   explanation?: ReactNode;
-  /** Copy-this-view control: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The detail page's live branch read — see LiquityPositionCard for the
    *  live-override behaviour. Listings omit it. */
   live?: LiquityForkTroveChainResponse | null;
@@ -59,7 +56,6 @@ export function BasedollarPositionCard({
       v={v}
       surface={receipts ? "detail" : "listing"}
       explanation={explanation}
-      viewHref={viewHref}
       live={live ? liveFromForkChain(live) : live}
       compact={compact}
       surplus={surplus}

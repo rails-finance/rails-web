@@ -284,8 +284,6 @@ export interface MoonwellPositionCardProps {
   peaks?: boolean;
   /** The card's Explanation section (narration describing the position NOW). */
   explanation?: ReactNode;
-  /** Copy-this-view control, the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** Detail-page stat captions (accrued interest, borrow rate) — computed from
    *  the event stream + the per-market chain read (computeMoonwellCardCaptions).
    *  Listing cards omit them. */
@@ -306,7 +304,6 @@ export function useMoonwellCardSlots({
   chain = null,
   peaks = true,
   explanation,
-  viewHref,
   captions,
   exports,
   flows,
@@ -564,7 +561,7 @@ export function useMoonwellCardSlots({
     ...common,
     surface: "detail" as const,
     heads,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: ended ? moonwellPositionModal(v.status) : moonwellPositionModal(v.status, v.borrows.length > 0),
     menu,
   };

@@ -547,7 +547,6 @@ export default function FxPositionView({
               <FxPositionCard
                 v={view}
                 surface="detail"
-                viewHref={tl.viewHref}
                 exports={exports}
                 drift={drift}
                 rebalanceRows={historyWindow.state === "whole" ? rebalanceRows : undefined}

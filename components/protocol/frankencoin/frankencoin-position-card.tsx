@@ -326,8 +326,6 @@ export interface FrankencoinPositionCardProps {
   challengeTally?: number | null;
   /** The (i) pane's prose. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes; `null` leaves the position's rows and the
    *  provenance row. */
   exports?: PositionCardExports | null;
@@ -344,7 +342,6 @@ export function useFrankencoinCardSlots({
   live,
   challengeTally = null,
   explanation,
-  viewHref,
   exports,
 }: FrankencoinPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
@@ -507,7 +504,7 @@ export function useFrankencoinCardSlots({
   const detailCommon = {
     ...common,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: frankencoinPositionModal({
       status: v.status,
       forcedSale: ended ? ending?.forcedAt != null : undefined,

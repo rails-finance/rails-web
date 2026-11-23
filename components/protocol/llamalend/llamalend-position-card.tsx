@@ -174,8 +174,6 @@ export interface LlamalendPositionCardProps {
   sold?: number | null;
   /** The card's Explanation section (narration describing the position NOW). */
   explanation?: React.ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** A line that stays in the card's foot: the loans line on a position with
    *  more than one loan, the owner's outcome on a liquidated one. */
   foot?: React.ReactNode;
@@ -246,7 +244,6 @@ export function useLlamalendCardSlots({
   lost,
   sold,
   explanation,
-  viewHref,
   foot,
   exports,
 }: LlamalendPositionCardProps): PositionCardSlots {
@@ -401,7 +398,7 @@ export function useLlamalendCardSlots({
     ...common,
     heads,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: llamalendPositionContent(
       open
         ? { status: v.status, inSoftLiq: v.inSoftLiq ?? undefined, bands: chain?.hasLoan ? chain.bands : null }

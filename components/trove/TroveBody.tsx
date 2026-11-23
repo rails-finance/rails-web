@@ -303,7 +303,6 @@ export function TroveBody({
           redeemedFirst={redeemedFirst}
           debtInFrontLoading={debtInFrontLoading}
           priceFailed={priceFailed}
-          viewHref={tl.viewHref}
           surplus={surplus}
           shutdown={shutdown}
           branchNotice={branchNotice}

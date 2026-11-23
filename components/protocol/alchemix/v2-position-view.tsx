@@ -223,7 +223,7 @@ export function AlchemixV2PositionView({
     heads: [v2DebtHead(p, debtProv), v2CollateralHead(p, underlyingProvAt)],
     outcome: v2Outcome(p, v3SuccessorLinks(p, successorHref)),
     counters: null,
-    explainer: { body: explanation, viewHref: tl.viewHref },
+    explainer: { body: explanation },
     learnMore: null,
     menu: {
       leading: () => (

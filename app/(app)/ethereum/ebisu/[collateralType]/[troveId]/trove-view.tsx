@@ -553,7 +553,6 @@ export default function EbisuTroveDetail({
                 v={view}
                 receipts
                 surplus={surplus}
-                viewHref={tl.viewHref}
                 live={liveRisk ? chain : undefined}
                 shutdown={shutdown}
                 // The live read's rows in the panel, inside the card's receipts scope.

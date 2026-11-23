@@ -372,8 +372,6 @@ export interface CompoundV2PositionCardProps {
   captions?: CompoundV2CardCaptions;
   /** The (i) pane's prose (narration describing the position NOW). */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes (`compoundV2Exports`). Absent: the ⋮ holds the
    *  account's rows and the provenance row alone. */
   exports?: PositionCardExports;
@@ -389,7 +387,6 @@ export function useCompoundV2CardSlots({
   chain = null,
   captions,
   explanation,
-  viewHref,
   exports,
   flows,
 }: CompoundV2PositionCardProps): PositionCardSlots {
@@ -475,7 +472,7 @@ export function useCompoundV2CardSlots({
   };
   const detailCommon = {
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: compoundV2PositionModal({ status: v.status, hasDebt: v.borrows.length > 0 }),
     menu,
   };

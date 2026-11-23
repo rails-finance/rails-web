@@ -134,7 +134,6 @@ export interface SkySavingsPositionCardProps {
   explanation?: ReactNode;
   /** A line at the card's foot: the block the gate checked the page against. */
   foot?: ReactNode;
-  viewHref?: () => string;
 }
 
 export function skySavingsCardSlots({
@@ -143,7 +142,6 @@ export function skySavingsCardSlots({
   surface = "listing",
   explanation,
   foot,
-  viewHref,
 }: SkySavingsPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
   // A position that holds nothing keeps its figures (the interest it earned)
@@ -214,7 +212,7 @@ export function skySavingsCardSlots({
         : [],
     ],
     foot,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: skyPositionContent(),
     menu: { leading: () => <SkyMenuRows holder={p.holder} />, exports: null },
   };

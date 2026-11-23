@@ -13,9 +13,8 @@
 // line under it. The Date opens the navigator panel (the month grid) under
 // the strip. Driven by a
 // useTimelineEvents() state object, so a page wires it in one line. The
-// copy-link control that puts the current VIEW on the clipboard
-// (`tl.viewHref`) is in the position card's Explanation pane — see
-// `CopyViewLink` in `provenance-info-tabs.tsx`.
+// position card's ⋮ "Link to this …" row copies the current VIEW
+// (`lib/shared/position-link.ts`).
 
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";

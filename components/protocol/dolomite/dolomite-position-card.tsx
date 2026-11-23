@@ -251,8 +251,6 @@ export interface DolomitePositionCardProps {
   chainPending?: boolean;
   /** The card's Explanation section (narration describing the account NOW). */
   explanation?: React.ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** Detail-page captions (borrow rate), from the market-state read. */
   captions?: DolomiteCardCaptions;
   /** The ⋮'s export shapes. `null`: the ⋮ holds the account's rows and the
@@ -272,7 +270,6 @@ export function useDolomiteCardSlots({
   chain,
   chainPending = false,
   explanation,
-  viewHref,
   captions,
   exports,
   flows,
@@ -474,7 +471,7 @@ export function useDolomiteCardSlots({
     ...common,
     heads,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore:
       v.status === "open"
         ? dolomitePositionContent({ status: v.status, hasDebt: v.borrows.length > 0 })

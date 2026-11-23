@@ -396,8 +396,6 @@ export interface SparkPositionCardProps {
   outcomeAt?: number;
   /** The (i) pane's prose. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes; `null` leaves the link and the provenance row. */
   exports?: PositionCardExports | null;
   /** The page's Lifetime flows timeline and its read: a closed card's peak
@@ -415,7 +413,6 @@ export function useSparkCardSlots({
   lives,
   outcomeAt,
   explanation,
-  viewHref,
   exports,
   flows,
 }: SparkPositionCardProps): PositionCardSlots {
@@ -651,7 +648,7 @@ export function useSparkCardSlots({
   const detailCommon = {
     ...common,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: ended ? sparkPositionModal(v.status) : sparkPositionModal(v.status, v.borrows.length > 0),
     menu: { leading: () => <SparkMenuRows wallet={v.wallet} />, exports: exports ?? null },
   };

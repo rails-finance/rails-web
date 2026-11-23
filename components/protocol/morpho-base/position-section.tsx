@@ -281,7 +281,6 @@ export function MorphoBasePositionSection({
           <MorphoPositionCard
             v={{ ...view, vaultOwner }}
             surface="detail"
-            viewHref={tl.viewHref}
             session={deployment.session}
             // The LTV, the rate and the room to borrow from the live market read.
             live={chain}

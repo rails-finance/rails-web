@@ -571,7 +571,6 @@ export default function LiquityV1TroveView({
                 v={faceView}
                 surface="detail"
                 live={chainLive != null}
-                viewHref={tl.viewHref}
                 surplus={surplus}
                 priceUsd={priceNow}
                 endedBy={lastRow ? endedBy : null}

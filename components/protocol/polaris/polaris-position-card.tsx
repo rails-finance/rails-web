@@ -409,8 +409,6 @@ export interface PolarisPositionCardProps {
    *  (hooks/usePolarisUiState.ts); the listing render passes neither. */
   explanationDefaultOpen?: boolean;
   onExplanationToggle?: (open: boolean) => void;
-  /** Copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes (`polarisExports`). Absent: the ⋮ holds the CDP's
    *  rows and the provenance row alone. */
   exports?: PositionCardExports;
@@ -465,7 +463,6 @@ export function polarisCardSlots({
   explanation,
   explanationDefaultOpen,
   onExplanationToggle,
-  viewHref,
   exports,
   lifetime,
   againstHolding,
@@ -757,7 +754,6 @@ export function polarisCardSlots({
       body: explanation ?? null,
       defaultOpen: explanationDefaultOpen,
       onToggle: onExplanationToggle,
-      viewHref,
     },
     learnMore: polarisPositionModal(v.status),
     menu,

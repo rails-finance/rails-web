@@ -354,8 +354,6 @@ export interface CompoundPositionCardProps {
   peaks?: boolean;
   /** The (i) pane's prose. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The position page's path, for the ⋮'s link row. */
   pagePath?: string;
   /** The ⋮'s export shapes; `null` leaves the link and provenance rows. */
@@ -372,7 +370,6 @@ export function useCompoundCardSlots({
   lane = {},
   peaks = true,
   explanation,
-  viewHref,
   pagePath,
   exports,
 }: CompoundPositionCardProps): PositionCardSlots {
@@ -748,7 +745,7 @@ export function useCompoundCardSlots({
   const detailCommon = {
     ...common,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: compoundPositionModal({ status: v.status, deployment, side: ended ? undefined : eff.side }),
     menu,
   };

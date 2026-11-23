@@ -452,8 +452,6 @@ export interface PwnPositionCardProps {
   /** The card's Explanation section (the loan narrated as it stands now) —
    *  rendered by the shell on the detail surface. */
   explanation?: ReactNode;
-  /** Copy-this-view control, the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes (`pwnExports`). */
   exports?: PositionCardExports | null;
 }
@@ -465,7 +463,6 @@ export function pwnCardSlots({
   surface = "listing",
   viewer,
   explanation,
-  viewHref,
   exports,
 }: PwnPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
@@ -659,7 +656,7 @@ export function pwnCardSlots({
       status,
       heads,
       outcome,
-      explainer: { body: explanation ?? null, viewHref },
+      explainer: { body: explanation ?? null },
       learnMore,
       menu,
     };
@@ -747,7 +744,7 @@ export function pwnCardSlots({
     status,
     heads,
     panel: [left, right],
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore,
     menu,
   };

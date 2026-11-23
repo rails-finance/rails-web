@@ -18,8 +18,6 @@ export interface SectionExplainerSlot {
   /** Open the pane on mount (a surface that remembers it). */
   defaultOpen?: boolean;
   onToggle?: (open: boolean) => void;
-  /** The pane's copy-this-view link. */
-  viewHref?: () => string;
 }
 
 export function SectionExplainer({
@@ -51,7 +49,6 @@ export function SectionExplainer({
       rowExtra={rowExtra}
       explanation={slot.body == null ? undefined : snippet ? slot.body : <div data-nosnippet="">{slot.body}</div>}
       learnMore={learnMore}
-      viewHref={slot.viewHref}
       explanationDefaultOpen={slot.defaultOpen}
       onExplanationToggle={slot.onToggle}
       anatomy={{ ...anatomy, explanation: anatomy?.explanation ? `${anatomy.explanation} K3` : "K3" }}

@@ -801,7 +801,6 @@ export function AlchemistPositionView({
         explanationProps && hasAlchemixPositionExplanation(explanationProps) ? (
           <AlchemixPositionExplanation {...explanationProps} />
         ) : null,
-      viewHref: tl.viewHref,
     },
     learnMore: live ? alchemixPositionContent(position.status, `${deployment.basePath}/info`) : null,
     menu: {

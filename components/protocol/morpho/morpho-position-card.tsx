@@ -280,8 +280,6 @@ export interface MorphoPositionCardProps {
   live?: MorphoChainPositionResponse | null;
   /** The (i) Explanation: narration bullets describing the position NOW. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes; `null` or absent: the ⋮ holds the position's rows
    *  and the provenance row. */
   exports?: PositionCardExports | null;
@@ -295,7 +293,6 @@ export function useMorphoCardSlots({
   session = "morpho",
   live,
   explanation,
-  viewHref,
   exports,
 }: MorphoPositionCardProps): PositionCardSlots {
   // The chain and the capture lane are route facts: on a Base page the
@@ -666,7 +663,7 @@ export function useMorphoCardSlots({
   const detailCommon = {
     ...common,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore,
     menu,
   };

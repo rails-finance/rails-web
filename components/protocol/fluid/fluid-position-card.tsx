@@ -212,8 +212,6 @@ export interface FluidPositionCardProps {
   chainPending?: boolean;
   /** The card's Explanation section (narration describing the position NOW). */
   explanation?: ReactNode;
-  /** Copy-this-view control, the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes (`fluidExports`). */
   exports?: PositionCardExports | null;
 }
@@ -227,7 +225,6 @@ export function fluidCardSlots({
   chain = null,
   chainPending = false,
   explanation,
-  viewHref,
   exports,
 }: FluidPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
@@ -311,7 +308,7 @@ export function fluidCardSlots({
       surface: "detail",
       heads,
       outcome,
-      explainer: { body: explanation ?? null, viewHref },
+      explainer: { body: explanation ?? null },
       learnMore: fluidPositionContent({
         status: "closed",
         wasLiquidated: v.wasLiquidated,
@@ -448,7 +445,7 @@ export function fluidCardSlots({
     surface: "detail",
     heads,
     panel: [left, right],
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: fluidPositionContent({ status: "open", hasDebt }),
     menu: fluidMenu(v, exports),
   };

@@ -1,12 +1,11 @@
 // Live in-browser verification of the timeline's VIEW LINK — the URL grammar
 // useTimelineEvents reads and writes (`hide`, `hideAssets`, `hideAddresses`,
-// `from`/`to`), which the address bar carries (see the file header of
-// hooks/useTimelineEvents.ts).
+// `from`/`to`; see the file header of hooks/useTimelineEvents.ts).
 //
 // THE COPY-LINK CONTROL LEFT the position card's Explanation pane (ui-jobs
-// 807). The card's ⋮ "Link to this …" row copies the address bar on the
-// position's page, so `copyLink` presses that row and reads the clipboard; the
-// phone check states that the pane draws no control.
+// 807). The card's ⋮ "Link to this …" row copies the view on the position's
+// page (lib/shared/position-link.ts), so `copyLink` presses that row and reads
+// the clipboard; the phone check states that the pane draws no control.
 //
 // What it holds:
 //   1. A clean load stays clean: no param is written before a toggle, and the
@@ -122,7 +121,7 @@ const dateLabel = async (page) => {
 };
 
 /** The view's link, as the card's ⋮ copies it: its "Link to this …" row
- *  copies the address bar on the position's own page (lib/shared/
+ *  copies the view on the position's own page (lib/shared/
  *  position-link.ts, ui-jobs 807). Pressed until the menu opens: a press
  *  before hydration is lost. */
 async function copyLink(page) {

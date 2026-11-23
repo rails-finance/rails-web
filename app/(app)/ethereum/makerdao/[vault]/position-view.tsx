@@ -709,7 +709,6 @@ export default function MakerVaultDetailView({
                 <MakerVaultCard
                   v={cardView}
                   surface="detail"
-                  viewHref={tl.viewHref}
                   exports={exports ?? undefined}
                   // A terminal vault narrates from the replay + the timeline
                   // already on the page (no chain overlay needed); the open pane

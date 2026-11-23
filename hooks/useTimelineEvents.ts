@@ -89,10 +89,12 @@
 // toggle: a visitor who never touches the toolbar never has their saved
 // preference silently pasted into the address bar. That silence is about the
 // ADDRESS BAR — `viewHref()` composes the full current view into a link on
-// demand for the toolbar's copy-link control, which is an explicit share act
-// and works on a load where nothing was toggled.
+// demand for the position card's ⋮ link row (lib/shared/position-link.ts,
+// ui-jobs 807), an explicit share act that works on a load where nothing was
+// toggled.
 
 import { withoutLoneTo, type TimelineDates } from "@/lib/shared/timeline-dates";
+import { registerViewLink } from "@/lib/shared/position-link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import {
@@ -652,7 +654,7 @@ export function useTimelineEvents(
     sizeSides,
   ]);
 
-  // The same grammar, composed on demand for the copy-link control.
+  // The same grammar, composed on demand for the ⋮ link row.
   const viewHref = useCallback(() => {
     const url = new URL(window.location.href);
     writeViewParams(
@@ -670,6 +672,12 @@ export function useTimelineEvents(
     );
     return url.toString();
   }, [hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, sizeRanges, datesBy, sizeSides]);
+
+  // The ⋮ link row reads the view through the registry while this page is up.
+  useEffect(() => {
+    registerViewLink(viewHref);
+    return () => registerViewLink(null);
+  }, [viewHref]);
 
   const hiddenSet = useMemo(() => new Set(hiddenActions), [hiddenActions]);
   const hiddenAssetSet = useMemo(() => new Set(hiddenAssets), [hiddenAssets]);

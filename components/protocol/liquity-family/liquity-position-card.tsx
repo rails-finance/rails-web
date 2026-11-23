@@ -579,8 +579,6 @@ export interface LiquityPositionCardProps {
   compact?: boolean;
   /** The (i) pane's prose. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   explanationDefaultOpen?: boolean;
   onExplanationToggle?: (open: boolean) => void;
   /** A liquidated Trove's collateral surplus, read at the head. */
@@ -617,7 +615,6 @@ export function useLiquityCardSlots({
   live,
   compact = false,
   explanation,
-  viewHref,
   explanationDefaultOpen,
   onExplanationToggle,
   surplus,
@@ -1069,7 +1066,6 @@ export function useLiquityCardSlots({
       body: explanation ?? null,
       defaultOpen: explanationDefaultOpen,
       onToggle: onExplanationToggle,
-      viewHref,
     },
     learnMore,
     menu,

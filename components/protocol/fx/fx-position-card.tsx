@@ -650,9 +650,6 @@ export interface FxPositionCardProps {
   surface: "detail" | "listing";
   /** The card's Explanation section (narration describing the position NOW). */
   explanation?: ReactNode;
-  /** Copy-this-view control, forwarded to the shell: the page's
-   *  `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The per-interval socialized drift (the position page's fetch): gives the
    *  panel its collateral reconciliation row. */
   drift?: FxDriftResult | null;
@@ -674,7 +671,6 @@ export function useFxCardSlots({
   v,
   surface,
   explanation,
-  viewHref,
   drift,
   rebalanceRows,
   inTxFunding,
@@ -838,7 +834,7 @@ export function useFxCardSlots({
     ...common,
     heads,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: closed
       ? fxPositionContent({ status: v.everLiquidated ? "liquidated" : "closed", pool: poolMeta.tokenSymbol, terms })
       : fxPositionContent({

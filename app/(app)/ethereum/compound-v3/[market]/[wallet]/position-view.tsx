@@ -102,7 +102,6 @@ function Position({
   view: indexView,
   events,
   chain,
-  viewHref,
   folders,
   opening,
   flows,
@@ -118,8 +117,6 @@ function Position({
   chain: CompoundMarketChainResponse | null;
   /** A windowed page's opening balance: its actors join the Explanation's. */
   opening: TimelineOpeningBalance | null;
-  /** Copy-this-view control — the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The Lifetime flows panel. */
   flows: ReactNode;
   /** This position's page, for the card's ⋮ link row. */
@@ -180,7 +177,6 @@ function Position({
       <CompoundPositionCard
         v={view}
         surface="detail"
-        viewHref={viewHref}
         pagePath={pagePath}
         exports={exports}
         // The borrowing-limit headline and the panel's room and absorb rows
@@ -555,7 +551,6 @@ export default function CompoundPositionView({
                   events={compoundEvents}
                   chain={chain}
                   opening={opening}
-                  viewHref={tl.viewHref}
                   folders={servedFolders}
                   pagePath={`/ethereum/compound-v3/${market}/${wallet}`}
                   exports={exports}

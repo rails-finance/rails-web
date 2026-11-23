@@ -274,7 +274,7 @@ export function TransmuterPositionView({
     name,
     heads: transmuterHeads(p, maturity, provs),
     counters: null,
-    explainer: { body: explanation, viewHref: tl.viewHref },
+    explainer: { body: explanation },
     learnMore: null,
     menu: {
       leading: () => (

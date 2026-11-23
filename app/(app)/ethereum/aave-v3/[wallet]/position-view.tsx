@@ -890,7 +890,6 @@ export default function AaveV3PositionDetail({
                 <AaveV3PositionCard
                   v={cardView}
                   receipts
-                  viewHref={tl.viewHref}
                   captions={captions ?? undefined}
                   // The Pool read's room to borrow and eMode go in the panel,
                   // inside the card's receipts scope; the health factor pulses
