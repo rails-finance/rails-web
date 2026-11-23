@@ -2,8 +2,8 @@
 
 // Moonwell Base listing — client half. The shared Moonwell listing driver
 // pointed at the Base route, the shared Moonwell card bound to the Base lane
-// (session, sweep receipts, no replay peaks), and the one thing the Ethereum
-// listing never has to say: how complete the lane is.
+// (session, sweep receipts, the row's per-market peaks), and the one thing
+// the Ethereum listing never has to say: how complete the lane is.
 //
 // A row is one wallet's standing across every market under the one
 // Comptroller, as on Ethereum: every balance a chain read at the block the row

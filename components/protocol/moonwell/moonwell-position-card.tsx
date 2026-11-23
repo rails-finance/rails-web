@@ -82,6 +82,10 @@ export interface MoonwellPositionView {
   /** Highest recorded per-market supply / debt (closed/liquidated cards). */
   peakSupplies: MoonwellPeakAmount[];
   peakBorrows: MoonwellPeakAmount[];
+  /** Set where the server withheld the account's peaks (more than its
+   *  transaction cap, out of budget, a failed read, a plumbing wallet): the
+   *  closed face reads "not recorded". */
+  peakWithheld?: boolean;
   liquidationCount: number;
   /** Non-liquidation transaction count (activity-meta). */
   txCount: number;
@@ -277,10 +281,10 @@ export interface MoonwellPositionCardProps {
   /** The page's live Comptroller read: the Credit remaining headline and the
    *  panel's risk rows. Null while it is out; the listing passes none. */
   chain?: MoonwellChainResponse | null;
-  /** Whether the row carries highest-recorded amounts (the index's replay and
-   *  a whole sweep do; the Base listing, a chain read at a block with no
-   *  replay behind it, does not — its closed cards say so instead of showing
-   *  a dash as if nothing was ever held). */
+  /** Whether the row carries highest-recorded amounts (the index's replay,
+   *  a whole sweep and the Base listing's peakMarkets do); `false` makes the
+   *  closed cards say so instead of showing a dash as if nothing was ever
+   *  held. */
   peaks?: boolean;
   /** The card's Explanation section (narration describing the position NOW). */
   explanation?: ReactNode;
@@ -372,13 +376,17 @@ export function useMoonwellCardSlots({
     // states the assets it held, and the highest recorded per-market supply
     // and debt (replayed MAX over the wallet's life, per asset; no USD) open
     // behind the press under the peak label (C19).
-    const noPeaksNote = !peaks ? notRecordedNote("position") : undefined;
+    // No peaks on the lane, withheld by the server, or none on either side:
+    // every head reads "not recorded". A side never held beside one with
+    // peaks keeps its dash.
+    const unrecorded = !peaks || !!v.peakWithheld || (v.peakSupplies.length === 0 && v.peakBorrows.length === 0);
+    const noPeaksNote = unrecorded ? notRecordedNote("position") : undefined;
     // Each side leads with its main market at its highest recorded balance,
     // the same on the listing row and the position page (both read the
     // listing's prices, keyed by the underlying token, `pickMainAsset`, at
     // the market read's block).
     const held = (lines: MoonwellPeakAmount[], side: "supply" | "debt") => {
-      if (!peaks || lines.length === 0) return {};
+      if (unrecorded || lines.length === 0) return {};
       const pick = pickMainAsset(
         lines.map((r) => ({ ...r, key: r.address })),
         v.priceByAddress,
@@ -775,6 +783,7 @@ export function viewFromSummary(s: MoonwellPositionSummary): MoonwellPositionVie
     borrows: s.borrows,
     peakSupplies: s.peakSupplies,
     peakBorrows: s.peakBorrows,
+    peakWithheld: s.peakWithheld,
     liquidationCount: s.liquidationCount,
     txCount: s.txCount,
     lastActivityAt: s.lastActivityAt,

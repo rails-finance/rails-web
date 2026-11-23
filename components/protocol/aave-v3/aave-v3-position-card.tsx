@@ -115,6 +115,10 @@ export interface AaveV3PositionView {
   /** Highest recorded per-reserve supply / debt (closed / liquidated cards). */
   peakSupplies: AaveV3ReserveAmount[];
   peakBorrows: AaveV3ReserveAmount[];
+  /** Set where the server withheld the account's peaks (more than its
+   *  transaction cap, out of budget, a failed read, a plumbing wallet): the
+   *  closed face reads "not recorded". */
+  peakWithheld?: boolean;
   liquidationCount: number;
   /** Non-liquidation transaction count (activity-meta). */
   txCount: number;
@@ -339,10 +343,9 @@ export interface AaveV3PositionCardProps {
    *  receipts behind every figure. Ethereum's indexed lane by default; a Base
    *  lender passes its own (lib/aave-v3/card-deployment.tsx). */
   deployment?: AaveV3CardDeployment;
-  /** Whether this lane records "highest recorded" balances at all. A Base
-   *  LISTING row has no replay behind it, so its closed cards say so instead
-   *  of showing a dash as if nothing was ever held; the position page's
-   *  sweep supplies the peaks, so it keeps the default. */
+  /** Whether this lane records "highest recorded" balances at all. The
+   *  Arbitrum listing carries none, so its closed cards say so instead of
+   *  showing a dash as if nothing was ever held. */
   peaks?: boolean;
   /** The page is still reading the oracle prices: the USD headlines hold a bar in
    *  place, so nothing moves when the dollars land. */
@@ -469,12 +472,16 @@ export function useAaveV3CardSlots({
   // what each asset held at its height — highest recorded per-reserve supply +
   // debt (chain-state MAX over the account's life, per asset; no USD).
   if (v.status === "closed" || v.status === "liquidated") {
-    const notRecorded = peaks ? undefined : notRecordedNote("position");
+    // No peaks on the lane (Arbitrum's listing), withheld by the server, or
+    // none on either side: every head reads "not recorded". A side never held
+    // beside one with peaks keeps its dash.
+    const unrecorded = !peaks || !!v.peakWithheld || (v.peakSupplies.length === 0 && v.peakBorrows.length === 0);
+    const notRecorded = unrecorded ? notRecordedNote("position") : undefined;
     // Each side leads with its main asset at its highest recorded balance,
     // picked from the listing's prices (`pickMainAsset`): the same face on
     // the listing row and the position page where the listing carries the
-    // account's peaks (Ethereum). Base, Arbitrum and Seamless listings carry
-    // none, so their rows read "not recorded" while the page shows the face.
+    // account's peaks (Ethereum and Base). Arbitrum's listing carries none,
+    // so its rows read "not recorded" while the page shows the face.
     // The other assets sit on the small line, and every peak opens behind the
     // press under the peak label (C19).
     const peakHead = (
@@ -507,7 +514,7 @@ export function useAaveV3CardSlots({
         label,
         value: null,
         sub: notRecorded,
-        ...(peaks && reserves.length > 0
+        ...(!unrecorded && reserves.length > 0
           ? assetsHead(
               peakLabel,
               reserves.map((r) => ({ symbol: r.symbol, address: r.address })),
@@ -1178,6 +1185,7 @@ export function viewFromSummary(row: AaveV3PositionRow): AaveV3PositionView {
     borrows,
     peakSupplies,
     peakBorrows,
+    peakWithheld: row.peakWithheld,
     liquidationCount: row.liquidationCount,
     txCount: row.txCount,
     lastActivityAt: row.lastActivityAt,
