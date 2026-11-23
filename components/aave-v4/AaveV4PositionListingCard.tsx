@@ -186,7 +186,7 @@ export function AaveV4PositionListingCard({
     pclass: chainBalances ? "state" : "indexed",
     summary: chainBalances
       ? `${what}. The spoke's ${getter}, read when the row was served.${stored}`
-      : `${what}. The indexed balance, the live read having failed when the row was served.${stored}`,
+      : `${what}. The indexed balance; the read failed when the row was served.${stored}`,
     contract: { name: "Aave V4 spoke" },
     via: `Rails' Aave V4 spoke-positions row · spoke ${getter}`,
     ...(storedAtBlock != null ? { source: { block: storedAtBlock } } : {}),
@@ -277,11 +277,12 @@ export function AaveV4PositionListingCard({
   // beneath in cents; a side of several, compact dollars with the icons.
   const oneAsset = (
     r: AaveV4SpokeReserveSummary,
-    raw: string,
+    side: "supply" | "debt",
     receipt: AaveV4UsdResult | null,
   ): Pick<PositionCardHead, "value" | "usd"> => {
+    const debt = side === "debt";
+    const raw = debt ? r.debtBalanceRaw : r.supplyBalanceRaw;
     const amount = scaleChainBalance(raw, r.decimals);
-    const debt = raw === r.debtBalanceRaw && raw !== r.supplyBalanceRaw;
     return {
       value: (
         <Prov
@@ -315,7 +316,7 @@ export function AaveV4PositionListingCard({
       id: supplyOnly ? "supplied" : "collateral",
       label: supplyOnly ? "Supplied" : CARD_VOCAB.collateral,
       ...(oneColl
-        ? oneAsset(oneColl, oneColl.supplyBalanceRaw, collR)
+        ? oneAsset(oneColl, "supply", collR)
         : {
             assets: symbols.length > 0 ? <InlineAssetCluster assets={symbols.map(symbolOnly)} /> : undefined,
             value: collateralValue,
@@ -329,7 +330,7 @@ export function AaveV4PositionListingCard({
             id: "debt",
             label: CARD_VOCAB.debt,
             ...(oneDebt
-              ? oneAsset(oneDebt, oneDebt.debtBalanceRaw, debtR)
+              ? oneAsset(oneDebt, "debt", debtR)
               : {
                   assets:
                     calc.borrowingSymbols.length > 0 ? (

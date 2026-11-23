@@ -4,7 +4,7 @@
 // listing proxies pass it on unchanged, so no builder runs. On Arc the card
 // is one spoke of GET /api/at-block/aave-v4-arc/wallet, which rails-server
 // stores at each read of the wallet there. Every figure is that stored read's,
-// at its block: no head read.
+// at its block.
 
 import type { AaveV4SpokePositionRow } from "@/lib/api/fetch-aave-v4-spoke-positions";
 import { hfLabelV4 } from "@/lib/aave-v4/format";
