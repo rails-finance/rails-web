@@ -115,9 +115,9 @@ export interface AaveV3PositionView {
   /** Highest recorded per-reserve supply / debt (closed / liquidated cards). */
   peakSupplies: AaveV3ReserveAmount[];
   peakBorrows: AaveV3ReserveAmount[];
-  /** Set where the server withheld the account's peaks (more than its
-   *  transaction cap, out of budget, a failed read, a plumbing wallet): the
-   *  closed face reads "not recorded". */
+  /** Set where the server withheld a plumbing wallet's peaks; the
+   *  transaction cap, the read budget and a failed read arrive as empty peak
+   *  arrays. Either way the closed face reads "not recorded". */
   peakWithheld?: boolean;
   liquidationCount: number;
   /** Non-liquidation transaction count (activity-meta). */
@@ -472,7 +472,7 @@ export function useAaveV3CardSlots({
   // what each asset held at its height — highest recorded per-reserve supply +
   // debt (chain-state MAX over the account's life, per asset; no USD).
   if (v.status === "closed" || v.status === "liquidated") {
-    // No peaks on the lane (Arbitrum's listing), withheld by the server, or
+    // No peaks on the lane (Arbitrum's listing), peaks withheld for a plumbing wallet, or
     // none on either side: every head reads "not recorded". A side never held
     // beside one with peaks keeps its dash.
     const unrecorded = !peaks || !!v.peakWithheld || (v.peakSupplies.length === 0 && v.peakBorrows.length === 0);

@@ -75,9 +75,9 @@ export interface RawV3WalletRow {
   reserves: RawV3Reserve[];
   /** Per-reserve peaks (present for closed / liquidated accounts). */
   peakReserves?: RawV3PeakReserve[];
-  /** Set where the server withheld the account's peaks (more than its
-   *  transaction cap, out of budget, a failed read, a plumbing wallet): the
-   *  closed face reads "not recorded". */
+  /** Set where the server withheld a plumbing wallet's peaks; the
+   *  transaction cap, the read budget and a failed read arrive as empty peak
+   *  arrays. Either way the closed face reads "not recorded". */
   peakWithheld?: string | boolean | null;
   lastActivityAt: number;
   lastBlockNumber: number;

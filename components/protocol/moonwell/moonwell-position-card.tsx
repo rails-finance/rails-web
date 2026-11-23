@@ -82,9 +82,9 @@ export interface MoonwellPositionView {
   /** Highest recorded per-market supply / debt (closed/liquidated cards). */
   peakSupplies: MoonwellPeakAmount[];
   peakBorrows: MoonwellPeakAmount[];
-  /** Set where the server withheld the account's peaks (more than its
-   *  transaction cap, out of budget, a failed read, a plumbing wallet): the
-   *  closed face reads "not recorded". */
+  /** Set where the server withheld a plumbing wallet's peaks; the
+   *  transaction cap, the read budget and a failed read arrive as empty peak
+   *  arrays. Either way the closed face reads "not recorded". */
   peakWithheld?: boolean;
   liquidationCount: number;
   /** Non-liquidation transaction count (activity-meta). */
@@ -376,7 +376,7 @@ export function useMoonwellCardSlots({
     // states the assets it held, and the highest recorded per-market supply
     // and debt (replayed MAX over the wallet's life, per asset; no USD) open
     // behind the press under the peak label (C19).
-    // No peaks on the lane, withheld by the server, or none on either side:
+    // No peaks on the lane, peaks withheld for a plumbing wallet, or none on either side:
     // every head reads "not recorded". A side never held beside one with
     // peaks keeps its dash.
     const unrecorded = !peaks || !!v.peakWithheld || (v.peakSupplies.length === 0 && v.peakBorrows.length === 0);
