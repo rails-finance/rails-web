@@ -47,7 +47,7 @@ import {
 } from "@/lib/aave-v4/listing-visibility";
 import {
   ENDED_BY_LIQUIDATION,
-  readStatusParam,
+  setStatusChoice,
   STATUS_CHOICE_OPTIONS,
   type StatusChoice,
 } from "@/lib/shared/status-choice";
@@ -234,13 +234,8 @@ export function aaveV4ListDimensions(
     defaultValues: (f) => [defaultStatusChoice(f)],
     // Takes the choice, or an old link's list of statuses (ui-jobs 805).
     set: (f, values) => {
-      const read = readStatusParam(values);
-      const choice = read.choice ?? defaultStatusChoice(f);
-      return {
-        ...f,
-        statuses: choice === defaultStatusChoice(f) ? undefined : [choice],
-        ended: choice !== "closed" ? [] : read.endedByLiquidation ? [ENDED_BY_LIQUIDATION] : f.ended,
-      };
+      const { status, ended } = setStatusChoice(values, defaultStatusChoice(f), f.ended);
+      return { ...f, statuses: status.length ? status : undefined, ended };
     },
   };
 

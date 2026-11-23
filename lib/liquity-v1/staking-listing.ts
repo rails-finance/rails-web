@@ -11,7 +11,7 @@ import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filt
 import type { BaseListFilters, SerializableDimension } from "@/lib/shared/list-filter";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import { parseListingSearch, resolveEnsViaApi } from "@/lib/shared/listing-search";
-import { readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
+import { setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 import { defaultStatusChoice, namesWallet, statusChoice, statusParam } from "./sp-staking-visibility";
 import {
   readLiquityV1Staking,
@@ -52,10 +52,7 @@ export function stListDimensions(): SerializableDimension<StListFilters>[] {
       get: (f) => [statusChoice(f)],
       defaultValues: (f) => [defaultStatusChoice(f)],
       // Takes the choice, or an old link's list of statuses (ui-jobs 805).
-      set: (f, v) => {
-        const choice = readStatusParam(v).choice ?? defaultStatusChoice(f);
-        return { ...f, status: choice === defaultStatusChoice(f) ? [] : [choice] };
-      },
+      set: (f, v) => ({ ...f, status: setStatusChoice(v, defaultStatusChoice(f), []).status }),
     },
     transactionsDimension<StListFilters>({ get: (f) => f.tx, set: (f, tx) => ({ ...f, tx }), top: 2_000 }),
   ];

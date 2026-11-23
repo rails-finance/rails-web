@@ -13,11 +13,12 @@
 
 export type StatusChoice = "open" | "closed" | "all";
 
-/** The three segments, in the order the panel draws them. */
-export const STATUS_CHOICE_OPTIONS: { value: StatusChoice; label: string }[] = [
+/** The three segments, in the order the panel draws them. All is marked
+ *  `every`: a listing resting on it draws no Status pill. */
+export const STATUS_CHOICE_OPTIONS: { value: StatusChoice; label: string; every?: boolean }[] = [
   { value: "open", label: "Open" },
   { value: "closed", label: "Closed" },
-  { value: "all", label: "All" },
+  { value: "all", label: "All", every: true },
 ];
 
 /** The switch's one value, in the filters and in the URL (`?ended=liquidated`). */
@@ -46,6 +47,52 @@ export function readStatusParam(values: string[]): StatusRead {
   if (closed) return { choice: "closed", endedByLiquidation: false };
   if (liquidated) return { choice: "closed", endedByLiquidation: true };
   return { choice: null, endedByLiquidation: false };
+}
+
+/** A switch that narrows one choice: "Closed by liquidation" narrows Closed. */
+export interface StatusSwitch {
+  /** The switch's one value in the filters. */
+  value: string;
+  /** The choice it narrows; away from it the switch is off. */
+  narrows: StatusChoice;
+}
+
+/** The switch most families carry beside Status. */
+export const CLOSED_BY_LIQUIDATION: StatusSwitch = { value: ENDED_BY_LIQUIDATION, narrows: "closed" };
+
+/** A family's own reading of a `status` param: the choice, and whether an old
+ *  list turned the switch on. */
+export interface StatusIntent {
+  choice: StatusChoice | null;
+  switchOn: boolean;
+}
+
+export interface StatusSet {
+  /** The choice as stored: [] where it is the listing's resting choice. */
+  status: StatusChoice[];
+  /** The switch's values: kept only with the choice it narrows. */
+  ended: string[];
+}
+
+/** A Status dimension's `set` (ui-jobs 805): the new choice, or an old link's
+ *  list, written back as the stored choice and the switch. `values` is read by
+ *  `readStatusParam` unless the family passes its own reading. `resting` is the
+ *  listing's resting choice and `ended` the switch's values as they stand. An
+ *  old list that turns the switch on sets it; otherwise it keeps its values
+ *  with the choice it narrows and clears away from it. */
+export function setStatusChoice(
+  values: string[] | StatusIntent,
+  resting: StatusChoice,
+  ended: string[],
+  sw: StatusSwitch = CLOSED_BY_LIQUIDATION,
+): StatusSet {
+  const read = Array.isArray(values) ? readStatusParam(values) : null;
+  const intent = read ? { choice: read.choice, switchOn: read.endedByLiquidation } : (values as StatusIntent);
+  const choice = intent.choice ?? resting;
+  return {
+    status: choice === resting ? [] : [choice],
+    ended: choice !== sw.narrows ? [] : intent.switchOn ? [sw.value] : ended,
+  };
 }
 
 /** The lifecycle buckets an API whose rows carry one of open, closed or

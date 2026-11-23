@@ -27,7 +27,7 @@ import type { FetchMaplePositionsParams } from "@/lib/api/fetch-maple-positions"
 import type { MaplePositionSort } from "@/lib/sources/api/maple-positions";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import { defaultStatusChoice, mapleStatusBuckets, statusChoice } from "@/lib/maple/listing-visibility";
-import { readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
+import { setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** The Transactions slider's top: the round number above the busiest listed
  *  wallet (21,838 transactions, 20 Oct 2026). */
@@ -94,10 +94,7 @@ export function mapleListDimensions(): SerializableDimension<MapleListFilters>[]
       get: (f) => [statusChoice(f)],
       defaultValues: (f) => [defaultStatusChoice(f)],
       // Takes the choice, or an old link's list of statuses (ui-jobs 805).
-      set: (f, v) => {
-        const choice = readStatusParam(v).choice ?? defaultStatusChoice(f);
-        return { ...f, status: choice === defaultStatusChoice(f) ? [] : [choice] };
-      },
+      set: (f, v) => ({ ...f, status: setStatusChoice(v, defaultStatusChoice(f), []).status }),
     },
     {
       id: "queue",

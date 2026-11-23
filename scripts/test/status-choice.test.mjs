@@ -4,7 +4,14 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { everyStatusParam, readStatusParam, statusBuckets, statusNoun } from "../../lib/shared/status-choice.ts";
+import {
+  everyStatusParam,
+  readStatusParam,
+  setStatusChoice,
+  STATUS_CHOICE_OPTIONS,
+  statusBuckets,
+  statusNoun,
+} from "../../lib/shared/status-choice.ts";
 
 const read = (s) => readStatusParam(s.split(","));
 
@@ -61,4 +68,60 @@ test("the count line names the choice", () => {
   assert.equal(statusNoun("open", "positions"), "open positions");
   assert.equal(statusNoun("closed", "positions"), "closed positions");
   assert.equal(statusNoun("all", "positions"), "positions");
+});
+
+test("All is the one segment marked every", () => {
+  assert.deepEqual(
+    STATUS_CHOICE_OPTIONS.filter((o) => o.every).map((o) => o.value),
+    ["all"],
+  );
+});
+
+test("setStatusChoice stores the resting choice as nothing", () => {
+  assert.deepEqual(setStatusChoice(["open"], "open", []), { status: [], ended: [] });
+  assert.deepEqual(setStatusChoice(["closed"], "open", []), { status: ["closed"], ended: [] });
+  assert.deepEqual(setStatusChoice(["all"], "all", []), { status: [], ended: [] });
+  assert.deepEqual(setStatusChoice(["open"], "all", []), { status: ["open"], ended: [] });
+  // A param that names no status keeps the resting choice.
+  assert.deepEqual(setStatusChoice(["nonsense"], "open", []), { status: [], ended: [] });
+});
+
+test("setStatusChoice keeps the switch only with the choice it narrows", () => {
+  const on = ["liquidated"];
+  assert.deepEqual(setStatusChoice(["closed"], "open", on), { status: ["closed"], ended: on });
+  assert.deepEqual(setStatusChoice(["open"], "open", on), { status: [], ended: [] });
+  assert.deepEqual(setStatusChoice(["all"], "open", on), { status: ["all"], ended: [] });
+});
+
+test("setStatusChoice turns the switch on for an old list naming liquidated alone", () => {
+  assert.deepEqual(setStatusChoice(["liquidated"], "open", []), { status: ["closed"], ended: ["liquidated"] });
+  assert.deepEqual(setStatusChoice(["closed", "liquidated"], "open", []), { status: ["closed"], ended: [] });
+  assert.deepEqual(setStatusChoice(["open", "closed", "liquidated"], "open", ["liquidated"]), {
+    status: ["all"],
+    ended: [],
+  });
+});
+
+test("setStatusChoice takes a family's own reading and switch", () => {
+  // Frankencoin: Denied narrows Closed.
+  const denied = { value: "denied", narrows: "closed" };
+  assert.deepEqual(setStatusChoice({ choice: "closed", switchOn: true }, "open", [], denied), {
+    status: ["closed"],
+    ended: ["denied"],
+  });
+  // f(x): "Liquidated before" goes with All.
+  const before = { value: "liquidated", narrows: "all" };
+  assert.deepEqual(setStatusChoice({ choice: "all", switchOn: true }, "open", [], before), {
+    status: ["all"],
+    ended: ["liquidated"],
+  });
+  assert.deepEqual(setStatusChoice({ choice: "all", switchOn: false }, "all", ["liquidated"], before), {
+    status: [],
+    ended: ["liquidated"],
+  });
+  assert.deepEqual(setStatusChoice({ choice: "closed", switchOn: false }, "open", ["liquidated"], before), {
+    status: ["closed"],
+    ended: [],
+  });
+  assert.deepEqual(setStatusChoice({ choice: null, switchOn: false }, "all", [], before), { status: [], ended: [] });
 });

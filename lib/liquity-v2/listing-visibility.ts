@@ -21,6 +21,11 @@
 // The troves route takes active, zombie, open (active + zombie), closed,
 // liquidated and all; All sends no status.
 //
+// `status=active` is a link-only value (the branches page's redemption-queue
+// link): Open with Dormant left out. It sends `active`, its chip reads "Status
+// Open", the panel offers no segment for it, and picking any Status choice
+// drops it.
+//
 // `status` on the filter object carries RAW user intent: [] is "no opinion" and
 // resolves here at read time, one value is an explicit choice. The default is
 // never written into the filter object, so an identity search relaxes the view
@@ -33,6 +38,7 @@ import { namesIdentity } from "./search";
 import {
   ENDED_BY_LIQUIDATION,
   readStatusParam,
+  setStatusChoice,
   statusBuckets,
   statusNoun,
   type StatusChoice,
@@ -42,6 +48,9 @@ import {
 export const DORMANT = "dormant";
 /** The Dormant switch's URL param. */
 export const DORMANT_PARAM = "open";
+
+/** The link-only `status` value: Open with Dormant left out. */
+export const OPEN_ACTIVE = "active";
 
 /** A trove's place in the lifecycle, as the listings bucket it. */
 export type TroveLifecycle = "open" | "zombie" | "closed" | "liquidated";
@@ -59,23 +68,27 @@ export interface TroveStatusRead {
   choice: StatusChoice | null;
   endedByLiquidation: boolean;
   dormantOnly: boolean;
+  /** `status=active` alone: Open with Dormant left out. */
+  activeOnly: boolean;
 }
 
 /** A `status` param's values as the choice and the two switches. The three
- *  choice values read as themselves. An old list of buckets maps as follows:
- *  any open bucket (active, zombie, open) with any closed one (closed,
- *  liquidated) is All; zombie alone is Open with Dormant; any other open list
- *  (active alone, open, active + zombie) is Open; liquidated alone is Closed
- *  with the switch; closed is Closed. */
+ *  choice values read as themselves, and `active` alone is the link-only Open
+ *  without Dormant. An old list of buckets maps as follows: any open bucket
+ *  (active, zombie, open) with any closed one (closed, liquidated) is All;
+ *  zombie alone is Open with Dormant; any other open list (open, active +
+ *  zombie) is Open; liquidated alone is Closed with the switch; closed is
+ *  Closed. */
 export function readTroveStatusParam(values: string[]): TroveStatusRead {
   const v = new Set(values.map((s) => s.trim().toLowerCase()).filter(Boolean));
   const openSide = v.has("active") || v.has("zombie") || v.has("open");
   const dormantOnly = v.has("zombie") && !v.has("active") && !v.has("open");
+  const activeOnly = v.size === 1 && v.has(OPEN_ACTIVE);
   const closedSide = v.has("closed") || v.has("liquidated");
-  if (v.has("all") || (openSide && closedSide)) return { choice: "all", endedByLiquidation: false, dormantOnly: false };
-  if (openSide) return { choice: "open", endedByLiquidation: false, dormantOnly };
-  const read = readStatusParam([...v]);
-  return { ...read, dormantOnly: false };
+  const none = { endedByLiquidation: false, dormantOnly: false, activeOnly: false };
+  if (v.has("all") || (openSide && closedSide)) return { ...none, choice: "all" };
+  if (openSide) return { ...none, choice: "open", dormantOnly, activeOnly };
+  return { ...none, ...readStatusParam([...v]) };
 }
 
 /** The contextual default: the open troves while the search box names no
@@ -89,9 +102,19 @@ export function statusChoice(f: TroveVisibilityInput): StatusChoice {
   return readTroveStatusParam(f.status ?? []).choice ?? defaultStatusChoice(f);
 }
 
+/** The link-only `status=active`: Open with Dormant left out. */
+export function activeOnly(f: TroveVisibilityInput): boolean {
+  return readTroveStatusParam(f.status ?? []).activeOnly;
+}
+
+/** The Status dimension's value: the choice, or the link-only `active`. */
+export function troveStatusValue(f: TroveVisibilityInput): string {
+  return activeOnly(f) ? OPEN_ACTIVE : statusChoice(f);
+}
+
 /** The Dormant switch, which narrows Open alone. */
 export function dormantOnly(f: TroveVisibilityInput): boolean {
-  return statusChoice(f) === "open" && (f.dormant ?? []).includes(DORMANT);
+  return statusChoice(f) === "open" && !activeOnly(f) && (f.dormant ?? []).includes(DORMANT);
 }
 
 /** The "Closed by liquidation" switch, which narrows Closed alone. */
@@ -100,23 +123,35 @@ export function endedByLiquidation(f: TroveVisibilityInput): boolean {
 }
 
 /** The filter fields a Status edit writes: the choice (none where it is the
- *  default) and the two switches, each kept only beside its own choice. */
+ *  default; the link-only `active` as itself) and the two switches, each kept
+ *  only beside its own choice. Any choice drops `active`. */
 export function setTroveStatus<F extends TroveVisibilityInput>(f: F, values: string[]): F {
   const read = readTroveStatusParam(values);
-  const def = defaultStatusChoice(f);
-  const choice = read.choice ?? def;
-  return {
-    ...f,
-    status: choice === def ? [] : [choice],
-    dormant: choice !== "open" ? [] : read.dormantOnly ? [DORMANT] : (f.dormant ?? []),
-    ended: choice !== "closed" ? [] : read.endedByLiquidation ? [ENDED_BY_LIQUIDATION] : (f.ended ?? []),
-  };
+  const resting = defaultStatusChoice(f);
+  const { status, ended } = setStatusChoice(
+    { choice: read.choice, switchOn: read.endedByLiquidation },
+    resting,
+    f.ended ?? [],
+  );
+  const dormant = setStatusChoice({ choice: read.choice, switchOn: read.dormantOnly }, resting, f.dormant ?? [], {
+    value: DORMANT,
+    narrows: "open",
+  }).ended;
+  if (read.activeOnly) return { ...f, status: [OPEN_ACTIVE], dormant: [], ended };
+  return { ...f, status, dormant, ended };
+}
+
+/** The filter fields the Dormant switch writes. Turning it on drops the
+ *  link-only `active`, which leaves Dormant out. */
+export function setTroveDormant<F extends TroveVisibilityInput>(f: F, values: string[]): F {
+  if (values.length === 0 || !activeOnly(f)) return { ...f, dormant: values };
+  return { ...f, status: defaultStatusChoice(f) === "open" ? [] : ["open"], dormant: values };
 }
 
 /** The buckets the troves route is asked for; undefined for no status filter. */
 export function troveStatusBuckets(f: TroveVisibilityInput): string[] | undefined {
   const choice = statusChoice(f);
-  if (choice === "open") return dormantOnly(f) ? ["zombie"] : ["open"];
+  if (choice === "open") return dormantOnly(f) ? ["zombie"] : activeOnly(f) ? [OPEN_ACTIVE] : ["open"];
   return statusBuckets(choice, endedByLiquidation(f));
 }
 
@@ -127,6 +162,7 @@ export function troveStatusBuckets(f: TroveVisibilityInput): string[] | undefine
 export function troveDimensionAdmits(id: string, values: string[], lifecycle: TroveLifecycle): boolean {
   if (id === "dormant") return lifecycle === "zombie";
   if (id === "ended") return lifecycle === "liquidated";
+  if (values[0] === OPEN_ACTIVE) return lifecycle === "open";
   if (values[0] === "open") return lifecycle === "open" || lifecycle === "zombie";
   if (values[0] === "closed") return lifecycle === "closed" || lifecycle === "liquidated";
   return true;

@@ -31,6 +31,9 @@ export interface FilterOptionDef {
    *  735): the editors nest the legs under a row that ticks them all. The
    *  umbrella is a heading, never an option. */
   parent?: { value: string; label: string; meta?: string };
+  /** The option that lists every row ("All" in Status, ui-jobs 805): a
+   *  single-choice default resting on it constrains nothing and draws no pill. */
+  every?: boolean;
 }
 
 export interface FilterDimension<F> {

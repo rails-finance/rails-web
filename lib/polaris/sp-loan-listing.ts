@@ -18,7 +18,7 @@ import { resolveEnsViaApi } from "@/lib/shared/listing-search";
 import { normalizeMarket, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { parsePolarisSearch } from "@/lib/polaris/search";
 import { defaultStatusChoice, statusChoice, statusParam } from "@/lib/polaris/sp-loan-visibility";
-import { readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
+import { setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 import {
   readPolarisSpLoans,
   type PolarisDepositListResponse,
@@ -74,10 +74,7 @@ function statusDimension<F extends BaseListFilters & { status: string[] }>(): Se
     get: (f) => [statusChoice(f)],
     defaultValues: (f) => [defaultStatusChoice(f)],
     // Takes the choice, or an old link's list of statuses (ui-jobs 805).
-    set: (f, v) => {
-      const choice = readStatusParam(v).choice ?? defaultStatusChoice(f);
-      return { ...f, status: choice === defaultStatusChoice(f) ? [] : [choice] };
-    },
+    set: (f, v) => ({ ...f, status: setStatusChoice(v, defaultStatusChoice(f), []).status }),
   };
 }
 

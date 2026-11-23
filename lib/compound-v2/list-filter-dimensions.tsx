@@ -39,7 +39,7 @@ import {
   endedByLiquidation,
   statusChoice,
 } from "@/lib/compound-v2/listing-visibility";
-import { ENDED_BY_LIQUIDATION, readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
+import { ENDED_BY_LIQUIDATION, setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** The Transactions slider's top: the round number above the busiest listed
  *  wallet (24,845 transactions, 20 Oct 2026). */
@@ -117,15 +117,7 @@ export function compoundV2ListDimensions(): SerializableDimension<CompoundV2List
       get: (f) => [statusChoice(f)],
       defaultValues: (f) => [defaultStatusChoice(f)],
       // Takes the choice, or an old link's list of statuses (ui-jobs 805).
-      set: (f, v) => {
-        const read = readStatusParam(v);
-        const choice = read.choice ?? defaultStatusChoice(f);
-        return {
-          ...f,
-          status: choice === defaultStatusChoice(f) ? [] : [choice],
-          ended: choice !== "closed" ? [] : read.endedByLiquidation ? [ENDED_BY_LIQUIDATION] : f.ended,
-        };
-      },
+      set: (f, v) => ({ ...f, ...setStatusChoice(v, defaultStatusChoice(f), f.ended) }),
     },
     {
       id: "ended",

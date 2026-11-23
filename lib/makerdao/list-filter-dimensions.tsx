@@ -55,7 +55,7 @@ import {
   makerStatusBuckets,
   statusChoice,
 } from "@/lib/makerdao/listing-visibility";
-import { ENDED_BY_LIQUIDATION, readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
+import { ENDED_BY_LIQUIDATION, setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** The backend caps `limit` at 500; 20 is the page size the whole tier uses. */
 export const MAKER_ITEMS_PER_PAGE = 20;
@@ -174,16 +174,8 @@ export function makerListDimensions(
       segmented: true,
       get: (f) => [statusChoice(f)],
       defaultValues: (f) => [defaultStatusChoice(f)],
-      // Takes the choice, or an old link's list of statuses.
-      set: (f, v) => {
-        const read = readStatusParam(v);
-        const choice = read.choice ?? defaultStatusChoice(f);
-        return {
-          ...f,
-          status: choice === defaultStatusChoice(f) ? [] : [choice],
-          ended: choice !== "closed" ? [] : read.endedByLiquidation ? [ENDED_BY_LIQUIDATION] : f.ended,
-        };
-      },
+      // Takes the choice, or an old link's list of statuses (ui-jobs 805).
+      set: (f, v) => ({ ...f, ...setStatusChoice(v, defaultStatusChoice(f), f.ended) }),
     },
     {
       id: "ended",

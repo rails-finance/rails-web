@@ -29,8 +29,10 @@ const {
   dormantOnly,
   endedByLiquidation,
   readTroveStatusParam,
+  setTroveDormant,
   setTroveStatus,
   troveStatusBuckets,
+  troveStatusValue,
   troveDimensionAdmits,
   troveCountLine,
 } = await import("../../lib/liquity-v2/listing-visibility.ts");
@@ -77,16 +79,57 @@ test("each switch counts only beside its own choice", () => {
 
 test("old links map onto the choice and the switches", () => {
   const read = (s) => readTroveStatusParam(s.split(","));
-  assert.deepEqual(read("active,zombie"), { choice: "open", endedByLiquidation: false, dormantOnly: false });
-  assert.deepEqual(read("open"), { choice: "open", endedByLiquidation: false, dormantOnly: false });
-  assert.deepEqual(read("zombie"), { choice: "open", endedByLiquidation: false, dormantOnly: true });
-  assert.deepEqual(read("active"), { choice: "open", endedByLiquidation: false, dormantOnly: false });
-  assert.deepEqual(read("liquidated"), { choice: "closed", endedByLiquidation: true, dormantOnly: false });
-  assert.deepEqual(read("closed"), { choice: "closed", endedByLiquidation: false, dormantOnly: false });
-  assert.deepEqual(read("closed,liquidated"), { choice: "closed", endedByLiquidation: false, dormantOnly: false });
+  const none = { endedByLiquidation: false, dormantOnly: false, activeOnly: false };
+  assert.deepEqual(read("active,zombie"), { ...none, choice: "open" });
+  assert.deepEqual(read("open"), { ...none, choice: "open" });
+  assert.deepEqual(read("zombie"), { ...none, choice: "open", dormantOnly: true });
+  assert.deepEqual(read("active"), { ...none, choice: "open", activeOnly: true });
+  assert.deepEqual(read("liquidated"), { ...none, choice: "closed", endedByLiquidation: true });
+  assert.deepEqual(read("closed"), { ...none, choice: "closed" });
+  assert.deepEqual(read("closed,liquidated"), { ...none, choice: "closed" });
   for (const s of ["active,closed", "zombie,liquidated", "open,closed", "active,zombie,closed,liquidated", "all"]) {
-    assert.deepEqual(read(s), { choice: "all", endedByLiquidation: false, dormantOnly: false }, s);
+    assert.deepEqual(read(s), { ...none, choice: "all" }, s);
   }
+});
+
+test("the queue link's status=active is Open with Dormant left out", () => {
+  const active = fromLink("active");
+  assert.deepEqual(active, { ...BARE, status: ["active"] });
+  assert.equal(statusChoice(active), "open");
+  assert.equal(troveStatusValue(active), "active");
+  assert.deepEqual(troveStatusBuckets(active), ["active"]);
+  // The forks' filter drops the dormant troves.
+  const lifecycles = ["open", "zombie", "closed", "liquidated"];
+  assert.deepEqual(
+    lifecycles.filter((l) => troveDimensionAdmits("status", [troveStatusValue(active)], l)),
+    ["open"],
+  );
+  // Plain status=open still takes in Dormant.
+  const open = fromLink("open");
+  assert.deepEqual(open, BARE);
+  assert.deepEqual(troveStatusBuckets(open), ["open"]);
+  assert.deepEqual(
+    lifecycles.filter((l) => troveDimensionAdmits("status", [troveStatusValue(open)], l)),
+    ["open", "zombie"],
+  );
+  // On a holder search it is still Open without Dormant.
+  const held = fromLink("active", { ...BARE, q: HOLDER });
+  assert.deepEqual(troveStatusBuckets(held), ["active"]);
+});
+
+test("picking a Status choice or the Dormant switch drops status=active", () => {
+  const active = fromLink("active");
+  assert.deepEqual(setTroveStatus(active, ["open"]), BARE);
+  assert.deepEqual(setTroveStatus(active, ["closed"]), { ...BARE, status: ["closed"] });
+  assert.deepEqual(setTroveStatus(active, ["all"]), { ...BARE, status: ["all"] });
+  const dormant = setTroveDormant(active, ["dormant"]);
+  assert.deepEqual(dormant, { ...BARE, dormant: ["dormant"] });
+  assert.deepEqual(troveStatusBuckets(dormant), ["zombie"]);
+  // On a holder search Open is not the resting choice, so it is written.
+  const held = setTroveDormant(fromLink("active", { ...BARE, q: HOLDER }), ["dormant"]);
+  assert.deepEqual(held.status, ["open"]);
+  // Turning the switch off leaves the link value alone.
+  assert.deepEqual(setTroveDormant(active, []), active);
 });
 
 test("an old link decodes to filters that send the same troves or more", () => {

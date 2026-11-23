@@ -14,7 +14,7 @@ import { RECENT_ACTIVITY_LABEL } from "@/components/shared/filter-bar/sort-contr
 import type { BaseListFilters, SerializableDimension } from "@/lib/shared/list-filter";
 import type { SkyAsOf, SkyPosition, SkyPositionsPage } from "@/lib/sky-savings/types";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
-import { readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
+import { setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 import { defaultStatusChoice, parseSkySearch, statusChoice } from "@/lib/sky-savings/listing-visibility";
 
 export { parseSkySearch };
@@ -81,10 +81,7 @@ export function skyListDimensions(): SerializableDimension<SkyListFilters>[] {
       get: (f) => [statusChoice(f)],
       defaultValues: (f) => [defaultStatusChoice(f)],
       // Takes the choice, or an old link's list of statuses (ui-jobs 805).
-      set: (f, v) => {
-        const choice = readStatusParam(v).choice ?? defaultStatusChoice(f);
-        return { ...f, status: choice === defaultStatusChoice(f) ? [] : [choice] };
-      },
+      set: (f, v) => ({ ...f, status: setStatusChoice(v, defaultStatusChoice(f), []).status }),
     },
     transactionsDimension<SkyListFilters>({
       get: (f) => f.tx,

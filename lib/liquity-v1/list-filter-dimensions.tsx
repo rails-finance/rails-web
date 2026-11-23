@@ -40,7 +40,7 @@ import {
   liquityV1StatusBuckets,
   statusChoice,
 } from "@/lib/liquity-v1/listing-visibility";
-import { ENDED_BY_LIQUIDATION, readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
+import { ENDED_BY_LIQUIDATION, setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const LIQUITY_V1_ITEMS_PER_PAGE = 20;
@@ -114,15 +114,7 @@ export function liquityV1ListDimensions(): SerializableDimension<LiquityV1ListFi
       get: (f) => [statusChoice(f)],
       defaultValues: (f) => [defaultStatusChoice(f)],
       // Takes the choice, or an old link's list of statuses (ui-jobs 805).
-      set: (f, v) => {
-        const read = readStatusParam(v);
-        const choice = read.choice ?? defaultStatusChoice(f);
-        return {
-          ...f,
-          status: choice === defaultStatusChoice(f) ? [] : [choice],
-          ended: choice !== "closed" ? [] : read.endedByLiquidation ? [ENDED_BY_LIQUIDATION] : f.ended,
-        };
-      },
+      set: (f, v) => ({ ...f, ...setStatusChoice(v, defaultStatusChoice(f), f.ended) }),
     },
     {
       id: "ended",

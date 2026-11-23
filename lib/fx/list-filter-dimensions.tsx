@@ -43,7 +43,7 @@ import {
   readFxStatusParam,
   statusChoice,
 } from "@/lib/fx/listing-visibility";
-import { STATUS_CHOICE_OPTIONS, type StatusChoice } from "@/lib/shared/status-choice";
+import { setStatusChoice, STATUS_CHOICE_OPTIONS, type StatusChoice } from "@/lib/shared/status-choice";
 import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 
@@ -138,12 +138,16 @@ export function fxListDimensions(): SerializableDimension<FxListFilters>[] {
       // turn "Liquidated before" off.
       set: (f, v) => {
         const read = readFxStatusParam(v);
-        const choice = read.choice ?? defaultStatusChoice(f);
-        return {
-          ...f,
-          status: storedChoice(f, choice),
-          liquidations: choice !== "all" ? [] : read.liquidatedBefore ? [FX_LIQUIDATED_BEFORE] : f.liquidations,
-        };
+        const s = setStatusChoice(
+          { choice: read.choice, switchOn: read.liquidatedBefore },
+          defaultStatusChoice(f),
+          f.liquidations,
+          {
+            value: FX_LIQUIDATED_BEFORE,
+            narrows: "all",
+          },
+        );
+        return { ...f, status: s.status, liquidations: s.ended };
       },
     },
     {

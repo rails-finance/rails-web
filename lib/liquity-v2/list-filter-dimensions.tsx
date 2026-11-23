@@ -37,9 +37,12 @@ import {
   DORMANT_PARAM,
   dormantOnly,
   endedByLiquidation,
+  OPEN_ACTIVE,
+  setTroveDormant,
   setTroveStatus,
   statusChoice,
   troveStatusBuckets,
+  troveStatusValue,
 } from "@/lib/liquity-v2/listing-visibility";
 import { ENDED_BY_LIQUIDATION, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 import { parseTroveSearch } from "@/lib/liquity-v2/search";
@@ -138,10 +141,13 @@ export function troveStatusDimensions<
       param: "status",
       options: STATUS_CHOICE_OPTIONS,
       segmented: true,
-      get: (f) => [statusChoice(f)],
+      // The choice, or the link-only `active` (Open without Dormant).
+      get: (f) => [troveStatusValue(f)],
       defaultValues: (f) => [defaultStatusChoice(f)],
       // Takes the choice, or an old link's list of buckets (ui-jobs 805).
       set: (f, v) => setTroveStatus(f, v),
+      // `active` reads as Open.
+      chipLabel: (v) => `Status: ${v[0] === OPEN_ACTIVE ? "Open" : joinOptionLabels(v, STATUS_CHOICE_OPTIONS)}`,
     },
     {
       id: "dormant",
@@ -154,7 +160,7 @@ export function troveStatusDimensions<
       // Offered with Open, which it narrows.
       available: (f) => statusChoice(f) === "open",
       get: (f) => (dormantOnly(f) ? [DORMANT] : []),
-      set: (f, v) => ({ ...f, dormant: v }),
+      set: (f, v) => setTroveDormant(f, v),
       chipLabel: () => dormantLabel,
     },
     {

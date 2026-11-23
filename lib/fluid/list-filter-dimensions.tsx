@@ -33,7 +33,7 @@ import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-f
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { FetchFluidPositionsParams } from "@/lib/api/fetch-fluid-positions";
 import { defaultStatusChoice, fluidStatusBuckets, statusChoice } from "@/lib/fluid/listing-visibility";
-import { readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
+import { setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const FLUID_ITEMS_PER_PAGE = 20;
@@ -113,10 +113,7 @@ export function fluidListDimensions(
       get: (f) => [statusChoice(f)],
       defaultValues: (f) => [defaultStatusChoice(f)],
       // Takes the choice, or an old link's list of statuses (ui-jobs 805).
-      set: (f, v) => {
-        const choice = readStatusParam(v).choice ?? defaultStatusChoice(f);
-        return { ...f, status: choice === defaultStatusChoice(f) ? [] : [choice] };
-      },
+      set: (f, v) => ({ ...f, status: setStatusChoice(v, defaultStatusChoice(f), []).status }),
     },
     ...sizeDimensions<FluidListFilters>({
       getDebt: (f) => f.debt,
