@@ -3,10 +3,12 @@
 // set. MOCK FIRST CUT, per card kind, from what each listing row already
 // carries; the full form is a per-family extractor (item 560).
 //
-//   morpho                 loan + collateral token addresses
+//   morpho, morpho-base    loan + collateral token addresses
+//   moonwell-base          each supplied and borrowed market's underlying address
+//   compound-v2            each supplied, borrowed and peak market's symbol
 //   compound-v3            base token + each collateral line's address
 //   spark                  each supplied and borrowed reserve's address (peaks for a closed one)
-//   aave-v3                the dominant supply and debt addresses only (the row carries counts, not the list)
+//   aave-v3, seamless      the dominant supply and debt addresses only (the row carries counts, not the list)
 //   fluid                  supply and borrow symbols
 //   makerdao               the ilk's collateral symbol, and DAI
 //   liquity-v2             collateral symbol, and the row's debt symbol (BOLD)
@@ -36,7 +38,15 @@ export function walletPositionAssetKeys(p: WalletPosition): string[] {
   const c = p.card;
   switch (c.kind) {
     case "morpho":
+    case "morpho-base":
       addresses.push(c.row.loanToken, c.row.collateralToken);
+      break;
+    case "moonwell-base":
+      for (const r of [...c.row.supplies, ...c.row.borrows]) addresses.push(r.address);
+      break;
+    case "compound-v2":
+      for (const r of [...c.row.supplies, ...c.row.borrows, ...c.row.peakSupplies, ...c.row.peakBorrows])
+        symbols.push(r.symbol);
       break;
     case "compound-v3":
       addresses.push(c.row.base.address, ...c.row.collateral.map((a) => a.address));
@@ -46,6 +56,7 @@ export function walletPositionAssetKeys(p: WalletPosition): string[] {
         addresses.push(r.address);
       break;
     case "aave-v3":
+    case "seamless":
       addresses.push(c.row.dominantSupplyAddress, c.row.dominantDebtAddress);
       break;
     case "fluid":

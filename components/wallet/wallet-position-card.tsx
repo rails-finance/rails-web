@@ -46,6 +46,19 @@ import { stakeNowFromChain } from "@/lib/liquity-v1/staking-math";
 import { LiquityV2DepositCard } from "@/components/protocol/liquity/sp-deposit-card";
 import { depositNowFromChain as liquityV1DepositNow } from "@/lib/liquity-v1/sp-math";
 import { depositNowFromChain as liquityV2DepositNow } from "@/lib/liquity-v2/sp-math";
+import {
+  CompoundV2PositionCard,
+  viewFromSummary as compoundV2View,
+} from "@/components/protocol/compound-v2/compound-v2-position-card";
+import {
+  MoonwellPositionCard,
+  viewFromSummary as moonwellView,
+} from "@/components/protocol/moonwell/moonwell-position-card";
+import { MoonwellDeploymentProvider } from "@/lib/moonwell/deployment-context";
+import { MOONWELL_BASE_LISTED_IDENTITY } from "@/lib/moonwell-base/listed-identity";
+import { SEAMLESS_CARD_DEPLOYMENT } from "@/lib/seamless/position-provenance";
+import { makeListedMorphoReceipts } from "@/lib/morpho/listed-card-provenance";
+import { MORPHO_BASE_POSITIONS_ROUTE } from "@/lib/morpho-base/list-filter-dimensions";
 import { ArbitrumReadCard, CometReadCard } from "@/components/shared/arbitrum-positions-listing";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
@@ -54,6 +67,18 @@ import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 import { walletBranchState } from "@/lib/wallet/trove-shutdown";
 
 const BASE_LANE: CompoundCardLane = { chainId: BASE_CHAIN_ID, source: "sweep" };
+
+/** A Morpho Base card's receipts: the listing's for a stored row, the wallet
+ *  page's own read for an open one read at head. */
+const MORPHO_BASE_RECEIPTS = {
+  listing: makeListedMorphoReceipts({ chainId: BASE_CHAIN_ID, positionsRoute: MORPHO_BASE_POSITIONS_ROUTE }),
+  wallet: makeListedMorphoReceipts({
+    chainId: BASE_CHAIN_ID,
+    positionsRoute: MORPHO_BASE_POSITIONS_ROUTE,
+    custody:
+      "read live from the Morpho singleton at the head block the card names, served by GET /api/chain/wallet/<address>",
+  }),
+};
 
 /** `state`: the position's branch shutdown as the card draws it
  *  (`walletBranchState`). */
@@ -92,6 +117,31 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
       );
     case "morpho":
       return <MorphoPositionCard v={morphoView(card.row)} />;
+    case "morpho-base":
+      return (
+        <MorphoPositionCard
+          v={{ ...morphoView(card.row), vaultOwner: card.vaultOwner }}
+          session="morpho-base"
+          listedReceipts={MORPHO_BASE_RECEIPTS[card.read]}
+        />
+      );
+    case "compound-v2":
+      return <CompoundV2PositionCard v={compoundV2View(card.row)} surface="listing" />;
+    case "moonwell-base":
+      return (
+        <MoonwellDeploymentProvider value={MOONWELL_BASE_LISTED_IDENTITY}>
+          <MoonwellPositionCard v={moonwellView(card.row)} surface="listing" peaks={false} />
+        </MoonwellDeploymentProvider>
+      );
+    case "seamless":
+      return (
+        <AaveV3PositionCard
+          v={aaveView(card.row)}
+          deployment={SEAMLESS_CARD_DEPLOYMENT}
+          peaks={false}
+          notCollateral={notCollateralOf(card.row)}
+        />
+      );
     case "morpho-arbitrum":
       return <ArbitrumReadCard row={card.row} family="morpho" />;
     case "spark":

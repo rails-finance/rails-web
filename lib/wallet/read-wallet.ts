@@ -30,8 +30,11 @@ import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-posi
 import { readLiquityV1Sp, type LiquityV1DepositListResponse } from "@/lib/sources/api/liquity-v1-sp";
 import { readLiquityV2Sp, type LiquityV2DepositListResponse } from "@/lib/sources/api/liquity-v2-sp";
 import { readLiquityV1Staking, type LiquityV1StakeListResponse } from "@/lib/sources/api/liquity-v1-staking";
-import { aaveV3Base, aaveV3Ethereum, spark } from "@/lib/wallet/families/aave";
+import { aaveV3Base, aaveV3Ethereum, seamless, spark } from "@/lib/wallet/families/aave";
 import { compoundV3Base, compoundV3Ethereum } from "@/lib/wallet/families/compound";
+import { compoundV2 } from "@/lib/wallet/families/compound-v2";
+import { moonwellBase } from "@/lib/wallet/families/moonwell";
+import { morphoBase } from "@/lib/wallet/families/morpho-base";
 import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/families/ethereum-single";
 import { aaveV3Arbitrum, compoundV3Arbitrum, morphoArbitrum } from "@/lib/wallet/families/arbitrum";
 import {
@@ -66,6 +69,7 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   compoundV3Base,
   compoundV3Arbitrum,
   morphoEthereum,
+  morphoBase,
   morphoArbitrum,
   liquityV2,
   liquityV2Deposits,
@@ -81,6 +85,9 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   asymmetryDeposits,
   basedollar,
   basedollarDeposits,
+  compoundV2,
+  moonwellBase,
+  seamless,
 ];
 
 /** The families the page reads, by chain, in one sentence for the empty
@@ -295,7 +302,7 @@ async function readFamily(
     try {
       const remaining = deadline - Date.now();
       head = await withBudget(Math.max(500, remaining), (signal) =>
-        f.head!(open, address, signal, walletApiWait(remaining)),
+        f.head!(open, address, signal, walletApiWait(remaining), rows),
       );
     } catch (err) {
       error = publicErrorMessage(err);

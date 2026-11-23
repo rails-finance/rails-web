@@ -14,6 +14,9 @@ import type { ChainId } from "@/lib/shared/chains";
 import type { ProvClass } from "@/components/shared/provenance";
 import type { AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
 import type { CompoundPositionSummary } from "@/lib/sources/api/compound-positions";
+import type { CompoundV2PositionSummary } from "@/lib/sources/api/compound-v2-positions";
+import type { MoonwellPositionSummary } from "@/lib/sources/api/moonwell-positions";
+import type { MorphoBaseVaultOwnerNote } from "@/lib/morpho-base/vault-owner-note";
 import type { MorphoPositionSummary } from "@/lib/sources/api/morpho-positions";
 import type { SparkPositionSummary } from "@/lib/sources/api/spark-positions";
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
@@ -52,6 +55,19 @@ export type WalletCard =
    *  nothing held. */
   | { kind: "compound-v3-arbitrum"; row: ArbitrumReadRow; comet?: CometCard }
   | { kind: "morpho"; row: MorphoPositionSummary }
+  /** A Morpho Blue Base position. `read`: "listing" where the figures are the
+   *  stored chain read at the row's block, "wallet" where the wallet page read
+   *  the slots and the market at one head block. `vaultOwner`: the wallet is a
+   *  catalogued MetaMorpho vault. */
+  | {
+      kind: "morpho-base";
+      row: MorphoPositionSummary;
+      read: "listing" | "wallet";
+      vaultOwner: MorphoBaseVaultOwnerNote | null;
+    }
+  | { kind: "compound-v2"; row: CompoundV2PositionSummary }
+  | { kind: "moonwell-base"; row: MoonwellPositionSummary }
+  | { kind: "seamless"; row: AaveV3PositionRow }
   | { kind: "morpho-arbitrum"; row: ArbitrumReadRow }
   | { kind: "spark"; row: SparkPositionSummary }
   | { kind: "fluid"; row: FluidPositionSummary }

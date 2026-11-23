@@ -40,8 +40,16 @@ export interface FamilyModule {
   summaryKind?: "deposits" | "stakes";
   shape(rows: WalletSummaryRow[]): Promise<WalletPosition[]>;
   /** Absent where the family's figures are the stored ones (Arbitrum). */
-  /** `apiMs`: how long to wait for rails-server's route before the chain (walletApiWait). */
-  head?(open: WalletPosition[], address: string, signal: AbortSignal, apiMs: number): Promise<HeadResult>;
+  /** `apiMs`: how long to wait for rails-server's route before the chain (walletApiWait).
+   *  `rows`: the family's summary rows, for a head read that rebuilds an open
+   *  card with its listing builder (Compound V2, Moonwell, Morpho Base). */
+  head?(
+    open: WalletPosition[],
+    address: string,
+    signal: AbortSignal,
+    apiMs: number,
+    rows: WalletSummaryRow[],
+  ): Promise<HeadResult>;
 }
 
 /** Whether a summary row is the module's: its chain, family and kind. */

@@ -41,6 +41,9 @@ export const WALLET_PROTOCOLS: WalletProtocol[] = [
   { slug: "ebisu", name: "Ebisu", kinds: ["troves", "deposits"] },
   { slug: "asymmetry", name: "Asymmetry", kinds: ["troves", "deposits"] },
   { slug: "basedollar", name: "Basedollar", kinds: ["troves", "deposits"] },
+  { slug: "compound-v2", name: "Compound V2", kinds: ["loans", "deposits"] },
+  { slug: "moonwell", name: "Moonwell", kinds: ["loans", "deposits"] },
+  { slug: "seamless", name: "Seamless", kinds: ["loans", "deposits"] },
 ];
 
 export const walletProtocol = (slug: string | null | undefined): WalletProtocol | undefined =>

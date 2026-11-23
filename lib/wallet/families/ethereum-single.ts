@@ -49,7 +49,7 @@ const now = () => Math.floor(Date.now() / 1000);
 
 /** Loan tokens whose unit the dust floor may read as a dollar. Ranks only:
  *  the figure is never displayed (decision 0041). */
-const DOLLAR_LOANS = new Set([
+export const DOLLAR_LOANS = new Set([
   "USDC",
   "USDT",
   "DAI",
