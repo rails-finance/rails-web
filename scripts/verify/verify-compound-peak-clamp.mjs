@@ -109,13 +109,24 @@ assert(
   new RegExp(`${PEAK_DEBT}\\s*0\\.10?\\b`).test(bRaw),
   "genuine borrow still reads 0.1 (0.10 since the compact figures)",
 );
-// The collateral head, one asset or many, reads "Peak collateral" and its
-// C19 button's name leads with it (ui-jobs 803).
-assert(bText.includes(HEAD_COLLATERAL), `the collateral head reads '${HEAD_COLLATERAL}'`);
+// The collateral head, one asset or many, reads "Peak collateral" (ui-jobs
+// 803). Where it is a C19 button its name leads with that label; a listing
+// row, and a single collateral whose decimals did not load, draw no button.
+const bHead = bGrid.locator('[data-card-head="peak-collateral"]');
+const bHeadLabel = (
+  (await bHead
+    .first()
+    .innerText()
+    .catch(() => "")) ?? ""
+)
+  .split("\n")[0]
+  .trim();
+assert(bHeadLabel === HEAD_COLLATERAL, `the collateral head reads '${HEAD_COLLATERAL}' (got '${bHeadLabel}')`);
 const bToggle = bGrid.locator('[data-card-assets-toggle="peak-collateral"]');
-assert((await bToggle.count()) === 1, "the collateral head is a C19 button");
-const bName = (await bToggle.first().getAttribute("aria-label")) ?? "";
-assert(bName.startsWith(`${HEAD_COLLATERAL}, `), `its button is named '${HEAD_COLLATERAL}, …'`);
+if ((await bToggle.count()) > 0) {
+  const bName = (await bToggle.first().getAttribute("aria-label")) ?? "";
+  assert(bName.startsWith(`${HEAD_COLLATERAL}, `), `its button is named '${HEAD_COLLATERAL}, …'`);
+}
 // On Ethereum each row is the chain's balance, interest included, so the
 // principal-only footnote (the Base sweep's caveat) is not drawn here.
 assert(

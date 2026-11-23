@@ -191,8 +191,9 @@ export interface PositionCardHead {
  *
  *  Without `figure`, the icons are the figure. With it (a closed account's
  *  main asset, components/shared/closed-peak.tsx) the figure leads with its
- *  icon and a small line under it reads `also` ("Also supplied") with the
- *  other assets at 16 px, `main` left out once (`withoutFirst`). */
+ *  icon and a small line under it reads `also` ("Also supplied", "Also
+ *  collateral", "Also borrowed") with the other assets at 16 px, `main`
+ *  left out once (`withoutFirst`). */
 export function assetsHead(
   label: string,
   assets: AssetMark[],

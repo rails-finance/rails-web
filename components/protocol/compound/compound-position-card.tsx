@@ -476,7 +476,7 @@ export function useCompoundCardSlots({
           receipt: collProv(pick.main),
           block: v.priceBlock,
           skipped: pick.skipped,
-          side: "supply",
+          side: "collateral",
         })
       : one && !one.decimalsUnread
         ? mainAssetFigure({
@@ -484,7 +484,7 @@ export function useCompoundCardSlots({
             receipt: collProv(one),
             block: v.priceBlock,
             skipped: 0,
-            side: "supply",
+            side: "collateral",
             ranked: false,
           })
         : plan.lead?.kind === "base"

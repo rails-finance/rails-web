@@ -5,8 +5,9 @@
 // account's peaks: the side's main asset (`pickMainAsset`,
 // lib/shared/main-asset.ts) at its highest recorded balance in its token,
 // drawn as an open card draws "0.11" with its icon (`AssetAmount`,
-// `mainAssetFigure` below). The small line under it reads "Also supplied" or
-// "Also borrowed" with the side's other assets (`assetsHead`,
+// `mainAssetFigure` below). The small line under it reads "Also supplied"
+// under "Peak supplied", "Also collateral" under "Peak collateral" or "Also
+// borrowed" under "Peak debt", with the side's other assets (`assetsHead`,
 // components/shared/position-card.tsx). The figure's receipt is the asset's
 // highest-recorded receipt with one row stating why it leads, which the
 // dropdown's line for that asset carries too; the C19 button's name carries
@@ -220,7 +221,9 @@ export function mainAssetFigure(o: {
   block: number | null | undefined;
   /** Assets the pick passed over (`pickMainAsset`). */
   skipped: number;
-  side: "supply" | "debt";
+  /** The side, for the small line's words: "Also supplied", "Also
+   *  collateral" (under "Peak collateral"), "Also borrowed". */
+  side: "supply" | "collateral" | "debt";
   /** False for a side that holds one asset: no pick, so no ranking row. */
   ranked?: boolean;
 }): { figure: ReactNode; main: AssetMark; state: string; also: string; info: Provenance } {
@@ -252,7 +255,7 @@ export function mainAssetFigure(o: {
     state: ranked
       ? `${formatCompact(main.amount)} ${main.symbol}, ${rankingWords(o.block, o.skipped, false)}`
       : `${formatCompact(main.amount)} ${main.symbol}`,
-    also: o.side === "debt" ? "Also borrowed" : "Also supplied",
+    also: o.side === "debt" ? "Also borrowed" : o.side === "collateral" ? "Also collateral" : "Also supplied",
     info,
   };
 }
