@@ -15,10 +15,12 @@
 // - Terminal cards say "Highest recorded …" for a lifetime peak and "Final
 //   recorded …" for a last-known state that is not a peak; "not recorded" has
 //   one sentence.
-// - "Peak" is a side's one-day sum: its held assets valued together on the
-//   day they were worth the most (the line under a closed account card's
-//   dropdown heading, ui-jobs 803). "Highest recorded" is one asset's
-//   lifetime maximum (the dropdown's lines and the face's figure).
+// - "Peak <side>" ("Peak supplied", "Peak debt", "Peak collateral") heads a
+//   closed account card's side: one asset's highest recorded balance, shown
+//   for the side's largest asset (ui-jobs 803). "Peak value" is the side's
+//   one-day dollar sum, its held assets valued together on the day they were
+//   worth the most (the line under the card's dropdown heading). "Highest
+//   recorded" is one asset's lifetime maximum (the dropdown's lines).
 //
 // Labels here are the column HEADERS (12px, sentence case). Tower segment
 // names ("Borrowed (all time)") and mode-pill words ("Borrowing", "Supply
@@ -43,6 +45,11 @@ export const CARD_VOCAB = {
   /** Every supplied reserve or market, collateral or not. */
   peakSupplied: "Highest recorded supplied",
   peakDebt: "Highest recorded debt",
+  /** A closed account card's side labels: its largest asset's highest
+   *  recorded balance leads the side. */
+  headSupplied: "Peak supplied",
+  headDebt: "Peak debt",
+  headCollateral: "Peak collateral",
   /** Last-known state on terminal cards whose lane records no peak. */
   finalCollateral: "Final recorded collateral",
   finalDebt: "Final recorded debt",

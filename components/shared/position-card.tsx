@@ -609,7 +609,8 @@ function HeadBody({
       aria-expanded={toggle.open}
       aria-controls={toggle.open ? toggle.panelId : undefined}
       aria-label={[
-        head.list ? head.list.label : head.total ? `${head.label} ${formatUsdValue(head.total.usd)}` : head.label,
+        // A closed side's name leads with its face label ("Peak supplied").
+        head.list ? head.label : head.total ? `${head.label} ${formatUsdValue(head.total.usd)}` : head.label,
         head.list && !head.total ? (head.state ?? null) : null,
         head.list ? assetsWords(head.list.count) : head.breakdown ? `${head.breakdown.assets.length} assets` : null,
         "show breakdown",

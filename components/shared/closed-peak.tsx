@@ -41,7 +41,7 @@ import { useCallback, useMemo, type ReactNode } from "react";
 import { buildFlowModel, DAY_MS, type FlowModel, type FlowSide, type FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { keepByKey, peakState, sidePeaks } from "@/lib/shared/flows-peak";
-import { NOT_RECORDED } from "@/lib/shared/card-vocab";
+import { CARD_VOCAB, NOT_RECORDED } from "@/lib/shared/card-vocab";
 import { heldDayProv } from "@/lib/shared/flows-timeline-provenance";
 import { listWords } from "@/lib/shared/flows-sum";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -250,6 +250,17 @@ export function mainAssetFigure(o: {
   };
 }
 
+/** The side's word in the peak's receipt name ("Peak value, supplied"):
+ *  the face label without its "Peak". */
+const sideWord = (h: { id: string; label: string }): string =>
+  h.id === "peak-debt"
+    ? "debt"
+    : h.label === CARD_VOCAB.headCollateral
+      ? "collateral"
+      : h.label === CARD_VOCAB.headSupplied
+        ? "supplied"
+        : h.label;
+
 /** A detail card's closed heads with their one-day peak value in
  *  `PositionCardHead.peak`, for the dropdown's `PeakLine`. */
 export function withPeaks<H extends { id: string; label: string }>(
@@ -259,7 +270,7 @@ export function withPeaks<H extends { id: string; label: string }>(
 ): (H & { peak?: PeakHeadFigure })[] {
   if (!detail) return heads;
   return heads.map((h) =>
-    h.id.startsWith("peak-") ? { ...h, peak: peakOf(h.id === "peak-debt" ? "debt" : "collateral", h.label) } : h,
+    h.id.startsWith("peak-") ? { ...h, peak: peakOf(h.id === "peak-debt" ? "debt" : "collateral", sideWord(h)) } : h,
   );
 }
 

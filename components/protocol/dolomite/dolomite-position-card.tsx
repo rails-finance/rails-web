@@ -370,13 +370,13 @@ export function useDolomiteCardSlots({
       [
         {
           id: "peak-collateral",
-          label: CARD_VOCAB.collateral,
+          label: CARD_VOCAB.headCollateral,
           value: null,
           ...held(v.peakSupplies, "supply"),
         },
         {
           id: "peak-debt",
-          label: CARD_VOCAB.debt,
+          label: CARD_VOCAB.headDebt,
           value: null,
           ...held(v.peakBorrows, "debt"),
         },

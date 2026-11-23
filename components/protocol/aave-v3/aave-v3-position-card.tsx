@@ -483,7 +483,7 @@ export function useAaveV3CardSlots({
     const status: PositionCardStatus = liquidated
       ? { word: "Liquidated", tone: "danger" }
       : { word: "Closed", tone: "muted" };
-    // The face holds every supplied peak under "Supplied", as the listing row
+    // The face holds every supplied peak under "Peak supplied", as the listing row
     // does, so it never moves when the collateral switches land; read, they
     // order the supply dropdown: the collateral peaks first, then the
     // supplies that backed no borrowing under "Supplied, not collateral".
@@ -493,7 +493,7 @@ export function useAaveV3CardSlots({
     const { first, others } = splitSupplied(v.peakSupplies, notCollateral != null ? isOther : undefined);
     const supplyHead = peakHead(
       "peak-supplied",
-      "Supplied",
+      CARD_VOCAB.headSupplied,
       CARD_VOCAB.peakSupplied,
       v.peakSupplies,
       dep.peakSupply,
@@ -513,7 +513,7 @@ export function useAaveV3CardSlots({
     );
     const debtHead = peakHead(
       "peak-debt",
-      CARD_VOCAB.debt,
+      CARD_VOCAB.headDebt,
       CARD_VOCAB.peakDebt,
       v.peakBorrows,
       dep.peakDebt,

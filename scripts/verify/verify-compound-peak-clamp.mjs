@@ -105,12 +105,15 @@ assert(
   new RegExp(`${PEAK_DEBT}\\s*0\\.10?\\b`).test(bRaw),
   "genuine borrow still reads 0.1 (0.10 since the compact figures)",
 );
-// Two or more collateral assets state their icons under "Collateral" and carry
-// the peak label on the C19 button that opens them (ui-jobs 803); one asset
-// keeps the peak label on the head.
+// Two or more collateral assets state their icons under "Peak collateral",
+// which leads the C19 button's name (ui-jobs 803); one asset keeps
+// "Highest recorded collateral" on the head.
 const bToggle = bGrid.locator('[data-card-assets-toggle="peak-collateral"]');
 const bCollName = (await bToggle.count()) > 0 ? ((await bToggle.first().getAttribute("aria-label")) ?? "") : bText;
-assert(bCollName.includes("Highest recorded collateral"), "a borrower's supply column stays 'collateral'");
+assert(
+  bCollName.includes("Peak collateral") || bCollName.includes("Highest recorded collateral"),
+  "a borrower's supply column stays 'collateral'",
+);
 // On Ethereum each row is the chain's balance, interest included, so the
 // principal-only footnote (the Base sweep's caveat) is not drawn here.
 assert(

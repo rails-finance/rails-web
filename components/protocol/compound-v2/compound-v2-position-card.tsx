@@ -535,8 +535,8 @@ export function useCompoundV2CardSlots({
     };
     const heads: PositionCardHead[] = withPeaks(
       [
-        peakHead("peak-collateral", SUPPLIED, CARD_VOCAB.peakSupplied, v.peakSupplies, "supply"),
-        peakHead("peak-debt", CARD_VOCAB.debt, CARD_VOCAB.peakDebt, v.peakBorrows, "debt"),
+        peakHead("peak-collateral", CARD_VOCAB.headSupplied, CARD_VOCAB.peakSupplied, v.peakSupplies, "supply"),
+        peakHead("peak-debt", CARD_VOCAB.headDebt, CARD_VOCAB.peakDebt, v.peakBorrows, "debt"),
       ],
       peakOf,
       detail,

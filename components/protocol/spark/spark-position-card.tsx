@@ -468,7 +468,7 @@ export function useSparkCardSlots({
     // held, and their peaks, each at a different moment, open behind the
     // press under the peak label (C19). Where the peaks are read, a side the
     // account never held reads "None". The face holds every supplied peak
-    // under "Supplied", as the listing row does, so it never moves when the
+    // under "Peak supplied", as the listing row does, so it never moves when the
     // collateral switches land; read, they order the supply dropdown: the
     // collateral peaks first, then the supplies that backed no borrowing
     // under "Supplied, not collateral".
@@ -524,13 +524,13 @@ export function useSparkCardSlots({
       [
         {
           id: "peak-supplied",
-          label: "Supplied",
+          label: CARD_VOCAB.headSupplied,
           value: peaksRead ? <PeakNone /> : null,
           ...held(v.peakSupplies, "supply"),
         },
         {
           id: "peak-debt",
-          label: CARD_VOCAB.debt,
+          label: CARD_VOCAB.headDebt,
           value: peaksRead ? <PeakNone /> : null,
           ...held(v.peakBorrows, "debt"),
         },

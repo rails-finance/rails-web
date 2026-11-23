@@ -259,9 +259,9 @@ async function inspect(path) {
   // recorded …" is that card's peak grammar house-wide, and an open card never
   // uses it — so it is the cross-protocol way to tell the two apart, and it
   // keeps a closed subject from being read as a contradiction. An account
-  // family's closed heads state their assets and carry the peak label on the
-  // button that opens the peaks (ui-jobs 803), so their `peak-` head ids are
-  // the same signal.
+  // family's closed heads read "Peak supplied" and "Peak debt", "Highest
+  // recorded" only inside their dropdowns (ui-jobs 803), so their `peak-`
+  // head ids are the same signal.
   const terminal =
     bullets.some((b) => /Highest recorded/.test(b)) ||
     (await page.getByText("Highest recorded").count()) > 0 ||

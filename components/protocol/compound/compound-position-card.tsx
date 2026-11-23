@@ -497,7 +497,7 @@ export function useCompoundCardSlots({
         // press under the peak label (C19).
         ...(peaks && plan.count != null
           ? {
-              label: CARD_VOCAB.collateral,
+              label: CARD_VOCAB.headCollateral,
               ...assetsHead(
                 CARD_VOCAB.peakCollateral,
                 v.peak.collateral.map((c) => ({ symbol: c.symbol, address: c.address })),

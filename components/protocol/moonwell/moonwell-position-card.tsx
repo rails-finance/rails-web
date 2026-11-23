@@ -411,14 +411,14 @@ export function useMoonwellCardSlots({
       [
         {
           id: "peak-collateral",
-          label: SUPPLIED,
+          label: CARD_VOCAB.headSupplied,
           value: null,
           sub: noPeaksNote,
           ...held(v.peakSupplies, "supply"),
         },
         {
           id: "peak-debt",
-          label: CARD_VOCAB.debt,
+          label: CARD_VOCAB.headDebt,
           value: null,
           sub: noPeaksNote,
           ...held(v.peakBorrows, "debt"),
