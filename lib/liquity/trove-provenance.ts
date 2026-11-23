@@ -13,13 +13,13 @@ import type { Provenance } from "@/components/shared/provenance";
 export const trovePeakDebtProv: Provenance = {
   kind: "derived",
   summary:
-    "Peak debt, the most the trove has owed. It is the largest of two sets of figures: the debt the contract logged after each of the trove's changes, and the debt the trove had just before each repayment, which includes the interest built up to then.",
+    "Peak debt. The largest of two sets of figures: the debt the contract logged after each of the trove's changes and the debt the trove had just before each repayment, which includes the interest built up to then.",
   via: "max(debt) over the trove's TroveUpdated, BatchedTroveUpdated and TroveOperation logs",
 };
 
 export const trovePeakCollProv: Provenance = {
   kind: "derived",
   summary:
-    "Peak collateral, the most the trove has held. It is the largest of the balances the contract logged after each of the trove's changes and the balances just before each operation that reduced its debt.",
+    "Peak collateral. The largest of the balances the contract logged after each of the trove's changes and the balances just before each operation that reduced its debt.",
   via: "max(coll) over the trove's TroveUpdated, BatchedTroveUpdated and TroveOperation logs",
 };
