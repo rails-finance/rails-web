@@ -94,7 +94,7 @@
 // toggled.
 
 import { withoutLoneTo, type TimelineDates } from "@/lib/shared/timeline-dates";
-import { registerViewLink } from "@/lib/shared/position-link";
+import { registerViewLink, unregisterViewLink } from "@/lib/shared/position-link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import {
@@ -272,13 +272,6 @@ export interface TimelineEventsState {
   setTimelineDates: (dates: TimelineDates) => void;
   heatmapOpen: boolean;
   toggleHeatmap: () => void;
-
-  /** The current page's URL with the whole view — sort, the three hidden
-   *  sets, the date range — written into it (see the file header). Composed
-   *  on demand, so it is complete even when nothing has been toggled this
-   *  load and the address bar is still clean. Other params on the page
-   *  (`recent`, `epoch`, `loan`) are kept as they are. */
-  viewHref: () => string;
 
   totalCount: number;
   /** The events the filters admit. From this hook it counts the LOOSE events
@@ -654,7 +647,9 @@ export function useTimelineEvents(
     sizeSides,
   ]);
 
-  // The same grammar, composed on demand for the ⋮ link row.
+  // The same grammar, composed on demand for the ⋮ link row: the page's URL
+  // with the whole view written into it, complete on a load where nothing
+  // was toggled; other params (`recent`, `epoch`, `loan`) kept as they are.
   const viewHref = useCallback(() => {
     const url = new URL(window.location.href);
     writeViewParams(
@@ -676,7 +671,7 @@ export function useTimelineEvents(
   // The ⋮ link row reads the view through the registry while this page is up.
   useEffect(() => {
     registerViewLink(viewHref);
-    return () => registerViewLink(null);
+    return () => unregisterViewLink(viewHref);
   }, [viewHref]);
 
   const hiddenSet = useMemo(() => new Set(hiddenActions), [hiddenActions]);
@@ -1182,7 +1177,6 @@ export function useTimelineEvents(
     setTimelineDates,
     heatmapOpen,
     toggleHeatmap,
-    viewHref,
     historyWindow: win,
     olderCount: win.opening ? 0 : olderCount,
     olderCountIsFloor: !win.opening && olderCountIsFloor,

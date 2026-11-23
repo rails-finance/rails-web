@@ -7,9 +7,15 @@
 
 let viewLink: (() => string) | null = null;
 
-/** The page's timeline registers its view link; `null` on unmount. */
-export function registerViewLink(fn: (() => string) | null): void {
+/** The page's timeline registers its view link. */
+export function registerViewLink(fn: () => string): void {
   viewLink = fn;
+}
+
+/** A timeline unmounting clears the slot only while it holds that timeline's
+ *  link, so a second timeline's stays. */
+export function unregisterViewLink(fn: () => string): void {
+  if (viewLink === fn) viewLink = null;
 }
 
 /** The link to the position at `path`. Client only: reads `window.location`. */
