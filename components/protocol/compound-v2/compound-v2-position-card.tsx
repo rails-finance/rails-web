@@ -96,6 +96,7 @@ import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { shownUsd } from "@/lib/shared/holder-usd-receipt";
 import { compoundV2DebtDollars, compoundV2UsdReceipt } from "@/lib/compound-v2/usd-receipt";
 import { compoundV2LastEventDebtNote, type CompoundV2Face } from "@/lib/compound-v2/price-notes";
+import { positionLink } from "@/lib/shared/position-link";
 
 export interface CompoundV2PositionView {
   wallet: string;
@@ -353,7 +354,7 @@ function CompoundV2MenuRows({ wallet }: { wallet: string }) {
         icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this position"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}/ethereum/compound-v2/${wallet}`)}
+        onClick={() => copy("link", positionLink(`/ethereum/compound-v2/${wallet}`))}
       />
     </>
   );

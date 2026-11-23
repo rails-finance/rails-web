@@ -69,6 +69,7 @@ import { AmountText } from "@/components/shared/amount-text";
 import { formatDate } from "@/lib/date";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { serverReadOf, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
+import { positionLink } from "@/lib/shared/position-link";
 
 export interface FrankencoinPositionView {
   /** Lowercased Position contract address — the identity. */
@@ -293,7 +294,7 @@ function FrankencoinMenuRows({ position }: { position: string }) {
         icon={icon("link", <Link2 size={16} className="-rotate-45" />)}
         title="Link to this position"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}/ethereum/frankencoin/${position}`)}
+        onClick={() => copy("link", positionLink(`/ethereum/frankencoin/${position}`))}
       />
     </>
   );

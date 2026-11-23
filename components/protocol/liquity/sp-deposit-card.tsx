@@ -48,6 +48,7 @@ import { TINY_AMOUNT_FLOOR_TEXT } from "@/lib/utils/format";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import { RawFigure, tokenIcon } from "./sp-parts";
 import { WithdrawalWords } from "./sp-liquidations";
+import { positionLink } from "@/lib/shared/position-link";
 
 const NOUN = "Deposit";
 const ZERO = BigInt(0);
@@ -102,9 +103,7 @@ function DepositMenuRows({ row, dep }: { row: LiquityV2DepositRow<string>; dep: 
         icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this deposit"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() =>
-          copy("link", `${window.location.origin}${spDepositHref(dep, row.collateral_type, row.depositor)}`)
-        }
+        onClick={() => copy("link", positionLink(spDepositHref(dep, row.collateral_type, row.depositor)))}
       />
     </>
   );

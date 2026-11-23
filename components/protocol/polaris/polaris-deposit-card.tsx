@@ -35,6 +35,7 @@ import { big, type DepositLifetime, type DepositNow } from "@/lib/polaris/sp-loa
 import { spLiveProv, spPendingLossProv, spSumProv } from "@/lib/polaris/sp-loan-provenance";
 import type { PolarisDepositRow } from "@/lib/sources/api/polaris-sp-loans";
 import { RawFigure, tokenIcon } from "./polaris-sp-loan-parts";
+import { positionLink } from "@/lib/shared/position-link";
 
 const NOUN = "Deposit";
 
@@ -88,7 +89,7 @@ function DepositMenuRows({ row }: { row: PolarisDepositRow }) {
         icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this deposit"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}${polarisDepositHref(row.market, row.token_id)}`)}
+        onClick={() => copy("link", positionLink(polarisDepositHref(row.market, row.token_id)))}
       />
     </>
   );

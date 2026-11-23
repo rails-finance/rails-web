@@ -40,6 +40,7 @@ import { pctText } from "@/lib/shared/vault-amount-text";
 import { TINY_AMOUNT_FLOOR_TEXT } from "@/lib/utils/format";
 import type { LiquityV1DepositRow } from "@/lib/sources/api/liquity-v1-sp";
 import { RawFigure, tokenIcon, V1_SP_TOKENS } from "./v1-sp-parts";
+import { positionLink } from "@/lib/shared/position-link";
 
 const NOUN = "Deposit";
 const MARKET = "Stability Pool";
@@ -88,7 +89,7 @@ function DepositMenuRows({ row }: { row: LiquityV1DepositRow }) {
         icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this deposit"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}${liquityV1DepositHref(row.depositor)}`)}
+        onClick={() => copy("link", positionLink(liquityV1DepositHref(row.depositor)))}
       />
     </>
   );

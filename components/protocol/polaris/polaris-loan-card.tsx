@@ -31,6 +31,7 @@ import { big, type LoanLifetime } from "@/lib/polaris/sp-loan-math";
 import { loanAtFloorProv, loanCostProv, loanLiveProv, loanSumProv } from "@/lib/polaris/sp-loan-provenance";
 import type { PolarisLoanRow } from "@/lib/sources/api/polaris-sp-loans";
 import { RawFigure, tokenIcon } from "./polaris-sp-loan-parts";
+import { positionLink } from "@/lib/shared/position-link";
 
 const NOUN = "Loan";
 
@@ -77,7 +78,7 @@ function LoanMenuRows({ row }: { row: PolarisLoanRow }) {
         icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this loan"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}${polarisLoanHref(row.loan_id)}`)}
+        onClick={() => copy("link", positionLink(polarisLoanHref(row.loan_id)))}
       />
     </>
   );

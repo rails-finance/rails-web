@@ -85,6 +85,7 @@ import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { shownUsd } from "@/lib/shared/holder-usd-receipt";
 import { aaveV3PriceOf, aaveV3UsdOf, type AaveV3UsdRows } from "@/lib/aave-v3/usd-receipt";
 import type { AaveV3Face } from "@/lib/aave-v3/price-notes";
+import { positionLink } from "@/lib/shared/position-link";
 
 /** One reserve the wallet holds on a given side, scaled to display units. The
  *  `amountRaw` integer wei string backs the exact reveal (the raw chain figure). */
@@ -302,7 +303,7 @@ function AaveV3MenuRows({ pagePath }: { pagePath: string }) {
       title="Link to this position"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() =>
-        void navigator.clipboard.writeText(`${window.location.origin}${pagePath}`).then(() => {
+        void navigator.clipboard.writeText(positionLink(pagePath)).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         })

@@ -26,6 +26,7 @@ import { liquityV2RedeemerHref } from "@/lib/liquity-v2/redeemer-routes";
 import { redeemerSumProv } from "@/lib/liquity-v2/redeemer-provenance";
 import type { LiquityV2RedeemerResponse } from "@/lib/sources/api/liquity-v2-redeemer";
 import { RawFigure, tokenIcon } from "./sp-parts";
+import { positionLink } from "@/lib/shared/position-link";
 
 const BOLD = "BOLD";
 
@@ -49,7 +50,7 @@ function RedeemerMenuRows({ address }: { address: string }) {
         icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this page"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}${liquityV2RedeemerHref(address)}`)}
+        onClick={() => copy("link", positionLink(liquityV2RedeemerHref(address)))}
       />
     </>
   );

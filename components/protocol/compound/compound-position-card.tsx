@@ -69,6 +69,7 @@ import type {
   CompoundCurrentBase,
 } from "@/lib/sources/api/compound-positions";
 import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
+import { positionLink } from "@/lib/shared/position-link";
 
 /** Highest-recorded amounts over a position's life (closed/liquidated cards). */
 interface CompoundPeak {
@@ -309,7 +310,7 @@ function CompoundMenuRows({ pagePath }: { pagePath: string }) {
       title="Link to this account"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() => {
-        void navigator.clipboard.writeText(`${window.location.origin}${pagePath}`).then(() => {
+        void navigator.clipboard.writeText(positionLink(pagePath)).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         });

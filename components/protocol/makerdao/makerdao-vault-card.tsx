@@ -198,7 +198,7 @@ function MakerMenuRows({ v }: { v: MakerVaultView }) {
         icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this position"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}/ethereum/makerdao/${id}`)}
+        onClick={() => copy("link", positionLink(`/ethereum/makerdao/${id}`))}
       />
     </>
   );
@@ -421,6 +421,7 @@ export function MakerVaultCard(props: MakerVaultCardProps) {
 
 /** Build a card view from a listing row (MakerVaultSummary, the api builder's presentation shape). */
 import type { MakerVaultSummary } from "@/lib/sources/api/makerdao-vaults";
+import { positionLink } from "@/lib/shared/position-link";
 export function viewFromSummary(s: MakerVaultSummary): MakerVaultView {
   return {
     cdpId: s.cdpId,

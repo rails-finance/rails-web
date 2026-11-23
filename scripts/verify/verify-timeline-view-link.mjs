@@ -3,10 +3,10 @@
 // `from`/`to`), which the address bar carries (see the file header of
 // hooks/useTimelineEvents.ts).
 //
-// THE COPY-LINK CONTROL IS GONE from the position card's Explanation pane
-// (ui-jobs 807: the card's ⋮ carries Copy Position). The link a reader shares
-// is the address bar, so `copyLink` reads it, and the phone check states that
-// the pane draws no control.
+// THE COPY-LINK CONTROL LEFT the position card's Explanation pane (ui-jobs
+// 807). The card's ⋮ "Link to this …" row copies the address bar on the
+// position's page, so `copyLink` presses that row and reads the clipboard; the
+// phone check states that the pane draws no control.
 //
 // What it holds:
 //   1. A clean load stays clean: no param is written before a toggle, and the
@@ -121,10 +121,28 @@ const dateLabel = async (page) => {
   return (await pill.locator("span.font-semibold").first().innerText()).trim();
 };
 
-/** The view's link: the address bar, which carries the view's params (the
- *  card's copy-link control went with ui-jobs 807). */
+/** The view's link, as the card's ⋮ copies it: its "Link to this …" row
+ *  copies the address bar on the position's own page (lib/shared/
+ *  position-link.ts, ui-jobs 807). Pressed until the menu opens: a press
+ *  before hydration is lost. */
 async function copyLink(page) {
-  return page.evaluate(() => window.location.href);
+  const menu = page.locator('[data-card-menu] [role="menu"]');
+  for (let i = 0; i < 6 && !(await menu.isVisible().catch(() => false)); i++) {
+    await page
+      .locator("[data-card-menu] > button")
+      .first()
+      .click({ timeout: 10000 })
+      .catch(() => {});
+    await menu.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+  }
+  await menu
+    .locator('[role="menuitem"]', { hasText: /^Link to this/ })
+    .first()
+    .click();
+  await page.waitForTimeout(300);
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  await page.keyboard.press("Escape");
+  return copied;
 }
 
 /** Hide the first option of the axis named by `label` (its old menu name,

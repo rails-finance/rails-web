@@ -109,6 +109,7 @@ import type { PolarisChainResponse } from "@/lib/api/fetch-polaris-position";
 import type { PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-position";
 import { formatPolarisRatio, polarisFloorLine, polarisFloorWords } from "@/lib/polaris/ratio-format";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { positionLink } from "@/lib/shared/position-link";
 
 export interface PolarisPositionView {
   market: PolarisMarket;
@@ -378,7 +379,7 @@ function CdpMenuRows({ v }: { v: PolarisPositionView }) {
         icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this position"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}${polarisPositionHref(v.market, v.cdpId)}`)}
+        onClick={() => copy("link", positionLink(polarisPositionHref(v.market, v.cdpId)))}
       />
     </>
   );

@@ -28,6 +28,7 @@ import { exact, pctString, rayExact, rayNumber, skyYearlyEarnings, units, yearly
 import { chiProv, earnedProv, rateProv, sharesHeldProv, valueProv, yearlyProv } from "@/lib/sky-savings/provenance";
 import type { SkyAsOf, SkyPosition } from "@/lib/sky-savings/types";
 import { PanelFigure } from "@/components/shared/position-card-panel";
+import { positionLink } from "@/lib/shared/position-link";
 
 const worthHead = (p: SkyPosition, asOf: SkyAsOf): PositionCardHead => {
   const v = p.value ? units(p.value.raw) : 0;
@@ -120,7 +121,7 @@ function SkyMenuRows({ holder }: { holder: string }) {
         icon={copied === "link" ? <Icon name="check" size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this position"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}/ethereum/sky-savings/${holder}`)}
+        onClick={() => copy("link", positionLink(`/ethereum/sky-savings/${holder}`))}
       />
     </>
   );

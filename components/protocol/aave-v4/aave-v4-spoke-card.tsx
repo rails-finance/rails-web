@@ -75,6 +75,7 @@ import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { v4Apy } from "@/lib/aave-v4/rates";
+import { positionLink } from "@/lib/shared/position-link";
 
 export type { AaveSpokeCardInfo };
 
@@ -180,7 +181,7 @@ function AaveV4MenuRows({ pagePath }: { pagePath: string }) {
       title="Link to this position"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() =>
-        void navigator.clipboard.writeText(`${window.location.origin}${pagePath}`).then(() => {
+        void navigator.clipboard.writeText(positionLink(pagePath)).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         })

@@ -71,6 +71,7 @@ import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { FigureSlot } from "@/components/shared/skeleton-card";
+import { positionLink } from "@/lib/shared/position-link";
 
 export interface SparkPositionView {
   wallet: string;
@@ -339,7 +340,7 @@ function SparkMenuRows({ wallet }: { wallet: string }) {
       title="Link to this position"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() => {
-        void navigator.clipboard.writeText(`${window.location.origin}/ethereum/spark/${wallet}`).then(() => {
+        void navigator.clipboard.writeText(positionLink(`/ethereum/spark/${wallet}`)).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         });

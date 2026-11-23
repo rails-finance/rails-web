@@ -76,6 +76,7 @@ import { BlockRef } from "@/components/shared/block-ref";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { positionLink } from "@/lib/shared/position-link";
 
 const ORACLE_LINE_TIP =
   "The collateral valued in the loan asset at the market's oracle, the price Morpho's liquidation test uses.";
@@ -207,7 +208,7 @@ export function MorphoMenuRows({
         icon={icon("link", <Link2 size={16} className="-rotate-45" />)}
         title="Link to this position"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}${pagePath}`)}
+        onClick={() => copy("link", positionLink(pagePath))}
       />
     </>
   );

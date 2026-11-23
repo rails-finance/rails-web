@@ -62,6 +62,7 @@ import {
   liquityV1RecoveryNotice,
 } from "@/components/protocol/liquity-v1/liquity-v1-risk-slot";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { positionLink } from "@/lib/shared/position-link";
 
 export interface LiquityV1PositionView {
   wallet: string;
@@ -126,7 +127,7 @@ function TroveLinkRow({ pagePath }: { pagePath: string }) {
       title="Link to this Trove"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() => {
-        void navigator.clipboard.writeText(`${window.location.origin}${pagePath}`).then(() => {
+        void navigator.clipboard.writeText(positionLink(pagePath)).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         });
