@@ -489,7 +489,7 @@ export function useCompoundV2CardSlots({
       return detail
         ? peakOf(side === "supply" ? "collateral" : "debt", label)
         : largestAssetFigure(
-            lines.map((r) => ({ symbol: r.symbol, amount: r.amount, usdNow: lineUsd(v, r.market, r.amount) })),
+            lines.map((r) => ({ ...markOf(r), amount: r.amount, usdNow: lineUsd(v, r.market, r.amount) })),
           );
     };
     const peakHead = (

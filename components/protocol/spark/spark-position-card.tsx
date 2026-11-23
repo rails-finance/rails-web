@@ -493,6 +493,7 @@ export function useSparkCardSlots({
         : largestAssetFigure(
             reserves.map((r) => ({
               symbol: r.symbol,
+              address: r.address,
               amount: r.amount,
               usdNow: reserveUsd(v, r.address, r.amount),
               ...(r.decimalsUnread ? { decimalsUnread: true as const } : {}),

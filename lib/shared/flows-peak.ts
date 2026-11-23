@@ -30,6 +30,13 @@ export interface SidePeakResult {
 
 const cents = (v: number) => Math.round(v * 100) / 100;
 
+/** What a side's head states: its peak; no dollar figure, where every day it
+ *  held something had an unpriced asset; or nothing recorded, where the
+ *  timeline holds no balance above zero for the card's assets. */
+export function peakState(r: SidePeakResult): "peak" | "unpriced" | "not-recorded" {
+  return r.peak ? "peak" : r.unpriced.length > 0 ? "unpriced" : "not-recorded";
+}
+
 /** `heldAt[stop]` is the model's held rows at the end of day `startDay +
  *  stop`. `keep[side]` limits a side to some assets (a card's collateral
  *  without the supplies that back no borrowing); absent, every row counts. */

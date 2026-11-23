@@ -368,6 +368,7 @@ export function useDolomiteCardSlots({
               .filter((r) => r.tokens)
               .map((r) => ({
                 symbol: r.symbol,
+                address: r.token ?? null,
                 amount: r.amount,
                 usdNow: lineUsd(v, r.marketId, r.amount),
                 ...(r.decimalsUnread ? { decimalsUnread: true as const } : {}),

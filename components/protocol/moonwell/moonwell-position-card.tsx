@@ -370,7 +370,12 @@ export function useMoonwellCardSlots({
       return detail
         ? peakOf(side === "supply" ? "collateral" : "debt", side === "supply" ? SUPPLIED : CARD_VOCAB.debt)
         : largestAssetFigure(
-            lines.map((r) => ({ symbol: r.symbol, amount: r.amount, usdNow: lineUsd(v, r.address, r.amount) })),
+            lines.map((r) => ({
+              symbol: r.symbol,
+              address: r.address,
+              amount: r.amount,
+              usdNow: lineUsd(v, r.address, r.amount),
+            })),
           );
     };
     const held = (lines: MoonwellPeakAmount[], side: "supply" | "debt") =>

@@ -168,31 +168,49 @@ export interface PositionCardHead {
    *  headed `label` (the peak label). A listing card draws the icons alone.
    *  Built by `assetsHead`. */
   list?: { label: string; count: number; panel: ReactNode };
+  /** A small line under the figure, inside the C19 button where there is one:
+   *  a closed account's peak day and its icons at 16 px (`assetsHead`). */
+  below?: ReactNode;
   /** The side's USD total and its receipt: the breakdown's heading states it
    *  exact, and carries the receipt the headline (inside the button) cannot.
    *  `at`: a closed account's peak, stated "Peak $… · day" there. */
   total?: { usd: number; info: Provenance; at?: string };
 }
 
-/** A head stated by its assets (`PositionCardHead.list`): their icons,
- *  opening `panel` under `label`. The caller passes a mark for every asset
- *  the panel lists, a reserve whose decimals did not load included, so the
- *  icons and "+N" add up to the lines. With `figure` (a closed account's
- *  peak, components/shared/closed-peak.tsx) the figure leads and the icons
- *  follow as a sample, its day on the `sub` line; its `total` heads the
- *  dropdown with the receipt. */
+/** A head stated by its assets (`PositionCardHead.list`), opening `panel`
+ *  under `label`. The caller passes a mark for every asset the panel lists,
+ *  a reserve whose decimals did not load included, so the icons and "+N" add
+ *  up to the lines.
+ *
+ *  Without `figure`, the icons are the figure. With it (a closed account's
+ *  head, components/shared/closed-peak.tsx) the figure leads and a small line
+ *  under it carries `note` and the icons at 16 px: every asset beside a peak
+ *  in dollars, which no single asset is; the others beside `main`, the asset
+ *  the figure is in, which draws its own icon. A null figure (no dollar
+ *  figure) reads as a dash, `note` saying why. `total` heads the dropdown
+ *  with the receipt. */
 export function assetsHead(
   label: string,
   assets: AssetMark[],
   panel: ReactNode,
-  figure?: { figure: ReactNode; sub?: ReactNode; total?: PositionCardHead["total"] },
-): Pick<PositionCardHead, "value" | "assets" | "list" | "total" | "sub"> {
-  const cluster = <InlineAssetCluster assets={assets} />;
+  figure?: { figure: ReactNode | null; note?: ReactNode; main?: AssetMark; total?: PositionCardHead["total"] },
+): Pick<PositionCardHead, "value" | "list" | "total" | "below"> {
+  const list = { label, count: assets.length, panel };
+  if (!figure) return { value: <InlineAssetCluster assets={assets} />, list };
+  const main = figure.main;
+  const rest = main ? assets.filter((a) => !(a.symbol === main.symbol && a.address === main.address)) : assets;
+  const below =
+    figure.note != null || rest.length > 0 ? (
+      <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5" data-card-below="">
+        {figure.note}
+        {rest.length > 0 && <InlineAssetCluster assets={rest} size={16} overlap={5} />}
+      </span>
+    ) : undefined;
   return {
-    ...(figure
-      ? { value: figure.figure, assets: cluster, total: figure.total, ...(figure.sub ? { sub: figure.sub } : {}) }
-      : { value: cluster }),
-    list: { label, count: assets.length, panel },
+    value: figure.figure ?? <span className="text-rb-400">—</span>,
+    ...(below ? { below } : {}),
+    ...(figure.total ? { total: figure.total } : {}),
+    list,
   };
 }
 
@@ -545,6 +563,10 @@ function ListingPill({ status }: { status: PositionCardStatus | null }) {
 const tierOf = (h: PositionCardHead): "amount" | "measure" =>
   h.tier ?? (h.assets != null || h.usd !== undefined || h.breakdown != null || h.list != null ? "amount" : "measure");
 
+/** The small line under a figure (`PositionCardHead.below`): the `sub`
+ *  line's size and colour inside the figure's type. */
+const BELOW_TYPE = "mt-0.5 text-xs font-normal text-rb-500";
+
 /** A measure's figure: a step under the headline size, in a line box of the
  *  headline's height and dropped to its baseline. */
 const MEASURE_TYPE = "!text-lg lg:!text-xl !font-semibold h-8 lg:h-9 flex items-end lg:pb-px";
@@ -589,13 +611,14 @@ function HeadBody({
       ]
         .filter(Boolean)
         .join(", ")}
-      className={`-mx-1.5 -my-1 flex cursor-pointer flex-wrap items-center gap-x-1.5 rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-rb-200/70 focus-ring dark:hover:bg-rb-700/60 ${toggle.open ? "bg-rb-200/70 dark:bg-rb-700/60" : ""}`}
+      className={`-mx-1.5 -my-1 flex cursor-pointer rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-rb-200/70 focus-ring dark:hover:bg-rb-700/60 ${head.below != null ? "flex-col items-start" : "flex-wrap items-center gap-x-1.5"} ${toggle.open ? "bg-rb-200/70 dark:bg-rb-700/60" : ""}`}
       data-card-assets-toggle={head.id}
       data-anatomy="C19"
     >
       <QuietTipsContext.Provider value={true}>
         <ProvInert>{head.value}</ProvInert>
         {head.assets != null && <span className="inline-flex shrink-0 items-center">{head.assets}</span>}
+        {head.below != null && <span className={BELOW_TYPE}>{head.below}</span>}
       </QuietTipsContext.Provider>
     </button>
   );
@@ -622,6 +645,11 @@ function HeadBody({
               {head.value}
               {/* shrink-0: a long figure must never squeeze the icon away. */}
               <span className="inline-flex shrink-0 items-center">{head.assets}</span>
+            </span>
+          ) : head.below != null ? (
+            <span className="flex flex-col items-start">
+              {head.value}
+              <span className={BELOW_TYPE}>{head.below}</span>
             </span>
           ) : (
             head.value

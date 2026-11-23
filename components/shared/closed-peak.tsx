@@ -1,7 +1,7 @@
 "use client";
 
 // A closed account card's peak value per side (rails-ops ui-jobs 803): the
-// figure "$1.2M" with "Peak · 3 Mar 2025" on the line under it, the side's
+// figure "$1.2M" with "Peak · 3 Mar 2025" on the small line under it, the side's
 // held assets summed on the day they were worth the most, each valued as the
 // Lifetime flows panel values that day (lib/shared/flows-peak.ts). It reads
 // the flows timeline the page already holds for that panel, so the card makes
@@ -10,21 +10,26 @@
 // where the timeline keys by address, else by symbol. The figure's receipt is
 // the panel's held-figure receipt for that day (`heldDayProv`); inside the
 // card's C19 button it stays inert, and the dropdown's heading carries it.
-// While the timeline is read the figure holds a placeholder bar; a failed
-// read, an empty timeline, or a side with no priced or matching day reads
-// "price unavailable" (`unavailableWords`). Never a $0.
+// While the timeline is read the figure holds a placeholder bar. A failed
+// read, or a side whose held days all had an unpriced asset, reads "price
+// unavailable" (`unavailableWords`); a finished read whose timeline holds no
+// balance above zero for the side reads "not recorded" (`NOT_RECORDED`,
+// lib/shared/card-vocab.ts). The day, or either state, sits on the small
+// line under the figure with the side's icons at 16 px. Never a $0.
 
 import { useCallback, useMemo, type ReactNode } from "react";
 import { buildFlowModel, DAY_MS, type FlowSide, type FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
-import { sidePeaks } from "@/lib/shared/flows-peak";
+import { peakState, sidePeaks } from "@/lib/shared/flows-peak";
+import { NOT_RECORDED } from "@/lib/shared/card-vocab";
 import { heldDayProv } from "@/lib/shared/flows-timeline-provenance";
 import { listWords } from "@/lib/shared/flows-sum";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { unavailableWords } from "@/components/shared/position-card-panel";
-import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
+import { formatCompactUsd } from "@/lib/shared/format-compact";
+import { AssetAmount } from "@/components/shared/asset-amount";
 import { formatUsdValue } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 
@@ -45,8 +50,10 @@ export interface ClosedPeakAsset {
  *  and, where there is one, the total the dropdown's heading states with its
  *  receipt. */
 export interface PeakHeadFigure {
-  figure: ReactNode;
-  sub?: ReactNode;
+  /** Null: no dollar figure; `note` says why. */
+  figure: ReactNode | null;
+  /** The small line's words under the figure, before the icons. */
+  note?: ReactNode;
   total?: { usd: number; info: Provenance; at: string };
 }
 
@@ -117,18 +124,24 @@ export function useClosedPeaks(
   return useCallback(
     (side, label) => {
       if (!closed || !has || read === "withheld") return undefined;
+      // A side with no figure says why on the small line, with the icons, so
+      // the card keeps the priced card's height.
       const unavailable = (): PeakHeadFigure => ({
-        figure: (
-          <span className="text-rb-500" data-card-unavailable="">
-            {unavailableWords(true)}
-          </span>
-        ),
+        figure: null,
+        note: <span data-card-unavailable="">{unavailableWords(true)}</span>,
+      });
+      const notRecorded = (): PeakHeadFigure => ({
+        figure: null,
+        note: <span data-card-not-recorded="">{NOT_RECORDED}</span>,
       });
       if (read === "failed") return unavailable();
-      // A done read with no model is an empty timeline.
-      if (!peaks) return read === "done" ? unavailable() : { figure: <SkeletonBar width={96} figure /> };
+      // A done read with no model is an empty timeline: nothing recorded.
+      if (!peaks) return read === "done" ? notRecorded() : { figure: <SkeletonBar width={96} figure /> };
+      const state = peakState(peaks[side]);
+      if (state === "unpriced") return unavailable();
+      if (state === "not-recorded") return notRecorded();
       const { peak, unpriced } = peaks[side];
-      if (!peak) return unavailable();
+      if (!peak) return notRecorded();
       const at = formatDate(peak.day * 86_400);
       const prov = heldDayProv(`Peak ${label.toLowerCase()}`, at, peak.rows, formatCompactUsd);
       // Days a held asset had no price carry no dollar figure, so the peak
@@ -149,7 +162,7 @@ export function useClosedPeaks(
         : prov;
       return {
         figure: <PeakFigure usd={peak.usd} info={info} />,
-        sub: <span data-card-peak-day="">Peak · {at}</span>,
+        note: <span data-card-peak-day="">Peak · {at}</span>,
         total: { usd: peak.usd, info, at },
       };
     },
@@ -158,14 +171,22 @@ export function useClosedPeaks(
 }
 
 /** A listing row's figure for a closed side: its largest asset's highest
- *  recorded amount in its own token ("1.2M USDC"), with no USD. A listing
- *  holds no flows timeline, so no peak day; "largest" is by the row's current
- *  prices (each amount × its price now), since raw balances across decimals
- *  do not compare. An asset with no price now, or whose decimals did not
- *  load, is not a candidate; none left, no figure. */
+ *  recorded amount with that asset's own icon, as an open card draws "0.11"
+ *  with its icon (`AssetAmount`), and no USD; `main` names the asset, so the
+ *  small line under it lists only the others. A listing holds no flows
+ *  timeline, so no peak day; "largest" is by the row's current prices (each
+ *  amount × its price now), since raw balances across decimals do not
+ *  compare. An asset with no price now, or whose decimals did not load, is
+ *  not a candidate; none left, no figure. */
 export function largestAssetFigure(
-  assets: readonly { symbol: string; amount: number; usdNow: number | null; decimalsUnread?: true }[],
-): { figure: ReactNode } | undefined {
+  assets: readonly {
+    symbol: string;
+    address: string | null;
+    amount: number;
+    usdNow: number | null;
+    decimalsUnread?: true;
+  }[],
+): (PeakHeadFigure & { main: { symbol: string; address: string | null } }) | undefined {
   let best: (typeof assets)[number] | undefined;
   for (const a of assets)
     if (!a.decimalsUnread && a.usdNow != null && (!best || a.usdNow > (best.usdNow as number))) best = a;
@@ -173,8 +194,9 @@ export function largestAssetFigure(
   return {
     figure: (
       <span data-card-largest="">
-        {formatCompact(best.amount)} <span className="text-[0.55em] font-medium text-rb-500">{best.symbol}</span>
+        <AssetAmount value={best.amount} symbol={best.symbol} address={best.address ?? undefined} />
       </span>
     ),
+    main: { symbol: best.symbol, address: best.address },
   };
 }

@@ -4,7 +4,7 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sidePeaks } from "../../lib/shared/flows-peak.ts";
+import { peakState, sidePeaks } from "../../lib/shared/flows-peak.ts";
 
 const row = (side, symbol, amount, usd, price = usd / amount, asset = `0x${symbol.toLowerCase()}`) => ({
   side,
@@ -72,4 +72,18 @@ test("keep matching no row: no peak, the timeline's symbols named", () => {
   assert.deepEqual(out.collateral.unmatched, ["0xa0b869"]);
   assert.deepEqual(out.collateral.unpriced, []);
   assert.deepEqual(out.debt.unmatched, ["0xdac17f"]);
+});
+
+test("the states split by cause: a peak, no dollar figure, nothing recorded", () => {
+  const priced = [[row("collateral", "WETH", 1, 2000)]];
+  assert.equal(peakState(sidePeaks(priced, 0).collateral), "peak");
+  const unpriced = [[row("collateral", "XYZ", 10, 0, null)]];
+  assert.equal(peakState(sidePeaks(unpriced, 0).collateral), "unpriced");
+  // Days on record, none holding a balance above zero for the side.
+  const empty = [[], [row("collateral", "WETH", 0, 0)]];
+  assert.equal(peakState(sidePeaks(empty, 0).collateral), "not-recorded");
+  assert.equal(peakState(sidePeaks([], 0).debt), "not-recorded");
+  // Held rows the card's assets do not match: nothing recorded for them.
+  const other = [[row("collateral", "WETH", 1, 2000)]];
+  assert.equal(peakState(sidePeaks(other, 0, { collateral: () => false }).collateral), "not-recorded");
 });
