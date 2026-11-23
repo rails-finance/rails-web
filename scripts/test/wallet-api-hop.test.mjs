@@ -149,21 +149,32 @@ test("a finishing job hands its slot to the waiter, so no newcomer goes past the
   const limit = createLimiter(1);
   let running = 0;
   let peak = 0;
-  const job = () => async () => {
+  let third;
+  // The newcomer arrives one microtask hop after the first job's body ends:
+  // after the slot is released and before the woken waiter runs. A limiter
+  // that frees the slot and then wakes the waiter lets it in (peak 2).
+  const job = (newcomer) => async () => {
     running++;
     peak = Math.max(peak, running);
     await new Promise((done) => setTimeout(done, 2));
     running--;
+    if (newcomer)
+      Promise.resolve()
+        .then(() => {})
+        .then(() => {
+          third = limit(job(false));
+        });
   };
-  const first = limit(job());
-  const second = limit(job());
-  // A newcomer arriving as the first finishes queues behind the second.
-  await new Promise((done) => setTimeout(done, 1));
-  const third = limit(job());
-  await Promise.all([first, second, third]);
+  const first = limit(job(true));
+  const second = limit(job(false));
+  await Promise.all([first, second]);
+  await new Promise((done) => setTimeout(done, 20));
+  await third;
+  assert.ok(third, "the newcomer ran");
   assert.equal(peak, 1);
 });
 
+/** Kept as a guard: the summary is given first and must run first. */
 test("the first job given takes the first slot at once", async () => {
   const limit = createLimiter(1);
   const order = [];
