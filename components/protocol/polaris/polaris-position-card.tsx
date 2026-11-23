@@ -32,7 +32,6 @@
 
 import { polarisDebtUsd, polarisEquity, polarisPethUsd } from "@/lib/polaris/usd-receipt";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
-import { PositionNameId } from "@/components/shared/position-name-id";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { positionName, shortPositionId } from "@/lib/shared/position-name";
 import { ListingTag } from "@/components/shared/listing-tag";
@@ -344,8 +343,8 @@ function movedToTip(movedAt: number | null): string {
     : "This wallet held the position, then sent its NFT to the wallet shown.";
 }
 
-/** The CDP-grain identity on a listing row: the market and the CDP id. Its copy
- *  and NFT actions live in the CDP page's ⋮; the listing card is one link. */
+/** The card's tag on both surfaces: the market and the CDP id. Its copy and
+ *  NFT actions live in the CDP page's ⋮. */
 function CdpIdentity({ v }: { v: PolarisPositionView }) {
   const cfg = POLARIS_MARKET_CONFIG[v.market];
   return <ListingTag market={cfg.stable.symbol} id={v.cdpId} />;
@@ -493,15 +492,9 @@ export function polarisCardSlots({
 
   // The position's name (ui-jobs 703): the market's stable and the CDP id.
   const name = positionName({ market: stable, noun: POSITION_NOUN.polaris, id: v.cdpId });
-  // The listing names the holder and the CDP; the detail page's wallet row
-  // names the holder and the page heading the testnet, so the card states the
-  // market and the position.
-  const identity = detail ? (
-    <span className="flex items-center gap-2">
-      <span className="text-xs text-rb-500">{stable} market</span>
-      <PositionNameId name={name} />
-    </span>
-  ) : v.formerHold ? (
+  // The listing names the holder; the detail page's wallet row names the
+  // holder. Both surfaces carry the market and the CDP as the tag (ui-jobs 807).
+  const identity = detail ? undefined : v.formerHold ? (
     // The searched wallet held this CDP and sent its NFT on (ui-jobs 715).
     <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-rb-500" data-moved-to={v.formerHold.movedTo}>
       <RevealTip tip={movedToTip(v.formerHold.movedAt)} focusable className="text-rb-400 focus-ring rounded-sm">
@@ -752,9 +745,8 @@ export function polarisCardSlots({
       </div>
     ) : undefined;
 
-  const common = { status, heads, identity, notice, counters, name };
-  if (!detail)
-    return { ...common, notice: undefined, surface: "listing", menu: null, tag: <CdpIdentity v={v} />, outcome };
+  const common = { status, heads, identity, tag: <CdpIdentity v={v} />, notice, counters, name };
+  if (!detail) return { ...common, notice: undefined, surface: "listing", menu: null, outcome };
 
   const menu: PositionCardMenu = { leading: () => <CdpMenuRows v={v} />, exports: exports ?? null };
   const detailCommon = {

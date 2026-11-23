@@ -6,7 +6,7 @@
 // unstaked, its uncollected fees, or, staked, the AERO to claim and the wallet
 // that staked it; then the range drawn against the price.
 
-import { PositionNameId } from "@/components/shared/position-name-id";
+import { ListingTag } from "@/components/shared/listing-tag";
 import { marketPair, positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { Prov } from "@/components/shared/provenance";
@@ -120,10 +120,10 @@ function slots(r: AeroPositionRead): PositionCardSlots {
     heading: CARD_WORDS.heading,
     status: status ? { word: status.word, tone: "muted", tip: status.tip } : null,
     name,
+    // The NFT id as the tag, the listing's form (ui-jobs 807).
+    tag: <ListingTag id={p.id} />,
     identity: (
-      <span className="text-xs text-rb-500">
-        <PositionNameId name={name} /> · {p.staked ? CARD_WORDS.stakedBadge : CARD_WORDS.unstakedBadge}
-      </span>
+      <span className="text-xs text-rb-500">{p.staked ? CARD_WORDS.stakedBadge : CARD_WORDS.unstakedBadge}</span>
     ),
     heads,
     counters: null,

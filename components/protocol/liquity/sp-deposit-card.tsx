@@ -24,7 +24,6 @@ import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { sboldDepositorVault } from "@/lib/liquity-v2/sbold";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { ListingTag } from "@/components/shared/listing-tag";
-import { PositionNameId } from "@/components/shared/position-name-id";
 import { positionName } from "@/lib/shared/position-name";
 import {
   LIQUITY_V2_SP,
@@ -137,6 +136,8 @@ export function liquityV2DepositSlots({
     tokenIcon(symbol, address, raw, size, dep.chainId);
   const closed = row.status === "closed";
   const name = positionName({ market: b, noun: NOUN, id: row.depositor });
+  // The branch and the depositor as the tag on both surfaces (ui-jobs 807).
+  const tag = <ListingTag market={b} id={row.depositor} />;
   const counters = {
     lastActivityAt: Number(row.last_timestamp),
     eventCount: Number(row.tx_count),
@@ -242,16 +243,10 @@ export function liquityV2DepositSlots({
       counters,
       name,
       menu: null,
-      tag: <ListingTag market={b} id={row.depositor} />,
+      tag,
     };
   }
 
-  const identity = (
-    <span className="flex items-center gap-2">
-      <span className="text-xs text-rb-500">{b} Stability Pool</span>
-      <PositionNameId name={name} />
-    </span>
-  );
   const menu = { leading: () => <DepositMenuRows row={row} dep={dep} />, noun: "deposit", exports: null };
   const explainer = { body: explanation ?? null };
 
@@ -300,7 +295,7 @@ export function liquityV2DepositSlots({
       surface: "detail",
       status,
       heads,
-      identity,
+      tag,
       counters,
       name,
       explainer,
@@ -411,7 +406,7 @@ export function liquityV2DepositSlots({
     surface: "detail",
     status,
     heads,
-    identity,
+    tag,
     counters,
     name,
     explainer,

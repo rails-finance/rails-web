@@ -7,7 +7,7 @@
 // On the shared detail card (its ⋮, read stamp and (i)); the figures are
 // plain and the chain stays in each figure's receipt (decision 0059 point 1).
 
-import { PositionNameId } from "@/components/shared/position-name-id";
+import { ListingTag } from "@/components/shared/listing-tag";
 import { marketPair, positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import type { SessionProtocol } from "@/lib/shared/sessions";
@@ -150,18 +150,15 @@ function slots(r: UniPositionRead, protocol: UniProtocol): PositionCardSlots {
     heading: CARD_WORDS.heading,
     status: status ? { word: status.word, tone: "muted", tip: status.tip } : null,
     name,
-    identity: (
-      <span className="text-xs text-rb-500">
-        <PositionNameId name={name} />
-        {/* PancakeSwap: whether the farm holds it. */}
-        {p.staked !== undefined && (
-          <>
-            {" · "}
-            <Prov info={cardProv("cake", c)}>{p.staked ? CARD_WORDS.staked : CARD_WORDS.unstaked}</Prov>
-          </>
-        )}
-      </span>
-    ),
+    // The NFT id as the tag, the listing's form (ui-jobs 807).
+    tag: <ListingTag id={p.id} />,
+    // PancakeSwap: whether the farm holds it.
+    identity:
+      p.staked !== undefined ? (
+        <span className="text-xs text-rb-500">
+          <Prov info={cardProv("cake", c)}>{p.staked ? CARD_WORDS.staked : CARD_WORDS.unstaked}</Prov>
+        </span>
+      ) : undefined,
     heads,
     counters: null,
     menu: { exports: null },

@@ -1,15 +1,12 @@
 // Live in-browser verification of the timeline's VIEW LINK — the URL grammar
 // useTimelineEvents reads and writes (`hide`, `hideAssets`, `hideAddresses`,
-// `from`/`to`) and the copy-link control that composes it on demand (see the
-// file header of hooks/useTimelineEvents.ts).
+// `from`/`to`), which the address bar carries (see the file header of
+// hooks/useTimelineEvents.ts).
 //
-// ⚠️ THE CONTROL IS NOT ON THE TOOLBAR ANY MORE (`share-link-relocation`,
-// merged 2026-09-12 in `8cd7330c`). It sits at the foot of the EXPLANATION
-// PANE, beside Learn More — an explicit share act by a reader who has already
-// opened the pane. The pane is closed by default and mounted regardless, so
-// the control is always in the DOM and only sometimes visible: every check
-// here reaches it through `openExplanation`, and none of them may assume it
-// is on screen.
+// THE COPY-LINK CONTROL IS GONE from the position card's Explanation pane
+// (ui-jobs 807: the card's ⋮ carries Copy Position). The link a reader shares
+// is the address bar, so `copyLink` reads it, and the phone check states that
+// the pane draws no control.
 //
 // What it holds:
 //   1. A clean load stays clean: no param is written before a toggle, and the
@@ -73,7 +70,6 @@ async function open(width, url) {
   //
   // A page-readiness wait must therefore hang off something the page always
   // shows, and the waking flag the strip clears when its handlers are attached.
-  // Reaching the control is `openExplanation`'s job below.
   //
   // ⚠️ AND THAT IS NOT THE ROWS. Waiting on `[data-event-id]` was the first
   // repair and it was wrong for the same reason in reverse: section 4 opens
@@ -100,19 +96,15 @@ async function open(width, url) {
   return { ctx, page };
 }
 
-/** Open the Explanation pane, where the copy-link control now lives, and leave
- *  it open. Idempotent: the trigger is a TOGGLE, so a second call on an open
- *  pane would close it — the visible control is the test, not a flag of our
- *  own. A surface with no explanation at all has no trigger and no control,
- *  which the caller's own check reports. */
+/** Open the Explanation pane. The position card's pane carries no copy-link
+ *  control since ui-jobs 807 (the ⋮ carries Copy Position); a surface with no
+ *  explanation has no trigger. */
 async function openExplanation(page) {
-  const link = page.locator('button[aria-label="Copy a link to this view"], button[aria-label="Link copied"]').first();
-  if (await link.isVisible().catch(() => false)) return;
   const trigger = page.locator('button[aria-label^="Show"][aria-label$="explanation"]').first();
   if ((await trigger.count()) === 0) return;
   await trigger.scrollIntoViewIfNeeded();
   await trigger.click();
-  await link.waitFor({ state: "visible", timeout: 30000 });
+  await page.locator('button[aria-label^="Hide"][aria-label$="explanation"]').first().waitFor({ timeout: 30000 });
 }
 
 const search = (page) => page.evaluate(() => window.location.search);
@@ -129,13 +121,10 @@ const dateLabel = async (page) => {
   return (await pill.locator("span.font-semibold").first().innerText()).trim();
 };
 
+/** The view's link: the address bar, which carries the view's params (the
+ *  card's copy-link control went with ui-jobs 807). */
 async function copyLink(page) {
-  await openExplanation(page);
-  await page.click('button[aria-label="Copy a link to this view"]');
-  await page.waitForSelector('button[aria-label="Link copied"]', { timeout: 5000 });
-  const text = await page.evaluate(() => navigator.clipboard.readText());
-  await page.waitForSelector('button[aria-label="Copy a link to this view"]', { timeout: 5000 });
-  return text;
+  return page.evaluate(() => window.location.href);
 }
 
 /** Hide the first option of the axis named by `label` (its old menu name,
@@ -257,7 +246,7 @@ const hideFirstOption = (page, label) => hideOption(page, label, 0);
   const { ctx, page } = await open(390, `${BASE}${PAGE}?from=2025-01-01&to=2025-01-31`);
   await openExplanation(page);
   const btn = page.locator('button[aria-label="Copy a link to this view"]');
-  check("phone: the pane's copy-link control is visible", await btn.isVisible());
+  check("phone: the card's pane draws no copy-link control (ui-jobs 807)", (await btn.count()) === 0);
   const link = await copyLink(page);
   const sp = new URL(link).searchParams;
   check("phone: link carries the view", sp.get("from") === "2025-01-01" && sp.get("to") === "2025-01-31", link);

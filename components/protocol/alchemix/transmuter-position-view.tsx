@@ -54,7 +54,7 @@ import {
   transmuterStatus,
   type TransmuterCardProvs,
 } from "@/components/protocol/alchemix/transmuter-position-card";
-import { AlchemixIdentity } from "@/components/protocol/alchemix/alchemix-position-card";
+import { AlchemixIdentity, AlchemixTag } from "@/components/protocol/alchemix/alchemix-position-card";
 import { AlchemixMenuRows } from "@/components/protocol/alchemix/alchemix-menu-rows";
 import {
   TransmuterEventCard,
@@ -269,7 +269,8 @@ export function TransmuterPositionView({
   const common = {
     surface: "detail" as const,
     status: transmuterStatus(p),
-    identity: <AlchemixIdentity name={name.text} chain={p.chainName ?? `chain ${p.chainId}`} />,
+    tag: <AlchemixTag market={alchemixMarketWord(p.syntheticSymbol, "transmuter")} id={p.nftId} />,
+    identity: <AlchemixIdentity chain={p.chainName ?? `chain ${p.chainId}`} />,
     name,
     heads: transmuterHeads(p, maturity, provs),
     counters: null,

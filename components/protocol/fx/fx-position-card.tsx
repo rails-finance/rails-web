@@ -714,19 +714,10 @@ export function useFxCardSlots({
   // (ui-jobs 228); the listing card keeps it.
   // The position's name (ui-jobs 703): the pool's token and the position id.
   const name = positionName({ market: poolMeta.tokenSymbol, noun: POSITION_NOUN.fx, id: v.positionId });
-  const poolLabel = (
-    <span>
-      {name.market}
-      <span className="ml-2 font-normal tabular-nums text-rb-400">
-        {name.noun} {name.id}
-      </span>
-    </span>
-  );
-  const tag = detail ? undefined : <ListingTag market={poolMeta.tokenSymbol} id={v.positionId} />;
-  // The listing keeps the owner on the left and the pool and position at the right end.
-  const identity = detail ? (
-    <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">{poolLabel}</span>
-  ) : v.owner ? (
+  // The pool and the position as the tag on both surfaces (ui-jobs 807).
+  const tag = <ListingTag market={poolMeta.tokenSymbol} id={v.positionId} />;
+  // The listing keeps the owner on the left.
+  const identity = detail ? undefined : v.owner ? (
     <WalletPill wallet={v.owner} ensName={null} filterProtocol="fx" bookmark />
   ) : (
     <span className="text-xs font-normal tabular-nums text-rb-400">{short(v.owner)}</span>
@@ -741,7 +732,7 @@ export function useFxCardSlots({
     liquidationCount: v.liquidationCount,
     ...(detail ? { liquidationRule: FX_LIQUIDATION_RULE, order: "age-last" as const } : {}),
   };
-  const common = { status, identity, counters, name };
+  const common = { status, identity, tag, counters, name };
 
   // Settled getPosition read: NORMALIZED units, labeled with the normalized
   // symbol (stETH-equivalent on the wstETH pool), never the deposit token's.
@@ -837,7 +828,7 @@ export function useFxCardSlots({
     ];
   }
 
-  if (!detail) return { ...common, heads, surface: "listing", menu: null, tag, outcome };
+  if (!detail) return { ...common, heads, surface: "listing", menu: null, outcome };
 
   const tickLine =
     !closed && px?.tick != null ? (

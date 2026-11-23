@@ -151,41 +151,9 @@ export function depositedHead(
   };
 }
 
-/** The identity at the right of the heading (detail) or after the pill
- *  (listing): "alUSD position 1221", the chain, and on a listing the holder. */
+/** The identity after the tag: on a listing the holder, then the chain. The
+ *  position's name stands in the card's `tag` (AlchemixTag). */
 export function AlchemixIdentity({
-  name,
-  chain,
-  wallet,
-  session,
-  prefix,
-}: {
-  name: string;
-  chain: string;
-  wallet?: string | null;
-  session?: SessionProtocol;
-  /** A word before the wallet ("claimed by"). */
-  prefix?: string;
-}) {
-  return (
-    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-      {/* Not uppercased: the symbol's case is part of its name
-          (lib/alchemix/naming.ts). */}
-      <span className="font-bold tracking-wide text-foreground/80">{name}</span>
-      <span className="text-rb-500">{chain}</span>
-      {wallet && session ? (
-        <span className="inline-flex items-center gap-1.5 text-rb-500">
-          {prefix}
-          <WalletPill wallet={wallet} ensName={null} filterProtocol={session} bookmark />
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
-/** A listing's left side: the holder, then the chain. The position's name is
- *  the card's right-end `tag` (AlchemixTag). */
-export function AlchemixListingIdentity({
   chain,
   wallet,
   session,
@@ -210,7 +178,8 @@ export function AlchemixListingIdentity({
   );
 }
 
-/** A listing's right end: the synthetic and the position's id ("alETH", 265). */
+/** The card's `tag` on both surfaces: the synthetic and the position's id
+ *  ("alETH", 265). */
 export function AlchemixTag({ market, id }: { market: string; id: string }) {
   return <ListingTag market={market} id={id} />;
 }
@@ -247,9 +216,7 @@ export function alchemixListingSlots(p: AlchemixPositionSummary, session: Sessio
     surface: "listing",
     status: alchemixStatus(p.status),
     tag: <AlchemixTag market={alchemixMarketWord(sym)} id={p.tokenId} />,
-    identity: (
-      <AlchemixListingIdentity chain={p.chainName ?? `chain ${p.chainId}`} wallet={p.owner} session={session} />
-    ),
+    identity: <AlchemixIdentity chain={p.chainName ?? `chain ${p.chainId}`} wallet={p.owner} session={session} />,
     heads: [
       depositedHead(collSettled, "shares", undefined, collStamp),
       {

@@ -21,7 +21,6 @@ import { Prov } from "@/components/shared/provenance";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { ListingTag } from "@/components/shared/listing-tag";
-import { PositionNameId } from "@/components/shared/position-name-id";
 import { positionName } from "@/lib/shared/position-name";
 import { liquityV1StakeHref, LIQUITY_V1_STAKING_PATH } from "@/lib/liquity-v1/staking-routes";
 import { big, exactUnits, stakeShare, type StakeLifetime, type StakeNow } from "@/lib/liquity-v1/staking-math";
@@ -100,6 +99,8 @@ export function liquityV1StakeSlots({
   const detail = surface === "detail";
   const closed = row.status === "closed";
   const name = positionName({ market: MARKET, noun: NOUN, id: row.staker });
+  // Staking and the staker as the tag on both surfaces (ui-jobs 807).
+  const tag = <ListingTag market={MARKET} id={row.staker} />;
   const counters = {
     lastActivityAt: Number(row.last_timestamp),
     eventCount: Number(row.tx_count),
@@ -190,16 +191,10 @@ export function liquityV1StakeSlots({
       counters,
       name,
       menu: null,
-      tag: <ListingTag market={MARKET} id={row.staker} />,
+      tag,
     };
   }
 
-  const identity = (
-    <span className="flex items-center gap-2">
-      <span className="text-xs text-rb-500">{MARKET}</span>
-      <PositionNameId name={name} />
-    </span>
-  );
   const menu = { leading: () => <StakeMenuRows row={row} />, noun: "stake", exports: null };
   const explainer = { body: explanation ?? null };
 
@@ -286,7 +281,7 @@ export function liquityV1StakeSlots({
       surface: "detail",
       status,
       heads: paidHeads,
-      identity,
+      tag,
       counters,
       name,
       explainer,
@@ -357,7 +352,7 @@ export function liquityV1StakeSlots({
     surface: "detail",
     status,
     heads,
-    identity,
+    tag,
     counters,
     name,
     explainer,

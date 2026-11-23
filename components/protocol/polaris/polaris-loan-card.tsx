@@ -24,7 +24,6 @@ import { Prov } from "@/components/shared/provenance";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { ListingTag } from "@/components/shared/listing-tag";
-import { PositionNameId } from "@/components/shared/position-name-id";
 import { positionName, shortPositionId } from "@/lib/shared/position-name";
 import { FPETH, POLARIS_WETH } from "@/lib/polaris/asset-catalog";
 import { polarisLoanHref, polarisLoanNftUrl, POLARIS_LOANS_PATH } from "@/lib/polaris/routes";
@@ -98,6 +97,8 @@ export function polarisLoanSlots({
   const detail = surface === "detail";
   const closed = row.status === "closed";
   const name = positionName({ noun: "Reserve loan", id: row.loan_id });
+  // The loan and its ID as the tag on both surfaces (ui-jobs 807).
+  const tag = <ListingTag market="Reserve loan" id={row.loan_id} />;
   const counters = {
     lastActivityAt: Number(row.last_timestamp),
     eventCount: row.tx_count,
@@ -151,15 +152,10 @@ export function polarisLoanSlots({
       counters,
       name,
       menu: null,
-      tag: <ListingTag market="Reserve loan" id={row.loan_id} />,
+      tag,
     };
   }
 
-  const identity = (
-    <span className="flex items-center gap-2">
-      <PositionNameId name={name} />
-    </span>
-  );
   const menu = { leading: () => <LoanMenuRows row={row} />, noun: "loan", exports: null };
   const explainer = { body: explanation ?? null };
 
@@ -194,7 +190,7 @@ export function polarisLoanSlots({
           ) : null,
         },
       ],
-      identity,
+      tag,
       counters,
       name,
       explainer,
@@ -292,7 +288,7 @@ export function polarisLoanSlots({
     surface: "detail",
     status,
     heads,
-    identity,
+    tag,
     counters,
     name,
     explainer,

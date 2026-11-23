@@ -7,7 +7,7 @@
 // THE GRAIN IS THE PAIR: the card is one (owner, accountNumber), never an
 // owner. Dolomite is cross-margin WITHIN an account number and isolated
 // ACROSS them — one card per owner would assert a single collateralisation
-// across accounts that are independently liquidated. The identity slot carries
+// across accounts that are independently liquidated. The tag carries
 // Dolomite's own vocabulary: account 0 is the owner's "Dolomite Balance";
 // every other number is an isolated "Borrow Position".
 //
@@ -26,8 +26,7 @@
 // roster), priced by the core's own getMarketPrice.
 
 import { useClosedPeaks, withPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
-import { PositionNameId } from "@/components/shared/position-name-id";
-import { positionName, type PositionName } from "@/lib/shared/position-name";
+import { listingTagId, positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import { ListingTag } from "@/components/shared/listing-tag";
@@ -233,38 +232,11 @@ export function DolomiteAccountLabel({ text, accountNumber }: { text: string; ac
   );
 }
 
-/** The account-grain identity: the owner (address) + which of its accounts
- *  this is, in Dolomite's own vocabulary. On the detail page the label
- *  explains itself on hover or tap (the listing card sits inside a link), and
- *  the owner is on the page's wallet row above the card (ui-jobs 228). */
-function AccountIdentity({ v, tip, name }: { v: DolomitePositionView; tip?: boolean; name: PositionName }) {
-  // The listing keeps the wallet alone on the left; the account's name is the
-  // card's right-end `tag`.
-  if (!tip) {
-    return <WalletPill wallet={v.owner} ensName={null} filterProtocol="dolomite" bookmark />;
-  }
-  // A borrow position is numbered by its account, so it reads as one name,
-  // "Borrow position #12", in Dolomite's noun.
-  if (/^Borrow Position #/.test(v.accountLabel)) {
-    return (
-      <span className="text-xs tabular-nums text-rb-400" data-position-name-id="">
-        <DolomiteAccountLabel text={`Borrow position ${name.id}`} accountNumber={v.accountNumber} />
-      </span>
-    );
-  }
-  return (
-    <span className="flex items-center gap-2">
-      <span className="text-xs text-rb-500">
-        {/* The account's kind ("Dolomite Balance", "Borrow position (WLFI
-            frontend account)"); its number follows in the position's name. */}
-        <DolomiteAccountLabel
-          text={v.accountLabel.replace(/ #\S+$/, "").replace(/^Borrow Position\b/, "Borrow position")}
-          accountNumber={v.accountNumber}
-        />
-      </span>
-      <PositionNameId name={name} />
-    </span>
-  );
+/** The account-grain identity on a listing: the owner's wallet. The position
+ *  page names the owner in its wallet row above the card (ui-jobs 228), and
+ *  both surfaces carry the account as the tag. */
+function AccountIdentity({ v }: { v: DolomitePositionView }) {
+  return <WalletPill wallet={v.owner} ensName={null} filterProtocol="dolomite" bookmark />;
 }
 
 export interface DolomitePositionCardProps {
@@ -344,9 +316,14 @@ export function useDolomiteCardSlots({
     noun: nameParts.noun ?? POSITION_NOUN.dolomite,
     id: accountNumberId(v.accountNumber),
   });
-  const common = { status, identity: <AccountIdentity v={v} tip={detail} name={name} />, counters, name };
   const borrowId = /^Borrow Position #(.+)$/.test(v.accountLabel) ? accountNumberId(v.accountNumber) : undefined;
-  const tag = borrowId ? <ListingTag id={borrowId} /> : <ListingTag market={wlfi ? "WLFI" : v.accountLabel} />;
+  // The account as the tag on both surfaces (ui-jobs 807): a borrow
+  // position's number, else the account's name. The position page explains
+  // the account number on hover or tap.
+  const tagText = borrowId ? listingTagId(borrowId) : wlfi ? "WLFI" : v.accountLabel;
+  const tagNode = detail ? <DolomiteAccountLabel text={tagText} accountNumber={v.accountNumber} /> : tagText;
+  const tag = borrowId ? <ListingTag id={tagNode} /> : <ListingTag market={tagNode} />;
+  const common = { status, identity: detail ? undefined : <AccountIdentity v={v} />, tag, counters, name };
 
   // Closed / liquidated: every par is back at zero, so each side states the
   // markets it held, and what each market lane held at its height, the highest
@@ -465,7 +442,7 @@ export function useDolomiteCardSlots({
     }
   }
 
-  if (!detail) return { ...common, heads, surface: "listing", menu: null, tag, outcome };
+  if (!detail) return { ...common, heads, surface: "listing", menu: null, outcome };
 
   const detailCommon = {
     ...common,

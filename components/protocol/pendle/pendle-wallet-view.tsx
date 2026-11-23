@@ -9,6 +9,7 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardSlots } from "@/components/shared/position-card";
+import { ListingTag } from "@/components/shared/listing-tag";
 
 import { BlockRef } from "@/components/shared/block-ref";
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
@@ -110,12 +111,8 @@ function ListingCard({ p, w }: { p: PendlePosition; w: PendleWalletPositions }) 
         sub: maturityWords(t.expiry, w.timestamp),
       },
     ],
-    identity: (
-      <span className="inline-flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold text-foreground">{marketName(t)}</span>
-        <UnderlyingLabel p={p} />
-      </span>
-    ),
+    tag: <ListingTag market={marketName(t)} />,
+    identity: <UnderlyingLabel p={p} />,
     counters: { lastActivityAt: last?.timestamp ?? null, eventCount: rows.length, eventCountNoun: "router event" },
     menu: null,
   };

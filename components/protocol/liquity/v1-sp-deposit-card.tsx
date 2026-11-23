@@ -23,7 +23,6 @@ import { Prov } from "@/components/shared/provenance";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { ListingTag } from "@/components/shared/listing-tag";
-import { PositionNameId } from "@/components/shared/position-name-id";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { positionName } from "@/lib/shared/position-name";
 import { liquityV1DepositHref, LIQUITY_V1_SP_PATH } from "@/lib/liquity-v1/sp-routes";
@@ -109,6 +108,8 @@ export function liquityV1DepositSlots({
   const detail = surface === "detail";
   const closed = row.status === "closed";
   const name = positionName({ market: MARKET, noun: NOUN, id: row.depositor });
+  // The pool and the depositor as the tag on both surfaces (ui-jobs 807).
+  const tag = <ListingTag market={MARKET} id={row.depositor} />;
   const counters = {
     lastActivityAt: Number(row.last_timestamp),
     eventCount: Number(row.tx_count),
@@ -195,16 +196,10 @@ export function liquityV1DepositSlots({
       counters,
       name,
       menu: null,
-      tag: <ListingTag market={MARKET} id={row.depositor} />,
+      tag,
     };
   }
 
-  const identity = (
-    <span className="flex items-center gap-2">
-      <span className="text-xs text-rb-500">{MARKET}</span>
-      <PositionNameId name={name} />
-    </span>
-  );
   const menu = { leading: () => <DepositMenuRows row={row} />, noun: "deposit", exports: null };
   const explainer = { body: explanation ?? null };
 
@@ -259,7 +254,7 @@ export function liquityV1DepositSlots({
       surface: "detail",
       status,
       heads: paidHeads(l),
-      identity,
+      tag,
       counters,
       name,
       explainer,
@@ -402,7 +397,7 @@ export function liquityV1DepositSlots({
     surface: "detail",
     status,
     heads,
-    identity,
+    tag,
     counters,
     name,
     explainer,

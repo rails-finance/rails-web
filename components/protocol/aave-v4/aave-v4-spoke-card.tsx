@@ -39,6 +39,7 @@ import { type HubTier, hubChipLabel } from "@/components/protocol/aave-v4/aave-v
 import { type AaveSpokeCardInfo, liquidationBuffer, rateSymbolLabel, yearlyDebtCost } from "@/lib/aave-v4/spoke-cards";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { WalletPill } from "@/components/shared/wallet-pill";
+import { ListingTag } from "@/components/shared/listing-tag";
 import type { ClosedCollateralFactors } from "@/lib/aave-v4/use-closed-collateral-factors";
 import { fmtUsd, hfLabelV4, fmtLiqPrice } from "@/lib/aave-v4/format";
 import { formatCompact } from "@/lib/shared/format-compact";
@@ -159,12 +160,12 @@ function PeakUsd({ usd, info }: { usd: number; info: Provenance }) {
   );
 }
 
-/** The spoke and its hubs, at the right end of the heading row. */
-function SpokeIdentity({ name, hub, debtHubs }: { name: string; hub: HubTier; debtHubs: HubTier[] }) {
+/** The spoke's hubs, after the tag in the heading row; the spoke stands in
+ *  the tag (ui-jobs 807). */
+function HubIdentity({ hub, debtHubs }: { hub: HubTier; debtHubs: HubTier[] }) {
   return (
-    <span className="flex items-center gap-1.5 leading-none text-foreground">
-      <span className="text-xs font-semibold">{name}</span>
-      <span className="text-xs font-bold uppercase tracking-wide">{hubChipLabel(hub, debtHubs)}</span>
+    <span className="text-xs font-bold uppercase tracking-wide leading-none text-foreground">
+      {hubChipLabel(hub, debtHubs)}
     </span>
   );
 }
@@ -336,9 +337,11 @@ export function useAaveV4SpokeCardSlots({
   const identity = (
     <span className="flex items-center gap-2">
       {wallet && <WalletPill wallet={wallet} ensName={ensName ?? null} filterProtocol={session} bookmark />}
-      <SpokeIdentity name={spoke.name} hub={spoke.hub} debtHubs={spoke.debtHubs} />
+      <HubIdentity hub={spoke.hub} debtHubs={spoke.debtHubs} />
     </span>
   );
+  // The spoke (the market) as the tag, as the listing names it.
+  const tag = <ListingTag market={spoke.name} />;
   // The position's name: the spoke and the wallet (lib/shared/position-name.ts).
   const name = owner ? positionName({ market: spoke.name, noun: POSITION_NOUN[session], id: owner }) : undefined;
   // The owner transaction count, the liquidation triangle, then the time
@@ -396,6 +399,7 @@ export function useAaveV4SpokeCardSlots({
       status,
       heads,
       identity,
+      tag,
       counters,
       name,
       explainer,
@@ -570,6 +574,7 @@ export function useAaveV4SpokeCardSlots({
     status: null,
     heads,
     identity,
+    tag,
     counters,
     name,
     explainer,

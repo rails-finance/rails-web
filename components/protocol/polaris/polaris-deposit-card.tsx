@@ -27,7 +27,6 @@ import { Prov } from "@/components/shared/provenance";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { ListingTag } from "@/components/shared/listing-tag";
-import { PositionNameId } from "@/components/shared/position-name-id";
 import { HeadingTip } from "@/components/shared/tip-label";
 import { positionName, shortPositionId } from "@/lib/shared/position-name";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
@@ -109,6 +108,8 @@ export function polarisDepositSlots({
   const s = stable.symbol;
   const closed = row.status === "closed";
   const name = positionName({ market: s, noun: NOUN, id: row.token_id });
+  // The market and the deposit NFT as the tag on both surfaces (ui-jobs 807).
+  const tag = <ListingTag market={s} id={row.token_id} />;
   const counters = {
     lastActivityAt: Number(row.last_timestamp),
     eventCount: row.tx_count,
@@ -154,17 +155,12 @@ export function polarisDepositSlots({
       counters,
       name,
       menu: null,
-      tag: <ListingTag market={s} id={row.token_id} />,
+      tag,
     };
   }
 
-  const identity = (
-    <span className="flex items-center gap-2">
-      <span className="text-xs text-rb-500">{s} Stability Pool</span>
-      <PositionNameId name={name} />
-      {vault}
-    </span>
-  );
+  // The vault-held tag stays beside the market and ID.
+  const identity = vault ?? undefined;
   const menu = { leading: () => <DepositMenuRows row={row} />, noun: "deposit", exports: null };
   const explainer = { body: explanation ?? null };
 
@@ -200,6 +196,7 @@ export function polarisDepositSlots({
         },
       ],
       identity,
+      tag,
       counters,
       name,
       explainer,
@@ -293,6 +290,7 @@ export function polarisDepositSlots({
     status,
     heads,
     identity,
+    tag,
     counters,
     name,
     explainer,
