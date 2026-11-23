@@ -203,10 +203,8 @@ export async function readListingRows(
   ];
   const settled = await Promise.allSettled(
     reads.map(async (r) => {
-      const page = await withBudget(budgetMs, (own) => {
-        const both = AbortSignal.any([signal, own]);
-        return apiHop(() => r.read(both), both);
-      });
+      // The listing's budget runs from the slot, not from the queue.
+      const page = await apiHop(() => withBudget(budgetMs, (own) => r.read(AbortSignal.any([signal, own]))), signal);
       if (page.total > page.rows.length) throw new Error(`answered ${page.rows.length} of ${page.total} rows`);
       return page.rows;
     }),

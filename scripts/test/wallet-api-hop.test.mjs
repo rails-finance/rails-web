@@ -126,3 +126,65 @@ test("a failed job frees its slot", async () => {
   await assert.rejects(limit(async () => Promise.reject(new Error("no"))));
   assert.equal(await limit(async () => "next"), "next");
 });
+
+test("a job whose signal aborts while queued leaves the queue and rejects", async () => {
+  const limit = createLimiter(1);
+  let free;
+  const holder = limit(() => new Promise((done) => (free = done)));
+  const ctl = new AbortController();
+  let ran = false;
+  const queued = limit(async () => {
+    ran = true;
+  }, ctl.signal);
+  ctl.abort();
+  await assert.rejects(queued);
+  free("held");
+  assert.equal(await holder, "held");
+  // The slot goes to the next job, not the aborted one.
+  assert.equal(await limit(async () => "next"), "next");
+  assert.equal(ran, false);
+});
+
+test("a finishing job hands its slot to the waiter, so no newcomer goes past the cap", async () => {
+  const limit = createLimiter(1);
+  let running = 0;
+  let peak = 0;
+  const job = () => async () => {
+    running++;
+    peak = Math.max(peak, running);
+    await new Promise((done) => setTimeout(done, 2));
+    running--;
+  };
+  const first = limit(job());
+  const second = limit(job());
+  // A newcomer arriving as the first finishes queues behind the second.
+  await new Promise((done) => setTimeout(done, 1));
+  const third = limit(job());
+  await Promise.all([first, second, third]);
+  assert.equal(peak, 1);
+});
+
+test("the first job given takes the first slot at once", async () => {
+  const limit = createLimiter(1);
+  const order = [];
+  const summary = limit(async () => order.push("summary"));
+  const listing = limit(async () => order.push("listing"));
+  await Promise.all([summary, listing]);
+  assert.deepEqual(order, ["summary", "listing"]);
+});
+
+test("an abort during the retry's pause ends it with no second try", async () => {
+  const ctl = new AbortController();
+  let calls = 0;
+  const run = retryOnConnectionFailure(
+    async () => {
+      calls++;
+      throw reset();
+    },
+    ctl.signal,
+    50,
+  );
+  setTimeout(() => ctl.abort(), 5);
+  await assert.rejects(run);
+  assert.equal(calls, 1);
+});

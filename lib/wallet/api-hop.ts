@@ -40,23 +40,68 @@ export function isConnectionFailure(err: unknown): boolean {
   return chain.some((x) => (x.code != null && CONNECTION_CODES.has(x.code)) || CONNECTION_WORDS.test(x.message ?? ""));
 }
 
-/** A queue that runs at most `max` of the functions given to it at once. */
+/** The reason a signal aborted with, as an error. */
+const abortError = (signal: AbortSignal): unknown =>
+  signal.reason ?? Object.assign(new Error("aborted"), { name: "AbortError" });
+
+/** A queue that runs at most `max` of the functions given to it at once, in
+ *  the order given. A finishing job hands its slot straight to the next one
+ *  waiting, so no newcomer takes it between; a job whose `signal` aborts while
+ *  it waits leaves the queue and rejects. */
 export function createLimiter(max: number) {
   let running = 0;
-  const waiting: (() => void)[] = [];
+  const waiting: { go: () => void }[] = [];
   const release = () => {
-    running--;
-    waiting.shift()?.();
+    const next = waiting.shift();
+    if (next) next.go();
+    else running--;
   };
-  return async function limit<T>(fn: () => Promise<T>): Promise<T> {
-    if (running >= max) await new Promise<void>((go) => waiting.push(go));
-    running++;
+  const acquire = (signal?: AbortSignal): Promise<void> => {
+    if (signal?.aborted) return Promise.reject(abortError(signal));
+    if (running < max && waiting.length === 0) {
+      running++;
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        const i = waiting.indexOf(entry);
+        if (i >= 0) waiting.splice(i, 1);
+        reject(abortError(signal!));
+      };
+      const entry = {
+        go: () => {
+          signal?.removeEventListener("abort", onAbort);
+          resolve();
+        },
+      };
+      waiting.push(entry);
+      signal?.addEventListener("abort", onAbort, { once: true });
+    });
+  };
+  return async function limit<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    await acquire(signal);
     try {
       return await fn();
     } finally {
       release();
     }
   };
+}
+
+/** Wait `ms`, or reject at once where `signal` aborts first. */
+function pause(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(abortError(signal));
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortError(signal!));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 /** Run `fn`, and once more after `delayMs` where it failed at the connection
@@ -70,16 +115,17 @@ export async function retryOnConnectionFailure<T>(
     return await fn();
   } catch (err) {
     if (!isConnectionFailure(err) || signal?.aborted) throw err;
-    await new Promise((go) => setTimeout(go, delayMs));
-    if (signal?.aborted) throw err;
+    await pause(delayMs, signal);
     return fn();
   }
 }
 
 const limit = createLimiter(API_CONCURRENCY);
 
-/** One wallet-read request to the api host: queued behind the cap, retried
- *  once on a connection failure. */
+/** One wallet-read request to the api host: queued behind the cap (leaving
+ *  the queue where `signal` aborts), retried once on a connection failure.
+ *  `fn` starts only once the slot is granted, so a budget it sets runs from
+ *  then. */
 export function apiHop<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
-  return limit(() => retryOnConnectionFailure(fn, signal));
+  return limit(() => retryOnConnectionFailure(fn, signal), signal);
 }
