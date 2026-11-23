@@ -508,8 +508,9 @@ await page7.close();
 }
 
 // ── 9. the Debt facet is the Borrowing / Collateral-only pair, and there is no
-//       History facet (server 53dbf65 + web: "ever liquidated" is the Status
-//       bucket on Polaris — the NFT is burned, the id never reused). ─────────
+//       History facet (server 53dbf65 + web: "ever liquidated" is Closed with
+//       the "Closed by liquidation" switch on Polaris, ui-jobs 805 — the NFT is
+//       burned, the id never reused). ─────────────────────────────────────────
 {
   const all = await api("/api/polaris/positions?status=open&limit=1");
   const borrowing = await api("/api/polaris/positions?status=open&hasDebt=1&limit=1");

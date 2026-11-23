@@ -13,19 +13,23 @@
 //      for the open params — the count is never read off the page under test;
 //   2  every card on the bare directory carries an open lifecycle pill (OPEN, or
 //      DORMANT on Liquity V2, which is an open trove redeemed below the floor);
-//   3  the bare directory's Status pill (N1.10) is a default pill naming the
-//      resting view, nothing is set and no reset is offered — the resting
-//      view is a contextual default, not a selection someone made;
+//   3  the bare directory's Status pill (N1.10) is the locked default "Status
+//      Open", nothing is set and no reset is offered (the resting view is a
+//      contextual default that nobody selected); the count line under the
+//      results says "open";
 //   4  the bare directory's URL stays clean: no `status=` param;
-//   5  a search that names a holder relaxes the view to every status without
-//      touching the Status facet — the holder's closed position renders, the
-//      row count matches the API's total for that holder unfiltered, and the
-//      Status pill is neither set nor a default (nothing was selected). Same
-//      for a position-id search;
-//   6  ticking Closed in the Status pill's editor is a real selection: the pill
-//      is set, the URL carries the `status=` param, the total matches the API
-//      for that set — and the editor's "Reset to default" returns to the
-//      contextual default and the clean URL.
+//   5  a search that names a holder relaxes the view to All without touching
+//      the Status facet — the holder's closed position renders, the row count
+//      matches the API's total for that holder unfiltered, and no Status pill
+//      is drawn (All rests on nothing). Same for a position-id search;
+//   6  Status is one choice of Open / Closed / All (ui-jobs 805): the resting
+//      pill's editor draws no "Reset to default"; picking Closed sets the
+//      pill, writes `?status=closed` and shows the API's closed set (closed
+//      and liquidated together), and the count line says "closed"; picking
+//      Open again returns to the resting set and the clean URL.
+//
+// PWN keeps its own multi-choice Status, and its section ticks Repaid and
+// resets as before.
 //
 // Every fixture is read from the API at run time (the holder of a closed
 // position, the ids, the totals). Nothing is pinned: the live index moves by the
@@ -207,21 +211,19 @@ async function waitForTotalChange(page, rowSel, itemsPerPage, previous, tries = 
   return readTotal(page, rowSel, itemsPerPage);
 }
 
-/** The Status pill (N1.10, ui-jobs 681) read as the old chip row was: the
- *  SELECTION ("Status: Open, Closed" while the pill is set), the DEFAULT
- *  ("Status: Open" while it rests on a default that narrows the list), and
- *  whether a reset is offered at all — the toolbar's Clear all / Reset
+/** The Status pill (N1.10, ui-jobs 681) in its main button's accessible name:
+ *  the SELECTION ("Status Closed" while the pill is set), the DEFAULT ("Status
+ *  Open" while it rests on a default that narrows the list), and whether a
+ *  reset is offered at all — the toolbar's Clear all / Reset
  *  (`data-pill-clear`), drawn whenever any group is off its default (from sm
  *  it is hidden by CSS until two are, so this reads its presence, not its
- *  visibility). The pill's words come from its main button's accessible name
- *  ("Status Open"). */
+ *  visibility). An unset group draws no pill, and both words read null. */
 async function readChips(page) {
   return page.evaluate(() => {
     const toolbar = document.querySelector('[data-skel-section="listing-toolbar"]');
     const pill = toolbar?.querySelector('[data-filter-pill="Status"]');
     const state = pill?.getAttribute("data-pill-state") ?? null;
-    const name = pill?.querySelector("[data-pill-open]")?.getAttribute("aria-label") ?? "";
-    const words = name.startsWith("Status ") ? `Status: ${name.slice("Status ".length)}` : null;
+    const words = pill?.querySelector("[data-pill-open]")?.getAttribute("aria-label") ?? null;
     return {
       statusChip: state === "set" ? words : null,
       defaultChip: state === "default" ? words : null,
@@ -230,11 +232,28 @@ async function readChips(page) {
   });
 }
 
-/** The resting view and nothing selected: the Status pill is the default
- *  "Status: Open", nothing is set, no reset is offered. */
-const restsOnOpen = (chips) => chips.defaultChip === "Status: Open" && chips.statusChip == null && !chips.reset;
+/** The resting view and nothing selected: the Status pill is the locked
+ *  default "Status Open", nothing is set, no reset is offered. */
+const restsOnOpen = (chips) => chips.defaultChip === "Status Open" && chips.statusChip == null && !chips.reset;
+/** A search's resting choice is All: no Status pill at all, no reset. */
+const drawsNoStatus = (chips) => chips.defaultChip == null && chips.statusChip == null && !chips.reset;
 const describeChips = (chips) =>
   `${chips.defaultChip ? `default "${chips.defaultChip}"` : "no default pill"}, ${chips.statusChip ? `set "${chips.statusChip}"` : "nothing set"}${chips.reset ? ", reset offered" : ""}`;
+
+/** The count line's noun under the results (N3): "open positions" in
+ *  "Showing 1–20 of 216 open positions", or in "12 open positions" where one
+ *  page carries the count alone. Null where no line is drawn. */
+async function readCountNoun(page) {
+  return page.evaluate(() => {
+    const el = document.querySelector('[data-anatomy="N3"]');
+    if (!el) return null;
+    const line = (el.hasAttribute("data-result-line") ? el : (el.firstElementChild ?? el)).textContent ?? "";
+    const m = /^(?:Showing\s+[\d,]+[-–][\d,]+\s+of\s+)?[\d,]+\s+([^·]+)/.exec(line.replace(/\s+/g, " ").trim());
+    return m ? m[1].trim() : null;
+  });
+}
+/** Does the count line name the choice ("open …", "closed …")? */
+const nounNames = (noun, word) => noun != null && new RegExp(`^${word}\\b`, "i").test(noun);
 
 /** Type into the listing's search box and let the driver's 300 ms debounce push
  *  the URL. Given `rowSel`, wait for the row set to CHANGE before reading it: a
@@ -271,7 +290,23 @@ async function openStatus(page) {
   await page.locator('[data-pill-editor="Status"]').first().waitFor({ state: "visible", timeout: 10000 });
 }
 
-/** Tick one option in the Status pill's editor and apply it. */
+/** Pick one choice (open / closed / all) in the Status pill's editor and
+ *  apply it. Returns whether the editor drew a "Reset to default" while open
+ *  (a locked single choice draws none: the way back is picking Open). */
+async function pickStatus(page, value) {
+  await openStatus(page);
+  const editor = page.locator('[data-pill-editor="Status"]').first();
+  const reset = (await editor.locator("[data-pill-editor-remove]").count()) > 0;
+  await editor.locator(`[data-pill-option="${value}"]`).first().click();
+  await editor.locator("[data-pill-editor-apply]").first().click();
+  await page.waitForTimeout(1200);
+  return { reset };
+}
+
+/** The `status` URL value, or null where none is written. */
+const statusParam = (search) => new URLSearchParams(search).get("status");
+
+/** Tick one option in a multi-choice Status editor (PWN) and apply it. */
 async function tickStatus(page, label) {
   await openStatus(page);
   await page
@@ -283,11 +318,74 @@ async function tickStatus(page, label) {
   await page.waitForTimeout(1200);
 }
 
-/** The Status pill's way back: its editor's "Reset to default" (a default
- *  pill draws no ×). */
+/** A multi-choice Status pill's way back (PWN): its editor's "Reset to
+ *  default" (a default pill draws no ×). */
 async function resetStatus(page) {
   await openStatus(page);
   await page.locator('[data-pill-editor="Status"] [data-pill-editor-remove]').first().click();
+}
+
+/** Check 6 on a listing whose Status is the choice of Open / Closed / All:
+ *  pick Closed from the resting view, then Open again. `closedTotal` and
+ *  `openTotal` read the index's totals for the two choices; each is read
+ *  before and after the page so a moving index brackets the page's total. */
+async function checkStatusChoice({ url, label, rows, perPage, closedTotal, openTotal, closedQuery }) {
+  const picked = await openListing(context, url);
+  await waitForRows(picked, rows);
+  const resting = await readTotal(picked, rows, perPage);
+  const { reset } = await pickStatus(picked, "closed");
+  const closedBefore = await closedTotal();
+  const pickedTotal = await waitForTotalChange(picked, rows, perPage, resting.total);
+  const closedAfter = await closedTotal();
+  const pickedUrl = await picked.evaluate(() => window.location.search);
+  const pickedChips = await readChips(picked);
+  const pickedNoun = await readCountNoun(picked);
+  check(
+    label("6a. the resting Status editor draws no Reset to default"),
+    !reset,
+    reset ? "data-pill-editor-remove drawn" : "none drawn",
+  );
+  check(
+    label("6b. picking Closed sets the Status pill"),
+    pickedChips.statusChip === "Status Closed" && pickedChips.reset,
+    `${pickedChips.statusChip ?? "nothing set"}${pickedChips.reset ? " + reset offered" : " + no reset"}`,
+  );
+  check(
+    label("6c. picking Closed writes status=closed"),
+    statusParam(pickedUrl) === "closed",
+    `location.search "${pickedUrl}"`,
+  );
+  check(
+    label("6d. the Closed view's total is the index's closed set"),
+    withinIndex(pickedTotal.total, closedBefore, closedAfter),
+    `page ${pickedTotal.total} vs index ${closedBefore}→${closedAfter} for ${closedQuery}`,
+  );
+  check(label('6e. the count line says "closed"'), nounNames(pickedNoun, "closed"), `"${pickedNoun}"`);
+
+  // The way back is picking Open.
+  const openBefore = await openTotal();
+  await pickStatus(picked, "open");
+  const clearedTotal = await waitForTotalChange(picked, rows, perPage, pickedTotal.total);
+  const openAfter = await openTotal();
+  const clearedUrl = await picked.evaluate(() => window.location.search);
+  const clearedChips = await readChips(picked);
+  check(
+    label("6f. picking Open returns to the clean URL"),
+    statusParam(clearedUrl) == null,
+    `location.search "${clearedUrl}"`,
+  );
+  check(
+    label("6g. picking Open returns to the open resting set"),
+    restsOnOpen(clearedChips) && withinIndex(clearedTotal.total, openBefore, openAfter),
+    `${describeChips(clearedChips)}, page ${clearedTotal.total} vs index ${openBefore}→${openAfter}`,
+  );
+  await picked.close();
+}
+
+/** Check 3b: the bare directory's count line names the resting choice. */
+async function checkOpenNoun(page, label) {
+  const noun = await readCountNoun(page);
+  check(label('3b. the count line says "open"'), nounNames(noun, "open"), `"${noun}"`);
 }
 
 const browser = await chromium.launch();
@@ -360,10 +458,11 @@ if (wants("Liquity V2")) {
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
   check(
-    label("3. the bare directory names its resting view in the Status: Open default pill and offers no reset"),
+    label("3. the bare directory names its resting view in the locked Status Open pill and offers no reset"),
     restsOnOpen(bareChips),
     describeChips(bareChips),
   );
+  await checkOpenNoun(bare, label);
   check(
     label("4. the bare directory's URL carries no status param"),
     bareSearchOnLoad === "",
@@ -389,9 +488,9 @@ if (wants("Liquity V2")) {
       `page ${searchTotal.total} (${searchTotal.from}) vs API ${holderTotal}`,
     );
     check(
-      label("5c. relaxing on a search selects nothing — no Status pill set or defaulted, no reset"),
-      searchChips.statusChip == null && !searchChips.reset,
-      searchChips.statusChip ?? (searchChips.reset ? "reset offered" : "neither"),
+      label("5c. relaxing on a search selects nothing — All draws no Status pill and no reset"),
+      drawsNoStatus(searchChips),
+      describeChips(searchChips),
     );
     check(
       label("5d. every rendered pill is a real lifecycle word"),
@@ -412,59 +511,26 @@ if (wants("Liquity V2")) {
       idPills.length === 1 && idPills[0] === "CLOSED",
       `${idPills.length} row(s): ${idPills.join(", ") || "none"}`,
     );
-    check(
-      label("5f. the id search sets nothing either"),
-      idChips.statusChip == null && !idChips.reset,
-      idChips.statusChip ?? (idChips.reset ? "reset offered" : "neither"),
-    );
+    check(label("5f. the id search sets nothing either"), drawsNoStatus(idChips), describeChips(idChips));
     await byId.close();
   } else {
     check(label("5e. trove-id fixture"), false, "no closed trove id in the API answer");
   }
 
-  // ── 6. ticking Closed is a selection: set pill, URL param, and back again ────
-  const picked = await openListing(context, `${BASE}/ethereum/liquity-v2`);
-  await tickStatus(picked, "Closed");
-  const pickedUrl = await picked.evaluate(() => window.location.search);
-  const pickedChips = await readChips(picked);
-  const pickedTotal = await readTotal(picked, ROWS, PER_PAGE);
-  const pickedApi = await api("/api/troves?status=active,zombie,closed&limit=1");
-  check(
-    label("6a. ticking Closed sets the Status pill"),
-    pickedChips.statusChip != null && pickedChips.reset,
-    `${pickedChips.statusChip ?? "nothing set"}${pickedChips.reset ? " + reset offered" : " + no reset"}`,
-  );
-  check(
-    label("6b. ticking Closed writes the status param, closed included"),
-    /(^|[?&])status=/.test(pickedUrl) && pickedUrl.includes("closed"),
-    `location.search "${pickedUrl}"`,
-  );
-  check(
-    label("6c. the ticked view's total is the API's for that set"),
-    pickedTotal.total != null && pickedTotal.total === pickedApi.pagination?.total,
-    `page ${pickedTotal.total} vs API ${pickedApi.pagination?.total} for status=active,zombie,closed`,
-  );
-
-  // Reset to default → back to the contextual default and the clean URL.
-  await resetStatus(picked);
-  await picked.waitForTimeout(1200);
-  const clearedUrl = await picked.evaluate(() => window.location.search);
-  const clearedChips = await readChips(picked);
-  const clearedTotal = await readTotal(picked, ROWS, PER_PAGE);
-  check(
-    label("6d. Reset to default returns to the clean URL"),
-    !/(^|[?&])status=/.test(clearedUrl),
-    `location.search "${clearedUrl}"`,
-  );
-  const openAfterCleared = (await api("/api/troves?status=active,zombie&limit=1")).pagination?.total;
-  check(
-    label("6e. Reset to default returns to the open resting set"),
-    restsOnOpen(clearedChips) && withinIndex(clearedTotal.total, openTotal, openAfterCleared),
-    `${describeChips(clearedChips)}, page ${clearedTotal.total} vs API ${openTotal}→${openAfterCleared}`,
-  );
+  // ── 6. Status is one choice: Closed, then Open again ─────────────────────
+  // Closed asks the troves route for closed and liquidated together.
+  const troveTotal = async (q) => (await api(`/api/troves?${q}&limit=1`)).pagination?.total;
+  await checkStatusChoice({
+    url: `${BASE}/ethereum/liquity-v2`,
+    label,
+    rows: ROWS,
+    perPage: PER_PAGE,
+    closedTotal: () => troveTotal("status=closed,liquidated"),
+    openTotal: () => troveTotal("status=active,zombie"),
+    closedQuery: "status=closed,liquidated",
+  });
 
   await bare.close();
-  await picked.close();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -555,10 +621,11 @@ if (wants("Polaris")) {
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
   check(
-    label("3. the bare directory names its resting view in the Status: Open default pill and offers no reset"),
+    label("3. the bare directory names its resting view in the locked Status Open pill and offers no reset"),
     restsOnOpen(bareChips),
     describeChips(bareChips),
   );
+  await checkOpenNoun(bare, label);
   check(
     label("4. the bare directory's URL carries no status param"),
     bareSearchOnLoad === "",
@@ -592,9 +659,9 @@ if (wants("Polaris")) {
       `page ${searchTotal.total} (${searchTotal.from}) vs API ${closedHolder.total}`,
     );
     check(
-      label("5c. relaxing on a search selects nothing — no Status pill set or defaulted, no reset"),
-      searchChips.statusChip == null && !searchChips.reset,
-      searchChips.statusChip ?? (searchChips.reset ? "reset offered" : "neither"),
+      label("5c. relaxing on a search selects nothing — All draws no Status pill and no reset"),
+      drawsNoStatus(searchChips),
+      describeChips(searchChips),
     );
     check(
       label("5d. every rendered pill is a real lifecycle word"),
@@ -629,11 +696,7 @@ if (wants("Polaris")) {
       endedIdx >= 0 && ENDED_PILLS.has(idPills[endedIdx]),
       `usdp/${closedId} pill ${idPills[endedIdx] ?? "not rendered"}`,
     );
-    check(
-      label("5g. the id search sets nothing either"),
-      idChips.statusChip == null && !idChips.reset,
-      idChips.statusChip ?? (idChips.reset ? "reset offered" : "neither"),
-    );
+    check(label("5g. the id search sets nothing either"), drawsNoStatus(idChips), describeChips(idChips));
     await byId.close();
   } else {
     check(label("5e. position-number fixture"), false, "no closed position id in the API answer");
@@ -665,51 +728,20 @@ if (wants("Polaris")) {
     );
   }
 
-  // ── 6. ticking Closed is a selection: set pill, URL param, and back again ────
-  const picked = await openListing(context, `${BASE}/sepolia/polaris`);
-  await tickStatus(picked, "Closed");
-  const pickedUrl = await picked.evaluate(() => window.location.search);
-  const pickedChips = await readChips(picked);
-  const pickedTotal = await readTotal(picked, ROWS, PER_PAGE);
-  // Status rests on the open set, so ticking Closed ADDS to it: the selection is
-  // open + closed, and that is the set the index is asked for.
-  const pickedApi = await api("/api/polaris/positions?status=open,closed&limit=1");
-  check(
-    label("6a. ticking Closed sets the Status pill"),
-    pickedChips.statusChip != null && pickedChips.reset,
-    `${pickedChips.statusChip ?? "nothing set"}${pickedChips.reset ? " + reset offered" : " + no reset"}`,
-  );
-  check(
-    label("6b. ticking Closed writes the status param, closed included"),
-    /(^|[?&])status=/.test(pickedUrl) && pickedUrl.includes("closed"),
-    `location.search "${pickedUrl}"`,
-  );
-  check(
-    label("6c. the ticked view's total is the API's for that set"),
-    pickedTotal.total != null && pickedTotal.total === pickedApi.pagination?.total,
-    `page ${pickedTotal.total} vs API ${pickedApi.pagination?.total} for status=open,closed`,
-  );
-
-  // Reset to default → back to the contextual default and the clean URL.
-  await resetStatus(picked);
-  await picked.waitForTimeout(1200);
-  const clearedUrl = await picked.evaluate(() => window.location.search);
-  const clearedChips = await readChips(picked);
-  const clearedTotal = await readTotal(picked, ROWS, PER_PAGE);
-  check(
-    label("6d. Reset to default returns to the clean URL"),
-    !/(^|[?&])status=/.test(clearedUrl),
-    `location.search "${clearedUrl}"`,
-  );
-  const openAfterCleared = (await api("/api/polaris/positions?status=open&limit=1")).pagination?.total;
-  check(
-    label("6e. Reset to default returns to the open resting set"),
-    restsOnOpen(clearedChips) && withinIndex(clearedTotal.total, openTotal, openAfterCleared),
-    `${describeChips(clearedChips)}, page ${clearedTotal.total} vs API ${openTotal}→${openAfterCleared}`,
-  );
+  // ── 6. Status is one choice: Closed, then Open again ─────────────────────
+  // Closed asks the route for closed and liquidated together.
+  const polarisTotal = async (q) => (await api(`/api/polaris/positions?${q}&limit=1`)).pagination?.total;
+  await checkStatusChoice({
+    url: `${BASE}/sepolia/polaris`,
+    label,
+    rows: ROWS,
+    perPage: PER_PAGE,
+    closedTotal: () => polarisTotal("status=closed,liquidated"),
+    openTotal: () => polarisTotal("status=open"),
+    closedQuery: "status=closed,liquidated",
+  });
 
   await bare.close();
-  await picked.close();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -874,10 +906,11 @@ async function runRestingViewSection(spec) {
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
   check(
-    label("3. the bare directory names its resting view in the Status: Open default pill and offers no reset"),
+    label("3. the bare directory names its resting view in the locked Status Open pill and offers no reset"),
     restsOnOpen(bareChips),
     describeChips(bareChips),
   );
+  await checkOpenNoun(bare, label);
   check(
     label("4. the bare directory's URL carries no status param"),
     bareSearchOnLoad === "",
@@ -905,9 +938,9 @@ async function runRestingViewSection(spec) {
       `page ${searchTotal.total} (${searchTotal.from}) vs index ${holder.total}`,
     );
     check(
-      label("5c. relaxing on a search selects nothing — no Status pill set or defaulted, no reset"),
-      searchChips.statusChip == null && !searchChips.reset,
-      searchChips.statusChip ?? (searchChips.reset ? "reset offered" : "neither"),
+      label("5c. relaxing on a search selects nothing — All draws no Status pill and no reset"),
+      drawsNoStatus(searchChips),
+      describeChips(searchChips),
     );
     check(
       label("5d. every rendered pill is a real lifecycle word"),
@@ -940,11 +973,7 @@ async function runRestingViewSection(spec) {
         idPills.some((p) => ENDED_PILLS_ROSTER.has(p)),
         [...new Set(idPills)].join(", ") || "none",
       );
-      check(
-        label("5g. the id search sets nothing either"),
-        idChips.statusChip == null && !idChips.reset,
-        idChips.statusChip ?? (idChips.reset ? "reset offered" : "neither"),
-      );
+      check(label("5g. the id search sets nothing either"), drawsNoStatus(idChips), describeChips(idChips));
       await byId.close();
     }
   }
@@ -986,49 +1015,16 @@ async function runRestingViewSection(spec) {
     }
   }
 
-  // ── 6. ticking the ended option is a real selection ──────────────────────
-  const picked = await openListing(context, `${BASE}${spec.route}`);
-  await waitForRows(picked, ROWS);
-  const restingTotal = await readTotal(picked, ROWS, PER_PAGE);
-  await tickStatus(picked, spec.ticked.label);
-  const tickedBefore = await indexTotal(spec.api, spec.ticked.query);
-  const pickedTotal = await waitForTotalChange(picked, ROWS, PER_PAGE, restingTotal.total);
-  const tickedAfter = await indexTotal(spec.api, spec.ticked.query);
-  const pickedUrl = await picked.evaluate(() => window.location.search);
-  const pickedChips = await readChips(picked);
-  check(
-    label(`6a. ticking ${spec.ticked.label} sets the Status pill`),
-    pickedChips.statusChip != null && pickedChips.reset,
-    `${pickedChips.statusChip ?? "nothing set"}${pickedChips.reset ? " + reset offered" : " + no reset"}`,
-  );
-  check(
-    label(`6b. ticking ${spec.ticked.label} writes the status param`),
-    /(^|[?&])status=/.test(pickedUrl) && pickedUrl.includes(spec.ticked.urlWord),
-    `location.search "${pickedUrl}"`,
-  );
-  check(
-    label("6c. the ticked view's total is the index's for that set"),
-    withinIndex(pickedTotal.total, tickedBefore, tickedAfter),
-    `page ${pickedTotal.total} vs index ${tickedBefore}→${tickedAfter} for ${spec.ticked.query || "no status param"}`,
-  );
-
-  // Reset to default → back to the contextual default and the clean URL.
-  await resetStatus(picked);
-  const clearedTotal = await waitForTotalChange(picked, ROWS, PER_PAGE, pickedTotal.total);
-  const clearedIndex = await indexTotal(spec.api, spec.open);
-  const clearedUrl = await picked.evaluate(() => window.location.search);
-  const clearedChips = await readChips(picked);
-  check(
-    label("6d. Reset to default returns to the clean URL"),
-    !/(^|[?&])status=/.test(clearedUrl),
-    `location.search "${clearedUrl}"`,
-  );
-  check(
-    label("6e. Reset to default returns to the open resting set"),
-    restsOnOpen(clearedChips) && withinIndex(clearedTotal.total, openAfter, clearedIndex),
-    `${describeChips(clearedChips)}, page ${clearedTotal.total} vs index ${openAfter}→${clearedIndex}`,
-  );
-  await picked.close();
+  // ── 6. Status is one choice: Closed, then Open again ─────────────────────
+  await checkStatusChoice({
+    url: `${BASE}${spec.route}`,
+    label,
+    rows: ROWS,
+    perPage: PER_PAGE,
+    closedTotal: () => indexTotal(spec.api, spec.closed),
+    openTotal: () => indexTotal(spec.api, spec.open),
+    closedQuery: spec.closed,
+  });
 }
 
 /** The market-id fixture for Morpho and Morpho Base: a market holding both open
@@ -1062,7 +1058,7 @@ const ROSTER = [
     ended: ["closed", "liquidated"],
     holderParam: "wallet",
     holder: (r) => r.wallet,
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,liquidated",
   },
   {
     // Inherits the rule with no modules of its own: the Base lane builds its
@@ -1077,7 +1073,7 @@ const ROSTER = [
     ended: ["closed", "liquidated"],
     holderParam: "wallet",
     holder: (r) => r.wallet,
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,liquidated",
   },
   {
     // The other lane off Aave V3's registry.
@@ -1091,7 +1087,7 @@ const ROSTER = [
     ended: ["closed", "liquidated"],
     holderParam: "wallet",
     holder: (r) => r.wallet,
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,liquidated",
   },
   {
     name: "Aave V4",
@@ -1106,18 +1102,10 @@ const ROSTER = [
     ended: ["closed", "liquidated"],
     holderParam: "wallet",
     holder: (r) => r.wallet,
-    // V4's Status facet is a two-bucket axis (open | closed; a liquidation is
-    // the orthogonal History toggle), so ticking Closed makes the selection the
-    // WHOLE set. On every other explorer the client then sends no `status` at
-    // all, because a bare request there answers the whole lifecycle. The V4
-    // index does not: unscoped, it rests on OPEN-ONLY, and its token for no
-    // restriction is the explicit "all". So the ticked query here names the
-    // three buckets, and 6c is a discriminating check — the defect it was
-    // written against (2026-09-20, TO-DO §47) rendered 3,931 against an index
-    // of 7,507. Check 1 still cannot discriminate on its own: the holder search
-    // (check 5) is what proves V4's relax, and it is a real relax — scoped to a
-    // wallet the index answers every status.
-    ticked: { label: "Closed", query: "status=open,closed,liquidated", urlWord: "closed" },
+    // Check 1 cannot discriminate on its own here (a bare request is the open
+    // set): the holder search (check 5) is what proves V4's relax, and it is a
+    // real relax — scoped to a wallet the index answers every status.
+    closed: "status=closed,liquidated",
     note: "V4 changed behaviour most — it rested on every status in both contexts and now rests open-only. Its parse moved to lib/aave-v4/search.ts because the registry imports visibility.",
   },
   {
@@ -1131,7 +1119,7 @@ const ROSTER = [
     ended: ["closed", "liquidated"],
     holderParam: "wallet",
     holder: (r) => r.account,
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,liquidated",
   },
   {
     // Inherits the rule from Compound's registry.
@@ -1145,7 +1133,7 @@ const ROSTER = [
     ended: ["closed", "liquidated"],
     holderParam: "wallet",
     holder: (r) => r.account,
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,liquidated",
   },
   {
     name: "Compound V2",
@@ -1158,7 +1146,7 @@ const ROSTER = [
     ended: ["closed", "liquidated"],
     holderParam: "wallet",
     holder: (r) => r.wallet,
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,liquidated",
   },
   {
     name: "Dolomite",
@@ -1171,7 +1159,7 @@ const ROSTER = [
     ended: ["closed", "liquidated"],
     holderParam: "owner",
     holder: (r) => r.owner,
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,liquidated",
   },
   {
     name: "Fluid",
@@ -1186,9 +1174,8 @@ const ROSTER = [
     holder: (r) => r.owner,
     // A Fluid position is an NFT, so the box takes an id as well as a holder.
     id: { what: "position NFT id", of: (r) => r.nftId, query: (v) => `nft=${v}` },
-    // Two buckets, so ticking Closed selects the whole lifecycle and the status
-    // param drops — which on this index IS every status (unlike Aave V4's).
-    ticked: { label: "Closed", query: "", urlWord: "closed" },
+    // Two buckets: Closed is `closed` alone.
+    closed: "status=closed",
     note: "Fluid parses the same search box twice — once in the registry's fetch dispatch (pre-existing, forwarding free text as a wallet) and once in search.ts for the identity test. Known, and left alone by the sweep.",
   },
   {
@@ -1204,7 +1191,7 @@ const ROSTER = [
     ended: ["closed", "denied"],
     holderParam: "owner",
     holder: (r) => r.owner,
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,denied",
   },
   {
     name: "f(x)",
@@ -1221,7 +1208,8 @@ const ROSTER = [
     // as Polaris's markets do — so the count is read from the index, not assumed
     // to be one row.
     id: { what: "position number", of: (r) => r.positionId, query: (v) => `positionId=${v}` },
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    // The route has no row status: `closed` is a facet, and Closed sends it alone.
+    closed: "status=closed",
     note: "f(x) parses the same search box twice (parseFxQuery in the registry, parseFxSearch for the identity test). Known, and left alone by the sweep.",
   },
   {
@@ -1235,7 +1223,7 @@ const ROSTER = [
     ended: ["closed", "liquidated"],
     holderParam: "user",
     holder: (r) => r.user,
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,liquidated",
   },
   {
     name: "MakerDAO",
@@ -1252,7 +1240,7 @@ const ROSTER = [
     holderParam: "owner",
     holder: (r) => r.owner,
     id: { what: "vault number", of: (r) => r.cdpId, query: (v) => `cdpId=${v}` },
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,liquidated",
     note: "MakerDAO parses the same search box twice (makerSearchTarget in the registry, parseMakerSearch for the identity test). Known, and left alone by the sweep.",
   },
   {
@@ -1266,8 +1254,8 @@ const ROSTER = [
     ended: ["closed"],
     holderParam: "wallet",
     holder: (r) => r.wallet,
-    // Two buckets again: ticking Closed is the whole lifecycle, so no param.
-    ticked: { label: "Closed", query: "", urlWord: "closed" },
+    // Two buckets again: Closed is `closed` alone.
+    closed: "status=closed",
   },
   {
     name: "Moonwell",
@@ -1280,7 +1268,7 @@ const ROSTER = [
     ended: ["closed", "liquidated"],
     holderParam: "wallet",
     holder: (r) => r.wallet,
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,liquidated",
   },
   {
     // IN BY INHERITANCE, and the one the rails-ops entry asked to confirm: the
@@ -1297,7 +1285,7 @@ const ROSTER = [
     ended: ["closed", "liquidated"],
     holderParam: "wallet",
     holder: (r) => r.wallet,
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,liquidated",
   },
   {
     name: "Morpho Blue",
@@ -1312,7 +1300,7 @@ const ROSTER = [
     holderParam: "user",
     holder: (r) => r.owner,
     notIdentity: { what: "market id", pick: pickMarketFixture },
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,liquidated",
   },
   {
     name: "Morpho Base",
@@ -1326,7 +1314,7 @@ const ROSTER = [
     holderParam: "user",
     holder: (r) => r.owner,
     notIdentity: { what: "market id", pick: pickMarketFixture },
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,liquidated",
   },
   {
     name: "SparkLend",
@@ -1339,7 +1327,7 @@ const ROSTER = [
     ended: ["closed", "liquidated"],
     holderParam: "wallet",
     holder: (r) => r.wallet,
-    ticked: { label: "Closed", query: "status=open,closed", urlWord: "closed" },
+    closed: "status=closed,liquidated",
   },
 ];
 
@@ -1413,11 +1401,11 @@ if (wants("PWN")) {
       barePills.every((p) => p != null && (OPEN_PILLS_ROSTER.has(p) || p === "DEFAULTED · UNCLAIMED")),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
-  // The resting view names its default in the "Status: in escrow" default pill (lib/pwn/list-filter-dimensions.tsx
+  // The resting view names its default in the "Status in escrow" default pill (lib/pwn/list-filter-dimensions.tsx
   // `defaultChip`; N1.10 since ui-jobs 681): no selection, no reset offered, nothing in the URL.
   check(
-    label('3. the bare directory draws the default "Status: in escrow" pill and offers no reset'),
-    bareChips.defaultChip === "Status: in escrow" && bareChips.statusChip == null && !bareChips.reset,
+    label('3. the bare directory draws the default "Status in escrow" pill and offers no reset'),
+    bareChips.defaultChip === "Status in escrow" && bareChips.statusChip == null && !bareChips.reset,
     describeChips(bareChips),
   );
   check(
@@ -1460,7 +1448,7 @@ if (wants("PWN")) {
       `page ${searchPills.length} vs index ${theirs.length}`,
     );
     check(
-      label("5c. relaxing on a search selects nothing — no Status pill set or defaulted, no reset"),
+      label("5c. relaxing on a search selects nothing — no Status pill set, no reset"),
       searchChips.statusChip == null && !searchChips.reset,
       searchChips.statusChip ?? (searchChips.reset ? "reset offered" : "neither"),
     );
@@ -1538,7 +1526,7 @@ if (wants("PWN")) {
   );
   check(
     label("6e. Reset to default returns to the open resting set"),
-    clearedChips.defaultChip === "Status: in escrow" &&
+    clearedChips.defaultChip === "Status in escrow" &&
       clearedChips.statusChip == null &&
       withinIndex(clearedPills.length, openAfter, now.filter((r) => r.status === "open").length),
     `${describeChips(clearedChips)}, page ${clearedPills.length} rows vs index ${openAfter} open`,
