@@ -45,7 +45,6 @@ import { mainAssetFigure, useClosedPeaks, withPeaks, type ClosedPeakFlows } from
 import { pickMainAsset, splitSupplied } from "@/lib/shared/main-asset";
 import { HeadingTip } from "@/components/shared/tip-label";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
-import { PanelFigure } from "@/components/shared/position-card-panel";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { TokenAmountNotLoaded, loadedMarks } from "@/components/shared/not-loaded";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -136,6 +135,15 @@ export interface AaveV3PositionView {
    *  none), by lowercased address; `priceBlock` for the rest (ui-jobs 743). */
   priceBlockByAddress?: Record<string, number | null>;
   atBlock?: number;
+  /** The listing row's newest event: the block the index's balances stand at
+   *  (mv_aave_v3_positions, refreshed about hourly). */
+  indexBlock?: number;
+  /** The position page holds the balances back: the event tail has an event
+   *  after `indexBlock` and the Pool read has not answered yet (ui-jobs 806). */
+  figuresHeld?: boolean;
+  /** The Pool read failed while the event tail is ahead of the index: the
+   *  balances shown are the index's, and the card names both blocks. */
+  indexTrails?: { indexBlock: number; tailBlock: number };
   /** rails-server's head read and the block it read at, where it answered the page's read. */
   readBy?: PositionHeadStamp & { block: number };
   /** The position page's live health factor (the Pool's getUserAccountData,
@@ -427,6 +435,15 @@ export function useAaveV3CardSlots({
   const explainer = { body: explanation ?? null, viewHref };
   const isOther = (r: AaveV3ReserveAmount) => notCollateral?.has(r.address.toLowerCase()) === true;
 
+  // The Pool read failed while the event tail is ahead of the index row.
+  const trailNotice =
+    detail && v.indexTrails ? (
+      <div className="mb-2 text-xs text-rb-500" data-index-trails={v.indexTrails.indexBlock}>
+        Balances from the index at block {v.indexTrails.indexBlock.toLocaleString("en-US")}. The account has a later
+        event at block {v.indexTrails.tailBlock.toLocaleString("en-US")}; the Pool read did not answer.
+      </div>
+    ) : undefined;
+
   // Closed / liquidated: the account holds no open reserves, so the headline is
   // what each asset held at its height — highest recorded per-reserve supply +
   // debt (chain-state MAX over the account's life, per asset; no USD).
@@ -539,6 +556,7 @@ export function useAaveV3CardSlots({
       explainer,
       learnMore,
       menu: menuSlot,
+      notice: trailNotice,
       panel: undefined,
     };
   }
@@ -628,7 +646,7 @@ export function useAaveV3CardSlots({
             }
           />
         ),
-      pending: reserves.length > 0 && pending,
+      pending: v.figuresHeld === true || (reserves.length > 0 && pending),
       total: usd != null && usdInfo ? { usd, info: usdInfo } : undefined,
       assets: reserves.length > 0 && usd != null ? <InlineAssetCluster assets={loadedMarks(shown)} /> : undefined,
     };
@@ -637,8 +655,8 @@ export function useAaveV3CardSlots({
   // The health factor: the position page's live read. Omitted on every
   // listing view and on a deployment with no live HF receipt — an unasserted
   // layer, per the chain-state charter; pending on a page still reading. A
-  // read wallet with no debt reads "No debt" (HF is undefined, ∞ in protocol
-  // terms) — but only when the card shows no debt either. The balances are
+  // read wallet with no debt draws a dash, as Debt does (HF is undefined, ∞ in
+  // protocol terms) — but only when the card shows no debt either. The balances are
   // the index's, which trails the live read: a debt the read no longer finds
   // gets a dash and the reason in the notice.
   const hfProv = dep.healthFactor;
@@ -651,25 +669,40 @@ export function useAaveV3CardSlots({
           label: ratioLabel("pooled"),
           labelTip: detail && ratioLabel("pooled") === "Health factor" ? HF_TIP : undefined,
           pending: !hfRead,
-          value: !hfRead ? null : noDebtRead ? null : v.healthFactor == null ? (
-            <span className="text-rb-400">No debt</span>
-          ) : (
+          value: !hfRead ? null : noDebtRead ? null : v.healthFactor == null ? null : (
             <Prov info={hfProv(v.market, v.atBlock, v.readBy)}>{hfLabel(v.healthFactor)}</Prov>
           ),
         }
       : null;
 
+  // An account none of whose supplies back borrowing heads them "Supplied",
+  // with the not-collateral tip, and draws no stat row for them (ui-jobs 806).
+  const othersHead = collSupplies.length === 0 && otherSupplies.length > 0;
   const heads = [
-    sideHead(
-      "collateral",
-      CARD_VOCAB.collateral,
-      collSupplies,
-      suppliesSplit.shown,
-      collUsd,
-      collPending,
-      "Collateral",
-      "supply",
-    ),
+    othersHead
+      ? {
+          ...sideHead(
+            "collateral",
+            "Supplied",
+            otherSupplies,
+            othersSplit.shown,
+            otherUsd,
+            pricesPending && otherUsd == null,
+            "Supplied",
+            "supply",
+          ),
+          labelTip: detail ? NOT_COLLATERAL_TIP : undefined,
+        }
+      : sideHead(
+          "collateral",
+          CARD_VOCAB.collateral,
+          collSupplies,
+          suppliesSplit.shown,
+          collUsd,
+          collPending,
+          "Collateral",
+          "supply",
+        ),
     sideHead("debt", CARD_VOCAB.debt, v.borrows, borrowsSplit.shown, debtUsd, debtPending, "Borrowed", "debt"),
     ...(hfHead ? [hfHead] : []),
   ];
@@ -688,7 +721,9 @@ export function useAaveV3CardSlots({
       The Pool reads no debt{v.atBlock != null ? ` at block ${v.atBlock.toLocaleString("en-US")}` : ""}; the balances
       shown predate the account&rsquo;s latest events
     </div>
-  ) : undefined;
+  ) : (
+    trailNotice
+  );
 
   const common = { status, heads, identity, counters, notice, name };
   if (!detail) return { ...common, surface: "listing", menu: null, tag };
@@ -901,7 +936,7 @@ export function useAaveV3CardSlots({
       ? dep.usd("Supplied, not collateral", "supply", usdRows(v, otherSupplies, "compact"), v.market)?.prov
       : undefined;
   const notCollRow: PositionPanelRow | null =
-    otherSupplies.length === 0
+    otherSupplies.length === 0 || othersHead
       ? null
       : otherSupplies.length > 1 && otherUsd != null && otherInfo
         ? {
@@ -928,11 +963,6 @@ export function useAaveV3CardSlots({
             tip: NOT_COLLATERAL_TIP,
             value: (
               <span className="flex flex-col gap-0.5">
-                {otherUsd != null && otherInfo && (
-                  <Prov info={otherInfo}>
-                    <PanelFigure>{formatCompactUsd(otherUsd)}</PanelFigure>
-                  </Prov>
-                )}
                 {othersRanked.map((r) => (
                   <span key={r.address}>
                     {r.decimalsUnread ? (
@@ -952,6 +982,12 @@ export function useAaveV3CardSlots({
                     )}
                   </span>
                 ))}
+                {/* The dollars under the amounts, in the headline's green. */}
+                {otherUsd != null && otherInfo && (
+                  <Prov info={otherInfo}>
+                    <span className="text-xs font-bold tabular-nums text-green-400">{formatUsdValue(otherUsd)}</span>
+                  </Prov>
+                )}
               </span>
             ),
           };
@@ -1030,7 +1066,7 @@ export function useAaveV3CardSlots({
     explainer,
     learnMore,
     menu: menuSlot,
-    panel: [present([interestRow("supply"), notCollRow]), present([rateHeld, interestRow("debt"), roomHeld, liqHeld])],
+    panel: [present([notCollRow, interestRow("supply")]), present([rateHeld, interestRow("debt"), roomHeld, liqHeld])],
   };
 }
 
@@ -1128,6 +1164,7 @@ export function viewFromSummary(row: AaveV3PositionRow): AaveV3PositionView {
     priceBlock: row.priceBlock ?? null,
     // A Base lender's row names the block its chain figures were read at.
     atBlock: row.chainBlock ?? undefined,
+    indexBlock: row.lastBlockNumber,
     // A listing view never carries a health factor (0018): the row's snapshot
     // HF is not read, and the position page's live read is the only one
     // the card shows.

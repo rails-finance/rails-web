@@ -19,7 +19,7 @@
 import { LifecycleLine } from "@/components/shared/lifecycle-line";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { explorerSections, protocolForSession, subPageForPathname } from "@/lib/shared/protocols";
@@ -241,8 +241,9 @@ export function RailHeader({
   venue: RailVenue;
   /** Render the shared RecencyStamp on a row under the title (decision 0006's
    *  freshness signal). On for listings; off where the page reads no chain
-   *  head (the info page). */
-  stamp?: boolean;
+   *  head (the info page). A node takes its place where the rows come from a
+   *  read behind the head (Aave V3's hourly refresh, ui-jobs 806). */
+  stamp?: boolean | ReactNode;
 }) {
   const pathname = usePathname();
   const entry = protocolForSession(session);
@@ -290,9 +291,7 @@ export function RailHeader({
           Its line is held from first paint, so the stamp's arrival moves
           nothing under it. */}
       {stamp && (
-        <div className="flex min-h-7 items-center justify-end">
-          <RecencyStamp />
-        </div>
+        <div className="flex min-h-7 items-center justify-end">{stamp === true ? <RecencyStamp /> : stamp}</div>
       )}
     </div>
   );

@@ -7,6 +7,7 @@
 import { aaveV3RestingCountLine } from "@/lib/aave-v3/listing-visibility";
 import { fetchAaveV3Positions, type AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
+import { AaveV3ListingStamp } from "@/components/protocol/aave-v3/aave-v3-listing-stamp";
 import {
   AaveV3PositionCard,
   notCollateralOf,
@@ -41,6 +42,8 @@ export function AaveV3Listing({ initialItems, initialTotal, initialKey, initialS
       renderCard={(p) => <AaveV3PositionCard v={viewFromSummary(p)} notCollateral={notCollateralOf(p)} />}
       hrefFor={(p) => `/ethereum/aave-v3/${p.wallet}?market=${p.market}`}
       keyFor={(p) => `${p.wallet}|${p.market}`}
+      // The rows are the hourly refresh's: the stamp states it (ui-jobs 806).
+      stamp={<AaveV3ListingStamp />}
       strategy={serverStrategy<AaveV3PositionRow, AaveV3ListFilters>({
         dimensions: aaveV3ListDimensions(),
         itemsPerPage: AAVE_V3_ITEMS_PER_PAGE,
