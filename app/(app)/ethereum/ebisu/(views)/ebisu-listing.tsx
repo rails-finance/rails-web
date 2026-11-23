@@ -6,10 +6,15 @@
 // collateral ratio, no USD (interpreted layers, off by default). Holds the
 // presentation config + the in-memory strategy and hands them to the shared
 // ChainTruthListingPage driver with the SSR first-paint data from page.tsx.
+// The count names the Status choice ("open Troves"); the in-memory tier draws
+// the listing's noun, so the noun follows the filters (ui-jobs 805).
 
+import { useState } from "react";
 import type { EbisuTroveSummary } from "@/lib/sources/api/ebisu-troves";
 import { fetchEbisuTroves } from "@/lib/api/fetch-ebisu-troves";
 import { ChainTruthListingPage, memoryStrategy } from "@/components/shared/chain-truth-listing-page";
+import { decodeListFilters } from "@/lib/shared/list-filter";
+import { troveCountLine } from "@/lib/liquity-v2/listing-visibility";
 import { EbisuPositionCard, viewFromSummary } from "@/components/protocol/ebisu/ebisu-position-card";
 import {
   ebisuListDimensions,
@@ -27,10 +32,17 @@ export interface EbisuListingProps {
 }
 
 export function EbisuListing({ initialItems, initialTotal, initialKey, initialSearch }: EbisuListingProps) {
+  const [noun, setNoun] = useState(
+    () =>
+      troveCountLine(
+        decodeListFilters(ebisuListDimensions([]), new URLSearchParams(initialSearch ?? ""), EBISU_LIST_DEFAULTS),
+      ).noun,
+  );
   return (
     <ChainTruthListingPage<EbisuTroveSummary, EbisuListFilters>
       title="Ebisu Troves"
-      noun="Troves"
+      noun={noun}
+      onFilters={(f) => setNoun(troveCountLine(f).noun)}
       basePath="/ethereum/ebisu"
       defaults={EBISU_LIST_DEFAULTS}
       sortOptions={EBISU_SORT_OPTIONS}

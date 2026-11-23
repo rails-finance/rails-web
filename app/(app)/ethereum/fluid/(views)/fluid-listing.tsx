@@ -5,6 +5,7 @@
 // page.tsx. Positions are NFTs — the wallet search filters by current owner,
 // and each card links to /fluid/<nftId>.
 
+import { fluidCountLine } from "@/lib/fluid/listing-visibility";
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
 import { fetchFluidPositions } from "@/lib/api/fetch-fluid-positions";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
@@ -30,6 +31,7 @@ export function FluidListing({ initialItems, initialTotal, initialKey, initialSe
     <ChainTruthListingPage<FluidPositionSummary, FluidListFilters>
       title="Fluid Positions"
       noun="positions"
+      countLine={fluidCountLine}
       basePath="/ethereum/fluid"
       defaults={FLUID_LIST_DEFAULTS}
       sortOptions={FLUID_SORT_OPTIONS}
@@ -45,6 +47,11 @@ export function FluidListing({ initialItems, initialTotal, initialKey, initialSe
             data: r.data,
             total: r.pagination.total,
           })),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchFluidPositions({ ...fluidFiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

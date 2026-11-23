@@ -6,8 +6,8 @@
 // but no in-memory `matches` — the backend filters.
 //
 // This is the graduation of the old bespoke TroveListFilters registry onto the
-// shared ChainTruthListingPage driver (decision 0009): same four facets (Status /
-// Collateral / Redemptions / Delegation), same contextual-default status logic
+// shared ChainTruthListingPage driver (decision 0009): the facets Status /
+// Collateral / Redemptions / Delegation, the contextual-default status logic
 // (resolved through listing-visibility.ts so the listing keeps doubling as a
 // wallet view), now expressed as SerializableDimension so the one shared driver
 // owns the toolbar / URL / pagination.
@@ -31,15 +31,20 @@ import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import { joinOptionLabels } from "@/components/shared/filter-bar/types";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
-import type { StatusBucket } from "@/lib/liquity-v2/listing-visibility";
 import {
-  ALL_STATUS_BUCKETS,
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  isAllStatuses,
-  sameStatusSet,
+  defaultStatusChoice,
+  DORMANT,
+  DORMANT_PARAM,
+  dormantOnly,
+  endedByLiquidation,
+  OPEN_ACTIVE,
+  setTroveDormant,
+  setTroveStatus,
+  statusChoice,
+  troveStatusBuckets,
+  troveStatusValue,
 } from "@/lib/liquity-v2/listing-visibility";
+import { ENDED_BY_LIQUIDATION, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 import { parseTroveSearch } from "@/lib/liquity-v2/search";
 import type { FetchTrovesParams } from "@/lib/api/fetch-troves";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
@@ -65,10 +70,15 @@ export const LIQUITY_V2_COLLATERAL_TYPES = ["WETH", "wstETH", "rETH"];
 
 /** Filter selection for the Liquity V2 listing. `q` (BaseListFilters) is the
  *  tri-modal identity search; the facet fields mirror the old TroveListFilterParams
- *  (minus the identity fields, which now ride `q`). `statuses` carries RAW intent —
- *  undefined resolves to the contextual default via listing-visibility.ts. */
+ *  (minus the identity fields, which now ride `q`). */
 export interface LiquityV2ListFilters extends BaseListFilters {
-  statuses?: StatusBucket[];
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
+  status: string[];
+  /** "" | "dormant" — with Open, the dormant troves. URL param `open`. */
+  dormant: string[];
+  /** "" | "liquidated" — with Closed, the troves that ended by liquidation.
+   *  URL param `ended`. */
+  ended: string[];
   collateralTypes?: string[];
   hasRedemptions?: boolean;
   batchOnly?: boolean;
@@ -82,16 +92,17 @@ export interface LiquityV2ListFilters extends BaseListFilters {
   tx: string[];
 }
 
-// No status is written into the page defaults: `statuses: undefined` is "no
+// No status is written into the page defaults: an empty `status` is "no
 // opinion", and listing-visibility.ts resolves it per context — the open troves
-// (active + zombie) on the bare directory, every status once the search names a
-// holder or a trove id. Because the default is contextual rather than a
-// selection it draws no chip and no Reset link, and a cleared selection always
-// resolves back to whatever the current context rests on.
+// on the bare directory, every status once the search names a holder or a
+// trove id.
 export const LIQUITY_V2_LIST_DEFAULTS: LiquityV2ListFilters = {
   q: "",
   sortBy: "lastActivity",
   sortOrder: "desc",
+  status: [],
+  dormant: [],
+  ended: [],
   debt: [],
   coll: [],
   tx: [],
@@ -115,6 +126,59 @@ function bareLabel(values: string[], options: FilterOptionDef[]): string {
   return joinOptionLabels(values, options);
 }
 
+/** Status (Open / Closed / All, ui-jobs 805) and its two switches: Dormant with
+ *  Open, Closed by liquidation with Closed. The forks' listings take the same
+ *  three, with their own `matches` and, on Ebisu, the docs' word for Dormant. */
+export function troveStatusDimensions<
+  F extends BaseListFilters & { status: string[]; dormant: string[]; ended: string[] },
+>(dormantLabel = "Dormant"): [SerializableDimension<F>, SerializableDimension<F>, SerializableDimension<F>] {
+  return [
+    {
+      id: "status",
+      label: "Status",
+      group: "Status",
+      cardinality: "single",
+      param: "status",
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      // The choice, or the link-only `active` (Open without Dormant).
+      get: (f) => [troveStatusValue(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of buckets (ui-jobs 805).
+      set: (f, v) => setTroveStatus(f, v),
+      // `active` reads as Open.
+      chipLabel: (v) => `Status: ${v[0] === OPEN_ACTIVE ? "Open" : joinOptionLabels(v, STATUS_CHOICE_OPTIONS)}`,
+    },
+    {
+      id: "dormant",
+      label: dormantLabel,
+      // Its own group, for its pill; in the panel it sits under Status.
+      group: dormantLabel,
+      cardinality: "single",
+      param: DORMANT_PARAM,
+      options: [{ value: DORMANT, label: dormantLabel }],
+      // Offered with Open, which it narrows.
+      available: (f) => statusChoice(f) === "open",
+      get: (f) => (dormantOnly(f) ? [DORMANT] : []),
+      set: (f, v) => setTroveDormant(f, v),
+      chipLabel: () => dormantLabel,
+    },
+    {
+      id: "ended",
+      label: "Closed by liquidation",
+      group: "Closed by liquidation",
+      cardinality: "single",
+      param: "ended",
+      options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
+      // Offered with Closed, which it narrows.
+      available: (f) => statusChoice(f) === "closed",
+      get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
+      set: (f, v) => ({ ...f, ended: v }),
+      chipLabel: () => "Closed by liquidation",
+    },
+  ];
+}
+
 /**
  * Liquity V2 listing filter dimensions. Collateral options can be injected with
  * token icons for the client toolbar; the SSR decode path calls this bare (options
@@ -124,43 +188,7 @@ function bareLabel(values: string[], options: FilterOptionDef[]): string {
 export function liquityV2ListDimensions(
   collateralOptions: FilterOptionDef[] = LIQUITY_V2_COLLATERAL_TYPES.map((t) => ({ value: t, label: t })),
 ): SerializableDimension<LiquityV2ListFilters>[] {
-  // Status is a multi-select over four buckets. Zombie (an unredeemable
-  // sub-min-debt trove) and Liquidated (terminal) are real protocol states shown
-  // as first-class buckets alongside Open/Closed; the server resolves the
-  // selection onto (status, is_zombie). All four selected = "show everything" (no
-  // server filter). Empty = the contextual default (open troves while browsing,
-  // everything on an identity search), so `set` writes undefined whenever the
-  // choice equals that default — keeping the URL clean and the relax-on-search
-  // behaviour intact.
-  const status: SerializableDimension<LiquityV2ListFilters> = {
-    id: "status",
-    label: "Status",
-    group: "Status",
-    cardinality: "multi",
-    param: "status",
-    options: [
-      // Label "Open" to match the roster-wide status vocabulary (every other
-      // explorer's filter says Open/Closed/Liquidated); the wire value stays
-      // "active" — it is what the server resolves.
-      { value: "active", label: "Open" },
-      { value: "zombie", label: "Dormant" },
-      { value: "closed", label: "Closed" },
-      { value: "liquidated", label: "Liquidated" },
-    ],
-    get: (f) => effectiveStatuses(f),
-    defaultValues: (f) => defaultStatuses(f),
-    defaultChip: (f) => (defaultStatuses(f).length < ALL_STATUS_BUCKETS.length ? "Status: Open" : null),
-    clearDefault: (f) => ({ ...f, statuses: [...ALL_STATUS_BUCKETS] }),
-    set: (f, values) => {
-      const sel = canonicalStatuses(values);
-      const def = defaultStatuses(f);
-      return {
-        ...f,
-        statuses: sel.length === 0 || sameStatusSet(sel, def) ? undefined : sel,
-      };
-    },
-    chipLabel: (vals, opts) => `Status: ${joinOptionLabels(canonicalStatuses(vals), opts)}`,
-  };
+  const [status, dormant, ended] = troveStatusDimensions<LiquityV2ListFilters>();
 
   const collateral: SerializableDimension<LiquityV2ListFilters> = {
     id: "collateralTypes",
@@ -233,7 +261,7 @@ export function liquityV2ListDimensions(
     debtUnit: "BOLD",
   });
 
-  return [status, collateral, ...size, redemptions, delegation, transactions];
+  return [status, dormant, ended, collateral, ...size, redemptions, delegation, transactions];
 }
 
 /** Map the decoded selection + page onto the /api/troves fetch params — the
@@ -241,8 +269,8 @@ export function liquityV2ListDimensions(
 export function liquityV2FiltersToFetchParams(filters: LiquityV2ListFilters, page: number): FetchTrovesParams {
   return {
     ...parseTroveSearch(filters.q),
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // All maps to no status filter; Closed asks for closed and liquidated.
+    status: troveStatusBuckets(filters),
     collateralTypes:
       filters.collateralTypes && filters.collateralTypes.length > 0 ? filters.collateralTypes : undefined,
     hasRedemptions: filters.hasRedemptions,

@@ -21,6 +21,7 @@
 // roster is fetched, and the URL it keeps in sync is that page's own
 // (lib/morpho/list-filter-dimensions.tsx, "fixed to one market").
 
+import { morphoCountLine } from "@/lib/morpho/listing-visibility";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Lock } from "lucide-react";
 import { OPEN_SCOPE_PANEL, useAssetScope } from "@/lib/shared/asset-scope";
@@ -242,6 +243,7 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
         ) : undefined
       }
       noun="positions"
+      countLine={morphoCountLine}
       basePath={market ? market.path : "/ethereum/morpho"}
       defaults={MORPHO_LIST_DEFAULTS}
       sortOptions={MORPHO_SORT_OPTIONS}

@@ -23,6 +23,7 @@ import {
 } from "@/lib/polaris/holder-kinds";
 import { POLARIS_ITEMS_PER_PAGE } from "@/lib/polaris/list-filter-dimensions";
 import { namesHolder } from "@/lib/polaris/search";
+import { depositCountLine } from "@/lib/polaris/sp-loan-visibility";
 import { readListQuery } from "@/lib/shared/list-filter";
 import { useUrlSearchParams } from "@/lib/shared/use-url-search-params";
 import type { PolarisPositionSummary } from "@/lib/sources/api/polaris-positions";
@@ -91,6 +92,7 @@ export function SpListing(props: {
       basePath={POLARIS_SP_PATH}
       identity={<RailHeader session="polaris" venue="subPage" stamp />}
       titleHidden
+      countLine={depositCountLine}
       defaults={DEPOSIT_LIST_DEFAULTS}
       sortOptions={depositSortOptions}
       searchPlaceholder="Address, ENS, or deposit number (usdp:40)"
@@ -101,6 +103,8 @@ export function SpListing(props: {
         dimensions: depositListDimensions(marketOptions),
         itemsPerPage: SP_LOAN_ITEMS_PER_PAGE,
         fetchPage: (f, page) => fetchDepositPage(f, page),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (f) => fetchDepositPage(f, 1, { limit: 1 }).then((r) => r.total),
       })}
       renderAbove={({ items, total, filters }) => holderStrip(items, total, filters)}
       renderBelow={() => <HolderKinds kinds={otherKinds} reads={reads} wallet={wallet} />}

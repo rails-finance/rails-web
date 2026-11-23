@@ -6,7 +6,8 @@
 // `param` (for the shareable URL) but no in-memory `matches` — the backend filters.
 //
 // Facets:
-//   • Status  — open / closed / liquidated (lifecycle).
+//   • Status  — Open / Closed / All (ui-jobs 805), and Closed by liquidation
+//     with Closed.
 //   • Market  — cUSDCv3 / cWETHv3 / cUSDTv3 (Comet's fixed, known market set).
 //   • Size: Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts),
 //     sent as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd. The Debt range
@@ -31,12 +32,12 @@ import { COMPOUND_MARKETS } from "@/lib/compound/asset-catalog";
 import { COLLATERAL_PARAM, collateralOptions, collateralTokensOf } from "@/lib/shared/collateral-facet";
 import type { ChainId } from "@/lib/shared/chains";
 import {
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  isAllStatuses,
-  sameStatusSet,
+  compoundStatusBuckets,
+  defaultStatusChoice,
+  endedByLiquidation,
+  statusChoice,
 } from "@/lib/compound/listing-visibility";
+import { ENDED_BY_LIQUIDATION, setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** The Transactions slider's top on Ethereum: the round number above the
  *  busiest listed position. mv_compound_v3_positions carries no tx_count, so
@@ -53,8 +54,11 @@ const COMPOUND_V3_SIZE_NOTE = "At the latest indexed price per asset, as of the 
 export const COMPOUND_ITEMS_PER_PAGE = 20;
 
 export interface CompoundListFilters extends BaseListFilters {
-  /** open / closed / liquidated — multi (OR). */
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
+  /** "" | "liquidated" — with Closed, the positions that ended by liquidation.
+   *  URL param `ended`. */
+  ended: string[];
   /** usdc / weth / usdt — single-select market (stored as an array for the registry). */
   market: string[];
   /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
@@ -72,14 +76,13 @@ export interface CompoundListFilters extends BaseListFilters {
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
 // listing-visibility.ts resolves it per context — the open accounts on the bare directory,
-// every status once the search names an identity. Because the default is contextual rather
-// than a selection it draws no chip and no Reset link, and a cleared selection resolves back
-// to what the context rests on.
+// every status once the search names an identity.
 export const COMPOUND_LIST_DEFAULTS: CompoundListFilters = {
   q: "",
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
+  ended: [],
   market: [],
   debt: [],
   coll: [],
@@ -96,12 +99,6 @@ export const COMPOUND_SORT_OPTIONS: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },
   { value: "debt", label: "Borrow balance" },
   { value: "coll", label: "Collateral" },
-];
-
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated" },
 ];
 
 const MARKET_OPTIONS: FilterOptionDef[] = Object.values(COMPOUND_MARKETS).map((m) => ({
@@ -123,17 +120,28 @@ export function compoundListDimensions(
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
-      set: (f, v) => {
-        const sel = canonicalStatuses(v);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
-      },
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses (ui-jobs 805).
+      set: (f, v) => ({ ...f, ...setStatusChoice(v, defaultStatusChoice(f), f.ended) }),
+    },
+    {
+      id: "ended",
+      label: "Closed by liquidation",
+      // Its own group, for its pill; in the panel it sits under Status.
+      group: "Closed by liquidation",
+      cardinality: "single",
+      param: "ended",
+      options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
+      // Offered with Closed, which it narrows.
+      available: (f) => statusChoice(f) === "closed",
+      get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
+      set: (f, v) => ({ ...f, ended: v }),
+      chipLabel: () => "Closed by liquidation",
     },
     {
       id: "market",
@@ -156,7 +164,7 @@ export function compoundListDimensions(
     }),
     {
       id: "liquidations",
-      label: "History",
+      label: "Liquidated before",
       group: "History",
       cardinality: "single",
       param: "liq",
@@ -193,8 +201,8 @@ export function compoundFiltersToFetchParams(
   return {
     wallet: wallet ? wallet : undefined,
     market: filters.market[0] || undefined,
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // All maps to no status filter; Closed asks for closed and liquidated.
+    status: compoundStatusBuckets(filters) as FetchCompoundPositionsParams["status"],
     ...usdBounds(filters),
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
     collateralTokens: collateralTokensOf(filters.collateral, chainId),

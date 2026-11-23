@@ -272,6 +272,11 @@
           "value": "with"
         }
       ],
+      "ended": {
+        "status": "closed",
+        "param": "ended",
+        "value": "liquidated"
+      },
       "status": "liquidated"
     }
   },

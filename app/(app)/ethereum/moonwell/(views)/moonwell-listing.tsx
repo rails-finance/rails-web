@@ -5,6 +5,7 @@
 // page.tsx. The driver owns the toolbar, pagination, debounced search and the
 // fetch lifecycle; this file is just the Moonwell-specific config.
 
+import { moonwellCountLine } from "@/lib/moonwell/listing-visibility";
 import type { MoonwellPositionSummary } from "@/lib/sources/api/moonwell-positions";
 import { fetchMoonwellPositions } from "@/lib/api/fetch-moonwell-positions";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
@@ -30,6 +31,7 @@ export function MoonwellListing({ initialItems, initialTotal, initialKey, initia
     <ChainTruthListingPage<MoonwellPositionSummary, MoonwellListFilters>
       title="Moonwell Positions"
       noun="positions"
+      countLine={moonwellCountLine}
       basePath="/ethereum/moonwell"
       defaults={MOONWELL_LIST_DEFAULTS}
       sortOptions={MOONWELL_SORT_OPTIONS}
@@ -45,6 +47,11 @@ export function MoonwellListing({ initialItems, initialTotal, initialKey, initia
             data: r.data,
             total: r.pagination.total,
           })),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchMoonwellPositions({ ...moonwellFiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

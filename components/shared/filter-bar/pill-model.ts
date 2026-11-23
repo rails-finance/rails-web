@@ -85,10 +85,14 @@ export function groupDimensions<F>(dims: FilterDimension<F>[], filters: F): Pill
  *  "100+ holders" preset): where the dimension names its default chip, that
  *  chip read at the default (none for a default that narrows nothing, "Every
  *  vault"), so the pill stays locked while set; else default
- *  values that are some of the options and not all of them. */
+ *  values that are some of the options and not all of them. A single-choice
+ *  default on the option marked `every` (Status All, ui-jobs 805) narrows
+ *  nothing. */
 export function restsOnConstraint<F>(dim: FilterDimension<F>, f: F): boolean {
   if (dim.defaultChip) return dim.defaultChip(dim.set(f, dim.defaultValues?.(f) ?? [])) != null;
   const def = dim.defaultValues?.(f) ?? [];
+  if (dim.cardinality === "single" && def.length === 1 && dim.options.some((o) => o.every && o.value === def[0]))
+    return false;
   return def.length > 0 && (dim.options.length === 0 || def.length < dim.options.length);
 }
 

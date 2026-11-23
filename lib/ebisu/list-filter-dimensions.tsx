@@ -1,7 +1,7 @@
 // Ebisu trove listing filter registry (chain-state tier, IN-MEMORY). Ebisu is a small
 // set (~91 Troves across 5 branches), so — like Maker / Morpho — the page fetches all
-// of them once and filters client-side. Declares the categorical facets (Status,
-// Collateral branch) as ListDimensions over the in-memory row set; sort + search are
+// of them once and filters client-side. Declares the categorical facets (Status and
+// its switches, Collateral branch) as ListDimensions over the in-memory row set; sort + search are
 // the non-categorical controls. All values are read from the chain (replayed status, raw
 // collateral / ebUSD debt, user-set interest rate).
 //
@@ -16,6 +16,8 @@ import { matchesFormerHolder } from "@/lib/liquity-fork/former-holders";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { DEBT_SYMBOL } from "@/lib/ebisu/asset-catalog";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
+import { troveStatusDimensions } from "@/lib/liquity-v2/list-filter-dimensions";
+import { troveDimensionAdmits, type TroveLifecycle } from "@/lib/liquity-v2/listing-visibility";
 import type { ListDimension, BaseListFilters, ApplyConfig } from "@/lib/shared/list-filter";
 import type { EbisuTroveSummary } from "@/lib/sources/api/ebisu-troves";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -23,7 +25,13 @@ import { rangeAdmits, sizeDimensions } from "@/lib/shared/size-dimensions";
 import { transactionsDimension } from "@/lib/shared/transactions-dimension";
 
 export interface EbisuListFilters extends BaseListFilters {
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
+  /** "" | "dormant" — with Open, the troves below the minimum debt. URL param `open`. */
+  dormant: string[];
+  /** "" | "liquidated" — with Closed, the troves that ended by liquidation.
+   *  URL param `ended`. */
+  ended: string[];
   branches: string[];
   /** Debt range in ebUSD, one encodeRange value or [] for no bound. */
   debt: string[];
@@ -38,6 +46,8 @@ export const EBISU_LIST_DEFAULTS: EbisuListFilters = {
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
+  dormant: [],
+  ended: [],
   branches: [],
   debt: [],
   coll: [],
@@ -58,20 +68,17 @@ export const EBISU_SORT_OPTIONS: SortOption[] = [
   { value: "rate", label: "Interest rate" },
 ];
 
-// Zombie is a first-class bucket (Liquity V2 parity): an open Trove the server
-// marks zombie (`isZombie` on the served row) answers "Zombie" and not "Open",
-// the predicate the card's pill reads, so the buckets are disjoint. The web does
-// not derive the state from debt: an Ebisu redemption can leave a Trove below
-// MIN_DEBT that the chain still reads Active (ui-jobs 420).
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  // Ebisu's docs call it a zombie position (decision 0065).
-  { value: "zombie", label: "Zombie" },
-  { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated" },
-];
+// Status is Open / Closed / All with the Dormant and Closed by liquidation
+// switches (ui-jobs 805; lib/liquity-v2/listing-visibility.ts), applied here over
+// the fetched rows. A trove the server marks zombie (`isZombie` on the served
+// row) is the one the switch keeps, the predicate the card's pill reads. The web
+// does not derive the state from debt: an Ebisu redemption can leave a Trove
+// below MIN_DEBT that the chain still reads Active (ui-jobs 420). Ebisu's docs
+// call it a zombie position (decision 0065), so the switch reads "Zombie".
+const ZOMBIE_LABEL = "Zombie";
 
-const lifecycleOf = (row: EbisuTroveSummary): string => (row.status === "open" && row.isZombie ? "zombie" : row.status);
+const lifecycleOf = (row: EbisuTroveSummary): TroveLifecycle =>
+  row.status === "open" && row.isZombie ? "zombie" : row.status;
 
 /** Collateral in USD: $0 once the trove holds none, null while its branch is
  *  unpriced. */
@@ -90,17 +97,10 @@ export function ebisuListDimensions(rows: EbisuTroveSummary[]): ListDimension<Eb
   }
 
   return [
-    {
-      id: "status",
-      label: "Status",
-      group: "Status",
-      cardinality: "multi",
-      param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => f.status,
-      set: (f, v) => ({ ...f, status: v }),
-      matches: (row, v) => v.includes(lifecycleOf(row)),
-    },
+    ...troveStatusDimensions<EbisuListFilters>(ZOMBIE_LABEL).map((d) => ({
+      ...d,
+      matches: (row: EbisuTroveSummary, v: string[]) => troveDimensionAdmits(d.id, v, lifecycleOf(row)),
+    })),
     {
       id: "branches",
       label: "Collateral",

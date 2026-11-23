@@ -24,9 +24,9 @@
 //      `?q=<wallet>` on Polaris and `/wallet/<wallet>?protocol=liquity-v2` on
 //      Liquity V2 (ui-jobs 738), where it used to carry a
 //      `status=open,closed,liquidated` that said what the absent param already
-//      said. The explorers that DON'T declare a contextual default are
-//      untouched: on /ethereum/spark clearing Status still writes an explicit
-//      `?status=`, and reloading that URL still shows every status.
+//      said. A choice someone makes is still written: on /ethereum/spark
+//      picking All in the Filters panel's Status row writes `?status=all`
+//      (ui-jobs 805), and reloading that URL still shows every status.
 //
 // THE EXPECTED VALUES ARE RESTATED HERE, never imported and never read off the
 // card: the sums and the counts all come from the wallet route and
@@ -577,26 +577,23 @@ async function statedTotal(page) {
   await page.close();
 }
 
-// Spark rests on `status:["open"]` with NO contextual default, so the rule this
-// change added does not reach it: clearing Status must still write an explicit
-// param, because an absent one would snap back to "open". Since web `2a948029`
-// (16 Oct 2026) the resting default is the removable "Status: Open" chip, and
-// removing it widens to an explicit selection of every bucket
-// (lib/spark/list-filter-dimensions.tsx `clearDefault`).
-const SPARK_EVERY_STATUS = "?status=open,closed,liquidated";
+// Spark's bare directory rests on Open. Status is one choice of Open / Closed /
+// All (ui-jobs 805), drawn in the Filters panel as a segmented row: picking All
+// must write an explicit `?status=all`, because an absent param rests on Open.
+const SPARK_EVERY_STATUS = "?status=all";
 {
   const openTotal = (await api("/api/spark/positions?limit=1&status=open")).pagination?.total;
   const everyTotal = (await api("/api/spark/positions?limit=1")).pagination?.total;
   info("F3 fixtures (Spark)", `${openTotal} open of ${everyTotal} positions in all`);
 
   const page = await openListing(context, `${BASE}/ethereum/spark`);
-  // Status rests on Open, a default pill with no ×: every status is ticked
-  // in the Filters panel.
-  await setFilterViaSheet(page, "status", ["open", "closed", "liquidated"]);
+  // Status rests on Open, a locked pill with no ×: All is picked in the
+  // Filters panel's segmented Status row.
+  await setFilterViaSheet(page, "status", ["all"]);
   await page.waitForTimeout(3500);
   const cleared = await page.evaluate(() => location.search);
   check(
-    "F3. Spark: every Status ticked in the Filters panel writes an explicit `?status=` — the open-only explorers are untouched",
+    "F3. Spark: picking All in the Filters panel's Status row writes `?status=all`",
     cleared === SPARK_EVERY_STATUS,
     `"${cleared}"`,
   );
@@ -613,9 +610,8 @@ const SPARK_EVERY_STATUS = "?status=open,closed,liquidated";
   await reloaded.close();
 }
 
-// Aave V4's status default is the full set outright — the same on the page as
-// in the page-level defaults — so its bare directory URL was clean before this
-// change and must still be.
+// Aave V4's bare directory rests on Open, which writes no param: its URL stays
+// clean.
 {
   const page = await openListing(context, `${BASE}/ethereum/aave-v4`);
   const search = await page.evaluate(() => location.search);

@@ -9,6 +9,7 @@
 // is literally Account.Info: cross-margin within an account number, isolated
 // across them. keyFor is the pair for the same reason.
 
+import { dolomiteCountLine } from "@/lib/dolomite/listing-visibility";
 import { useEffect, useState } from "react";
 import { fetchDolomiteMarketRoster } from "@/lib/api/fetch-dolomite-market-roster";
 import type { DolomitePositionSummary } from "@/lib/sources/api/dolomite-positions";
@@ -68,6 +69,7 @@ export function DolomiteListing({ initialItems, initialTotal, initialKey, initia
     <ChainTruthListingPage<DolomitePositionSummary, DolomiteListFilters, DolomiteRosterState>
       title="Dolomite Accounts"
       noun="accounts"
+      countLine={dolomiteCountLine}
       basePath="/ethereum/dolomite"
       defaults={DOLOMITE_LIST_DEFAULTS}
       sortOptions={DOLOMITE_SORT_OPTIONS}
@@ -85,6 +87,11 @@ export function DolomiteListing({ initialItems, initialTotal, initialKey, initia
             data: r.data,
             total: r.pagination.total,
           })),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchDolomitePositions({ ...dolomiteFiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

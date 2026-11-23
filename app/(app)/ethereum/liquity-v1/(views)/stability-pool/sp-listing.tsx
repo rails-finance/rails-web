@@ -5,6 +5,7 @@
 // (components/protocol/liquity/v1-sp-deposit-card.tsx). A deposit is its
 // depositor, so the href and key are the address.
 
+import { spCountLine } from "@/lib/liquity-v1/sp-staking-visibility";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import { RailHeader } from "@/components/shared/rail-header";
 import { liquityV1DepositHref, LIQUITY_V1_SP_PATH } from "@/lib/liquity-v1/sp-routes";
@@ -67,6 +68,7 @@ export function SpListing(props: {
       basePath={LIQUITY_V1_SP_PATH}
       identity={<RailHeader session="liquity-v1" venue="subPage" stamp />}
       titleHidden
+      countLine={spCountLine}
       defaults={SP_LIST_DEFAULTS}
       sortOptions={SORT_OPTIONS}
       searchPlaceholder="Depositor address or ENS"
@@ -77,6 +79,8 @@ export function SpListing(props: {
         dimensions: spListDimensions(),
         itemsPerPage: SP_ITEMS_PER_PAGE,
         fetchPage: (f, page) => fetchSpPage(f, page),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (f) => fetchSpPage(f, 1, { limit: 1 }).then((r) => r.total),
       })}
       renderAbove={({ items, total, filters }) => holderStrip(items, total, filters)}
       renderBelow={() => <HolderKinds kinds={OTHER_KINDS} reads={reads} wallet={wallet} />}

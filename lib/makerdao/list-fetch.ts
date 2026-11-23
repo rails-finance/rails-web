@@ -30,7 +30,24 @@ export async function fetchMakerVaultPage(
   signal?: AbortSignal,
   headers?: HeadersInit,
 ): Promise<MakerVaultPage> {
-  const params = makerFiltersToFetchParams(filters, page, roster);
+  return askMakerVaults(makerFiltersToFetchParams(filters, page, roster), baseUrl, signal, headers);
+}
+
+/** A selection's total, one row asked (the editors' "Show N", ui-jobs 805). */
+export async function countMakerVaults(
+  filters: MakerListFilters,
+  roster: MakerRosterState | undefined,
+): Promise<number> {
+  const params = makerFiltersToFetchParams(filters, 1, roster);
+  return (await askMakerVaults(params && { ...params, limit: 1, offset: 0 })).total;
+}
+
+async function askMakerVaults(
+  params: ReturnType<typeof makerFiltersToFetchParams>,
+  baseUrl?: string,
+  signal?: AbortSignal,
+  headers?: HeadersInit,
+): Promise<MakerVaultPage> {
   // Null = a selection nothing can match (a collateral type no ilk is named, a
   // typed name with no roster to resolve it). No request: rails-server ignores
   // params it cannot answer, so asking anyway would return the whole index.

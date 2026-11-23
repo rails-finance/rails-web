@@ -26,6 +26,7 @@ import {
   type FrankencoinListFilters,
   type FrankencoinRosterState,
 } from "@/lib/frankencoin/list-filter-dimensions";
+import { frankencoinCountLine } from "@/lib/frankencoin/listing-visibility";
 
 export interface FrankencoinListingProps {
   initialItems?: FrankencoinPositionSummary[];
@@ -68,6 +69,7 @@ export function FrankencoinListing({ initialItems, initialTotal, initialKey, ini
     <ChainTruthListingPage<FrankencoinPositionSummary, FrankencoinListFilters, FrankencoinRosterState>
       title="Frankencoin Positions"
       noun="positions"
+      countLine={frankencoinCountLine}
       basePath="/ethereum/frankencoin"
       defaults={FRANKENCOIN_LIST_DEFAULTS}
       sortOptions={FRANKENCOIN_SORT_OPTIONS}
@@ -85,6 +87,10 @@ export function FrankencoinListing({ initialItems, initialTotal, initialKey, ini
             data: r.data,
             total: r.pagination.total,
           })),
+        countDraft: (filters) =>
+          fetchFrankencoinPositions({ ...frankencoinFiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

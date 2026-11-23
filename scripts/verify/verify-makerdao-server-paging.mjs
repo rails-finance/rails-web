@@ -29,8 +29,8 @@ const BASE = process.env.BASE ?? "http://localhost:3000";
 const LIST = "/ethereum/makerdao";
 /** The bare directory rests on the open vaults (lib/makerdao/listing-visibility.ts),
  *  while the Collateral menu counts every status. The whole-index checks open the
- *  listing with every status chosen so both count the same set. */
-const ALL_STATUS = "status=open,closed,liquidated";
+ *  listing on Status All (ui-jobs 805) so both count the same set. */
+const ALL_STATUS = "status=all";
 const LIST_ALL = `${LIST}?${ALL_STATUS}`;
 
 /** Its vault count on 2026-08-28. The index only grows, so this is a floor. */

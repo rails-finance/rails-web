@@ -6,8 +6,9 @@
 // `matches` predicate — the backend is the filter.
 //
 // Facets:
-//   • Status   — open / closed / liquidated (lifecycle). 'liquidated' names
-//     only a CLOSED account — the two-axis status model.
+//   • Status   — Open / Closed / All (ui-jobs 805), and Closed by liquidation
+//     with Closed. 'liquidated' names only a CLOSED account — the two-axis
+//     status model.
 //   • Size: Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts),
 //     sent as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd. The Debt range
 //     replaces the old Position dropdown: its `?state=borrowing` reads as at
@@ -45,12 +46,12 @@ import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filt
 import type { FetchDolomitePositionsParams } from "@/lib/api/fetch-dolomite-positions";
 import type { DolomitePositionSort } from "@/lib/sources/api/dolomite-positions";
 import {
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  isAllStatuses,
-  sameStatusSet,
+  dolomiteStatusBuckets,
+  defaultStatusChoice,
+  endedByLiquidation,
+  statusChoice,
 } from "@/lib/dolomite/listing-visibility";
+import { ENDED_BY_LIQUIDATION, setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** The Transactions slider's top: the round number above the busiest listed
  *  account (357 transactions, 20 Oct 2026). */
@@ -63,8 +64,11 @@ const DOLOMITE_SIZE_NOTE = "At the latest Dolomite oracle price per market, as o
 export const DOLOMITE_ITEMS_PER_PAGE = 20;
 
 export interface DolomiteListFilters extends BaseListFilters {
-  /** open / closed / liquidated — multi (OR). */
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
+  /** "" | "liquidated" — with Closed, the positions that ended by liquidation.
+   *  URL param `ended`. */
+  ended: string[];
   /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
    *  debt) or [] for no bound. URL param `debt`, read from `state` too. */
   debt: string[];
@@ -85,14 +89,13 @@ export interface DolomiteListFilters extends BaseListFilters {
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
 // listing-visibility.ts resolves it per context — the open accounts on the bare directory,
-// every status once the search names an identity. Because the default is contextual rather
-// than a selection it draws no chip and no Reset link, and a cleared selection resolves back
-// to what the context rests on.
+// every status once the search names an identity.
 export const DOLOMITE_LIST_DEFAULTS: DolomiteListFilters = {
   q: "",
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
+  ended: [],
   debt: [],
   coll: [],
   accountKind: [],
@@ -108,12 +111,6 @@ export const DOLOMITE_SORT_OPTIONS: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },
   { value: "debt", label: "Debt" },
   { value: "coll", label: "Collateral" },
-];
-
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated and closed" },
 ];
 
 const ACCOUNT_KIND_OPTIONS: FilterOptionDef[] = [
@@ -160,17 +157,28 @@ export function dolomiteListDimensions(
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
-      set: (f, v) => {
-        const sel = canonicalStatuses(v);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
-      },
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses (ui-jobs 805).
+      set: (f, v) => ({ ...f, ...setStatusChoice(v, defaultStatusChoice(f), f.ended) }),
+    },
+    {
+      id: "ended",
+      label: "Closed by liquidation",
+      // Its own group, for its pill; in the panel it sits under Status.
+      group: "Closed by liquidation",
+      cardinality: "single",
+      param: "ended",
+      options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
+      // Offered with Closed, which it narrows.
+      available: (f) => statusChoice(f) === "closed",
+      get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
+      set: (f, v) => ({ ...f, ended: v }),
+      chipLabel: () => "Closed by liquidation",
     },
     ...sizeDimensions<DolomiteListFilters>({
       getDebt: (f) => f.debt,
@@ -214,7 +222,7 @@ export function dolomiteListDimensions(
     },
     {
       id: "liquidations",
-      label: "History",
+      label: "Liquidated before",
       group: "History",
       cardinality: "single",
       param: "liq",
@@ -238,8 +246,8 @@ export function dolomiteFiltersToFetchParams(filters: DolomiteListFilters, page:
   const owner = filters.q.trim();
   return {
     owner: owner ? owner : undefined,
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // All maps to no status filter; Closed asks for closed and liquidated.
+    status: dolomiteStatusBuckets(filters) as FetchDolomitePositionsParams["status"],
     // The old Position dropdown's flags, for the two Debt ranges it maps to.
     hasDebt: filters.debt[0] === "1-" ? true : undefined,
     noDebt: filters.debt[0] === "-0" ? true : undefined,

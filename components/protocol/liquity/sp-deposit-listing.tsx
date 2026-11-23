@@ -21,6 +21,7 @@ import {
   SP_LIST_DEFAULTS,
   type SpListFilters,
 } from "@/lib/liquity-v2/sp-listing";
+import { spCountLine } from "@/lib/liquity-v2/sp-visibility";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 
 export interface SpDepositListingProps {
@@ -56,6 +57,7 @@ export function SpDepositListing({
       basePath={dep.spPath}
       identity={<RailHeader session={dep.session as SessionProtocol} venue="subPage" stamp />}
       titleHidden
+      countLine={spCountLine}
       defaults={SP_LIST_DEFAULTS}
       sortOptions={(f) => spSortOptions(f, dep)}
       searchPlaceholder="Depositor address or ENS"
@@ -66,6 +68,8 @@ export function SpDepositListing({
         dimensions: spListDimensions(branchOptions),
         itemsPerPage: SP_ITEMS_PER_PAGE,
         fetchPage: (f, page) => fetchSpPage<string>(f, page, {}, dep),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (f) => fetchSpPage<string>(f, 1, { limit: 1 }, dep).then((r) => r.total),
       })}
       walletSearch={dep.id}
       {...props}

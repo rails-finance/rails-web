@@ -6,6 +6,7 @@
 // names a staker states the wallet's Troves and deposit under the rows and
 // counts them in the strip (§1b, §6).
 
+import { stakingCountLine } from "@/lib/liquity-v1/sp-staking-visibility";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import { RailHeader } from "@/components/shared/rail-header";
 import { liquityV1StakeHref, LIQUITY_V1_STAKING_PATH } from "@/lib/liquity-v1/staking-routes";
@@ -66,6 +67,7 @@ export function StakingListing(props: {
       basePath={LIQUITY_V1_STAKING_PATH}
       identity={<RailHeader session="liquity-v1" venue="subPage" stamp />}
       titleHidden
+      countLine={stakingCountLine}
       defaults={ST_LIST_DEFAULTS}
       sortOptions={SORT_OPTIONS}
       searchPlaceholder="Staker address or ENS"
@@ -76,6 +78,8 @@ export function StakingListing(props: {
         dimensions: stListDimensions(),
         itemsPerPage: ST_ITEMS_PER_PAGE,
         fetchPage: (f, page) => fetchStakePage(f, page),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (f) => fetchStakePage(f, 1, { limit: 1 }).then((r) => r.total),
       })}
       renderAbove={({ items, total, filters }) => holderStrip(items, total, filters)}
       renderBelow={() => <HolderKinds kinds={OTHER_KINDS} reads={reads} wallet={wallet} />}

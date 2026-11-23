@@ -6,7 +6,8 @@
 // predicate — the backend is the filter.
 //
 // Facets that ship LIVE (backend + proxy honor the params):
-//   • Status   — open / closed / liquidated (lifecycle), over mv_moonwell_wallets.
+//   • Status   — Open / Closed / All (ui-jobs 805), over mv_moonwell_wallets,
+//     and Closed by liquidation with Closed.
 //   • Size: Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts),
 //     sent as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd. The Debt range
 //     replaces the old Position dropdown: its `?state=borrowing` reads as at
@@ -29,12 +30,12 @@ import type { FetchMoonwellPositionsParams } from "@/lib/api/fetch-moonwell-posi
 import type { MoonwellPositionSort } from "@/lib/sources/api/moonwell-positions";
 import { MOONWELL_MARKETS } from "@/lib/moonwell/asset-catalog";
 import {
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  isAllStatuses,
-  sameStatusSet,
+  moonwellStatusBuckets,
+  defaultStatusChoice,
+  endedByLiquidation,
+  statusChoice,
 } from "@/lib/moonwell/listing-visibility";
+import { ENDED_BY_LIQUIDATION, setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** The Transactions slider's top on Ethereum: the round number above the
  *  busiest listed wallet (92 transactions, 20 Oct 2026). */
@@ -47,8 +48,11 @@ const MOONWELL_SIZE_NOTE = "At the latest indexed price per asset, as of the lis
 export const MOONWELL_ITEMS_PER_PAGE = 20;
 
 export interface MoonwellListFilters extends BaseListFilters {
-  /** open / closed / liquidated — multi (OR). Lifecycle over mv_moonwell_wallets. */
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
+  /** "" | "liquidated" — with Closed, the positions that ended by liquidation.
+   *  URL param `ended`. */
+  ended: string[];
   /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
    *  debt) or [] for no bound. URL param `debt`, read from `state` too. */
   debt: string[];
@@ -66,14 +70,13 @@ export interface MoonwellListFilters extends BaseListFilters {
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
 // listing-visibility.ts resolves it per context — the open wallets on the bare directory,
-// every status once the search names an identity. Because the default is contextual rather
-// than a selection it draws no chip and no Reset link, and a cleared selection resolves back
-// to what the context rests on.
+// every status once the search names an identity.
 export const MOONWELL_LIST_DEFAULTS: MoonwellListFilters = {
   q: "",
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
+  ended: [],
   debt: [],
   coll: [],
   liquidations: [],
@@ -88,12 +91,6 @@ export const MOONWELL_SORT_OPTIONS: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },
   { value: "debt", label: "Debt" },
   { value: "coll", label: "Collateral" },
-];
-
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated" },
 ];
 
 const LIQUIDATION_OPTIONS: FilterOptionDef[] = [{ value: "liquidated", label: "Liquidated before" }];
@@ -112,17 +109,28 @@ export function moonwellListDimensions(
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
-      set: (f, v) => {
-        const sel = canonicalStatuses(v);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
-      },
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses (ui-jobs 805).
+      set: (f, v) => ({ ...f, ...setStatusChoice(v, defaultStatusChoice(f), f.ended) }),
+    },
+    {
+      id: "ended",
+      label: "Closed by liquidation",
+      // Its own group, for its pill; in the panel it sits under Status.
+      group: "Closed by liquidation",
+      cardinality: "single",
+      param: "ended",
+      options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
+      // Offered with Closed, which it narrows.
+      available: (f) => statusChoice(f) === "closed",
+      get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
+      set: (f, v) => ({ ...f, ended: v }),
+      chipLabel: () => "Closed by liquidation",
     },
     ...sizeDimensions<MoonwellListFilters>({
       getDebt: (f) => f.debt,
@@ -154,7 +162,7 @@ export function moonwellListDimensions(
     },
     {
       id: "liquidations",
-      label: "History",
+      label: "Liquidated before",
       group: "History",
       cardinality: "single",
       param: "liq",
@@ -177,8 +185,8 @@ export function moonwellFiltersToFetchParams(filters: MoonwellListFilters, page:
   const wallet = filters.q.trim();
   return {
     wallet: wallet ? wallet : undefined,
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // All maps to no status filter; Closed asks for closed and liquidated.
+    status: moonwellStatusBuckets(filters) as FetchMoonwellPositionsParams["status"],
     // The old Position dropdown's flags, for the two Debt ranges it maps to.
     hasDebt: filters.debt[0] === "1-" ? true : undefined,
     noDebt: filters.debt[0] === "-0" ? true : undefined,
