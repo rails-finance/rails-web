@@ -49,7 +49,7 @@ export type WalletPositionStatus = "open" | "closed" | "liquidated" | "redeemed"
 export type WalletCard =
   | { kind: "aave-v3"; lane: "ethereum" | "base"; row: AaveV3PositionRow }
   | { kind: "aave-v3-arbitrum"; row: ArbitrumReadRow }
-  | { kind: "aave-v4"; lane: "ethereum" | "base"; row: AaveV4SpokePositionRow }
+  | { kind: "aave-v4"; lane: "ethereum" | "base"; row: AaveV4SpokePositionRow; storedAtBlock?: number }
   /** One spoke of the Arc wallet read, as stored at its block. */
   | { kind: "aave-v4"; lane: "arc"; read: ArcWalletRead }
   | { kind: "compound-v3"; lane: "ethereum" | "base"; row: CompoundPositionSummary }

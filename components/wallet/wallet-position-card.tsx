@@ -81,10 +81,10 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
       if (card.lane === "arc") return <AaveV4ArcWalletCard read={card.read} />;
       return card.lane === "base" ? (
         <AaveV4DeploymentProvider value={BASE_AAVE_V4}>
-          <AaveV4PositionListingCard row={card.row} />
+          <AaveV4PositionListingCard row={card.row} storedAtBlock={card.storedAtBlock} />
         </AaveV4DeploymentProvider>
       ) : (
-        <AaveV4PositionListingCard row={card.row} />
+        <AaveV4PositionListingCard row={card.row} storedAtBlock={card.storedAtBlock} />
       );
     case "compound-v3":
       return card.lane === "base" ? (

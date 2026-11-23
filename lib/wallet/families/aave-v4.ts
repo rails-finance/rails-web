@@ -68,7 +68,7 @@ function aaveV4Lane(lane: "ethereum" | "base"): FamilyModule {
           positionId: r.positionId,
           href: r.href,
           status,
-          card: { kind: "aave-v4", lane, row },
+          card: { kind: "aave-v4", lane, row, storedAtBlock: opt(r.readBlock) },
           collateralUsd: opt(r.collateralUsd),
           debtUsd: opt(r.debtUsd),
           usdSource: r.usdSource ?? oracle,
