@@ -418,7 +418,6 @@ export function MorphoLenderOpenCard({
   deployment?: MorphoPageDeployment;
 }) {
   const identity = morphoCardIdentity({
-    market: marketLabel(p.loanSymbol, p.collateralSymbol, p.lltv === 0),
     lltv: p.lltv,
     listingOwner: surface === "detail" ? undefined : { wallet: p.user, session: deployment.session, vault },
   });
@@ -439,6 +438,7 @@ export function MorphoLenderOpenCard({
           status: null,
           heads,
           identity,
+          tag: morphoCardTag(marketLabel(p.loanSymbol, p.collateralSymbol, p.lltv === 0)),
           name: positionName({
             market: marketLabel(p.loanSymbol, p.collateralSymbol, p.lltv === 0),
             noun: POSITION_NOUN[deployment.session],
@@ -505,8 +505,8 @@ export function LenderClosedCard({
     name: positionName({ market: pos.marketLabel, noun: POSITION_NOUN[deployment.session], id: wallet }),
     status: { word: "Closed", tone: "muted" as const },
     heads: [{ id: "peak-supply", label: CARD_VOCAB.peakSupply, value: null, sub: notRecordedNote("wallet") }],
+    tag: morphoCardTag(pos.marketLabel),
     identity: morphoCardIdentity({
-      market: pos.marketLabel,
       lltv: pos.lltv,
       listingOwner: detail ? undefined : { wallet, session: deployment.session, vault },
     }),
@@ -531,6 +531,6 @@ export function LenderClosedCard({
           exports: exports ?? null,
         },
       }
-    : { ...common, surface: "listing", menu: null, tag: morphoCardTag(pos.marketLabel) };
+    : { ...common, surface: "listing", menu: null };
   return <PositionCard slots={slots} />;
 }

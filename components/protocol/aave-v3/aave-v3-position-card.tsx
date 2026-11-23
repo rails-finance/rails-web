@@ -386,26 +386,32 @@ export function useAaveV3CardSlots({
   const marketTitle = marketLabel
     ? `${marketLabel} is one of the Aave V3 markets on Ethereum. Each market is a separate account with a separate health factor.`
     : undefined;
-  const marketBadge = marketLabel ? (
-    <span
-      className="text-xs font-semibold text-rb-500 header-badge-tip focus-ring rounded-sm"
-      title={marketTitle}
-      data-tooltip={marketTitle}
-      tabIndex={detail ? 0 : undefined}
-    >
-      {marketLabel}
-    </span>
-  ) : null;
+  // The market in the tag on both surfaces (ui-jobs 807); the position page
+  // keeps its tip.
+  const tag = !marketLabel ? undefined : (
+    <ListingTag
+      market={
+        detail ? (
+          <span
+            className="header-badge-tip focus-ring rounded-sm"
+            title={marketTitle}
+            data-tooltip={marketTitle}
+            tabIndex={0}
+          >
+            {marketLabel}
+          </span>
+        ) : (
+          marketLabel
+        )
+      }
+    />
+  );
   // The listing names the wallet on the left (its controls are buttons, which
-  // can sit inside the row's <Link>) and the market at the right end; the
-  // position page names the wallet in its top row (ui-jobs 228) and keeps the
-  // market at the heading's right end.
-  const identity = detail ? (
-    (marketBadge ?? undefined)
-  ) : (
+  // can sit inside the row's <Link>); the position page names the wallet in
+  // its top row (ui-jobs 228).
+  const identity = detail ? undefined : (
     <WalletPill wallet={v.wallet} ensName={null} filterProtocol={dep.session} bookmark />
   );
-  const tag = detail || !marketLabel ? undefined : <ListingTag market={marketLabel} />;
   // The position's name (ui-jobs 703): the market and the account's wallet.
   const name = positionName({ market: marketLabel, noun: POSITION_NOUN[dep.session], id: v.wallet });
 
@@ -543,13 +549,14 @@ export function useAaveV3CardSlots({
       status,
       heads: withPeaks([supplyHead, debtHead], peakOf, detail),
       identity,
+      tag,
       counters,
       outcome: {
         word: liquidated ? "Liquidated" : "Closed",
         dates: v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined,
       },
     };
-    if (!detail) return { ...common, surface: "listing", menu: null, tag };
+    if (!detail) return { ...common, surface: "listing", menu: null };
     return {
       ...common,
       surface: "detail",
@@ -725,8 +732,8 @@ export function useAaveV3CardSlots({
     trailNotice
   );
 
-  const common = { status, heads, identity, counters, notice, name };
-  if (!detail) return { ...common, surface: "listing", menu: null, tag };
+  const common = { status, heads, identity, tag, counters, notice, name };
+  if (!detail) return { ...common, surface: "listing", menu: null };
 
   // ── Each side's reserve rows, and the panel: the supplied side's values
   //    on the left, the borrowed side's and the risk on the right.
@@ -920,7 +927,6 @@ export function useAaveV3CardSlots({
   const emodeIdentity =
     emode && chainPool ? (
       <span className="flex items-center gap-2">
-        {marketBadge}
         <span className="text-xs font-semibold text-rb-500" data-emode={emode.id}>
           E-Mode: <Prov info={userEmodeProv(emode.label, chainPool)}>{emode.label}</Prov>
         </span>
