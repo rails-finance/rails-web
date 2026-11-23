@@ -99,6 +99,9 @@ export interface AaveV3ReserveAmount {
   decimalsUnread?: true;
 }
 
+/** The listing row's mark where its account has an event after the refresh. */
+const AAVE_V3_CHANGED_SINCE_REFRESH = "changed since the refresh";
+
 export interface AaveV3PositionView {
   wallet: string;
   /** core | prime | etherfi — which Pool this cross-collateralised account is on. */
@@ -138,6 +141,9 @@ export interface AaveV3PositionView {
   /** The listing row's newest event: the block the index's balances stand at
    *  (mv_aave_v3_positions, refreshed about hourly). */
   indexBlock?: number;
+  /** A listing row whose account has an event after `indexBlock`: the newest
+   *  event's block (ui-jobs 806 follow-up). */
+  changedAfterIndex?: number;
   /** The position page holds the balances back: the event tail has an event
    *  after `indexBlock` and the Pool read has not answered yet (ui-jobs 806). */
   figuresHeld?: boolean;
@@ -424,6 +430,17 @@ export function useAaveV3CardSlots({
     countRule: v.countRule,
     liquidationRule: v.liquidationRule,
     ...(detail ? { order: "age-last" as const } : {}),
+    // A listing row whose account moved after the hourly refresh says so; the
+    // position page reads the account at head.
+    ...(!detail && v.changedAfterIndex != null
+      ? {
+          extra: (
+            <span className="text-xs text-rb-500" data-row-changed-after={v.changedAfterIndex}>
+              {AAVE_V3_CHANGED_SINCE_REFRESH}
+            </span>
+          ),
+        }
+      : {}),
   };
 
   // The "?" every state panel owns — the same content function serves Aave V3
@@ -1171,6 +1188,9 @@ export function viewFromSummary(row: AaveV3PositionRow): AaveV3PositionView {
     // A Base lender's row names the block its chain figures were read at.
     atBlock: row.chainBlock ?? undefined,
     indexBlock: row.lastBlockNumber,
+    ...(row.latestEventBlock != null && row.latestEventBlock > row.lastBlockNumber
+      ? { changedAfterIndex: row.latestEventBlock }
+      : {}),
     // A listing view never carries a health factor (0018): the row's snapshot
     // HF is not read, and the position page's live read is the only one
     // the card shows.
