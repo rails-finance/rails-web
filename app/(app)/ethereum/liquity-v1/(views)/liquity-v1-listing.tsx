@@ -28,11 +28,12 @@ import {
 import {
   liquityV1ListDimensions,
   liquityV1FiltersToFetchParams,
-  liquityV1ListDefaults,
+  LIQUITY_V1_LIST_DEFAULTS,
   LIQUITY_V1_SORT_OPTIONS,
   LIQUITY_V1_ITEMS_PER_PAGE,
   type LiquityV1ListFilters,
 } from "@/lib/liquity-v1/list-filter-dimensions";
+import { liquityV1CountLine, statusChoice } from "@/lib/liquity-v1/listing-visibility";
 
 export interface LiquityV1ListingProps {
   initialItems?: LiquityV1PositionSummary[];
@@ -45,9 +46,7 @@ const OTHER_KINDS = [LIQUITY_V1_DEPOSITS, LIQUITY_V1_STAKES];
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
 export function LiquityV1Listing({ initialItems, initialTotal, initialKey, initialSearch }: LiquityV1ListingProps) {
-  // A wallet search rests on every status (liquityV1ListDefaults).
   const q = readListQuery(useUrlSearchParams(initialSearch ?? ""));
-  const defaults = liquityV1ListDefaults(q);
   // The wallet's deposit and stake, under the rows and counted in the strip
   // (§1b, §6).
   const { wallet, reads } = useHolderKinds(OTHER_KINDS, q);
@@ -60,7 +59,7 @@ export function LiquityV1Listing({ initialItems, initialTotal, initialKey, initi
   // failed one leaves its kind unsaid.
   const holderStrip = (items: LiquityV1PositionSummary[], total: number, f: LiquityV1ListFilters) =>
     ADDRESS.test(f.q.trim()) &&
-    f.status.length === 0 &&
+    statusChoice(f) === "all" &&
     !f.liquidations.length &&
     !f.redemptions.length &&
     !f.debt.length &&
@@ -83,8 +82,9 @@ export function LiquityV1Listing({ initialItems, initialTotal, initialKey, initi
     <ChainTruthListingPage<LiquityV1PositionSummary, LiquityV1ListFilters>
       title="Liquity V1 Troves"
       noun="Troves"
+      countLine={liquityV1CountLine}
       basePath="/ethereum/liquity-v1"
-      defaults={defaults}
+      defaults={LIQUITY_V1_LIST_DEFAULTS}
       sortOptions={LIQUITY_V1_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"
       renderCard={liquityV1TroveCard}
@@ -98,6 +98,10 @@ export function LiquityV1Listing({ initialItems, initialTotal, initialKey, initi
             data: r.data,
             total: r.pagination.total,
           })),
+        countDraft: (filters) =>
+          fetchLiquityV1Positions({ ...liquityV1FiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       renderAbove={({ items, total, filters }) => holderStrip(items, total, filters)}
       renderBelow={() => <HolderKinds kinds={OTHER_KINDS} reads={reads} wallet={wallet} />}

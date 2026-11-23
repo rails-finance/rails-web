@@ -19,7 +19,8 @@
 // redemption queue by nominal ICR (price-free by construction), which with one
 // collateral asset is the same order a collateral ratio would give. Facets + sorts
 // that ship LIVE:
-//   • Status  — open / closed / liquidated (mv_liquity_v1_positions.status).
+//   • Status  — Open / Closed / All (ui-jobs 805; lib/liquity-v1/listing-visibility.ts),
+//     and Closed by liquidation with Closed.
 //   • Size    — Debt (LUSD) and Collateral (USD), as above.
 //   • History — Liquidated before / Redeemed before (ever, from the event stream).
 //   • Transactions — a range over the Trove's distinct transactions (`minTx` /
@@ -29,11 +30,17 @@
 
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
-import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { FetchLiquityV1PositionsParams } from "@/lib/api/fetch-liquity-v1-positions";
 import type { LiquityV1PositionStatus, LiquityV1PositionSort } from "@/lib/sources/api/liquity-v1-positions";
+import {
+  defaultStatusChoice,
+  endedByLiquidation,
+  liquityV1StatusBuckets,
+  statusChoice,
+} from "@/lib/liquity-v1/listing-visibility";
+import { ENDED_BY_LIQUIDATION, readStatusParam, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const LIQUITY_V1_ITEMS_PER_PAGE = 20;
@@ -51,7 +58,11 @@ const LIQUITY_V1_SIZE_TOP = 50_000_000;
 const LIQUITY_V1_SIZE_NOTE = "Debt in LUSD; collateral at the Liquity PriceFeed's latest indexed price.";
 
 export interface LiquityV1ListFilters extends BaseListFilters {
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
+  /** "" | "liquidated" — with Closed, the Troves that ended by liquidation.
+   *  URL param `ended`. */
+  ended: string[];
   /** ["with"] = Troves liquidated at least once (orthogonal to current status). */
   liquidations: string[];
   /** ["with"] = Troves redeemed against at least once. */
@@ -65,32 +76,21 @@ export interface LiquityV1ListFilters extends BaseListFilters {
   tx: string[];
 }
 
-// Resting view = the live Troves (84 of ~7,239). Status defaults to ["open"] as an
-// ACTIVE selection (a clearable chip, not the dimension's inactive default), so the
-// listing renders the open set at rest and only broadens when the user opts in.
-const LIQUITY_V1_LIST_DEFAULTS: LiquityV1ListFilters = {
+// No status is written into the page defaults: an empty `status` is "no opinion", and
+// listing-visibility.ts resolves it per context — the open Troves on the bare listing, every
+// status once the search names a wallet.
+export const LIQUITY_V1_LIST_DEFAULTS: LiquityV1ListFilters = {
   q: "",
   sortBy: "recent",
   sortOrder: "desc",
-  status: ["open"],
+  status: [],
+  ended: [],
   liquidations: [],
   redemptions: [],
   debt: [],
   coll: [],
   tx: [],
 };
-
-// A search for a wallet asks about that wallet's Troves, and most of them are
-// closed: the listing a wallet chip opens (`?q=<address>`) drops the Open
-// default and shows every life, whatever its status. A status the reader picks
-// still applies.
-const LIQUITY_V1_WALLET_DEFAULTS: LiquityV1ListFilters = { ...LIQUITY_V1_LIST_DEFAULTS, status: [] };
-const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
-
-/** The resting selection for a search: every status when it names a wallet. */
-export function liquityV1ListDefaults(q: string): LiquityV1ListFilters {
-  return ADDRESS.test(q.trim()) ? LIQUITY_V1_WALLET_DEFAULTS : LIQUITY_V1_LIST_DEFAULTS;
-}
 
 export const LIQUITY_V1_SORT_OPTIONS: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },
@@ -101,23 +101,42 @@ export const LIQUITY_V1_SORT_OPTIONS: SortOption[] = [
   { value: "ratio", label: "Ratio" },
 ];
 
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated" },
-];
-
 export function liquityV1ListDimensions(): SerializableDimension<LiquityV1ListFilters>[] {
   return [
     {
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => f.status,
-      set: (f, v) => ({ ...f, status: v }),
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses (ui-jobs 805).
+      set: (f, v) => {
+        const read = readStatusParam(v);
+        const choice = read.choice ?? defaultStatusChoice(f);
+        return {
+          ...f,
+          status: choice === defaultStatusChoice(f) ? [] : [choice],
+          ended: choice !== "closed" ? [] : read.endedByLiquidation ? [ENDED_BY_LIQUIDATION] : f.ended,
+        };
+      },
+    },
+    {
+      id: "ended",
+      label: "Closed by liquidation",
+      // Its own group, for its pill; in the panel it sits under Status.
+      group: "Closed by liquidation",
+      cardinality: "single",
+      param: "ended",
+      options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
+      // Offered with Closed, which it narrows.
+      available: (f) => statusChoice(f) === "closed",
+      get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
+      set: (f, v) => ({ ...f, ended: v }),
+      chipLabel: () => "Closed by liquidation",
     },
     ...sizeDimensions<LiquityV1ListFilters>({
       getDebt: (f) => f.debt,
@@ -130,7 +149,7 @@ export function liquityV1ListDimensions(): SerializableDimension<LiquityV1ListFi
     }),
     {
       id: "liquidations",
-      label: "Liquidations",
+      label: "Liquidated before",
       group: "History",
       cardinality: "single",
       param: "liq",
@@ -141,7 +160,7 @@ export function liquityV1ListDimensions(): SerializableDimension<LiquityV1ListFi
     },
     {
       id: "redemptions",
-      label: "Redemptions",
+      label: "Redeemed before",
       group: "History",
       cardinality: "single",
       param: "redeem",
@@ -167,7 +186,7 @@ export function liquityV1FiltersToFetchParams(
   const wallet = filters.q.trim();
   return {
     wallet: wallet ? wallet : undefined,
-    status: filters.status.length > 0 ? (filters.status as LiquityV1PositionStatus[]) : undefined,
+    status: liquityV1StatusBuckets(filters) as LiquityV1PositionStatus[] | undefined,
     hasLiquidations: filters.liquidations.includes("with") ? true : undefined,
     hasRedemptions: filters.redemptions.includes("with") ? true : undefined,
     ...sizeBounds(filters, { debt: "unit", coll: "usd" }),

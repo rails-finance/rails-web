@@ -25,6 +25,7 @@ import { useLiquityV2Prices } from "@/hooks/useLiquityV2Prices";
 import { useLiquityV2BranchCcr } from "@/hooks/useLiquityV2BranchCcr";
 import { BranchCcrNotice } from "@/components/protocol/liquity/branch-ccr-notice";
 import { normalizeCcrBranch } from "@/lib/liquity-v2/branch-ccr";
+import { troveCountLine } from "@/lib/liquity-v2/listing-visibility";
 import {
   liquityV2ListDimensions,
   liquityV2FiltersToFetchParams,
@@ -68,6 +69,7 @@ export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initi
     <ChainTruthListingPage<TroveSummary, LiquityV2ListFilters>
       title={troveWords("listing_title")}
       noun={troveWords("listing_noun")}
+      countLine={(f) => troveCountLine(f, troveWords("listing_noun"))}
       basePath="/ethereum/liquity-v2"
       defaults={LIQUITY_V2_LIST_DEFAULTS}
       sortOptions={LIQUITY_V2_SORT_OPTIONS}
@@ -83,6 +85,11 @@ export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initi
             data: r.data,
             total: r.pagination.total,
           })),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchTroves({ ...liquityV2FiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       walletSearch="liquity-v2"
       onFilters={(f) => setCollateralFacet((f.collateralTypes?.length ?? 0) > 0)}
