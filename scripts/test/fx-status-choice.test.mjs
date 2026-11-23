@@ -1,7 +1,8 @@
 // f(x)'s Status as Open / Closed / All (lib/fx/listing-visibility.ts, ui-jobs 805). The API has
 // no row status: `closed` is a facet of the settled sweep and `liquidated` is the ever-liquidated
-// fact, OR-joined (rails-server api/src/routes/fx.ts). So Closed sends `closed` alone, there is no
-// "Closed by liquidation", and "Liquidated before" stands with All. A registered resolver maps
+// fact, OR-joined (rails-server api/src/routes/fx.ts). So Closed sends `closed` alone, "Closed by
+// liquidation" narrows it with `ended=liquidated`, and "Liquidated before" stands with All. A
+// registered resolver maps
 // `@/` and adds the `.ts`.
 // Run: npm test
 import test from "node:test";
@@ -32,8 +33,16 @@ export async function resolve(spec, ctx, next) {
 `;
 register("data:text/javascript," + encodeURIComponent(hook));
 
-const { fxCountLine, defaultStatusChoice, statusChoice, liquidatedBefore, readFxStatusParam, fxStatusFacets } =
-  await import(ROOT + "lib/fx/listing-visibility.ts");
+const {
+  fxCountLine,
+  defaultStatusChoice,
+  statusChoice,
+  liquidatedBefore,
+  readFxStatusParam,
+  fxStatusFacets,
+  endedByLiquidation,
+  fxEndedParam,
+} = await import(ROOT + "lib/fx/listing-visibility.ts");
 
 const HOLDER = "0x" + "ab".repeat(20);
 
@@ -90,6 +99,24 @@ test("Liquidated before is in effect with All alone", () => {
   assert.equal(liquidatedBefore({ status: ["closed"], liquidations: ["liquidated"] }), false);
   assert.deepEqual(fxStatusFacets({ status: ["closed"], liquidations: ["liquidated"] }), ["closed"]);
   assert.equal(liquidatedBefore({ status: [], q: HOLDER, liquidations: ["liquidated"] }), true);
+});
+
+test("Closed by liquidation narrows Closed and sends ended=liquidated", () => {
+  const f = { status: ["closed"], ended: ["liquidated"] };
+  assert.equal(endedByLiquidation(f), true);
+  assert.equal(statusChoice(f), "closed");
+  assert.deepEqual(fxStatusFacets(f), ["closed"]);
+  assert.equal(fxEndedParam(f), "liquidated");
+});
+
+test("Closed by liquidation is off away from Closed, and ended is never sent empty", () => {
+  for (const status of [[], ["open"], ["all"]]) {
+    const f = { status, ended: ["liquidated"] };
+    assert.equal(endedByLiquidation(f), false, status.join(","));
+    assert.equal(fxEndedParam(f), undefined, status.join(","));
+  }
+  assert.equal(fxEndedParam({ status: ["closed"], ended: [] }), undefined);
+  assert.equal(fxEndedParam({ status: ["closed"] }), undefined);
 });
 
 test("the count line names what is shown", () => {

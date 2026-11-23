@@ -52,6 +52,9 @@ export interface AaveV3PositionRow {
   dominantDebtAddress: string | null;
   lastActivityAt: number;
   lastBlockNumber: number;
+  /** The account's newest event in the tail and live head; above
+   *  `lastBlockNumber` when it changed after the hourly refresh. */
+  latestEventBlock?: number | null;
   lastTxHash: string | null;
   /** Lifetime liquidation count for this wallet (the listing renders a LIQUIDATED
    *  badge whenever > 0). */

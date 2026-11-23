@@ -732,7 +732,6 @@ export function AaveV3PoolPositionView({
                   <AaveV3PositionCard
                     v={view}
                     receipts
-                    viewHref={tl.viewHref}
                     deployment={d.card}
                     pricesPending={!pricesSettled}
                     captions={captions ?? undefined}

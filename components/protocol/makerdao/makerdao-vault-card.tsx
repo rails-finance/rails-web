@@ -19,7 +19,6 @@
 // parked USD.)
 
 import { ListingTag } from "@/components/shared/listing-tag";
-import { PositionNameId } from "@/components/shared/position-name-id";
 import { listingTagId, positionName, type PositionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { type ReactNode, useState } from "react";
@@ -161,13 +160,12 @@ function KindChip({ word, tip }: { word: string; tip: string }) {
 }
 
 /** What kind of vault this is, where it is not a plain CdpManager vault with
- *  a number: a urn named by its address, a LockStake engine urn, or a urn
- *  opened on the Vat with no manager. */
-function VaultKindChips({ v, urn = true }: { v: MakerVaultView; urn?: boolean }) {
+ *  a number: a LockStake engine urn, or a urn opened on the Vat with no
+ *  manager. The tag's urn address carries the urn's tip. */
+function VaultKindChips({ v }: { v: MakerVaultView }) {
   if (v.cdpId != null && !v.lse) return null;
   return (
     <>
-      {urn && v.cdpId == null && <KindChip word="Urn" tip={URN_TIP} />}
       {v.lse ? (
         <KindChip word="LockStake" tip={LOCKSTAKE_TIP} />
       ) : v.cdpId == null ? (
@@ -200,7 +198,7 @@ function MakerMenuRows({ v }: { v: MakerVaultView }) {
         icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this position"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}/ethereum/makerdao/${id}`)}
+        onClick={() => copy("link", positionLink(`/ethereum/makerdao/${id}`))}
       />
     </>
   );
@@ -214,8 +212,6 @@ export interface MakerVaultCardProps {
   /** The card's Explanation section (the V4/trove "About this position" home):
    *  narration bullets describing the vault NOW. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes (`makerdaoExports`). Absent: the ⋮ holds the
    *  vault's rows and the provenance row alone. */
   exports?: PositionCardExports;
@@ -226,7 +222,6 @@ export function makerVaultCardSlots({
   v,
   surface = "listing",
   explanation,
-  viewHref,
   exports,
 }: MakerVaultCardProps): PositionCardSlots {
   const detail = surface === "detail";
@@ -257,16 +252,11 @@ export function makerVaultCardSlots({
     ...(detail ? { order: "age-last" as const } : {}),
   };
 
-  // The vault's kind labels the card. The listing adds the owner and the
-  // vault's number; the detail page names the owner in its wallet row, and
-  // its heading the ilk and the vault's number or urn.
+  // The vault's kind labels the card. The listing adds the owner; the detail
+  // page names the owner in its wallet row.
   const name = vaultName(v);
   const identity = detail ? (
-    <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-      {v.ilk}
-      <PositionNameId name={name} />
-      <VaultKindChips v={v} />
-    </span>
+    <VaultKindChips v={v} />
   ) : (
     <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
       {v.owner ? (
@@ -274,11 +264,11 @@ export function makerVaultCardSlots({
       ) : (
         <span className="font-normal tabular-nums text-rb-400">—</span>
       )}
-      <VaultKindChips v={v} urn={false} />
+      <VaultKindChips v={v} />
     </span>
   );
-  // The listing's right end: the ilk and the vault's number.
-  const tag = detail ? undefined : (
+  // The ilk and the vault's number or urn as the tag on both surfaces (ui-jobs 807).
+  const tag = (
     <ListingTag
       market={v.ilk}
       id={
@@ -293,14 +283,14 @@ export function makerVaultCardSlots({
     />
   );
 
-  const common = { status, identity, counters, name };
+  const common = { status, identity, tag, counters, name };
   const menu: PositionCardMenu = {
     leading: () => <MakerMenuRows v={v} />,
     exports: exports ?? null,
   };
   const detailCommon = {
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: makerPositionModal(v.status, !!v.lse),
     menu,
   };
@@ -345,7 +335,7 @@ export function makerVaultCardSlots({
       dates: v.lastActivityAt != null ? [{ at: v.lastActivityAt }] : undefined,
       tip: endTip,
     };
-    if (!detail) return { ...common, heads, outcome, surface: "listing", menu: null, tag };
+    if (!detail) return { ...common, heads, outcome, surface: "listing", menu: null };
     return { ...common, ...detailCommon, heads, outcome };
   }
 
@@ -417,7 +407,7 @@ export function makerVaultCardSlots({
     },
   ];
 
-  if (!detail) return { ...common, heads, surface: "listing", menu: null, tag };
+  if (!detail) return { ...common, heads, surface: "listing", menu: null };
   return { ...common, ...detailCommon, heads, outcome: undefined, panel: makerdaoPanelColumns(v) };
 }
 
@@ -428,6 +418,7 @@ export function MakerVaultCard(props: MakerVaultCardProps) {
 
 /** Build a card view from a listing row (MakerVaultSummary, the api builder's presentation shape). */
 import type { MakerVaultSummary } from "@/lib/sources/api/makerdao-vaults";
+import { positionLink } from "@/lib/shared/position-link";
 export function viewFromSummary(s: MakerVaultSummary): MakerVaultView {
   return {
     cdpId: s.cdpId,

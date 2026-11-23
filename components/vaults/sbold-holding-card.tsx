@@ -158,6 +158,7 @@ export function SboldHoldingCard({ data, vaultHref }: { data: SboldHolding; vaul
           surface: "detail",
           heading: "Holding summary",
           status: null,
+          lifecycle: false,
           identity: (
             <span className="text-sm font-semibold text-foreground" data-card-vault-symbol={share}>
               <Link href={vaultHref} className="hover:underline" prefetch={false}>

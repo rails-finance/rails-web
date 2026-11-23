@@ -7,7 +7,7 @@
 // THE GRAIN IS THE PAIR: the card is one (owner, accountNumber), never an
 // owner. Dolomite is cross-margin WITHIN an account number and isolated
 // ACROSS them — one card per owner would assert a single collateralisation
-// across accounts that are independently liquidated. The identity slot carries
+// across accounts that are independently liquidated. The tag carries
 // Dolomite's own vocabulary: account 0 is the owner's "Dolomite Balance";
 // every other number is an isolated "Borrow Position".
 //
@@ -25,9 +25,9 @@
 // USD keys by MARKET ID (Dolomite's own key — symbols collide on this
 // roster), priced by the core's own getMarketPrice.
 
-import { useClosedPeaks, withPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
-import { PositionNameId } from "@/components/shared/position-name-id";
-import { positionName, type PositionName } from "@/lib/shared/position-name";
+import { mainAssetFigure, useClosedPeaks, withPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
+import { pickMainAsset } from "@/lib/shared/main-asset";
+import { listingTagId, positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import { ListingTag } from "@/components/shared/listing-tag";
@@ -174,9 +174,9 @@ function LegLines({ lines, side }: { lines: DolomiteBalanceAmount[]; side: "supp
   );
 }
 
-/** A closed card's per-market PEAK amounts (highest recorded PAR, the scaled
- *  balance, labeled so on hover), each traced; no USD (the oracle prices only
- *  the present). */
+/** A closed card's per-market PEAK amounts (in tokens, or the highest
+ *  recorded PAR labeled so on hover), each traced; no USD (the oracle prices
+ *  only the present). */
 function PeakLines({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply" | "debt" }) {
   return (
     <span className="flex flex-col gap-1">
@@ -233,38 +233,11 @@ export function DolomiteAccountLabel({ text, accountNumber }: { text: string; ac
   );
 }
 
-/** The account-grain identity: the owner (address) + which of its accounts
- *  this is, in Dolomite's own vocabulary. On the detail page the label
- *  explains itself on hover or tap (the listing card sits inside a link), and
- *  the owner is on the page's wallet row above the card (ui-jobs 228). */
-function AccountIdentity({ v, tip, name }: { v: DolomitePositionView; tip?: boolean; name: PositionName }) {
-  // The listing keeps the wallet alone on the left; the account's name is the
-  // card's right-end `tag`.
-  if (!tip) {
-    return <WalletPill wallet={v.owner} ensName={null} filterProtocol="dolomite" bookmark />;
-  }
-  // A borrow position is numbered by its account, so it reads as one name,
-  // "Borrow position #12", in Dolomite's noun.
-  if (/^Borrow Position #/.test(v.accountLabel)) {
-    return (
-      <span className="text-xs tabular-nums text-rb-400" data-position-name-id="">
-        <DolomiteAccountLabel text={`Borrow position ${name.id}`} accountNumber={v.accountNumber} />
-      </span>
-    );
-  }
-  return (
-    <span className="flex items-center gap-2">
-      <span className="text-xs text-rb-500">
-        {/* The account's kind ("Dolomite Balance", "Borrow position (WLFI
-            frontend account)"); its number follows in the position's name. */}
-        <DolomiteAccountLabel
-          text={v.accountLabel.replace(/ #\S+$/, "").replace(/^Borrow Position\b/, "Borrow position")}
-          accountNumber={v.accountNumber}
-        />
-      </span>
-      <PositionNameId name={name} />
-    </span>
-  );
+/** The account-grain identity on a listing: the owner's wallet. The position
+ *  page names the owner in its wallet row above the card (ui-jobs 228), and
+ *  both surfaces carry the account as the tag. */
+function AccountIdentity({ v }: { v: DolomitePositionView }) {
+  return <WalletPill wallet={v.owner} ensName={null} filterProtocol="dolomite" bookmark />;
 }
 
 export interface DolomitePositionCardProps {
@@ -278,8 +251,6 @@ export interface DolomitePositionCardProps {
   chainPending?: boolean;
   /** The card's Explanation section (narration describing the account NOW). */
   explanation?: React.ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** Detail-page captions (borrow rate), from the market-state read. */
   captions?: DolomiteCardCaptions;
   /** The ⋮'s export shapes. `null`: the ⋮ holds the account's rows and the
@@ -299,7 +270,6 @@ export function useDolomiteCardSlots({
   chain,
   chainPending = false,
   explanation,
-  viewHref,
   captions,
   exports,
   flows,
@@ -344,28 +314,58 @@ export function useDolomiteCardSlots({
     noun: nameParts.noun ?? POSITION_NOUN.dolomite,
     id: accountNumberId(v.accountNumber),
   });
-  const common = { status, identity: <AccountIdentity v={v} tip={detail} name={name} />, counters, name };
   const borrowId = /^Borrow Position #(.+)$/.test(v.accountLabel) ? accountNumberId(v.accountNumber) : undefined;
-  const tag = borrowId ? <ListingTag id={borrowId} /> : <ListingTag market={wlfi ? "WLFI" : v.accountLabel} />;
+  // The account as the tag on both surfaces (ui-jobs 807): a borrow
+  // position's number, else the account's name. The position page explains
+  // the account number on hover or tap.
+  const tagText = borrowId ? listingTagId(borrowId) : wlfi ? "WLFI" : v.accountLabel;
+  const tagNode = detail ? <DolomiteAccountLabel text={tagText} accountNumber={v.accountNumber} /> : tagText;
+  const tag = borrowId ? <ListingTag id={tagNode} /> : <ListingTag market={tagNode} />;
+  const common = { status, identity: detail ? undefined : <AccountIdentity v={v} />, tag, counters, name };
 
   // Closed / liquidated: every par is back at zero, so each side states the
-  // markets it held, and what each market lane held at its height, the highest
-  // recorded par, opens behind the press under the peak label (C19). The LIQUIDATED
+  // markets it held, and what each market lane held at its height (in tokens
+  // where the route states them, else the highest recorded par) opens behind
+  // the press under the peak label (C19). The LIQUIDATED
   // outcome appears only here: an open survivor never reaches this branch,
   // however many liquidations its meta cluster counts.
   let heads: PositionCardHead[];
   let outcome: PositionCardOutcome | undefined;
   if (v.status !== "open") {
-    const held = (lines: DolomitePeakAmount[], side: "supply" | "debt") =>
-      lines.length > 0
-        ? assetsHead(
-            side === "supply" ? CARD_VOCAB.peakCollateral : CARD_VOCAB.peakDebt,
-            lines.map((r) => ({ symbol: r.symbol, address: r.token ?? null })),
-            <span className="text-sm font-semibold tabular-nums text-foreground">
-              <PeakLines lines={lines} side={side} />
-            </span>,
-          )
-        : {};
+    const held = (lines: DolomitePeakAmount[], side: "supply" | "debt") => {
+      if (lines.length === 0) return {};
+      // The face states the largest market's peak where it is in tokens; a
+      // par peak stays behind the press (C19).
+      const inTokens = lines.filter((r) => r.tokens);
+      const pick = pickMainAsset(
+        inTokens.map((r) => ({ ...r, key: String(r.marketId) })),
+        v.priceByMarket,
+      );
+      const figure = pick
+        ? mainAssetFigure({
+            main: {
+              symbol: pick.main.symbol,
+              address: pick.main.token ?? null,
+              amount: pick.main.amount,
+              exact: formatUnitsExact(pick.main.amountRaw, pick.main.decimals),
+            },
+            receipt: dolomitePeakTokenProv(pick.main.symbol, side),
+            block: v.marketReadBy?.block ?? null,
+            // Par peaks are passed over with the unpriced ones.
+            skipped: lines.length - inTokens.length + pick.skipped,
+            side: side === "supply" ? "collateral" : "debt",
+            ranked: lines.length > 1,
+          })
+        : undefined;
+      return assetsHead(
+        side === "supply" ? CARD_VOCAB.peakCollateral : CARD_VOCAB.peakDebt,
+        lines.map((r) => ({ symbol: r.symbol, address: r.token ?? null })),
+        <span className="text-sm font-semibold tabular-nums text-foreground">
+          <PeakLines lines={lines} side={side} />
+        </span>,
+        figure,
+      );
+    };
     heads = withPeaks(
       [
         {
@@ -465,13 +465,13 @@ export function useDolomiteCardSlots({
     }
   }
 
-  if (!detail) return { ...common, heads, surface: "listing", menu: null, tag, outcome };
+  if (!detail) return { ...common, heads, surface: "listing", menu: null, outcome };
 
   const detailCommon = {
     ...common,
     heads,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore:
       v.status === "open"
         ? dolomitePositionContent({ status: v.status, hasDebt: v.borrows.length > 0 })

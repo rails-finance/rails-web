@@ -84,6 +84,7 @@ import { alchemixPriceAssets, alchemixPriceReason } from "@/lib/alchemix/price-l
 import { AlchemixEventCard } from "@/components/protocol/alchemix/alchemix-event-card";
 import {
   AlchemixIdentity,
+  AlchemixTag,
   NOT_SETTLED,
   alchemixAmountFigure,
   alchemixChip,
@@ -777,7 +778,8 @@ export function AlchemistPositionView({
   const cardSlots: PositionCardSlots = {
     surface: "detail",
     status: alchemixStatus(position.status),
-    identity: <AlchemixIdentity name={name.text} chain={position.chainName ?? `chain ${chainId}`} />,
+    tag: <AlchemixTag market={alchemixMarketWord(sym)} id={tokenId} />,
+    identity: <AlchemixIdentity chain={position.chainName ?? `chain ${chainId}`} />,
     name,
     heads,
     notice:
@@ -799,7 +801,6 @@ export function AlchemistPositionView({
         explanationProps && hasAlchemixPositionExplanation(explanationProps) ? (
           <AlchemixPositionExplanation {...explanationProps} />
         ) : null,
-      viewHref: tl.viewHref,
     },
     learnMore: live ? alchemixPositionContent(position.status, `${deployment.basePath}/info`) : null,
     menu: {

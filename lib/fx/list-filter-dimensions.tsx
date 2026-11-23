@@ -37,13 +37,20 @@ import type { FxPositionSort } from "@/lib/sources/api/fx-positions";
 import { FX_POOLS, FX_POOL_KEYS, isFxPoolKey, parseFxPositionSlug, type FxPoolKey } from "@/lib/fx/asset-catalog";
 import {
   defaultStatusChoice,
+  endedByLiquidation,
   FX_LIQUIDATED_BEFORE,
+  fxEndedParam,
   fxStatusFacets,
   liquidatedBefore,
   readFxStatusParam,
   statusChoice,
 } from "@/lib/fx/listing-visibility";
-import { setStatusChoice, STATUS_CHOICE_OPTIONS, type StatusChoice } from "@/lib/shared/status-choice";
+import {
+  ENDED_BY_LIQUIDATION,
+  setStatusChoice,
+  STATUS_CHOICE_OPTIONS,
+  type StatusChoice,
+} from "@/lib/shared/status-choice";
 import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 
@@ -68,6 +75,9 @@ export interface FxListFilters extends BaseListFilters {
   /** "" | "liquidated" — positions liquidated at least once; with All only.
    *  URL param `liq`. */
   liquidations: string[];
+  /** "" | "liquidated" — with Closed, the positions that ended by
+   *  liquidation. URL param `ended`. */
+  ended: string[];
   /** Pool keys the position must belong to (multi, OR). */
   pools: string[];
   /** Debt range in fxUSD, one encodeRange value (`1000-50000`, `-0` for no
@@ -88,6 +98,7 @@ export const FX_LIST_DEFAULTS: FxListFilters = {
   sortOrder: "desc",
   status: [],
   liquidations: [],
+  ended: [],
   pools: [],
   debt: [],
   coll: [],
@@ -147,8 +158,24 @@ export function fxListDimensions(): SerializableDimension<FxListFilters>[] {
             narrows: "all",
           },
         );
-        return { ...f, status: s.status, liquidations: s.ended };
+        // "Closed by liquidation" stays with Closed alone.
+        const choice = read.choice ?? defaultStatusChoice(f);
+        return { ...f, status: s.status, liquidations: s.ended, ended: choice === "closed" ? f.ended : [] };
       },
+    },
+    {
+      id: "ended",
+      label: "Closed by liquidation",
+      // Its own group, for its pill; in the panel it sits under Status.
+      group: "Closed by liquidation",
+      cardinality: "single",
+      param: "ended",
+      options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
+      // Offered with Closed, which it narrows.
+      available: (f) => statusChoice(f) === "closed",
+      get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
+      set: (f, v) => ({ ...f, ended: v }),
+      chipLabel: () => "Closed by liquidation",
     },
     {
       id: "pools",
@@ -214,6 +241,8 @@ export function fxFiltersToFetchParams(filters: FxListFilters, page: number): Fe
     pools: pools.length > 0 ? pools : undefined,
     // All maps to no status filter, or to `liquidated` with "Liquidated before".
     status: fxStatusFacets(filters),
+    // With Closed, the positions whose last action was a liquidation.
+    ended: fxEndedParam(filters),
     ...sizeBounds(filters, { debt: "unit", coll: "usd" }),
     ...transactionBounds(filters.tx),
     sortBy,

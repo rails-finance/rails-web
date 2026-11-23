@@ -9,6 +9,7 @@ import { Image as ImageIcon, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { shortPositionId } from "@/lib/shared/position-name";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
+import { positionLink } from "@/lib/shared/position-link";
 
 function useCopied(): [string | null, (key: string, value: string) => void] {
   const [copied, setCopied] = useState<string | null>(null);
@@ -53,7 +54,7 @@ export function TroveMenuRows({
         icon={copied === "link" ? <Icon name="check" size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this Trove"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}${pagePath}`)}
+        onClick={() => copy("link", positionLink(pagePath))}
       />
     </>
   );

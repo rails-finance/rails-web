@@ -10,6 +10,7 @@
 // Every figure is read when the page opens; the read stamp names the blocks.
 
 import { Prov } from "@/components/shared/provenance";
+import { ListingTag } from "@/components/shared/listing-tag";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import {
   PositionCard,
@@ -148,14 +149,8 @@ function slots(r: FluidBasePositionRead): PositionCardSlots {
     surface: "detail",
     heading: CARD_WORDS.heading,
     status: p.isLiquidated ? { word: "Liquidated", tone: "danger" } : null,
-    identity: (
-      <span className="text-xs font-semibold text-rb-500">
-        {name.market}
-        <span className="ml-2 font-normal tabular-nums text-rb-400">
-          {name.noun} {name.id}
-        </span>
-      </span>
-    ),
+    // The pair and the position id as the tag, as Fluid's listing names them.
+    tag: <ListingTag market={`${p.colUnit} / ${p.debtUnit}`} id={p.id} />,
     name,
     heads,
     counters: null,

@@ -71,6 +71,7 @@ import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { FigureSlot } from "@/components/shared/skeleton-card";
+import { positionLink } from "@/lib/shared/position-link";
 
 export interface SparkPositionView {
   wallet: string;
@@ -339,7 +340,7 @@ function SparkMenuRows({ wallet }: { wallet: string }) {
       title="Link to this position"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() => {
-        void navigator.clipboard.writeText(`${window.location.origin}/ethereum/spark/${wallet}`).then(() => {
+        void navigator.clipboard.writeText(positionLink(`/ethereum/spark/${wallet}`)).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         });
@@ -395,8 +396,6 @@ export interface SparkPositionCardProps {
   outcomeAt?: number;
   /** The (i) pane's prose. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes; `null` leaves the link and the provenance row. */
   exports?: PositionCardExports | null;
   /** The page's Lifetime flows timeline and its read: a closed card's peak
@@ -414,7 +413,6 @@ export function useSparkCardSlots({
   lives,
   outcomeAt,
   explanation,
-  viewHref,
   exports,
   flows,
 }: SparkPositionCardProps): PositionCardSlots {
@@ -650,7 +648,7 @@ export function useSparkCardSlots({
   const detailCommon = {
     ...common,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: ended ? sparkPositionModal(v.status) : sparkPositionModal(v.status, v.borrows.length > 0),
     menu: { leading: () => <SparkMenuRows wallet={v.wallet} />, exports: exports ?? null },
   };

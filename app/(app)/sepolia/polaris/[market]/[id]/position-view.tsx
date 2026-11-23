@@ -428,7 +428,6 @@ export default function PolarisPositionView({
                   v={view}
                   lifetime={lifetime}
                   againstHolding={againstHolding}
-                  viewHref={tl.viewHref}
                   exports={exports ?? undefined}
                   explanationDefaultOpen={explanationOpen}
                   onExplanationToggle={setExplanationOpen}

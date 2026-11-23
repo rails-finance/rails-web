@@ -69,6 +69,7 @@ import type {
   CompoundCurrentBase,
 } from "@/lib/sources/api/compound-positions";
 import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
+import { positionLink } from "@/lib/shared/position-link";
 
 /** Highest-recorded amounts over a position's life (closed/liquidated cards). */
 interface CompoundPeak {
@@ -299,35 +300,6 @@ function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
   );
 }
 
-/** Identity cluster (owner + market label). The pill links to the session's
- *  wallet-filtered listing only where the session HAS a listing — the Base
- *  explorer opens on a wallet and has no list to filter. */
-function CompoundIdentity({
-  v,
-  session,
-  wallet = true,
-  listing = false,
-}: {
-  v: CompoundPositionView;
-  session: SessionProtocol;
-  /** False on the detail page, whose wallet row above the card names the
-   *  owner (ui-jobs 228). */
-  wallet?: boolean;
-  listing?: boolean;
-}) {
-  const market = <span className="text-xs font-semibold text-rb-500">{v.marketLabel}</span>;
-  // The listing keeps the wallet on the left and the market in the card's `tag`.
-  if (listing) {
-    return <WalletPill wallet={v.account} ensName={null} filterProtocol={session} bookmark />;
-  }
-  return (
-    <span className="flex items-center gap-2">
-      {wallet && <WalletPill wallet={v.account} ensName={null} filterProtocol={session} bookmark />}
-      {market}
-    </span>
-  );
-}
-
 /** The position's row at the head of the card's ⋮: a link to its page. A
  *  Comet position has no ID or NFT of its own; it is (market, wallet). */
 function CompoundMenuRows({ pagePath }: { pagePath: string }) {
@@ -338,7 +310,7 @@ function CompoundMenuRows({ pagePath }: { pagePath: string }) {
       title="Link to this account"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() => {
-        void navigator.clipboard.writeText(`${window.location.origin}${pagePath}`).then(() => {
+        void navigator.clipboard.writeText(positionLink(pagePath)).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         });
@@ -382,8 +354,6 @@ export interface CompoundPositionCardProps {
   peaks?: boolean;
   /** The (i) pane's prose. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The position page's path, for the ⋮'s link row. */
   pagePath?: string;
   /** The ⋮'s export shapes; `null` leaves the link and provenance rows. */
@@ -400,7 +370,6 @@ export function useCompoundCardSlots({
   lane = {},
   peaks = true,
   explanation,
-  viewHref,
   pagePath,
   exports,
 }: CompoundPositionCardProps): PositionCardSlots {
@@ -425,7 +394,12 @@ export function useCompoundCardSlots({
         : v.status === "unread"
           ? { word: "Not loaded", tone: "muted" }
           : null;
-  const identity = <CompoundIdentity v={v} session={session} wallet={!detail} listing={!detail} />;
+  // The market as the tag on both surfaces (ui-jobs 807); the listing names
+  // the wallet after it, the detail page's wallet row above the card does
+  // (ui-jobs 228).
+  const identity = detail ? undefined : (
+    <WalletPill wallet={v.account} ensName={null} filterProtocol={session} bookmark />
+  );
   const tag = <ListingTag market={v.marketLabel} />;
   const counters: PositionCardMetaProps = {
     lastActivityAt: v.lastActivityAt,
@@ -760,8 +734,8 @@ export function useCompoundCardSlots({
       : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
   // The position's name (ui-jobs 703): the market and the account.
   const name = positionName({ market: v.marketLabel, noun: POSITION_NOUN[session], id: v.account });
-  const common = { status, heads: detail ? heads.map(tipped) : heads, identity, counters, outcome, name };
-  if (!detail) return { ...common, surface: "listing", menu: null, tag };
+  const common = { status, heads: detail ? heads.map(tipped) : heads, identity, tag, counters, outcome, name };
+  if (!detail) return { ...common, surface: "listing", menu: null };
 
   const menu: PositionCardMenu = {
     leading: pagePath ? () => <CompoundMenuRows pagePath={pagePath} /> : undefined,
@@ -771,7 +745,7 @@ export function useCompoundCardSlots({
   const detailCommon = {
     ...common,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: compoundPositionModal({ status: v.status, deployment, side: ended ? undefined : eff.side }),
     menu,
   };

@@ -8,6 +8,7 @@ import { Hash, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { shortAddr } from "@/lib/shared/format-event";
+import { positionLink } from "@/lib/shared/position-link";
 
 export function MapleMenuRows({
   address,
@@ -43,7 +44,7 @@ export function MapleMenuRows({
         icon={copied === "link" ? <Icon name="check" size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title={`Link to this ${noun}`}
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}${pagePath}`)}
+        onClick={() => copy("link", positionLink(pagePath))}
       />
     </>
   );

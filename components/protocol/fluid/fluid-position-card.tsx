@@ -212,8 +212,6 @@ export interface FluidPositionCardProps {
   chainPending?: boolean;
   /** The card's Explanation section (narration describing the position NOW). */
   explanation?: ReactNode;
-  /** Copy-this-view control, the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes (`fluidExports`). */
   exports?: PositionCardExports | null;
 }
@@ -227,27 +225,19 @@ export function fluidCardSlots({
   chain = null,
   chainPending = false,
   explanation,
-  viewHref,
   exports,
 }: FluidPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
   const pairText = fluidPairText(v, chain);
   // The position's name (ui-jobs 703): the pair and the NFT id.
   const name = positionName({ market: pairText, noun: POSITION_NOUN.fluid, id: v.nftId });
-  // The position type and the share pair are labels the figures do not carry
-  // (ui-jobs 270 item 6): the pair, the position's name and the vault kind.
-  const typeLabel = (
-    <span className="text-xs font-semibold text-rb-500">
-      {name.market}
-      <span className="ml-2 font-normal tabular-nums text-rb-400">
-        {name.noun} {name.id} · {v.vaultKindLabel}
-      </span>
-    </span>
-  );
-  // The listing names the owner and the vault kind on the left and the pair
-  // and NFT at the right end; the position page's wallet row names the owner.
+  // The pair and the NFT id as the tag on both surfaces (ui-jobs 807); the
+  // vault kind after it, a label the figures do not carry (ui-jobs 270 item
+  // 6). The listing names the owner first; the position page's wallet row
+  // names the owner.
+  const kind = <span className="text-xs font-normal tabular-nums text-rb-400">{v.vaultKindLabel}</span>;
   const identity = detail ? (
-    typeLabel
+    kind
   ) : (
     <span className="contents">
       {v.owner ? (
@@ -255,10 +245,10 @@ export function fluidCardSlots({
       ) : (
         <span className="font-normal tabular-nums text-rb-400">—</span>
       )}
-      <span className="text-xs font-normal tabular-nums text-rb-400">{v.vaultKindLabel}</span>
+      {kind}
     </span>
   );
-  const tag = detail ? undefined : <ListingTag market={pairText} id={v.nftId} />;
+  const tag = <ListingTag market={pairText} id={v.nftId} />;
   const counters = {
     lastActivityAt: v.lastActivityAt,
     eventCount: v.txCount,
@@ -271,7 +261,7 @@ export function fluidCardSlots({
       ? { word: "Liquidated", tone: "danger" }
       : { word: "Closed", tone: "muted" }
     : null;
-  const common = { status, identity, counters, name };
+  const common = { status, identity, tag, counters, name };
 
   if (closed) {
     // The settled figures have gone to zero, so the headline is what each leg
@@ -312,13 +302,13 @@ export function fluidCardSlots({
           <div className="text-xs text-rb-500 mt-0.5">each peak at its own date</div>
         ) : undefined,
     };
-    if (!detail) return { ...common, surface: "listing", menu: null, tag, heads, outcome };
+    if (!detail) return { ...common, surface: "listing", menu: null, heads, outcome };
     return {
       ...common,
       surface: "detail",
       heads,
       outcome,
-      explainer: { body: explanation ?? null, viewHref },
+      explainer: { body: explanation ?? null },
       learnMore: fluidPositionContent({
         status: "closed",
         wasLiquidated: v.wasLiquidated,
@@ -371,7 +361,7 @@ export function fluidCardSlots({
     heads.push({ id: "position-ratio", label: "Debt to collateral ratio", value: null, pending: true });
   }
 
-  if (!detail) return { ...common, surface: "listing", menu: null, tag, heads };
+  if (!detail) return { ...common, surface: "listing", menu: null, heads };
 
   const left = [sigmaRow(v, "supply", chain), sigmaRow(v, "borrow", chain)].filter(
     (r): r is PositionPanelRow => r != null,
@@ -455,7 +445,7 @@ export function fluidCardSlots({
     surface: "detail",
     heads,
     panel: [left, right],
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: fluidPositionContent({ status: "open", hasDebt }),
     menu: fluidMenu(v, exports),
   };

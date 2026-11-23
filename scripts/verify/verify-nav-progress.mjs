@@ -247,12 +247,8 @@ const browser = await chromium.launch();
     );
   };
 
-  await quietCase("the copy button inside a row link", () =>
-    page.locator(`${ROW} button[aria-label="Copy address"]`).first().click(),
-  );
-  await quietCase("the bookmark star inside a row link", () =>
-    page.locator(`${ROW} button[aria-label="Save wallet"]`).first().click(),
-  );
+  // A listing row draws no copy button and no bookmark toggle (ui-jobs 807),
+  // so the row's controls are not pressed here.
 
   await quietCase("a hash-only link", () => page.click("#vnp-hash"));
   const hashed = await page.evaluate(() => location.hash);

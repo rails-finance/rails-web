@@ -53,3 +53,8 @@ export function usePositionCardIdentity(): PositionCardIdentity | null {
     hue: protocolBrand(entry.id)?.hue ?? null,
   };
 }
+
+/** True inside a listing row's header: the row is one link, so the wallet
+ *  pill (C7) draws no copy and no bookmark toggle, only a filled bookmark
+ *  where the address is saved (ui-jobs 807). */
+export const ListingRowContext = createContext(false);

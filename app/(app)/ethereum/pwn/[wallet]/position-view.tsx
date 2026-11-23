@@ -507,7 +507,6 @@ export default function PwnLoanView({
                   viewer={wallet}
                   surface="detail"
                   exports={exports}
-                  viewHref={tl.viewHref}
                   explanation={<PwnPositionExplanation v={view} wallet={wallet} />}
                 />
                 {/* Lifetime flows: the bars and the line over the loan's replay

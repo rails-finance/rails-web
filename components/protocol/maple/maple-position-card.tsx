@@ -309,8 +309,6 @@ export interface MaplePositionCardProps {
   cancelledRequests?: number;
   /** The card's Explanation section (narration describing the position NOW). */
   explanation?: ReactNode;
-  /** Copy-this-view control: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** Detail-page stat captions (earned interest), computed from the event
    *  stream and the pool chain read (computeMapleCardCaptions). */
   captions?: MapleCardCaptions;
@@ -325,7 +323,6 @@ export function mapleCardSlots({
   surface,
   cancelledRequests,
   explanation,
-  viewHref,
   captions,
   exports,
 }: MaplePositionCardProps): PositionCardSlots {
@@ -383,7 +380,7 @@ export function mapleCardSlots({
       heads,
       outcome,
       surface: "detail",
-      explainer: { body: explanation ?? null, viewHref },
+      explainer: { body: explanation ?? null },
       learnMore: maplePositionContent({ status: "closed" }),
       menu: { leading: menuLeading, exports: exports ?? null },
     };
@@ -478,7 +475,7 @@ export function mapleCardSlots({
     ...common,
     heads,
     surface: "detail",
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: maplePositionContent({ status: "open", inQueue: v.inQueue }),
     menu: { leading: menuLeading, exports: exports ?? null },
     panel: [[...shareRows, ...interestRows(captions, it0 ? poolReadBy(v, it0) : undefined)], queueRows],

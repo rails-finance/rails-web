@@ -55,6 +55,7 @@ import { withoutFirst, type AssetMark } from "@/lib/shared/asset-mark";
 import { PeakLine, type PeakHeadFigure } from "@/components/shared/closed-peak";
 import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
 import {
+  ListingRowContext,
   PositionCardEdgeContext,
   usePositionCardIdentity,
   type PositionCardIdentity,
@@ -271,6 +272,12 @@ interface PositionCardSlotsCommon {
    *  the right end of the heading row; listing after the pill, as Liquity
    *  V2's listing draws its owner. */
   identity?: ReactNode;
+  /** The position's market and ID (`ListingTag`), after the status pill on
+   *  both surfaces (ui-jobs 807). */
+  tag?: ReactNode;
+  /** `false` on a card with no open/closed life (a vault, a holding, an
+   *  account, a redeemer): no lifecycle pill, so a live card draws no OPEN. */
+  lifecycle?: false;
   /** A line above the headlines that stays in view: a deprecation banner, a
    *  running challenge, a refused reason. */
   notice?: ReactNode;
@@ -335,9 +342,6 @@ export interface PositionCardListingSlots extends PositionCardSlotsCommon {
    *  one link and its position's actions live in the page's ⋮ (Miles,
    *  17 Oct 2026). A menu here must stop a press from reaching the <Link>. */
   menu: ReactNode | null;
-  /** The position's market and ID, at the right end of the heading row (where
-   *  a detail card draws its identity); `identity` keeps the holder on the left. */
-  tag?: ReactNode;
   /** Present on a closed position. */
   outcome?: PositionCardOutcome;
   /** What stands where the lifecycle pill does, on a row that is not a
@@ -517,27 +521,23 @@ function PositionCardRow({
   );
 }
 
-/** The small tag at the left of a detail card's heading row, with its "?". */
-function StatusTag({ status }: { status: PositionCardStatus }) {
+/** A detail card's lifecycle pill, the listing's (ui-jobs 807), with the
+ *  status's "?" beside it. */
+function DetailPill({ status }: { status: PositionCardStatus | null }) {
   return (
     <span className="inline-flex items-center">
-      <span
-        className={`rounded-xs px-1.5 py-0.5 text-[11px] font-semibold ${POSITION_TAG_TONE[status.tone]}`}
-        data-anatomy={status.anatomy ? `C6 ${status.anatomy}` : "C6"}
-      >
-        {status.prov ? <Prov info={status.prov}>{status.word}</Prov> : status.word}
-      </span>
-      {status.tip && <RowHelp tip={status.tip} name={status.word} />}
+      <StatusPill status={status} />
+      {status?.tip && <RowHelp tip={status.tip} name={status.word} />}
     </span>
   );
 }
 
 const OPEN_PILL = "bg-positive/20 text-positive";
 
-/** The listing's lifecycle pill: OPEN for a live position, else the status
- *  word in capitals. On the wallet view an open position draws none, AT RISK
- *  excepted (`PositionCardEdge`). */
-function ListingPill({ status }: { status: PositionCardStatus | null }) {
+/** The lifecycle pill on both surfaces: OPEN for a live position, else the
+ *  status word in capitals. On the wallet view an open position draws none,
+ *  AT RISK excepted (`PositionCardEdge`). */
+function StatusPill({ status }: { status: PositionCardStatus | null }) {
   const edge = useContext(PositionCardEdgeContext);
   if (!status && edge?.atRisk)
     return (
@@ -997,24 +997,26 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             aligned (ui-jobs 430). */}
         <span className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 ${wallet ? "[&>:empty]:hidden" : ""}`}>
           {protocolMark}
+          {/* One order on both surfaces (ui-jobs 807): the pill, the market
+              and ID, then the identity. */}
           {detail ? (
             <>
+              {/* A card with no lifecycle draws no OPEN; a status word stands. */}
+              {(slots.status || slots.lifecycle !== false) && <DetailPill status={slots.status} />}
               {/* `contents`: the wrapper names the identity for a saved
                   position's default name without taking part in the row. */}
               <span className="contents" data-card-identity="">
+                {slots.tag}
                 {slots.identity}
               </span>
-              {slots.status && <StatusTag status={slots.status} />}
               {/* The block and time of the read behind the figures (ui-jobs 512). */}
               <PositionReadStamp />
             </>
           ) : (
             <>
-              {slots.lead ?? <ListingPill status={slots.status} />}
+              {slots.lead ?? <StatusPill status={slots.status} />}
+              {slots.tag && <QuietTipsContext.Provider value={true}>{slots.tag}</QuietTipsContext.Provider>}
               {slots.identity}
-              {/* The wallet view draws the market and ID at the left, the
-                  read's stamp at the right. */}
-              {wallet && slots.tag && <QuietTipsContext.Provider value={true}>{slots.tag}</QuietTipsContext.Provider>}
             </>
           )}
         </span>
@@ -1041,11 +1043,11 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             {chainPill && <span className={`${slots.stamp ? "" : "max-md:ml-auto "}${narrowOnly}`}>{chainPill}</span>}
           </span>
         ) : (
-          ((!wallet && slots.tag) || (wallet && edge?.stamp) || chainPill) && (
+          ((wallet && edge?.stamp) || chainPill) && (
             // Quiet like the figures: the listing card is one link.
             <QuietTipsContext.Provider value={true}>
               <span className="ml-auto flex items-center gap-2">
-                {wallet ? edge?.stamp && <span className="-my-1.5 flex items-center">{edge.stamp}</span> : slots.tag}
+                {wallet && edge?.stamp && <span className="-my-1.5 flex items-center">{edge.stamp}</span>}
                 {chainPill}
               </span>
             </QuietTipsContext.Provider>
@@ -1060,7 +1062,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
 
   const body = (
     <div {...(closed ? { "data-anatomy": "C11" } : {})}>
-      {header}
+      {detail ? header : <ListingRowContext.Provider value={true}>{header}</ListingRowContext.Provider>}
       {/* A listing card is one link: its figures and labels open no tips
           (the position page keeps them). */}
       <QuietTipsContext.Provider value={!detail}>

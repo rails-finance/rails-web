@@ -24,7 +24,6 @@ import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { sboldDepositorVault } from "@/lib/liquity-v2/sbold";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { ListingTag } from "@/components/shared/listing-tag";
-import { PositionNameId } from "@/components/shared/position-name-id";
 import { positionName } from "@/lib/shared/position-name";
 import {
   LIQUITY_V2_SP,
@@ -49,6 +48,7 @@ import { TINY_AMOUNT_FLOOR_TEXT } from "@/lib/utils/format";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import { RawFigure, tokenIcon } from "./sp-parts";
 import { WithdrawalWords } from "./sp-liquidations";
+import { positionLink } from "@/lib/shared/position-link";
 
 const NOUN = "Deposit";
 const ZERO = BigInt(0);
@@ -103,9 +103,7 @@ function DepositMenuRows({ row, dep }: { row: LiquityV2DepositRow<string>; dep: 
         icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this deposit"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() =>
-          copy("link", `${window.location.origin}${spDepositHref(dep, row.collateral_type, row.depositor)}`)
-        }
+        onClick={() => copy("link", positionLink(spDepositHref(dep, row.collateral_type, row.depositor)))}
       />
     </>
   );
@@ -137,6 +135,8 @@ export function liquityV2DepositSlots({
     tokenIcon(symbol, address, raw, size, dep.chainId);
   const closed = row.status === "closed";
   const name = positionName({ market: b, noun: NOUN, id: row.depositor });
+  // The branch and the depositor as the tag on both surfaces (ui-jobs 807).
+  const tag = <ListingTag market={b} id={row.depositor} />;
   const counters = {
     lastActivityAt: Number(row.last_timestamp),
     eventCount: Number(row.tx_count),
@@ -242,16 +242,10 @@ export function liquityV2DepositSlots({
       counters,
       name,
       menu: null,
-      tag: <ListingTag market={b} id={row.depositor} />,
+      tag,
     };
   }
 
-  const identity = (
-    <span className="flex items-center gap-2">
-      <span className="text-xs text-rb-500">{b} Stability Pool</span>
-      <PositionNameId name={name} />
-    </span>
-  );
   const menu = { leading: () => <DepositMenuRows row={row} dep={dep} />, noun: "deposit", exports: null };
   const explainer = { body: explanation ?? null };
 
@@ -300,7 +294,7 @@ export function liquityV2DepositSlots({
       surface: "detail",
       status,
       heads,
-      identity,
+      tag,
       counters,
       name,
       explainer,
@@ -411,7 +405,7 @@ export function liquityV2DepositSlots({
     surface: "detail",
     status,
     heads,
-    identity,
+    tag,
     counters,
     name,
     explainer,

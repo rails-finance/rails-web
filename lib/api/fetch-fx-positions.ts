@@ -15,6 +15,9 @@ export interface FetchFxPositionsParams {
   owner?: string;
   pools?: FxPoolKey[];
   status?: (FxPositionStatus | "liquidated")[];
+  /** "liquidated": with `status=closed`, the positions that ended by
+   *  liquidation. Never sent empty (the route answers that with a 400). */
+  ended?: "liquidated";
   /** Inclusive bounds on the position's settled debt in fxUSD and its
    *  collateral in USD; any one alone. */
   minDebt?: number;
@@ -46,6 +49,7 @@ export async function fetchFxPositions(p: FetchFxPositionsParams): Promise<FxPos
   if (p.owner) qs.set("owner", p.owner);
   if (p.pools && p.pools.length > 0) qs.set("pools", p.pools.join(","));
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
+  if (p.ended) qs.set("ended", p.ended);
   for (const k of ["minDebt", "maxDebt", "minCollUsd", "maxCollUsd", "minTx", "maxTx"] as const) {
     if (p[k] != null) qs.set(k, String(p[k]));
   }

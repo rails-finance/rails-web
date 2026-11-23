@@ -842,7 +842,6 @@ export default function SparkPositionDetail({
               <SparkPositionCard
                 v={cardView ?? liveView}
                 surface="detail"
-                viewHref={tl.viewHref}
                 outcomeAt={lastLiquidationAt}
                 notCollateral={notCollateral}
                 lives={lives}

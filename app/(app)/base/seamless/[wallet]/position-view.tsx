@@ -677,7 +677,6 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                   <AaveV3PositionCard
                     v={view}
                     receipts
-                    viewHref={tl.viewHref}
                     deployment={SEAMLESS_LIVE_CARD_DEPLOYMENT}
                     captions={captions ?? undefined}
                     // The Pool read's room to borrow and eMode go in the panel,

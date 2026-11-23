@@ -85,6 +85,7 @@ import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { shownUsd } from "@/lib/shared/holder-usd-receipt";
 import { aaveV3PriceOf, aaveV3UsdOf, type AaveV3UsdRows } from "@/lib/aave-v3/usd-receipt";
 import type { AaveV3Face } from "@/lib/aave-v3/price-notes";
+import { positionLink } from "@/lib/shared/position-link";
 
 /** One reserve the wallet holds on a given side, scaled to display units. The
  *  `amountRaw` integer wei string backs the exact reveal (the raw chain figure). */
@@ -98,6 +99,9 @@ export interface AaveV3ReserveAmount {
    *  is never shown (see AaveV3ReserveSummary.decimalsUnread). */
   decimalsUnread?: true;
 }
+
+/** The listing row's mark where its account has an event after the refresh. */
+const AAVE_V3_CHANGED_SINCE_REFRESH = "changed since the refresh";
 
 export interface AaveV3PositionView {
   wallet: string;
@@ -138,6 +142,9 @@ export interface AaveV3PositionView {
   /** The listing row's newest event: the block the index's balances stand at
    *  (mv_aave_v3_positions, refreshed about hourly). */
   indexBlock?: number;
+  /** A listing row whose account has an event after `indexBlock`: the newest
+   *  event's block (ui-jobs 806 follow-up). */
+  changedAfterIndex?: number;
   /** The position page holds the balances back: the event tail has an event
    *  after `indexBlock` and the Pool read has not answered yet (ui-jobs 806). */
   figuresHeld?: boolean;
@@ -296,7 +303,7 @@ function AaveV3MenuRows({ pagePath }: { pagePath: string }) {
       title="Link to this position"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() =>
-        void navigator.clipboard.writeText(`${window.location.origin}${pagePath}`).then(() => {
+        void navigator.clipboard.writeText(positionLink(pagePath)).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         })
@@ -320,8 +327,6 @@ export interface AaveV3PositionCardProps {
   receipts?: boolean;
   /** The card's (i) Explanation. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** Detail-page figures (accrued interest, borrow rate) — computed from the
    *  event stream + live Pool read (computeAaveV3CardCaptions). */
   captions?: AaveV3CardCaptions;
@@ -359,7 +364,6 @@ export function useAaveV3CardSlots({
   v,
   receipts = false,
   explanation,
-  viewHref,
   captions,
   chain,
   hfPending = false,
@@ -386,26 +390,32 @@ export function useAaveV3CardSlots({
   const marketTitle = marketLabel
     ? `${marketLabel} is one of the Aave V3 markets on Ethereum. Each market is a separate account with a separate health factor.`
     : undefined;
-  const marketBadge = marketLabel ? (
-    <span
-      className="text-xs font-semibold text-rb-500 header-badge-tip focus-ring rounded-sm"
-      title={marketTitle}
-      data-tooltip={marketTitle}
-      tabIndex={detail ? 0 : undefined}
-    >
-      {marketLabel}
-    </span>
-  ) : null;
+  // The market in the tag on both surfaces (ui-jobs 807); the position page
+  // keeps its tip.
+  const tag = !marketLabel ? undefined : (
+    <ListingTag
+      market={
+        detail ? (
+          <span
+            className="header-badge-tip focus-ring rounded-sm"
+            title={marketTitle}
+            data-tooltip={marketTitle}
+            tabIndex={0}
+          >
+            {marketLabel}
+          </span>
+        ) : (
+          marketLabel
+        )
+      }
+    />
+  );
   // The listing names the wallet on the left (its controls are buttons, which
-  // can sit inside the row's <Link>) and the market at the right end; the
-  // position page names the wallet in its top row (ui-jobs 228) and keeps the
-  // market at the heading's right end.
-  const identity = detail ? (
-    (marketBadge ?? undefined)
-  ) : (
+  // can sit inside the row's <Link>); the position page names the wallet in
+  // its top row (ui-jobs 228).
+  const identity = detail ? undefined : (
     <WalletPill wallet={v.wallet} ensName={null} filterProtocol={dep.session} bookmark />
   );
-  const tag = detail || !marketLabel ? undefined : <ListingTag market={marketLabel} />;
   // The position's name (ui-jobs 703): the market and the account's wallet.
   const name = positionName({ market: marketLabel, noun: POSITION_NOUN[dep.session], id: v.wallet });
 
@@ -418,6 +428,17 @@ export function useAaveV3CardSlots({
     countRule: v.countRule,
     liquidationRule: v.liquidationRule,
     ...(detail ? { order: "age-last" as const } : {}),
+    // A listing row whose account moved after the hourly refresh says so; the
+    // position page reads the account at head.
+    ...(!detail && v.changedAfterIndex != null
+      ? {
+          extra: (
+            <span className="text-xs text-rb-500" data-row-changed-after={v.changedAfterIndex}>
+              {AAVE_V3_CHANGED_SINCE_REFRESH}
+            </span>
+          ),
+        }
+      : {}),
   };
 
   // The "?" every state panel owns — the same content function serves Aave V3
@@ -432,7 +453,7 @@ export function useAaveV3CardSlots({
     leading: () => <AaveV3MenuRows pagePath={pagePathOf(dep.session, v)} />,
     exports: exports ?? null,
   };
-  const explainer = { body: explanation ?? null, viewHref };
+  const explainer = { body: explanation ?? null };
   const isOther = (r: AaveV3ReserveAmount) => notCollateral?.has(r.address.toLowerCase()) === true;
 
   // The Pool read failed while the event tail is ahead of the index row.
@@ -543,13 +564,14 @@ export function useAaveV3CardSlots({
       status,
       heads: withPeaks([supplyHead, debtHead], peakOf, detail),
       identity,
+      tag,
       counters,
       outcome: {
         word: liquidated ? "Liquidated" : "Closed",
         dates: v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined,
       },
     };
-    if (!detail) return { ...common, surface: "listing", menu: null, tag };
+    if (!detail) return { ...common, surface: "listing", menu: null };
     return {
       ...common,
       surface: "detail",
@@ -725,8 +747,8 @@ export function useAaveV3CardSlots({
     trailNotice
   );
 
-  const common = { status, heads, identity, counters, notice, name };
-  if (!detail) return { ...common, surface: "listing", menu: null, tag };
+  const common = { status, heads, identity, tag, counters, notice, name };
+  if (!detail) return { ...common, surface: "listing", menu: null };
 
   // ── Each side's reserve rows, and the panel: the supplied side's values
   //    on the left, the borrowed side's and the risk on the right.
@@ -920,7 +942,6 @@ export function useAaveV3CardSlots({
   const emodeIdentity =
     emode && chainPool ? (
       <span className="flex items-center gap-2">
-        {marketBadge}
         <span className="text-xs font-semibold text-rb-500" data-emode={emode.id}>
           E-Mode: <Prov info={userEmodeProv(emode.label, chainPool)}>{emode.label}</Prov>
         </span>
@@ -1165,6 +1186,9 @@ export function viewFromSummary(row: AaveV3PositionRow): AaveV3PositionView {
     // A Base lender's row names the block its chain figures were read at.
     atBlock: row.chainBlock ?? undefined,
     indexBlock: row.lastBlockNumber,
+    ...(row.latestEventBlock != null && row.latestEventBlock > row.lastBlockNumber
+      ? { changedAfterIndex: row.latestEventBlock }
+      : {}),
     // A listing view never carries a health factor (0018): the row's snapshot
     // HF is not read, and the position page's live read is the only one
     // the card shows.

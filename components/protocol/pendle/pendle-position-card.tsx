@@ -13,6 +13,7 @@ import { POSITION_NOUN } from "@/lib/shared/protocols";
 import Link from "next/link";
 import { Store } from "lucide-react";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
+import { ListingTag } from "@/components/shared/listing-tag";
 import type { PositionPanelRow } from "@/components/shared/position-card-panel";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { Prov } from "@/components/shared/provenance";
@@ -391,18 +392,21 @@ export function PendlePositionCard({
     exports: null,
   };
 
-  const identity = (
-    <span className="inline-flex flex-wrap items-center gap-2">
-      <Link
-        href={pendleMarketHref(t.market.address)}
-        className="text-xs font-semibold text-foreground hover:underline"
-        data-pendle-market-link={t.market.address}
-      >
-        {marketName(t)}
-      </Link>
-      <UnderlyingLabel p={p} />
-    </span>
+  // The market as the tag, linked to its page; the underlying's label after it.
+  const tag = (
+    <ListingTag
+      market={
+        <Link
+          href={pendleMarketHref(t.market.address)}
+          className="hover:underline"
+          data-pendle-market-link={t.market.address}
+        >
+          {marketName(t)}
+        </Link>
+      }
+    />
   );
+  const identity = <UnderlyingLabel p={p} />;
 
   const counters = { lastActivityAt: last?.timestamp ?? null, eventCount: rows.length, eventCountNoun: "router event" };
   // The position's name: the market and the wallet (lib/shared/position-name.ts).
@@ -413,6 +417,7 @@ export function PendlePositionCard({
         surface: "detail",
         status: { word: expired ? "Matured" : "Closed", tone: "muted" },
         identity,
+        tag,
         heads: [heads[1], heads[3]],
         outcome: {
           word: "Closed",
@@ -439,6 +444,7 @@ export function PendlePositionCard({
             }
           : null,
         identity,
+        tag,
         heads,
         counters,
         name,

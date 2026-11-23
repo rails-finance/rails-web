@@ -523,7 +523,6 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                       flows={{ read: flows.read, timeline: flows.timeline }}
                       v={view}
                       surface="detail"
-                      viewHref={tl.viewHref}
                       captions={captions ?? undefined}
                       // Credit remaining and the credit limit come from the
                       // Comptroller read.

@@ -178,7 +178,7 @@ export const balanceAfterProv = (sym: string, coords: DolomiteCoords): Provenanc
         ? `Re-run the core's getAccountWei eth_call at block ${coords.blockNumber} against an archive node`
         : "Re-run the core's getAccountWei eth_call at the event's block",
   },
-  summary: `${sym} this account held AFTER this event${atBlock(coords)}, interest included — the emitted \`newPar\` times the market's index at the block (the supply index on a positive balance, the borrow index rounded up on a debt), from the block's LogIndexUpdate. That is the core's parToWei, so it equals getAccountWei read at the block; a negative balance IS debt.`,
+  summary: `${sym} this account held AFTER this event${atBlock(coords)}, interest included — the emitted \`newPar\` times the market's index at the block (the supply index on a positive balance, the borrow index on a debt, rounded half-up), from the block's LogIndexUpdate. That is the core's parToWei, so it equals getAccountWei read at the block; a negative balance IS debt.`,
   contract: MARGIN,
   via: `${DOLOMITE_VIA} · newPar × LogIndexUpdate index at the block`,
   formula: "par after × index ÷ 10^18",

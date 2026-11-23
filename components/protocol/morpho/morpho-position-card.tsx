@@ -76,6 +76,7 @@ import { BlockRef } from "@/components/shared/block-ref";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { positionLink } from "@/lib/shared/position-link";
 
 const ORACLE_LINE_TIP =
   "The collateral valued in the loan asset at the market's oracle, the price Morpho's liquidation test uses.";
@@ -207,24 +208,23 @@ export function MorphoMenuRows({
         icon={icon("link", <Link2 size={16} className="-rotate-45" />)}
         title="Link to this position"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}${pagePath}`)}
+        onClick={() => copy("link", positionLink(pagePath))}
       />
     </>
   );
 }
 
-/** The labels a Morpho card carries in its heading row: the market and its
- *  LLTV, with the owner's wallet pill first on a listing. */
+/** The labels a Morpho card carries in its heading row after the tag: the
+ *  market's LLTV, with the owner's wallet pill first on a listing. */
 export function morphoCardIdentity({
-  market,
   lltv,
   listingOwner,
 }: {
-  market: ReactNode;
   lltv: number;
   /** The listing's owner pill; the position page names the owner in its wallet row. */
   listingOwner?: { wallet: string; session: SessionProtocol; vault?: { name: string; href: string } | null };
 }): ReactNode {
+  // The market stands in the card's `tag` on both surfaces (ui-jobs 807).
   return (
     <span className="flex flex-wrap items-center gap-2 text-xs font-semibold text-rb-500">
       {listingOwner && (
@@ -236,20 +236,12 @@ export function morphoCardIdentity({
           vault={listingOwner.vault ?? null}
         />
       )}
-      {listingOwner ? (
-        // The listing's market goes to the card's right-end `tag`.
-        lltv > 0 && <span className="text-rb-400">LLTV {(lltv * 100).toFixed(1)}%</span>
-      ) : (
-        <span>
-          {market}
-          {lltv > 0 && <span className="ml-2 text-rb-400">LLTV {(lltv * 100).toFixed(1)}%</span>}
-        </span>
-      )}
+      {lltv > 0 && <span className="text-rb-400">LLTV {(lltv * 100).toFixed(1)}%</span>}
     </span>
   );
 }
 
-/** The listing's right-end `tag`: the market (the collateral / loan pair). */
+/** The card's `tag` on both surfaces: the market (the collateral / loan pair). */
 export function morphoCardTag(market: ReactNode): ReactNode {
   return <ListingTag market={market} />;
 }
@@ -288,8 +280,6 @@ export interface MorphoPositionCardProps {
   live?: MorphoChainPositionResponse | null;
   /** The (i) Explanation: narration bullets describing the position NOW. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes; `null` or absent: the ⋮ holds the position's rows
    *  and the provenance row. */
   exports?: PositionCardExports | null;
@@ -303,7 +293,6 @@ export function useMorphoCardSlots({
   session = "morpho",
   live,
   explanation,
-  viewHref,
   exports,
 }: MorphoPositionCardProps): PositionCardSlots {
   // The chain and the capture lane are route facts: on a Base page the
@@ -344,7 +333,6 @@ export function useMorphoCardSlots({
   const status: PositionCardStatus | null = v.status === "open" ? null : STATUS[v.status];
   const marketPair = <MorphoMarketPair label={v.marketLabel} marketId={v.marketId} loanToken={v.loanToken} />;
   const identity = morphoCardIdentity({
-    market: marketPair,
     lltv: v.lltv,
     listingOwner: detail ? undefined : { wallet: v.owner, session, vault: v.vaultOwner },
   });
@@ -651,8 +639,16 @@ export function useMorphoCardSlots({
       : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
   // The position's name (ui-jobs 703): the market pair and the owner.
   const name = positionName({ market: v.marketLabel, noun: POSITION_NOUN[session], id: v.owner });
-  const common = { status, heads: detail ? heads.map(tipped) : heads, identity, counters, outcome, name };
-  if (!detail) return { ...common, surface: "listing", menu: null, tag: morphoCardTag(marketPair) };
+  const common = {
+    status,
+    heads: detail ? heads.map(tipped) : heads,
+    identity,
+    tag: morphoCardTag(marketPair),
+    counters,
+    outcome,
+    name,
+  };
+  if (!detail) return { ...common, surface: "listing", menu: null };
 
   const menu: PositionCardMenu = {
     leading: () => (
@@ -667,7 +663,7 @@ export function useMorphoCardSlots({
   const detailCommon = {
     ...common,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore,
     menu,
   };

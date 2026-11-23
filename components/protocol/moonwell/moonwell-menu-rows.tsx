@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
+import { positionLink } from "@/lib/shared/position-link";
 
 export function MoonwellMenuRows({ wallet, pagePath }: { wallet: string; pagePath: string }) {
   const [copied, setCopied] = useState<string | null>(null);
@@ -29,7 +30,7 @@ export function MoonwellMenuRows({ wallet, pagePath }: { wallet: string; pagePat
         icon={copied === "link" ? <Icon name="check" size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this position"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}${pagePath}`)}
+        onClick={() => copy("link", positionLink(pagePath))}
       />
     </>
   );

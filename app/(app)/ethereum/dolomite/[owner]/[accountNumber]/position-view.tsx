@@ -422,7 +422,6 @@ export default function DolomitePositionView({
                   flows={{ read: flows.read, timeline: flows.timeline }}
                   v={cardView}
                   surface="detail"
-                  viewHref={tl.viewHref}
                   captions={captions ?? undefined}
                   // The margin ratio from the core read is the third headline;
                   // its line and the fall to it are panel rows.

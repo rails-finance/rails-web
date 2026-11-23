@@ -48,11 +48,7 @@ import type { ChainId } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { BlockRef } from "@/components/shared/block-ref";
-import {
-  AlchemixListingIdentity,
-  AlchemixTag,
-  alchemixChip,
-} from "@/components/protocol/alchemix/alchemix-position-card";
+import { AlchemixIdentity, AlchemixTag, alchemixChip } from "@/components/protocol/alchemix/alchemix-position-card";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -300,7 +296,7 @@ export function transmuterListingSlots(
     status: transmuterStatus(p),
     tag: <AlchemixTag market={alchemixMarketWord(p.syntheticSymbol, "transmuter")} id={p.nftId} />,
     identity: (
-      <AlchemixListingIdentity
+      <AlchemixIdentity
         chain={p.chainName ?? `chain ${p.chainId}`}
         wallet={holder}
         session={session}

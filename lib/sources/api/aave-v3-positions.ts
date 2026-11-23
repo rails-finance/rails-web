@@ -77,6 +77,10 @@ export interface RawV3WalletRow {
   peakReserves?: RawV3PeakReserve[];
   lastActivityAt: number;
   lastBlockNumber: number;
+  /** The newest block in aave_v3_events_served (the sealed tail and the live
+   *  head) for this wallet and market; above `lastBlockNumber` when the
+   *  account changed after the hourly refresh. */
+  latestEventBlock?: number | null;
   lastTxHash: string | null;
   txCount: number;
   liquidationCount: number;
@@ -301,6 +305,7 @@ export async function buildAaveV3PositionRows(
       dominantDebtAddress: domDebt?.addr ?? null,
       lastActivityAt: w.lastActivityAt,
       lastBlockNumber: w.lastBlockNumber,
+      latestEventBlock: w.latestEventBlock ?? null,
       lastTxHash: w.lastTxHash,
       liquidationCount: w.liquidationCount,
       lastLiquidationAt: w.lastLiquidationAt,

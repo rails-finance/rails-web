@@ -6,9 +6,9 @@
 //
 // THE GRAIN IS THE PAIR: the card is one position in one isolated market,
 // never a user — controllers liquidate independently, and one card per user
-// would assert a single health across markets that share nothing. The
-// identity slot carries the user AND the market (collateral / borrowed pair,
-// version-tagged), because both halves are the key.
+// would assert a single health across markets that share nothing. The card
+// names the user AND the market (the collateral / borrowed pair in the tag,
+// the version beside it), because both halves are the key.
 //
 // ⇒ SOFT-LIQUIDATION LEADS. When the live overlay says the AMM has already
 // converted part of this position's collateral (user_state.stablecoin > 0 —
@@ -137,42 +137,21 @@ const stateProv = (v: LlamalendPositionView, sym: string, which: "collateral" | 
  *  or lend (borrowed from lenders' deposits); a V2 market says V2. */
 const MARKET_KIND: Partial<Record<LlamalendFactoryKind, string>> = { crvusd: "mint market", oneway: "lend market" };
 
-/** The position + market identity: whose position, in which isolated market.
- *  The detail page draws the owner on the wallet row above the card
+/** The identity after the tag: the market kind, with the owner first on a
+ *  listing. The market's pair stands in the card's `tag` (ui-jobs 807); the
+ *  detail page draws the owner on the wallet row above the card
  *  (ui-jobs 228). */
-function PositionIdentity({
-  v,
-  wallet = true,
-  listing = false,
-}: {
-  v: LlamalendPositionView;
-  wallet?: boolean;
-  /** A listing row: the market's pair goes to the card's right-end `tag`, and
-   *  the market kind stays beside the wallet. */
-  listing?: boolean;
-}) {
+function PositionIdentity({ v, wallet }: { v: LlamalendPositionView; wallet: boolean }) {
   const kind = v.factory ? MARKET_KIND[v.factory] : undefined;
-  if (listing) {
-    const kinds = [kind, v.version === "v2" ? "V2 market" : null].filter(Boolean);
-    return (
-      <span className="flex items-center gap-2">
-        <WalletPill wallet={v.user} ensName={null} filterProtocol="llamalend" bookmark />
-        {kinds.length > 0 && (
-          <span className="text-xs text-rb-500" data-llamalend-market-kind="">
-            {kinds.join(" · ")}
-          </span>
-        )}
-      </span>
-    );
-  }
+  const kinds = [kind, v.version === "v2" ? "V2 market" : null].filter(Boolean);
   return (
     <span className="flex items-center gap-2">
       {wallet && <WalletPill wallet={v.user} ensName={null} filterProtocol="llamalend" bookmark />}
-      <span className="text-xs text-rb-500">
-        {v.marketLabel}
-        {kind && <span data-llamalend-market-kind=""> · {kind}</span>}
-        {v.version === "v2" && <span data-llamalend-market-kind=""> · V2 market</span>}
-      </span>
+      {kinds.length > 0 && (
+        <span className="text-xs text-rb-500" data-llamalend-market-kind="">
+          {kinds.join(" · ")}
+        </span>
+      )}
     </span>
   );
 }
@@ -195,8 +174,6 @@ export interface LlamalendPositionCardProps {
   sold?: number | null;
   /** The card's Explanation section (narration describing the position NOW). */
   explanation?: React.ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** A line that stays in the card's foot: the loans line on a position with
    *  more than one loan, the owner's outcome on a liquidated one. */
   foot?: React.ReactNode;
@@ -267,7 +244,6 @@ export function useLlamalendCardSlots({
   lost,
   sold,
   explanation,
-  viewHref,
   foot,
   exports,
 }: LlamalendPositionCardProps): PositionCardSlots {
@@ -298,11 +274,11 @@ export function useLlamalendCardSlots({
   const name = positionName({ market: v.marketLabel, noun: POSITION_NOUN.llamalend, id: v.user });
   const common = {
     status,
-    identity: <PositionIdentity v={v} wallet={!detail} listing={!detail} />,
+    identity: <PositionIdentity v={v} wallet={!detail} />,
+    tag: <ListingTag market={v.marketLabel} />,
     counters,
     name,
   };
-  const tag = <ListingTag market={v.marketLabel} />;
 
   // Closed / liquidated: the last emitted absolutes are back at zero, so the
   // card states the outcome (no USD: the oracle prices the PRESENT, not
@@ -416,13 +392,13 @@ export function useLlamalendCardSlots({
     }
   }
 
-  if (!detail) return { ...common, heads, surface: "listing", menu: null, tag, outcome };
+  if (!detail) return { ...common, heads, surface: "listing", menu: null, outcome };
 
   const detailCommon = {
     ...common,
     heads,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: llamalendPositionContent(
       open
         ? { status: v.status, inSoftLiq: v.inSoftLiq ?? undefined, bands: chain?.hasLoan ? chain.bands : null }

@@ -62,6 +62,7 @@ import {
   liquityV1RecoveryNotice,
 } from "@/components/protocol/liquity-v1/liquity-v1-risk-slot";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { positionLink } from "@/lib/shared/position-link";
 
 export interface LiquityV1PositionView {
   wallet: string;
@@ -126,7 +127,7 @@ function TroveLinkRow({ pagePath }: { pagePath: string }) {
       title="Link to this Trove"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() => {
-        void navigator.clipboard.writeText(`${window.location.origin}${pagePath}`).then(() => {
+        void navigator.clipboard.writeText(positionLink(pagePath)).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         });
@@ -151,8 +152,6 @@ export interface LiquityV1PositionCardProps {
   riskPending?: boolean;
   /** The card's Explanation section: narration bullets describing the Trove now. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** A closed life's ETH left in the CollSurplusPool (a full redemption, or a
    *  capped Recovery Mode liquidation), read at the head. Unclaimed, it takes a
    *  line under Outcome. */
@@ -174,7 +173,6 @@ export function liquityV1CardSlots({
   chain,
   riskPending = false,
   explanation,
-  viewHref,
   surplus,
   priceUsd,
   endedBy,
@@ -339,7 +337,7 @@ export function liquityV1CardSlots({
   const detailCommon = {
     ...common,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: liquityV1PositionModal(v.status, endedBy),
     menu: {
       leading: () => <TroveLinkRow pagePath={pagePath} />,

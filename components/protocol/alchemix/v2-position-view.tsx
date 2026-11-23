@@ -49,7 +49,7 @@ import {
   v2Outcome,
   v3SuccessorLinks,
 } from "@/components/protocol/alchemix/v2-position-card";
-import { AlchemixIdentity } from "@/components/protocol/alchemix/alchemix-position-card";
+import { AlchemixIdentity, AlchemixTag } from "@/components/protocol/alchemix/alchemix-position-card";
 import { AlchemixMenuRows } from "@/components/protocol/alchemix/alchemix-menu-rows";
 import { AlchemixV2EventCard, type AlchemixV2Event } from "@/components/protocol/alchemix/v2-event-card";
 import type { AlchemixV2PositionData } from "@/types/api/alchemix";
@@ -217,12 +217,13 @@ export function AlchemixV2PositionView({
   const cardSlots: PositionCardSlots = {
     surface: "detail",
     status: V2_STATUS,
-    identity: <AlchemixIdentity name={name.text} chain={p.chainName ?? `chain ${p.chainId}`} />,
+    tag: <AlchemixTag market={p.syntheticSymbol} id={alchemixV2AccountLabel(p.account)} />,
+    identity: <AlchemixIdentity chain={p.chainName ?? `chain ${p.chainId}`} />,
     name,
     heads: [v2DebtHead(p, debtProv), v2CollateralHead(p, underlyingProvAt)],
     outcome: v2Outcome(p, v3SuccessorLinks(p, successorHref)),
     counters: null,
-    explainer: { body: explanation, viewHref: tl.viewHref },
+    explainer: { body: explanation },
     learnMore: null,
     menu: {
       leading: () => (

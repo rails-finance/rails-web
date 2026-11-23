@@ -127,7 +127,6 @@ import {
 } from "@/lib/basedollar/asset-catalog";
 import { TroveIdentityRow } from "./trove-identity-row";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
-import { PositionNameId } from "@/components/shared/position-name-id";
 import { positionName } from "@/lib/shared/position-name";
 import { ListingTag } from "@/components/shared/listing-tag";
 import { TroveMenuRows } from "./trove-menu-rows";
@@ -580,8 +579,6 @@ export interface LiquityPositionCardProps {
   compact?: boolean;
   /** The (i) pane's prose. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   explanationDefaultOpen?: boolean;
   onExplanationToggle?: (open: boolean) => void;
   /** A liquidated Trove's collateral surplus, read at the head. */
@@ -618,7 +615,6 @@ export function useLiquityCardSlots({
   live,
   compact = false,
   explanation,
-  viewHref,
   explanationDefaultOpen,
   onExplanationToggle,
   surplus,
@@ -770,10 +766,8 @@ export function useLiquityCardSlots({
   // The position's name (ui-jobs 703): the branch's collateral and the Trove id.
   const name = positionName({ market: ops.collateralSymbol(ct), noun: POSITION_NOUN[protocol], id: v.id });
   // The listing names the owner; the delegate shows under Interest rate. The
-  // page's wallet row names the owner, so the detail heading carries the id.
-  const identity = detail ? (
-    <PositionNameId name={name} />
-  ) : (
+  // page's wallet row names the owner; both surfaces carry the ID as the tag.
+  const identity = detail ? undefined : (
     <TroveIdentityRow
       protocol={protocol}
       troveId={v.id}
@@ -1047,14 +1041,13 @@ export function useLiquityCardSlots({
     counters,
     outcome,
     name,
+    tag: <ListingTag id={v.id} />,
   };
-  // The listing's right end: the branch and the Trove ID.
   if (!detail)
     return {
       ...common,
       surface: "listing",
       menu: null,
-      tag: <ListingTag id={v.id} />,
     };
 
   const menu: PositionCardMenu | null =
@@ -1073,7 +1066,6 @@ export function useLiquityCardSlots({
       body: explanation ?? null,
       defaultOpen: explanationDefaultOpen,
       onToggle: onExplanationToggle,
-      viewHref,
     },
     learnMore,
     menu,

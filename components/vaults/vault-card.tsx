@@ -165,6 +165,7 @@ export function VaultCard({
         slots={{
           surface: "detail",
           sidebar: false,
+          lifecycle: false,
           heading: "Vault summary",
           status,
           identity,
