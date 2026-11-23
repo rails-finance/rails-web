@@ -519,6 +519,8 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                   )}
                   {!pinnedRoute && view && data && (
                     <MoonwellPositionCard
+                      // A closed card's peak value per side reads the panel's timeline.
+                      flows={{ read: flows.read, timeline: flows.timeline }}
                       v={view}
                       surface="detail"
                       viewHref={tl.viewHref}

@@ -25,6 +25,7 @@
 // USD keys by MARKET ID (Dolomite's own key — symbols collide on this
 // roster), priced by the core's own getMarketPrice.
 
+import { useClosedPeaks, withPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
 import { PositionNameId } from "@/components/shared/position-name-id";
 import { positionName, type PositionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
@@ -38,6 +39,7 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
+  assetsHead,
 } from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
@@ -195,6 +197,7 @@ function PeakLines({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply
                   ? formatUnitsExact(r.amountRaw, r.decimals)
                   : `${formatUnitsExact(r.amountRaw, r.decimals)} (par: multiply by the market's interest index for tokens)`
               }
+              iconSize={16}
             />
           )}
         </Prov>
@@ -282,6 +285,9 @@ export interface DolomitePositionCardProps {
   /** The ⋮'s export shapes. `null`: the ⋮ holds the account's rows and the
    *  provenance row alone. */
   exports?: PositionCardExports | null;
+  /** The page's Lifetime flows timeline and its read: a closed card's peak
+   *  value per side (components/shared/closed-peak.tsx). */
+  flows?: ClosedPeakFlows;
 }
 
 /** The Dolomite account's slots for the shared position card: the three
@@ -296,8 +302,13 @@ export function useDolomiteCardSlots({
   viewHref,
   captions,
   exports,
+  flows,
 }: DolomitePositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
+  const peakOf = useClosedPeaks(flows, v.status !== "open", {
+    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, key: String(r.marketId) })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, key: String(r.marketId) })),
+  });
   const usdOf = dustUsdOf(v);
   // Dust lines (under a cent) leave the icon stack and its "+N"; the panel puts
   // them behind the "N dust reserves hidden" control.
@@ -337,25 +348,42 @@ export function useDolomiteCardSlots({
   const borrowId = /^Borrow Position #(.+)$/.test(v.accountLabel) ? accountNumberId(v.accountNumber) : undefined;
   const tag = borrowId ? <ListingTag id={borrowId} /> : <ListingTag market={wlfi ? "WLFI" : v.accountLabel} />;
 
-  // Closed / liquidated: every par is back at zero, so the heads are what each
-  // market lane held at its height, the highest recorded par. The LIQUIDATED
+  // Closed / liquidated: every par is back at zero, so each side states the
+  // markets it held, and what each market lane held at its height, the highest
+  // recorded par, opens behind the press under the peak label (C19). The LIQUIDATED
   // outcome appears only here: an open survivor never reaches this branch,
   // however many liquidations its meta cluster counts.
   let heads: PositionCardHead[];
   let outcome: PositionCardOutcome | undefined;
   if (v.status !== "open") {
-    heads = [
-      {
-        id: "peak-collateral",
-        label: CARD_VOCAB.peakCollateral,
-        value: v.peakSupplies.length > 0 ? <PeakLines lines={v.peakSupplies} side="supply" /> : null,
-      },
-      {
-        id: "peak-debt",
-        label: CARD_VOCAB.peakDebt,
-        value: v.peakBorrows.length > 0 ? <PeakLines lines={v.peakBorrows} side="debt" /> : null,
-      },
-    ];
+    const held = (lines: DolomitePeakAmount[], side: "supply" | "debt") =>
+      lines.length > 0
+        ? assetsHead(
+            side === "supply" ? CARD_VOCAB.peakCollateral : CARD_VOCAB.peakDebt,
+            lines.map((r) => ({ symbol: r.symbol, address: r.token ?? null })),
+            <span className="text-sm font-semibold tabular-nums text-foreground">
+              <PeakLines lines={lines} side={side} />
+            </span>,
+          )
+        : {};
+    heads = withPeaks(
+      [
+        {
+          id: "peak-collateral",
+          label: CARD_VOCAB.headCollateral,
+          value: null,
+          ...held(v.peakSupplies, "supply"),
+        },
+        {
+          id: "peak-debt",
+          label: CARD_VOCAB.headDebt,
+          value: null,
+          ...held(v.peakBorrows, "debt"),
+        },
+      ],
+      peakOf,
+      detail,
+    );
     outcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: outcomeDates(v) ?? (v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined),

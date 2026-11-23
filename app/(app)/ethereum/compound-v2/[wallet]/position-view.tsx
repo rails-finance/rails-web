@@ -521,6 +521,8 @@ export default function CompoundV2PositionView({
             <>
               {!onEventPage && liveView && cardView && (
                 <CompoundV2PositionCard
+                  // A closed card's peak value per side reads the panel's timeline.
+                  flows={{ read: flows.read, timeline: flows.timeline }}
                   v={cardView}
                   surface="detail"
                   viewHref={tl.viewHref}

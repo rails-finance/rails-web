@@ -926,7 +926,7 @@ L5:
     title: |-
       About this position
     intro: |-
-      This account has repaid all its debt and withdrawn its supply. The panel above shows the highest supply and debt each market reached.
+      This account has repaid all its debt and withdrawn its supply. The panel above lists the markets it held; a press on them opens the highest supply and debt each market reached.
     detailsHeading: |-
       Key concepts:
     details:
@@ -950,7 +950,7 @@ L5:
     title: |-
       About this position
     intro: |-
-      This account was liquidated at least once and has since closed, with nothing left supplied or borrowed. The panel above shows the highest supply and debt each market reached.
+      This account was liquidated at least once and has since closed, with nothing left supplied or borrowed. The panel above lists the markets it held; a press on them opens the highest supply and debt each market reached.
     detailsHeading: |-
       Key concepts:
     details:

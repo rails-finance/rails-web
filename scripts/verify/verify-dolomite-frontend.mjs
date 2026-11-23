@@ -138,7 +138,40 @@ await page.waitForTimeout(2500);
 const liqBody = await page.textContent("body");
 check("liquidated detail: outcome renders", /LIQUIDATED|Liquidated/.test(liqBody));
 check("liquidated detail: liquidation legs in the timeline", /Collateral seized|Liquidation/.test(liqBody));
-check("liquidated detail: peak WLFI line renders", /WLFI/.test(liqBody));
+// A closed Dolomite head states its markets by their icons (ui-jobs 803): the
+// listing row holds par peaks and the position page token peaks, so neither
+// surface leads with one market's amount, and no dollar figure stands there.
+const collHead = page.locator('[data-card-head="peak-collateral"]').first();
+const collHeadText = await collHead.evaluate((h) => h.innerText.replace(/\s+/g, " ").trim()).catch(() => null);
+check(
+  "liquidated detail: closed collateral head shows its markets, no dollar figure",
+  collHeadText != null && !/\$/.test(collHeadText) && (await collHead.locator("[data-card-assets-toggle]").count()) > 0,
+  collHeadText ?? "no peak-collateral head",
+);
+// The peaks: each side states its markets' icons, and the C19 button they
+// make opens the peak lines in a dropdown (ui-jobs 803). Each side's line is
+// read in its dropdown.
+let peakWlfi = "";
+for (const side of ["peak-collateral", "peak-debt"]) {
+  const toggle = page.locator(`[data-card-assets-toggle="${side}"]`).first();
+  if ((await toggle.count()) === 0) continue;
+  await toggle.click();
+  const panel = page.locator("[data-breakdown-panel]");
+  await panel.waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
+  const text = (await panel.count()) > 0 ? await panel.innerText() : "";
+  // The dropdown states the side's peak value, or why there is none, under
+  // its heading (ui-jobs 803).
+  if (side === "peak-collateral")
+    check(
+      "liquidated detail: the collateral dropdown carries the peak line",
+      (await panel.locator("[data-card-peak-line]").count()) > 0,
+      text.slice(0, 120),
+    );
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  if (/WLFI/.test(text)) peakWlfi = side;
+}
+check("liquidated detail: peak WLFI line renders", peakWlfi !== "", peakWlfi ? `on ${peakWlfi}` : "no WLFI peak line");
 
 check("no page errors across the run", pageErrors.length === 0, pageErrors.slice(0, 2).join(" | "));
 

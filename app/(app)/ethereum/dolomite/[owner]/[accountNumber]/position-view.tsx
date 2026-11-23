@@ -418,6 +418,8 @@ export default function DolomitePositionView({
             <>
               {!onEventPage && liveView && cardView && (
                 <DolomitePositionCard
+                  // A closed card's peak value per side reads the panel's timeline.
+                  flows={{ read: flows.read, timeline: flows.timeline }}
                   v={cardView}
                   surface="detail"
                   viewHref={tl.viewHref}

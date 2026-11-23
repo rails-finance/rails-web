@@ -1287,7 +1287,7 @@ L5:
     title: |-
       About this position
     intro: |-
-      This account has repaid its debt and withdrawn its collateral. Its card shows the most each reserve ever held or owed.
+      This account has repaid its debt and withdrawn its collateral. Its card lists the reserves it held; a press on them opens the most each reserve ever held or owed.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1311,7 +1311,7 @@ L5:
     title: |-
       About this position
     intro: |-
-      This account was liquidated at least once, when its health factor fell below 1, and holds nothing now. Its card shows the most each reserve ever held or owed.
+      This account was liquidated at least once, when its health factor fell below 1, and holds nothing now. Its card lists the reserves it held; a press on them opens the most each reserve ever held or owed.
     detailsHeading: |-
       Key concepts:
     details:
