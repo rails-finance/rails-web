@@ -31,7 +31,7 @@ import { readLiquityV1Sp, type LiquityV1DepositListResponse } from "@/lib/source
 import { readLiquityV2Sp, type LiquityV2DepositListResponse } from "@/lib/sources/api/liquity-v2-sp";
 import { readLiquityV1Staking, type LiquityV1StakeListResponse } from "@/lib/sources/api/liquity-v1-staking";
 import { aaveV3Base, aaveV3Ethereum, spark } from "@/lib/wallet/families/aave";
-import { aaveV4Arc, aaveV4Base, aaveV4Ethereum } from "@/lib/wallet/families/aave-v4";
+import { ARC_ON_WALLET, aaveV4Arc, aaveV4Base, aaveV4Ethereum } from "@/lib/wallet/families/aave-v4";
 import { compoundV3Base, compoundV3Ethereum } from "@/lib/wallet/families/compound";
 import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/families/ethereum-single";
 import { aaveV3Arbitrum, compoundV3Arbitrum, morphoArbitrum } from "@/lib/wallet/families/arbitrum";
@@ -93,6 +93,7 @@ export const WALLET_FAMILIES: FamilyModule[] = [
 export function walletFamiliesLine(): string {
   const byChain = new Map<WalletSummaryRow["chain"], string[]>();
   for (const f of WALLET_FAMILIES) {
+    if (f.summaryChain === "arc" && !ARC_ON_WALLET) continue;
     const names = byChain.get(f.summaryChain) ?? [];
     if (!names.includes(f.name)) names.push(f.name);
     byChain.set(f.summaryChain, names);
@@ -258,12 +259,15 @@ export async function readSummary(address: string, signal: AbortSignal, readerIp
   }
   const extra = await listing;
   const open = extra.rows.filter((r) => r.status === "open").length;
+  // Arc's rows, while its explorer is unlaunched, leave the rows and the counts.
+  const hidden = ARC_ON_WALLET ? [] : rows.filter((r) => r.chain === "arc");
+  const hiddenOpen = hidden.filter((r) => r.status === "open").length;
   return {
     ...first!,
-    rows: [...rows, ...extra.rows],
-    total: first!.total + extra.rows.length,
-    open: first!.open + open,
-    closed: first!.closed + extra.rows.length - open,
+    rows: [...rows.filter((r) => !hidden.includes(r)), ...extra.rows],
+    total: first!.total + extra.rows.length - hidden.length,
+    open: first!.open + open - hiddenOpen,
+    closed: first!.closed + extra.rows.length - open - (hidden.length - hiddenOpen),
     listingFailed: extra.failed,
   };
 }

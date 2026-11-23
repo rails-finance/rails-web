@@ -21,6 +21,7 @@ import {
   storeStamp,
   type WalletSummaryRow,
 } from "@/lib/wallet/summary-row";
+import { protocolForSession } from "@/lib/shared/protocols";
 import type { FamilyModule } from "./module";
 
 /** "$2.1M": a peak in dollars, for the History table. */
@@ -129,6 +130,10 @@ function arcReadOf(c: ArcCard): ArcWalletRead {
     ],
   };
 }
+
+/** Arc's rows stay off the wallet page while the Aave V4 Arc explorer is
+ *  unlaunched (ui-jobs 811; the manager's ruling, 23 Nov 2026). */
+export const ARC_ON_WALLET = !protocolForSession("aave-v4-arc")?.unlaunched;
 
 export const aaveV4Arc: FamilyModule = {
   id: "aave-v4-arc",
