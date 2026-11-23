@@ -31,10 +31,36 @@ export interface SidePeakResult {
 const cents = (v: number) => Math.round(v * 100) / 100;
 
 /** What a side's head states: its peak; no dollar figure, where every day it
- *  held something had an unpriced asset; or nothing recorded, where the
- *  timeline holds no balance above zero for the card's assets. */
-export function peakState(r: SidePeakResult): "peak" | "unpriced" | "not-recorded" {
-  return r.peak ? "peak" : r.unpriced.length > 0 ? "unpriced" : "not-recorded";
+ *  held something had an unpriced asset; held within a day, where the
+ *  timeline has days but no day's close holds a balance above zero for the
+ *  card's assets (a side opened and emptied between two closes); or nothing
+ *  recorded, where the timeline has no days, or its rows for the side are
+ *  assets the card does not list. */
+export function peakState(r: SidePeakResult, days: number): "peak" | "unpriced" | "within-day" | "not-recorded" {
+  if (r.peak) return "peak";
+  if (r.unpriced.length > 0) return "unpriced";
+  return days > 0 && r.unmatched.length === 0 ? "within-day" : "not-recorded";
+}
+
+/** One asset a closed side lists: its symbol, and its key in the timeline
+ *  where the card knows it (a reserve's address, a cToken or Dolomite
+ *  market). */
+export interface PeakAssetKey {
+  symbol: string;
+  key?: string | null;
+}
+
+/** Which held rows are the card's: by the timeline's key where the card
+ *  passes keys, so two markets sharing a symbol stay apart; by symbol where
+ *  it passes none. */
+export function keepByKey(assets: readonly PeakAssetKey[]): (row: FlowAssetHeld) => boolean {
+  const keys = new Set(assets.map((a) => a.key?.toLowerCase()).filter((k): k is string => !!k));
+  const symbols = new Set(assets.filter((a) => !a.key).map((a) => a.symbol));
+  return (r) => {
+    const k = r.asset?.toLowerCase();
+    if (k != null && keys.has(k)) return true;
+    return symbols.has(r.symbol);
+  };
 }
 
 /** `heldAt[stop]` is the model's held rows at the end of day `startDay +

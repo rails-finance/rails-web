@@ -171,6 +171,9 @@ export interface PositionCardHead {
   /** A small line under the figure, inside the C19 button where there is one:
    *  a closed account's peak day and its icons at 16 px (`assetsHead`). */
   below?: ReactNode;
+  /** Why a side shows no figure ("not recorded", "loading"): the C19
+   *  button's name carries it where there is no total. */
+  state?: string;
   /** The side's USD total and its receipt: the breakdown's heading states it
    *  exact, and carries the receipt the headline (inside the button) cannot.
    *  `at`: a closed account's peak, stated "Peak $… · day" there. */
@@ -186,19 +189,28 @@ export interface PositionCardHead {
  *  head, components/shared/closed-peak.tsx) the figure leads and a small line
  *  under it carries `note` and the icons at 16 px: every asset beside a peak
  *  in dollars, which no single asset is; the others beside `main`, the asset
- *  the figure is in, which draws its own icon. A null figure (no dollar
+ *  the figure is in, which draws its icon. A null figure (no dollar
  *  figure) reads as a dash, `note` saying why. `total` heads the dropdown
  *  with the receipt. */
 export function assetsHead(
   label: string,
   assets: AssetMark[],
   panel: ReactNode,
-  figure?: { figure: ReactNode | null; note?: ReactNode; main?: AssetMark; total?: PositionCardHead["total"] },
-): Pick<PositionCardHead, "value" | "list" | "total" | "below"> {
+  figure?: {
+    figure: ReactNode | null;
+    note?: ReactNode;
+    main?: AssetMark;
+    total?: PositionCardHead["total"];
+    state?: string;
+  },
+): Pick<PositionCardHead, "value" | "list" | "total" | "below" | "state"> {
   const list = { label, count: assets.length, panel };
   if (!figure) return { value: <InlineAssetCluster assets={assets} />, list };
   const main = figure.main;
-  const rest = main ? assets.filter((a) => !(a.symbol === main.symbol && a.address === main.address)) : assets;
+  // The main asset leaves the small line once: two markets sharing its
+  // symbol and address (cWBTC and cWBTC2) keep the other.
+  const mainAt = main ? assets.findIndex((a) => a.symbol === main.symbol && a.address === main.address) : -1;
+  const rest = assets.filter((_, i) => i !== mainAt);
   const below =
     figure.note != null || rest.length > 0 ? (
       <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5" data-card-below="">
@@ -210,6 +222,7 @@ export function assetsHead(
     value: figure.figure ?? <span className="text-rb-400">—</span>,
     ...(below ? { below } : {}),
     ...(figure.total ? { total: figure.total } : {}),
+    ...(figure.state ? { state: figure.state } : {}),
     list,
   };
 }
@@ -606,6 +619,7 @@ function HeadBody({
       aria-label={[
         head.list ? head.list.label : head.total ? `${head.label} ${formatUsdValue(head.total.usd)}` : head.label,
         head.list && head.total?.at ? peakWords(head.total.usd, head.total.at) : null,
+        head.list && !head.total ? (head.state ?? null) : null,
         head.list ? assetsWords(head.list.count) : head.breakdown ? `${head.breakdown.assets.length} assets` : null,
         "show breakdown",
       ]
@@ -618,7 +632,11 @@ function HeadBody({
       <QuietTipsContext.Provider value={true}>
         <ProvInert>{head.value}</ProvInert>
         {head.assets != null && <span className="inline-flex shrink-0 items-center">{head.assets}</span>}
-        {head.below != null && <span className={BELOW_TYPE}>{head.below}</span>}
+        {head.below != null && (
+          <span className={BELOW_TYPE}>
+            <ProvInert>{head.below}</ProvInert>
+          </span>
+        )}
       </QuietTipsContext.Provider>
     </button>
   );

@@ -432,8 +432,8 @@ export function useSparkCardSlots({
   const detail = surface === "detail";
   const isOther = (r: SparkReserveAmount) => notCollateral?.has(r.address.toLowerCase()) === true;
   const peakOf = useClosedPeaks(flows, v.status !== "open", {
-    collateral: v.peakSupplies.filter((r) => !isOther(r)).map((r) => ({ symbol: r.symbol, address: r.address })),
-    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, address: r.address })),
+    collateral: v.peakSupplies.filter((r) => !isOther(r)).map((r) => ({ symbol: r.symbol, key: r.address })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, key: r.address })),
   });
   const collSupplies = v.supplies.filter((r) => !isOther(r));
   const otherSupplies = v.supplies.filter(isOther);

@@ -304,8 +304,8 @@ export function useMoonwellCardSlots({
   const { supplyProv, borrowProv, mSymbolOf } = useLineReceipts(serverReadOf(chain), marketBy);
   const detail = surface === "detail";
   const peakOf = useClosedPeaks(flows, v.status !== "open", {
-    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, address: r.address })),
-    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, address: r.address })),
+    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, key: r.market })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, key: r.market })),
   });
 
   // The collateral column holds the entered markets; a supply the account

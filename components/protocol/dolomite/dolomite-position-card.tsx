@@ -306,8 +306,8 @@ export function useDolomiteCardSlots({
 }: DolomitePositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
   const peakOf = useClosedPeaks(flows, v.status !== "open", {
-    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, address: r.token ?? null })),
-    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, address: r.token ?? null })),
+    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, key: String(r.marketId) })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, key: String(r.marketId) })),
   });
   const usdOf = dustUsdOf(v);
   // Dust lines (under a cent) leave the icon stack and its "+N"; the panel puts

@@ -390,8 +390,8 @@ export function useCompoundV2CardSlots({
 }: CompoundV2PositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
   const peakOf = useClosedPeaks(flows, v.status !== "open", {
-    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, address: underlyingOf(r.market) ?? null })),
-    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, address: underlyingOf(r.market) ?? null })),
+    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, key: r.market })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, key: r.market })),
   });
   const marketBy = marketReadBy(v);
   const supplyLine = (r: CompoundV2SupplyAmount): UsdLine => ({

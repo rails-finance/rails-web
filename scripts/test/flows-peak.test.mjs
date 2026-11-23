@@ -4,7 +4,7 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { peakState, sidePeaks } from "../../lib/shared/flows-peak.ts";
+import { keepByKey, peakState, sidePeaks } from "../../lib/shared/flows-peak.ts";
 
 const row = (side, symbol, amount, usd, price = usd / amount, asset = `0x${symbol.toLowerCase()}`) => ({
   side,
@@ -74,16 +74,33 @@ test("keep matching no row: no peak, the timeline's symbols named", () => {
   assert.deepEqual(out.debt.unmatched, ["0xdac17f"]);
 });
 
-test("the states split by cause: a peak, no dollar figure, nothing recorded", () => {
+test("the states split by cause", () => {
   const priced = [[row("collateral", "WETH", 1, 2000)]];
-  assert.equal(peakState(sidePeaks(priced, 0).collateral), "peak");
+  assert.equal(peakState(sidePeaks(priced, 0).collateral, priced.length), "peak");
   const unpriced = [[row("collateral", "XYZ", 10, 0, null)]];
-  assert.equal(peakState(sidePeaks(unpriced, 0).collateral), "unpriced");
-  // Days on record, none holding a balance above zero for the side.
-  const empty = [[], [row("collateral", "WETH", 0, 0)]];
-  assert.equal(peakState(sidePeaks(empty, 0).collateral), "not-recorded");
-  assert.equal(peakState(sidePeaks([], 0).debt), "not-recorded");
+  assert.equal(peakState(sidePeaks(unpriced, 0).collateral, unpriced.length), "unpriced");
+  // Days on record, none whose close holds a balance above zero for the side.
+  const within = [[], [row("collateral", "WETH", 0, 0)]];
+  assert.equal(peakState(sidePeaks(within, 0).collateral, within.length), "within-day");
+  // No days at all: nothing recorded.
+  assert.equal(peakState(sidePeaks([], 0).debt, 0), "not-recorded");
   // Held rows the card's assets do not match: nothing recorded for them.
   const other = [[row("collateral", "WETH", 1, 2000)]];
-  assert.equal(peakState(sidePeaks(other, 0, { collateral: () => false }).collateral), "not-recorded");
+  assert.equal(peakState(sidePeaks(other, 0, { collateral: () => false }).collateral, other.length), "not-recorded");
+});
+
+test("two markets sharing a symbol stay apart by their key", () => {
+  const heldAt = [
+    [row("collateral", "WBTC", 1, 30000, 30000, "cwbtc"), row("collateral", "WBTC", 2, 60000, 30000, "cwbtc2")],
+  ];
+  const keep = keepByKey([{ symbol: "WBTC", key: "cWBTC2" }]);
+  const { peak } = sidePeaks(heldAt, 0, { collateral: keep }).collateral;
+  assert.equal(peak.usd, 60000);
+  assert.deepEqual(
+    peak.rows.map((r) => r.asset),
+    ["cwbtc2"],
+  );
+  // Without keys the card falls back to symbols, and both count.
+  const bySymbol = sidePeaks(heldAt, 0, { collateral: keepByKey([{ symbol: "WBTC" }]) }).collateral;
+  assert.equal(bySymbol.peak.usd, 90000);
 });

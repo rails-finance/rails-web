@@ -786,13 +786,15 @@ export default function AaveV3PositionDetail({
     emode: switches?.emode ?? null,
   });
   const flowFocus = useFlowFocusValue(focusRoot, flowTimeline);
-  // A closed card's peak value per side reads the same day rows.
+  // A closed card's peak value per side reads the same day rows, through the
+  // flow-focus value's model, so the page builds it once for both.
   const peakFlows = useMemo(
     () => ({
       read: (flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading") as FlowsRead,
-      timeline: flowSeriesTimeline,
+      timeline: flowTimeline,
+      model: flowFocus.model,
     }),
-    [flowSeries, flowSeriesFailed, flowSeriesTimeline],
+    [flowSeries, flowSeriesFailed, flowTimeline, flowFocus.model],
   );
   // The card's count counts transactions; its tip gives the events too.
   const cardView = useMemo(

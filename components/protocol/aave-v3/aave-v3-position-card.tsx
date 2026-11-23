@@ -369,8 +369,8 @@ export function useAaveV3CardSlots({
     collateral: (peaks && notCollateral != null
       ? v.peakSupplies.filter((r) => notCollateral.has(r.address.toLowerCase()) !== true)
       : v.peakSupplies
-    ).map((r) => ({ symbol: r.symbol, address: r.address })),
-    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, address: r.address })),
+    ).map((r) => ({ symbol: r.symbol, key: r.address })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, key: r.address })),
   });
 
   const marketLabel = dep.marketLabel(v.market);

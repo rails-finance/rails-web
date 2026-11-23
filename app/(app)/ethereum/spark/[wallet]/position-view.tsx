@@ -741,13 +741,15 @@ export default function SparkPositionDetail({
     emode: switches?.emode ?? null,
   });
   const flowFocus = useFlowFocusValue(focusRoot, flowTimeline);
-  // A closed card's peak value per side reads the same day rows.
+  // A closed card's peak value per side reads the same day rows, through the
+  // flow-focus value's model, so the page builds it once for both.
   const peakFlows = useMemo(
     () => ({
       read: (flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading") as FlowsRead,
-      timeline: flowSeriesTimeline,
+      timeline: flowTimeline,
+      model: flowFocus.model,
     }),
-    [flowSeries, flowSeriesFailed, flowSeriesTimeline],
+    [flowSeries, flowSeriesFailed, flowTimeline, flowFocus.model],
   );
   // The supplies that back no borrowing, which the card lists apart: open, the
   // live read's collateral switch and threshold (the e-mode category's where
