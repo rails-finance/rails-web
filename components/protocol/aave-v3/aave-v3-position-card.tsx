@@ -41,7 +41,6 @@ import { RevealTip } from "@/components/shared/reveal-tip";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
-import { PanelFigure } from "@/components/shared/position-card-panel";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { TokenAmountNotLoaded, loadedMarks } from "@/components/shared/not-loaded";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -646,29 +645,31 @@ export function useAaveV3CardSlots({
           label: ratioLabel("pooled"),
           labelTip: detail && ratioLabel("pooled") === "Health factor" ? HF_TIP : undefined,
           pending: !hfRead,
-          value: !hfRead ? null : noDebtRead ? null : v.healthFactor == null ? (
-            <span className="text-rb-400">No debt</span>
-          ) : (
+          // No debt: a dash, as the Debt head draws (ui-jobs 806).
+          value: !hfRead ? null : noDebtRead ? null : v.healthFactor == null ? null : (
             <Prov info={hfProv(v.market, v.atBlock, v.readBy)}>{hfLabel(v.healthFactor)}</Prov>
           ),
         }
       : null;
 
-  // A listing row draws no stat line: an account whose supplies back no
-  // borrowing heads them as such, where Collateral would show a dash (ui-jobs 806).
-  const othersHead = !detail && collSupplies.length === 0 && otherSupplies.length > 0;
+  // An account none of whose supplies back borrowing heads them "Supplied",
+  // with the not-collateral tip, and draws no stat row for them (ui-jobs 806).
+  const othersHead = collSupplies.length === 0 && otherSupplies.length > 0;
   const heads = [
     othersHead
-      ? sideHead(
-          "collateral",
-          "Supplied, not collateral",
-          otherSupplies,
-          othersSplit.shown,
-          otherUsd,
-          pricesPending && otherUsd == null,
-          "Supplied, not collateral",
-          "supply",
-        )
+      ? {
+          ...sideHead(
+            "collateral",
+            "Supplied",
+            otherSupplies,
+            othersSplit.shown,
+            otherUsd,
+            pricesPending && otherUsd == null,
+            "Supplied",
+            "supply",
+          ),
+          labelTip: detail ? NOT_COLLATERAL_TIP : undefined,
+        }
       : sideHead(
           "collateral",
           CARD_VOCAB.collateral,
@@ -912,7 +913,7 @@ export function useAaveV3CardSlots({
       ? dep.usd("Supplied, not collateral", "supply", usdRows(v, otherSupplies, "compact"), v.market)?.prov
       : undefined;
   const notCollRow: PositionPanelRow | null =
-    otherSupplies.length === 0
+    otherSupplies.length === 0 || othersHead
       ? null
       : otherSupplies.length > 1 && otherUsd != null && otherInfo
         ? {
@@ -939,11 +940,6 @@ export function useAaveV3CardSlots({
             tip: NOT_COLLATERAL_TIP,
             value: (
               <span className="flex flex-col gap-0.5">
-                {otherUsd != null && otherInfo && (
-                  <Prov info={otherInfo}>
-                    <PanelFigure>{formatCompactUsd(otherUsd)}</PanelFigure>
-                  </Prov>
-                )}
                 {othersRanked.map((r) => (
                   <span key={r.address}>
                     {r.decimalsUnread ? (
@@ -963,6 +959,12 @@ export function useAaveV3CardSlots({
                     )}
                   </span>
                 ))}
+                {/* The dollars under the amounts, in the headline's green (ui-jobs 806). */}
+                {otherUsd != null && otherInfo && (
+                  <Prov info={otherInfo}>
+                    <span className="text-xs font-bold tabular-nums text-green-400">{formatUsdValue(otherUsd)}</span>
+                  </Prov>
+                )}
               </span>
             ),
           };
@@ -1041,7 +1043,7 @@ export function useAaveV3CardSlots({
     explainer,
     learnMore,
     menu: menuSlot,
-    panel: [present([interestRow("supply"), notCollRow]), present([rateHeld, interestRow("debt"), roomHeld, liqHeld])],
+    panel: [present([notCollRow, interestRow("supply")]), present([rateHeld, interestRow("debt"), roomHeld, liqHeld])],
   };
 }
 
