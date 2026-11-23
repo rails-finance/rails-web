@@ -27,6 +27,13 @@ const BASE = process.env.BASE ?? "http://localhost:3000";
 // The peak-debt column label, from lib/shared/card-vocab.ts (`peakDebt`). One
 // constant, so the presence and the absence below cannot drift apart.
 const PEAK_DEBT = "Highest recorded borrow balance";
+// The closed card's other names (lib/shared/card-vocab.ts): a pure lender's
+// head (`peakSupply`), a one-collateral head (`peakCollateral`), and the
+// multi-collateral head (`headCollateral`, ui-jobs 803), which leads its C19
+// button's name.
+const PEAK_SUPPLY = "Highest recorded supply";
+const PEAK_COLLATERAL = "Highest recorded collateral";
+const HEAD_COLLATERAL = "Peak collateral";
 
 // Pure lender: supplied 3 WETH, withdrew the full balance + interest. Its peak
 // borrow is the interest tail — a phantom, not a borrow.
@@ -58,9 +65,10 @@ const bodyText = await page.locator("body").innerText();
 // the identity flip (wallet leads the cluster) — allow it, keep the
 // same-header-cluster claim tight (≤60 chars of pill between them).
 assert(/CLOSED[\s\S]{0,60}?cWETHv3/.test(bodyText), "the closed card is the cWETHv3 one");
-assert(cardText.includes("Highest recorded supply"), "collateral column labelled 'Highest recorded supply'");
-assert(!cardText.includes("Highest recorded collateral"), "no 'Highest recorded collateral' on a supply-only card");
-assert(/Highest recorded supply\s*3\b/.test(rawText), "supply value reads 3");
+assert(cardText.includes(PEAK_SUPPLY), `collateral column labelled '${PEAK_SUPPLY}'`);
+assert(!cardText.includes(PEAK_COLLATERAL), `no '${PEAK_COLLATERAL}' on a supply-only card`);
+assert(!cardText.includes(HEAD_COLLATERAL), `no '${HEAD_COLLATERAL}' on a supply-only card`);
+assert(new RegExp(`${PEAK_SUPPLY}\\s*3\\b`).test(rawText), "supply value reads 3");
 
 assert(!/8\.94\d*e-7/.test(bodyText), "no 8.94e-7 phantom anywhere on the page");
 assert(!/e-\d/.test(bodyText), "no exponential tiny-amount rendering at all");
@@ -105,15 +113,16 @@ assert(
   new RegExp(`${PEAK_DEBT}\\s*0\\.10?\\b`).test(bRaw),
   "genuine borrow still reads 0.1 (0.10 since the compact figures)",
 );
-// Two or more collateral assets state their icons under "Peak collateral",
-// which leads the C19 button's name (ui-jobs 803); one asset keeps
-// "Highest recorded collateral" on the head.
+// The collateral head by case: two or more collateral assets are a C19
+// button whose name leads "Peak collateral, …" (ui-jobs 803); one asset is
+// headed "Highest recorded collateral" with no button.
 const bToggle = bGrid.locator('[data-card-assets-toggle="peak-collateral"]');
-const bCollName = (await bToggle.count()) > 0 ? ((await bToggle.first().getAttribute("aria-label")) ?? "") : bText;
-assert(
-  bCollName.includes("Peak collateral") || bCollName.includes("Highest recorded collateral"),
-  "a borrower's supply column stays 'collateral'",
-);
+if ((await bToggle.count()) > 0) {
+  const name = (await bToggle.first().getAttribute("aria-label")) ?? "";
+  assert(name.startsWith(`${HEAD_COLLATERAL}, `), `a multi-collateral head's button is named '${HEAD_COLLATERAL}, …'`);
+} else {
+  assert(bText.includes(PEAK_COLLATERAL), `a one-collateral head reads '${PEAK_COLLATERAL}'`);
+}
 // On Ethereum each row is the chain's balance, interest included, so the
 // principal-only footnote (the Base sweep's caveat) is not drawn here.
 assert(
