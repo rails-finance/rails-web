@@ -92,8 +92,9 @@ export const compoundV2: FamilyModule = {
     signal.throwIfAborted();
     const state = await resolveCompoundV2MarketState();
     signal.throwIfAborted();
-    // The block, then the two Multicalls over the twenty markets.
-    const reads = 3;
+    // The reads that answered: the live read's block and two Multicalls
+    // (rails-server's head routes, or the chain), or the stored snapshot's one call.
+    const reads = state.read?.stored ? 1 : state.read ? 3 : 0;
     if (state.size === 0 || !state.read) {
       return { reads, positions: open.map((p) => ({ ...p, headRead: "failed" })) };
     }

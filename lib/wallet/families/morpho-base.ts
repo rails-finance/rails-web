@@ -182,10 +182,21 @@ export const morphoBase: FamilyModule = {
     const cardById = new Map(cards.map((s) => [s.positionId, s]));
 
     return {
-      reads: 1,
+      // The block, then the Multicall.
+      reads: 2,
       positions: open.map((p): WalletPosition => {
         // The figures stay the sweep's, so the section states no total (rule 743).
-        if (closed.has(p.positionId)) return { ...p, closedSince: { block }, headRead: "stored" };
+        // It states no risk: no flag, and no rank in the open group.
+        if (closed.has(p.positionId))
+          return {
+            ...p,
+            closedSince: { block },
+            buffer: undefined,
+            riskFigure: undefined,
+            liquidatable: undefined,
+            dustUsd: undefined,
+            headRead: "stored",
+          };
         const s = cardById.get(p.positionId);
         if (!s) return { ...p, headRead: "failed" };
         const prior = p.card as { vaultOwner: ReturnType<typeof morphoBaseVaultOwnerNote> };
