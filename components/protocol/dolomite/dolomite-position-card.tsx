@@ -25,7 +25,8 @@
 // USD keys by MARKET ID (Dolomite's own key — symbols collide on this
 // roster), priced by the core's own getMarketPrice.
 
-import { useClosedPeaks, withPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
+import { mainAssetFigure, useClosedPeaks, withPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
+import { pickMainAsset } from "@/lib/shared/main-asset";
 import { listingTagId, positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import type { ServerRead } from "@/lib/shared/server-head-read";
@@ -173,9 +174,9 @@ function LegLines({ lines, side }: { lines: DolomiteBalanceAmount[]; side: "supp
   );
 }
 
-/** A closed card's per-market PEAK amounts (highest recorded PAR, the scaled
- *  balance, labeled so on hover), each traced; no USD (the oracle prices only
- *  the present). */
+/** A closed card's per-market PEAK amounts (in tokens, or the highest
+ *  recorded PAR labeled so on hover), each traced; no USD (the oracle prices
+ *  only the present). */
 function PeakLines({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply" | "debt" }) {
   return (
     <span className="flex flex-col gap-1">
@@ -326,23 +327,48 @@ export function useDolomiteCardSlots({
   const common = { status, identity: detail ? undefined : <AccountIdentity v={v} />, tag, counters, name };
 
   // Closed / liquidated: every par is back at zero, so each side states the
-  // markets it held, and what each market lane held at its height, the highest
-  // recorded par, opens behind the press under the peak label (C19). The LIQUIDATED
+  // markets it held, and what each market lane held at its height (in tokens
+  // where the route states them, else the highest recorded par) opens behind
+  // the press under the peak label (C19). The LIQUIDATED
   // outcome appears only here: an open survivor never reaches this branch,
   // however many liquidations its meta cluster counts.
   let heads: PositionCardHead[];
   let outcome: PositionCardOutcome | undefined;
   if (v.status !== "open") {
-    const held = (lines: DolomitePeakAmount[], side: "supply" | "debt") =>
-      lines.length > 0
-        ? assetsHead(
-            side === "supply" ? CARD_VOCAB.peakCollateral : CARD_VOCAB.peakDebt,
-            lines.map((r) => ({ symbol: r.symbol, address: r.token ?? null })),
-            <span className="text-sm font-semibold tabular-nums text-foreground">
-              <PeakLines lines={lines} side={side} />
-            </span>,
-          )
-        : {};
+    const held = (lines: DolomitePeakAmount[], side: "supply" | "debt") => {
+      if (lines.length === 0) return {};
+      // The face states the largest market's peak where it is in tokens; a
+      // par peak stays behind the press (C19).
+      const inTokens = lines.filter((r) => r.tokens);
+      const pick = pickMainAsset(
+        inTokens.map((r) => ({ ...r, key: String(r.marketId) })),
+        v.priceByMarket,
+      );
+      const figure = pick
+        ? mainAssetFigure({
+            main: {
+              symbol: pick.main.symbol,
+              address: pick.main.token ?? null,
+              amount: pick.main.amount,
+              exact: formatUnitsExact(pick.main.amountRaw, pick.main.decimals),
+            },
+            receipt: dolomitePeakTokenProv(pick.main.symbol, side),
+            block: v.marketReadBy?.block ?? null,
+            // Par peaks are passed over with the unpriced ones.
+            skipped: lines.length - inTokens.length + pick.skipped,
+            side: side === "supply" ? "collateral" : "debt",
+            ranked: lines.length > 1,
+          })
+        : undefined;
+      return assetsHead(
+        side === "supply" ? CARD_VOCAB.peakCollateral : CARD_VOCAB.peakDebt,
+        lines.map((r) => ({ symbol: r.symbol, address: r.token ?? null })),
+        <span className="text-sm font-semibold tabular-nums text-foreground">
+          <PeakLines lines={lines} side={side} />
+        </span>,
+        figure,
+      );
+    };
     heads = withPeaks(
       [
         {
