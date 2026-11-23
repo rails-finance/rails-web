@@ -10,7 +10,8 @@
 // outline when not). A bookmark is an affordance state, not a risk/value
 // signal — so it stays out of the valence palette (no green/red, no amber).
 
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
+import { ListingRowContext } from "@/components/shared/position-card-edge";
 import { isBookmarked, toggleBookmark, SESSIONS_CHANGED_EVENT } from "@/lib/shared/sessions";
 
 /** Whether the wallet is saved, kept in step with every change anywhere
@@ -62,7 +63,14 @@ export function BookmarkMark({ wallet, size = 12 }: { wallet: string; size?: num
   );
 }
 
-export function BookmarkToggle({
+/** The save toggle; inside a listing row's header, the inert mark (ui-jobs
+ *  807), so no family can nest a control in the row's link. */
+export function BookmarkToggle(props: { wallet: string; ensName: string | null; size?: number }) {
+  const listingRow = useContext(ListingRowContext);
+  return listingRow ? <BookmarkMark wallet={props.wallet} /> : <BookmarkToggleButton {...props} />;
+}
+
+function BookmarkToggleButton({
   wallet,
   ensName,
   size = 13,

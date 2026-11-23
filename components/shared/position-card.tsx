@@ -275,6 +275,9 @@ interface PositionCardSlotsCommon {
   /** The position's market and ID (`ListingTag`), after the status pill on
    *  both surfaces (ui-jobs 807). */
   tag?: ReactNode;
+  /** `false` on a card with no open/closed life (a vault, a holding, an
+   *  account, a redeemer): no lifecycle pill, so a live card draws no OPEN. */
+  lifecycle?: false;
   /** A line above the headlines that stays in view: a deprecation banner, a
    *  running challenge, a refused reason. */
   notice?: ReactNode;
@@ -998,8 +1001,8 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
               and ID, then the identity. */}
           {detail ? (
             <>
-              {/* A card that is not a position (a vault card) draws no OPEN. */}
-              {(slots.status || slots.sidebar !== false) && <DetailPill status={slots.status} />}
+              {/* A card with no lifecycle draws no OPEN; a status word stands. */}
+              {(slots.status || slots.lifecycle !== false) && <DetailPill status={slots.status} />}
               {/* `contents`: the wrapper names the identity for a saved
                   position's default name without taking part in the row. */}
               <span className="contents" data-card-identity="">

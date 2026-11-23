@@ -192,6 +192,7 @@ export function MapleCustodyCard({
   const slots: PositionCardSlots = {
     surface: "detail",
     status: null,
+    lifecycle: false,
     heads,
     // Custody is what this address is.
     identity: (

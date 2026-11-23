@@ -152,6 +152,7 @@ export function liquityV2RedeemerSlots({
   return {
     surface: "detail",
     status: null,
+    lifecycle: false,
     heads,
     // The redemptions and the wallet as the tag, the deposit card's (ui-jobs 807).
     tag: <ListingTag market="Liquity V2 redemptions" id={data.address} />,

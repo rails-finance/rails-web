@@ -497,6 +497,7 @@ function plainSlots(p: VaultHoldingPlainCardProps): PositionCardSlots {
     surface: "detail",
     heading: "Holding summary",
     status: null,
+    lifecycle: false,
     identity,
     heads: p.never ? [worthNow] : [side("in"), side("out"), worthNow, profit],
     counters: null,

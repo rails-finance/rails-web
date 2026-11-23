@@ -26,7 +26,7 @@ import {
   type PositionPanelRow,
 } from "@/components/shared/position-card";
 import type { PositionCardMetaProps } from "@/components/shared/position-card-meta";
-import { BookmarkToggle } from "@/components/shared/bookmark-toggle";
+import { BookmarkMark, BookmarkToggle } from "@/components/shared/bookmark-toggle";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { StatValue, StatFootnote } from "@/components/shared/stat-value";
 import { RevealTip } from "@/components/shared/reveal-tip";
@@ -567,7 +567,7 @@ export function pwnCardSlots({
   ) : (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-rb-500 tabular-nums">
       <span className="text-foreground/80">{parties}</span>
-      {favWallet && <BookmarkToggle wallet={favWallet} ensName={null} />}
+      {favWallet && <BookmarkMark wallet={favWallet} />}
     </span>
   );
 
