@@ -5,8 +5,7 @@
 import type { MorphoPageDeployment } from "@/lib/morpho/page-deployment";
 import { morphoSweepWhole } from "@/lib/morpho/page-deployment";
 import { MORPHO_BASE_CHAIN_ID } from "./asset-catalog";
-import { morphoBasePositionHref, morphoBaseWalletHref } from "./routes";
-import { MORPHO_BASE_POSITIONS_ROUTE } from "./list-filter-dimensions";
+import { MORPHO_BASE_POSITIONS_ROUTE, morphoBasePositionHref, morphoBaseWalletHref } from "./routes";
 
 export const MORPHO_BASE_PAGE: MorphoPageDeployment = {
   session: "morpho-base",

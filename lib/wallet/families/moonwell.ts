@@ -25,11 +25,11 @@ import type { FamilyModule, HeadResult } from "./module";
 const USD_SOURCE = "Moonwell Base Comptroller's oracle at the sweep's block";
 
 /** The market roster rails-server ships beside the Base listing's rows. */
-async function readRoster(signal: AbortSignal): Promise<RawMoonwellBaseMarketState[]> {
+async function readRoster(signal: AbortSignal, readerIp?: string): Promise<RawMoonwellBaseMarketState[]> {
   const base = process.env.RAILS_API_URL?.replace(/\/$/, "");
   if (!base) throw new Error("RAILS_API_URL is not set");
   const res = await fetch(`${base}/api/moonwell-base/positions?limit=1`, {
-    ...createAuthFetchOptions({ signal }),
+    ...createAuthFetchOptions({ signal }, readerIp),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`/api/moonwell-base/positions answered ${res.status}`);
@@ -102,9 +102,9 @@ export const moonwellBase: FamilyModule = {
       };
     });
   },
-  async head(open, _address, signal, _apiMs, rows): Promise<HeadResult> {
+  async head(open, _address, signal, _apiMs, { rows, readerIp }): Promise<HeadResult> {
     if (open.length === 0) return { positions: open, reads: 0 };
-    const roster = rosterFromMarketState(await readRoster(signal));
+    const roster = rosterFromMarketState(await readRoster(signal, readerIp));
     // One summary row per wallet, so each open position finds its row by id.
     const raw = new Map(rows.map((r) => [r.positionId, r.card as RawMoonwellWalletRow]));
     const cards = await buildMoonwellPositionRows(
@@ -112,7 +112,8 @@ export const moonwellBase: FamilyModule = {
       roster,
     );
     return {
-      reads: 0,
+      // The roster's one call to rails-server; no chain is read.
+      reads: 1,
       positions: open.map((p, i): WalletPosition => {
         const s = cards[i];
         const usd = dollarsOf(s);

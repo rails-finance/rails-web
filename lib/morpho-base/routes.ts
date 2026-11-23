@@ -34,6 +34,9 @@ export function morphoBasePositionHref(wallet: string, marketId: string): string
   return `${morphoBaseWalletHref(wallet)}/${morphoBaseMarketSegment(marketId)}`;
 }
 
+/** The Base listing's positions route, which a listed card's receipts name. */
+export const MORPHO_BASE_POSITIONS_ROUTE = "/api/morpho-base/positions";
+
 // The vault routes (`/base/morpho/vaults` and its children) are formed
 // in lib/vaults/routes.ts: a vault is a chain-scoped section beside the
 // VAULTS tab of this same explorer (rails-ops decision 0028).

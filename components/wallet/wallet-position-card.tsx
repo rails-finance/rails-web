@@ -58,7 +58,7 @@ import { MoonwellDeploymentProvider } from "@/lib/moonwell/deployment-context";
 import { MOONWELL_BASE_LISTED_IDENTITY } from "@/lib/moonwell-base/listed-identity";
 import { SEAMLESS_CARD_DEPLOYMENT } from "@/lib/seamless/position-provenance";
 import { makeListedMorphoReceipts } from "@/lib/morpho/listed-card-provenance";
-import { MORPHO_BASE_POSITIONS_ROUTE } from "@/lib/morpho-base/list-filter-dimensions";
+import { MORPHO_BASE_POSITIONS_ROUTE } from "@/lib/morpho-base/routes";
 import { ArbitrumReadCard, CometReadCard } from "@/components/shared/arbitrum-positions-listing";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
@@ -69,7 +69,7 @@ import { walletBranchState } from "@/lib/wallet/trove-shutdown";
 const BASE_LANE: CompoundCardLane = { chainId: BASE_CHAIN_ID, source: "sweep" };
 
 /** A Morpho Base card's receipts: the listing's for a stored row, the wallet
- *  page's own read for an open one read at head. */
+ *  page's head read for an open one. */
 const MORPHO_BASE_RECEIPTS = {
   listing: makeListedMorphoReceipts({ chainId: BASE_CHAIN_ID, positionsRoute: MORPHO_BASE_POSITIONS_ROUTE }),
   wallet: makeListedMorphoReceipts({
@@ -257,6 +257,14 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
       // An Aave V3 Base account the chain has not been read for (open point 8).
       <span className="text-[11px] font-medium text-rb-500" data-wallet-not-read="">
         Not read
+      </span>
+    ) : p.closedSince ? (
+      <span
+        className="text-[11px] font-medium text-rb-500"
+        data-wallet-closed-since={p.closedSince.block}
+        title={`At block ${p.closedSince.block.toLocaleString("en-US")} the position holds no collateral and no debt; the card shows the sweep's earlier read.`}
+      >
+        Closed since the sweep
       </span>
     ) : (
       // A closed position's card states its ending; the read's age is an

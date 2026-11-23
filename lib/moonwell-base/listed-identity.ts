@@ -8,7 +8,7 @@ import {
   MOONWELL_BASE_DEPLOY_BLOCK,
   MOONWELL_BASE_WETH_ROUTER,
 } from "@/lib/moonwell-base/asset-catalog";
-import { MOONWELL_BASE_POSITIONS_ROUTE } from "@/lib/moonwell-base/list-filter-dimensions";
+import { MOONWELL_BASE_POSITIONS_ROUTE } from "@/lib/moonwell-base/routes";
 
 export const MOONWELL_BASE_LISTED_IDENTITY = makeListedMoonwellIdentity({
   session: "moonwell-base",

@@ -174,6 +174,10 @@ export interface WalletPosition {
    *  not run (a Trove head that failed or timed out), and the card takes the
    *  catalog's record alone (`walletBranchState`). */
   shutdown?: BranchShutdownState | null;
+  /** A stored open position the head read finds holding nothing (a Morpho
+   *  Base pair repaid and withdrawn since the sweep): the head read's block.
+   *  The card keeps the sweep's figures and its stamp says so. */
+  closedSince?: { block: number };
   headRead: HeadRead;
   readAtBlock?: number;
   /** Unix seconds. */

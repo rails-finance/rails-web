@@ -1,7 +1,8 @@
 // Compound V2 on Ethereum, for the wallet view (decision 0071; SERVER-ONLY).
 // One row per wallet (mig 512): the card is the listing row, built from the
-// summary row's `card` by the listing's builder. A closed row needs no market
-// state: its card is its peaks. The head read is the listing's read of the
+// summary row's `card` by the listing's builder. A closed row with peaks is
+// built with the market state, so its card prices the peaks to pick its main
+// market as the listing's does. The head read is the listing's read of the
 // twenty markets' state (resolveCompoundV2MarketState: rails-server's head
 // routes first, then its stored snapshot), made once for the wallet's open row
 // and handed to the builder: the exchange rates turn the stored cTokens into
@@ -54,11 +55,11 @@ export const compoundV2: FamilyModule = {
   summaryChain: "ethereum",
   summaryFamily: "compound-v2",
   async shape(rows) {
-    // No market state here: an open card is rebuilt with it in `head`.
-    const cards = await buildCompoundV2PositionRows(
-      rows.map((r) => r.card as RawCompoundV2WalletRow),
-      new Map(),
-    );
+    // An open card is rebuilt with the market state in `head`; a closed one
+    // with peaks reads it here.
+    const raw = rows.map((r) => r.card as RawCompoundV2WalletRow);
+    const peaks = rows.some((r, i) => r.status !== "open" && (raw[i].peakMarkets?.length ?? 0) > 0);
+    const cards = await buildCompoundV2PositionRows(raw, peaks ? undefined : new Map());
     return rows.map((r, i): WalletPosition => {
       const s = cards[i];
       const base: WalletPosition = {
@@ -80,17 +81,21 @@ export const compoundV2: FamilyModule = {
         history: {
           ...historyBase(r),
           size: supply || debt ? [supply ?? "nothing supplied", debt].filter(Boolean).join(" / ") : undefined,
-          sizeNote: supply || debt ? "highest recorded" : undefined,
+          sizeNote: supply || debt ? "peak" : undefined,
           result: (r.liquidationCount ?? 0) > 0 ? plural(r.liquidationCount!, "liquidation") : undefined,
         },
       };
     });
   },
-  async head(open, _address, _signal, _apiMs, rows): Promise<HeadResult> {
+  async head(open, _address, signal, _apiMs, { rows }): Promise<HeadResult> {
     if (open.length === 0) return { positions: open, reads: 0 };
+    signal.throwIfAborted();
     const state = await resolveCompoundV2MarketState();
+    signal.throwIfAborted();
+    // The block, then the two Multicalls over the twenty markets.
+    const reads = 3;
     if (state.size === 0 || !state.read) {
-      return { reads: 1, positions: open.map((p) => ({ ...p, headRead: "failed" })) };
+      return { reads, positions: open.map((p) => ({ ...p, headRead: "failed" })) };
     }
     // One summary row per wallet, so each open position finds its row by id.
     const raw = new Map(rows.map((r) => [r.positionId, r.card as RawCompoundV2WalletRow]));
@@ -99,7 +104,7 @@ export const compoundV2: FamilyModule = {
       state,
     );
     return {
-      reads: 1,
+      reads,
       positions: open.map((p, i): WalletPosition => {
         const s = cards[i];
         const usd = dollarsOf(s);

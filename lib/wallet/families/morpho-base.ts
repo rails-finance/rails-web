@@ -7,9 +7,8 @@
 // The head read is one Multicall at one Base block over the wallet's open
 // markets: each position's slots, the market's totals and its oracle's price.
 // The builder takes those as the row and its market, so every figure on an
-// open card (collateral, the debt through the totals, the collateral valued at
-// the oracle) is at that block, and the LTV against the LLTV is read from the
-// same figures.
+// open card is at that block. A pair the read finds holding nothing (mig 515's
+// open rule, `morphoOpenRaw`) keeps the sweep's card, marked `closedSince`.
 
 import { parseAbi } from "viem";
 import {
@@ -19,6 +18,7 @@ import {
   type RawMorphoPositionRow,
 } from "@/lib/sources/api/morpho-positions";
 import { parseMarketParams } from "@/lib/morpho/asset-catalog";
+import { morphoOpenRaw } from "@/lib/morpho/position-legs";
 import { MORPHO_BASE_DEPLOYMENT } from "@/lib/sources/chain/morpho-deployments";
 import { morphoBaseVaultOwnerNote } from "@/lib/morpho-base/vault-owner-note";
 import { chainClient } from "@/lib/sources/chain/rpc";
@@ -92,7 +92,7 @@ export const morphoBase: FamilyModule = {
       ];
     });
   },
-  async head(open, address, _signal, _apiMs, rows): Promise<HeadResult> {
+  async head(open, address, signal, _apiMs, { rows }): Promise<HeadResult> {
     if (open.length === 0) return { positions: open, reads: 0 };
     const byId = new Map(rows.map((r) => [r.positionId, r]));
     const targets = open.flatMap((p) => {
@@ -104,7 +104,9 @@ export const morphoBase: FamilyModule = {
     if (targets.length === 0) return { positions: open.map((p) => ({ ...p, headRead: "failed" })), reads: 0 };
 
     const client = chainClient(BASE_CHAIN_ID);
+    signal.throwIfAborted();
     const head = await client.getBlock();
+    signal.throwIfAborted();
     const blockNumber = head.number;
     const blue = MORPHO_BASE_DEPLOYMENT.blue as `0x${string}`;
     const priced = (t: (typeof targets)[number]) => !t.params.isIdle && t.params.oracle !== ZERO_ADDR;
@@ -121,11 +123,14 @@ export const morphoBase: FamilyModule = {
         : []),
     ]);
     const results = await client.multicall({ contracts, allowFailure: true, blockNumber });
+    signal.throwIfAborted();
 
     const block = Number(blockNumber);
     const at = Number(head.timestamp);
     const readAt = new Date(at * 1000).toISOString();
     const read = new Map<string, { raw: RawMorphoPositionRow; market: RawMorphoListedMarket }>();
+    // Pairs the read finds holding nothing: the sweep's card stays.
+    const closed = new Set<string>();
     let i = 0;
     for (const t of targets) {
       const pos = results[i++];
@@ -133,6 +138,10 @@ export const morphoBase: FamilyModule = {
       const price = priced(t) ? results[i++] : null;
       if (pos.status !== "success" || mkt.status !== "success") continue;
       const [, borrowShares, collateral] = pos.result as readonly [bigint, bigint, bigint];
+      if (!morphoOpenRaw(collateral.toString(), borrowShares.toString())) {
+        closed.add(t.p.positionId);
+        continue;
+      }
       const [tsa, tss, tba, tbs, lastUpdate, fee] = mkt.result as readonly bigint[];
       read.set(t.p.positionId, {
         raw: {
@@ -175,6 +184,8 @@ export const morphoBase: FamilyModule = {
     return {
       reads: 1,
       positions: open.map((p): WalletPosition => {
+        // The figures stay the sweep's, so the section states no total (rule 743).
+        if (closed.has(p.positionId)) return { ...p, closedSince: { block }, headRead: "stored" };
         const s = cardById.get(p.positionId);
         if (!s) return { ...p, headRead: "failed" };
         const prior = p.card as { vaultOwner: ReturnType<typeof morphoBaseVaultOwnerNote> };

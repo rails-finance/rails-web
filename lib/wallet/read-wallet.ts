@@ -283,6 +283,7 @@ async function readFamily(
   rows: WalletSummaryRow[],
   address: string,
   deadline: number,
+  readerIp?: string,
 ): Promise<{ read: WalletFamilyRead; positions: WalletPosition[] }> {
   const t0 = Date.now();
   const byId = new Map(rows.map((r) => [r.positionId, r]));
@@ -302,7 +303,7 @@ async function readFamily(
     try {
       const remaining = deadline - Date.now();
       head = await withBudget(Math.max(500, remaining), (signal) =>
-        f.head!(open, address, signal, walletApiWait(remaining), rows),
+        f.head!(open, address, signal, walletApiWait(remaining), { rows, readerIp }),
       );
     } catch (err) {
       error = publicErrorMessage(err);
@@ -374,7 +375,7 @@ export async function readWalletUncached(
       rows: summary.rows.filter((r) => takesRow(f, r)),
     }))
     .filter((g) => g.rows.length > 0);
-  const settled = await Promise.allSettled(groups.map((g) => readFamily(g.f, g.rows, address, deadline)));
+  const settled = await Promise.allSettled(groups.map((g) => readFamily(g.f, g.rows, address, deadline, readerIp)));
   const families: WalletFamilyRead[] = [];
   const positions: WalletPosition[] = [];
   settled.forEach((s, i) => {

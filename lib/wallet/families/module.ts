@@ -23,8 +23,17 @@ export const walletApiWait = (remainingMs: number) =>
 
 export interface HeadResult {
   positions: WalletPosition[];
-  /** Chain reads made: Multicalls, or calls of an existing reader. */
+  /** Reads made: Multicalls, calls of an existing reader, or calls to rails-server. */
   reads: number;
+}
+
+/** What a head read may need beyond its open positions. */
+export interface HeadContext {
+  /** The family's summary rows, for a head read that rebuilds an open card
+   *  with its listing builder (Compound V2, Moonwell, Morpho Base). */
+  rows: WalletSummaryRow[];
+  /** The reader's address, forwarded on a call to rails-server. */
+  readerIp?: string;
 }
 
 export interface FamilyModule {
@@ -40,15 +49,13 @@ export interface FamilyModule {
   summaryKind?: "deposits" | "stakes";
   shape(rows: WalletSummaryRow[]): Promise<WalletPosition[]>;
   /** Absent where the family's figures are the stored ones (Arbitrum). */
-  /** `apiMs`: how long to wait for rails-server's route before the chain (walletApiWait).
-   *  `rows`: the family's summary rows, for a head read that rebuilds an open
-   *  card with its listing builder (Compound V2, Moonwell, Morpho Base). */
+  /** `apiMs`: how long to wait for rails-server's route before the chain (walletApiWait). */
   head?(
     open: WalletPosition[],
     address: string,
     signal: AbortSignal,
     apiMs: number,
-    rows: WalletSummaryRow[],
+    ctx: HeadContext,
   ): Promise<HeadResult>;
 }
 
