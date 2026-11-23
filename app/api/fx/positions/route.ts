@@ -39,6 +39,8 @@ export async function GET(request: NextRequest) {
     if (sp.get("owner")) qs.set("owner", sp.get("owner")!);
     if (sp.get("pools")) qs.set("pools", sp.get("pools")!);
     if (sp.get("status")) qs.set("status", sp.get("status")!);
+    // Forwarded only as its one value: rails-server answers an empty `ended` with a 400.
+    if (sp.get("ended") === "liquidated") qs.set("ended", "liquidated");
     // A debt, collateral or transaction-count bound is forwarded only as a
     // whole number.
     for (const k of ["minDebt", "maxDebt", "minCollUsd", "maxCollUsd", "minTx", "maxTx"]) {

@@ -8,9 +8,11 @@
 // Status is ONE CHOICE of three (ui-jobs 805; lib/shared/status-choice.ts): Open, Closed or All,
 // one `status` URL value. /api/fx/positions has no row status: `open` and `closed` are facets of
 // the settled sweep, and `liquidated` is the ever-liquidated fact, OR-joined with them
-// (rails-server api/src/routes/fx.ts). So Closed sends `closed` alone, and there is no "Closed by
-// liquidation" switch. "Liquidated before" (`liq`) is asked as `liquidated` and stands only with
-// All: choosing it moves Status to All, and choosing Open or Closed turns it off.
+// (rails-server api/src/routes/fx.ts). So Closed sends `closed` alone. "Closed by liquidation"
+// (`ended`) narrows Closed as on the other families: the API's `ended=liquidated`, ANDed with
+// `status` (the position's last action was a liquidation; rails-server mig 508). "Liquidated
+// before" (`liq`) is asked as `liquidated` and stands only with All: choosing it moves Status to
+// All, and choosing Open or Closed turns it off.
 //
 // `status` on the filter object carries RAW user intent: [] is "no opinion" and resolves here
 // at read time, one value is an explicit choice. The default is never written into the filter
@@ -18,7 +20,7 @@
 // bare directory URL stays clean.
 
 import { namesIdentity } from "@/lib/fx/search";
-import { readStatusParam, statusNoun, type StatusChoice } from "@/lib/shared/status-choice";
+import { ENDED_BY_LIQUIDATION, readStatusParam, statusNoun, type StatusChoice } from "@/lib/shared/status-choice";
 
 /** The "Liquidated before" switch's one value, in the filters and in the URL (`?liq=liquidated`). */
 export const FX_LIQUIDATED_BEFORE = "liquidated";
@@ -28,6 +30,7 @@ export const FX_LIQUIDATED_BEFORE = "liquidated";
 export interface FxVisibilityInput {
   status?: string[];
   liquidations?: string[];
+  ended?: string[];
   q?: string;
 }
 
@@ -57,6 +60,16 @@ export function statusChoice(f: FxVisibilityInput): StatusChoice {
 /** "Liquidated before", in effect only with All. */
 export function liquidatedBefore(f: FxVisibilityInput): boolean {
   return statusChoice(f) === "all" && (f.liquidations ?? []).includes(FX_LIQUIDATED_BEFORE);
+}
+
+/** "Closed by liquidation", in effect only with Closed. */
+export function endedByLiquidation(f: FxVisibilityInput): boolean {
+  return statusChoice(f) === "closed" && (f.ended ?? []).includes(ENDED_BY_LIQUIDATION);
+}
+
+/** The API's `ended` value, or undefined: the route answers an empty `ended` with a 400. */
+export function fxEndedParam(f: FxVisibilityInput): typeof ENDED_BY_LIQUIDATION | undefined {
+  return endedByLiquidation(f) ? ENDED_BY_LIQUIDATION : undefined;
 }
 
 /** The status facets the API is asked for; undefined for no status filter. */
