@@ -858,7 +858,9 @@ function SegmentRow<F>({
   const options = dim.options.map((o) => ({ value: o.value as string | null, label: o.label }));
   const segments = preset ? options : [{ value: null as string | null, label: "Any" }, ...options];
   const picked = segments.findIndex((s) => s.value != null && cur.includes(s.value));
-  const at = preset ? Math.max(picked, 0) : isDimensionActive(dim, filters) ? picked : 0;
+  // A value outside the segments (the queue link's link-only Open) checks
+  // none of them; the first still takes the Tab stop.
+  const at = preset ? picked : isDimensionActive(dim, filters) ? picked : 0;
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const pick = (i: number) => {
     const v = segments[i].value;
@@ -896,7 +898,7 @@ function SegmentRow<F>({
               type="button"
               role="radio"
               aria-checked={on}
-              tabIndex={on ? 0 : -1}
+              tabIndex={i === Math.max(at, 0) ? 0 : -1}
               onClick={() => pick(i)}
               className={`flex-auto h-10 whitespace-nowrap rounded-md px-3 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                 on

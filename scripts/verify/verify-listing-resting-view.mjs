@@ -643,10 +643,6 @@ if (wants("Polaris")) {
     const searchPills = await readPills(bare, ROWS);
     const searchChips = await readChips(bare);
     const searchTotal = await readTotal(bare, ROWS, PER_PAGE);
-    // Known URL noise, not a defect: the encoder compares the effective set
-    // against the PAGE-level default (["open"]), so a holder search writes the
-    // relaxed set out. It round-trips and sets no pill — the shared encode rule
-    // (lib/shared/list-filter.ts:99-110) is deliberately page-level.
     info(label("5. after typing the holder"), `location.search "${searchUrl}"`);
     check(
       label("5a. the holder's ended position renders"),
