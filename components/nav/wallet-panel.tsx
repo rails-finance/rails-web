@@ -189,8 +189,8 @@ export function WalletPanel() {
       style={{ left: railRight }}
       data-wallet-panel-root=""
     >
-      {/* The scrim: the page behind the panel lightened (light) or darkened
-          (dark); a press closes it. */}
+      {/* The scrim: the page behind the panel darkened (H16.1); a press
+          closes it. */}
       <div
         aria-hidden="true"
         onClick={close}

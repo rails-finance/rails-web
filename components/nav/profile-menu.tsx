@@ -605,10 +605,12 @@ export function ProfileMenu() {
               aria-label={MENU_NAME}
               data-profile-menu=""
               data-profile-menu-variant={place.phone ? "sheet" : "drop"}
-              className={`${place.phone ? "fixed" : "absolute"} z-[var(--z-popover)] overflow-y-auto overscroll-contain border border-rb-200 bg-background px-3 pb-4 pt-3 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
+              // Over the scrim the phone sheet takes the modal sheet's dark
+              // tone and top edge (mobile-sheet.tsx, ui-jobs 810).
+              className={`${place.phone ? "fixed" : "absolute"} z-[var(--z-popover)] overflow-y-auto overscroll-contain border border-rb-200 bg-background px-3 pb-4 pt-3 shadow-xl ${
                 place.phone
-                  ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] rounded-t-2xl border-x-0 border-b-0 pb-[max(1rem,env(safe-area-inset-bottom))]"
-                  : "profile-drop w-80 rounded-xl"
+                  ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] rounded-t-2xl border-x-0 border-b-0 pb-[max(1rem,env(safe-area-inset-bottom))] dark:border-rb-600 dark:bg-rb-800"
+                  : "profile-drop w-80 rounded-xl dark:border-rb-800 dark:bg-rb-900"
               }`}
               // The dropdown stops above the window's foot and scrolls within
               // itself (ui-jobs 586).
