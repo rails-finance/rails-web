@@ -171,6 +171,9 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
   /** Opt-in slot rendered between the header block and the toolbar — e.g. a
    *  protocol-level stats band. Passed through to the presentation shell. */
   headerExtra?: ReactNode;
+  /** In place of the rail header's head stamp: a stamp for a listing whose
+   *  rows come from a read behind the head (Aave V3's refresh, ui-jobs 806). */
+  stamp?: ReactNode;
   /** Opt-in slot rendered ABOVE the row column, fed with the rows the page is
    *  showing — the holder strip a wallet search draws over its own positions
    *  (`components/shared/holder-strip.tsx`). Called with the displayed rows,
@@ -243,6 +246,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   renderError,
   onFilters,
   headerExtra,
+  stamp,
   renderAbove,
   renderBelow,
   identity,
@@ -582,6 +586,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
         title={typeof title === "function" ? title(filters) : title}
         protocol={directoryEntry}
         headerExtra={headerExtra}
+        stamp={stamp}
         above={above}
         below={renderBelow?.(filters)}
         emptyNote={

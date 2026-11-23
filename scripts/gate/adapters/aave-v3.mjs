@@ -34,7 +34,7 @@ import {
   stableRateReserves,
 } from "@/lib/aave-v3/market-notes";
 import { marketNoteReceiptLine, marketNoteSentence } from "@/lib/shared/market-note";
-import { v3ViewWithLiveRead } from "@/lib/aave-v3/chain-position-view";
+import { v3IndexLag, v3PageView } from "@/lib/aave-v3/chain-position-view";
 import { getJson } from "../lib/host-fetch.mjs";
 
 export default {
@@ -121,7 +121,8 @@ export default {
           )
         : [];
 
-    const liveView = chain ? v3ViewWithLiveRead(view, chain) : view;
+    // As the page does (v3PageView): a tail ahead of the index row takes the read's balances.
+    const liveView = v3PageView(view, chain, true, v3IndexLag(view, aaveEvents, servedFolders));
     const lifetimeEvents = lifetimeFiguresKnown(historyWindow) ? aaveEvents : undefined;
     const captions = computeAaveV3CardCaptions(
       liveView,
