@@ -87,7 +87,7 @@ export function StatBreakdown({
   /** The button's `data-stat-breakdown-toggle`: the row's id. */
   id: string;
   label: string;
-  /** The figure on the button: the assets' USD total, or their count. */
+  /** The figure on the button: the assets' USD total. */
   figure: ReactNode;
   breakdown: PanelRowBreakdown;
 }) {

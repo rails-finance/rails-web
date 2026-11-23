@@ -41,13 +41,7 @@ import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
-import {
-  mainAssetFigure,
-  rankingWords,
-  useClosedPeaks,
-  withPeaks,
-  type ClosedPeakFlows,
-} from "@/components/shared/closed-peak";
+import { mainAssetFigure, useClosedPeaks, withPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
 import { pickMainAsset, splitSupplied } from "@/lib/shared/main-asset";
 import { HeadingTip } from "@/components/shared/tip-label";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
@@ -439,29 +433,37 @@ export function useAaveV3CardSlots({
   if (v.status === "closed" || v.status === "liquidated") {
     const notRecorded = peaks ? undefined : notRecordedNote("position");
     // Each side leads with its main asset at its highest recorded balance,
-    // the same on the listing row and the position page (both read the
-    // listing's prices, `pickMainAsset`); the other assets sit on the small
-    // line, and every peak opens behind the press under the peak label (C19).
+    // picked from the listing's prices (`pickMainAsset`): the same face on
+    // the listing row and the position page where the listing carries the
+    // account's peaks (Ethereum). Base, Arbitrum and Seamless listings carry
+    // none, so their rows read "not recorded" while the page shows the face.
+    // The other assets sit on the small line, and every peak opens behind the
+    // press under the peak label (C19).
     const peakHead = (
       id: string,
       label: string,
       peakLabel: string,
       reserves: AaveV3ReserveAmount[],
       receipt: (symbol: string) => Provenance,
-      panel: ReactNode,
+      /** The dropdown's body, given each line's receipt. */
+      panel: (receiptOf: (r: AaveV3ReserveAmount) => Provenance) => ReactNode,
     ): PositionCardHead => {
-      const main = pickMainAsset(
+      const pick = pickMainAsset(
         reserves.map((r) => ({ ...r, key: r.address })),
         v.priceByAddress,
       );
-      const figure = main
+      const figure = pick
         ? mainAssetFigure({
-            main: { ...main, exact: formatUnitsExact(main.amountRaw, main.decimals) },
-            receipt: receipt(main.symbol),
-            ranking: rankingWords(v.priceBlock),
+            main: { ...pick.main, exact: formatUnitsExact(pick.main.amountRaw, pick.main.decimals) },
+            receipt: receipt(pick.main.symbol),
+            block: v.priceBlock,
+            skipped: pick.skipped,
             side: id === "peak-debt" ? "debt" : "supply",
           })
         : undefined;
+      // The main asset's line carries the ranking row its figure carries.
+      const receiptOf = (r: AaveV3ReserveAmount) =>
+        figure && pick && r.address === pick.main.address ? figure.info : receipt(r.symbol);
       return {
         id,
         label,
@@ -471,7 +473,7 @@ export function useAaveV3CardSlots({
           ? assetsHead(
               peakLabel,
               reserves.map((r) => ({ symbol: r.symbol, address: r.address })),
-              panel,
+              panel(receiptOf),
               figure,
             )
           : {}),
@@ -485,30 +487,29 @@ export function useAaveV3CardSlots({
     // does, so it never moves when the collateral switches land; read, they
     // order the supply dropdown: the collateral peaks first, then the
     // supplies that backed no borrowing under "Supplied, not collateral".
-    const lines = (reserves: AaveV3ReserveAmount[], receipt: (symbol: string) => Provenance) => (
-      <ReserveAmounts reserves={reserves} receipt={(r) => receipt(r.symbol)} iconSize={16} />
+    const lines = (reserves: AaveV3ReserveAmount[], receiptOf: (r: AaveV3ReserveAmount) => Provenance) => (
+      <ReserveAmounts reserves={reserves} receipt={receiptOf} iconSize={16} />
     );
     const { first, others } = splitSupplied(v.peakSupplies, notCollateral != null ? isOther : undefined);
-    const suppliedPanel = (
-      <span className="flex flex-col gap-3 text-sm font-semibold tabular-nums text-foreground">
-        {first.length > 0 && lines(first, dep.peakSupply)}
-        {others.length > 0 && (
-          <span className="flex flex-col gap-1" data-aave-peak-not-collateral="">
-            <span className="text-xs font-medium text-rb-500">
-              <HeadingTip text="Supplied, not collateral" tip={PEAK_NOT_COLLATERAL_TIP} />
-            </span>
-            {lines(others, dep.peakSupply)}
-          </span>
-        )}
-      </span>
-    );
     const supplyHead = peakHead(
       "peak-supplied",
       "Supplied",
       CARD_VOCAB.peakSupplied,
       v.peakSupplies,
       dep.peakSupply,
-      suppliedPanel,
+      (receiptOf) => (
+        <span className="flex flex-col gap-3 text-sm font-semibold tabular-nums text-foreground">
+          {first.length > 0 && lines(first, receiptOf)}
+          {others.length > 0 && (
+            <span className="flex flex-col gap-1" data-aave-peak-not-collateral="">
+              <span className="text-xs font-medium text-rb-500">
+                <HeadingTip text="Supplied, not collateral" tip={PEAK_NOT_COLLATERAL_TIP} />
+              </span>
+              {lines(others, receiptOf)}
+            </span>
+          )}
+        </span>
+      ),
     );
     const debtHead = peakHead(
       "peak-debt",
@@ -516,7 +517,9 @@ export function useAaveV3CardSlots({
       CARD_VOCAB.peakDebt,
       v.peakBorrows,
       dep.peakDebt,
-      <span className="text-sm font-semibold tabular-nums text-foreground">{lines(v.peakBorrows, dep.peakDebt)}</span>,
+      (receiptOf) => (
+        <span className="text-sm font-semibold tabular-nums text-foreground">{lines(v.peakBorrows, receiptOf)}</span>
+      ),
     );
     const common = {
       name,

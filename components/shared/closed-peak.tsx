@@ -1,31 +1,32 @@
 "use client";
 
 // A closed account card's head per side (rails-ops ui-jobs 803), the same on
-// the listing row and the position page: the side's main asset
-// (`pickMainAsset`, lib/shared/main-asset.ts) at its highest recorded balance
-// in its own token, drawn as an open card draws "0.11" with its icon
-// (`AssetAmount`, `mainAssetFigure` below). The small line under it reads
-// "Also supplied" or "Also borrowed" with the side's other assets
-// (`assetsHead`, components/shared/position-card.tsx). The figure's receipt
-// is the asset's highest-recorded receipt with one row stating why it leads;
-// the C19 button's name carries the same statement.
+// the listing row and the position page where the listing carries the
+// account's peaks: the side's main asset (`pickMainAsset`,
+// lib/shared/main-asset.ts) at its highest recorded balance in its token,
+// drawn as an open card draws "0.11" with its icon (`AssetAmount`,
+// `mainAssetFigure` below). The small line under it reads "Also supplied" or
+// "Also borrowed" with the side's other assets (`assetsHead`,
+// components/shared/position-card.tsx). The figure's receipt is the asset's
+// highest-recorded receipt with one row stating why it leads, which the
+// dropdown's line for that asset carries too; the C19 button's name carries
+// the same statement.
 //
-// The side's one-day peak value lives in the position page's dropdown alone:
+// The side's one-day peak value lives in the position page's dropdown:
 // `useClosedPeaks` computes it into `PositionCardHead.peak` (`withPeaks`), and
-// `PeakLine` draws it under the dropdown's heading.
+// `PeakLine` draws "Peak value $1.2M · 3 Mar 2025" under the dropdown's
+// heading. The value is the side's held assets summed on the day they were
+// worth the most, each valued as the Lifetime flows panel values that day
+// (lib/shared/flows-peak.ts). It reads the flows timeline the page holds for
+// that panel, so the card makes no read; it takes the page's flow model where
+// the page passes one, else builds it once per timeline, and both sides come
+// from one pass over its days. Rows match the card's assets by the timeline's
+// key (a reserve's address, a market), else by symbol. Its receipt is the
+// panel's held-figure receipt for that day (`heldDayProv`), named "Peak
+// value, supplied" or "Peak value, debt".
 //
-// The peak value per side, as `useClosedPeaks` gives it: a figure "$1.2M"
-// and a note "Peak · 3 Mar 2025", the side's held assets summed on the day they were worth the most, each valued
-// as the Lifetime flows panel values that day (lib/shared/flows-peak.ts). It
-// reads the flows timeline the page holds for that panel, so the card makes
-// no read; it takes the page's flow model where the page passes one, else
-// builds it once per timeline, and both sides come from one pass over its
-// days. Rows match the card's assets by the timeline's key (a reserve's
-// address, a market), else by symbol. The figure's receipt is the panel's
-// held-figure receipt for that day (`heldDayProv`).
-//
-// Where a side has no peak, the note says why, by cause:
-//   - the read is running: a placeholder bar in the figure's place;
+// Where a side has no peak, the line says why, by cause:
+//   - the read is running: a placeholder bar;
 //   - the read failed: "Unavailable" (the Trove card's word for a read that
 //     did not answer, components/trove/TroveDetailsBand.tsx);
 //   - every held day had an unpriced asset: "price unavailable"
@@ -69,27 +70,15 @@ export interface ClosedPeakAsset {
   key?: string | null;
 }
 
-/** A head's peak: the figure, the small line's words under it and, where
- *  there is one, the total the dropdown's heading states with its receipt.
- *  `state`: the words a figureless side's button name carries. */
+/** A side's peak for the dropdown's `PeakLine`: the value with its receipt
+ *  and day, or why there is none. */
 export interface PeakHeadFigure {
-  /** Null: no dollar figure; `note` says why. */
-  figure: ReactNode | null;
-  /** The small line's words under the figure, before the icons. */
+  /** The placeholder bar while the timeline is read. */
+  figure?: ReactNode;
+  /** Why the side has no peak, in words, with its receipt where it has one. */
   note?: ReactNode;
+  /** The peak: its value, receipt and day. */
   total?: { usd: number; info: Provenance; at: string };
-  state?: string;
-}
-
-/** "$1.2M", muted as a historic figure, exact on hover. */
-function PeakFigure({ usd, info }: { usd: number; info: Provenance }) {
-  return (
-    <span className="text-rb-500" data-card-peak="">
-      <RevealTip tip={formatUsdValue(usd)}>
-        <Prov info={info}>{formatCompactUsd(usd)}</Prov>
-      </RevealTip>
-    </span>
-  );
 }
 
 /** The Trove card's word for a read that did not answer. */
@@ -156,9 +145,7 @@ export function useClosedPeaks(
       // A side with no figure says why on the small line, with the icons, so
       // the card keeps the priced card's height.
       const words = (text: string, hook: string, prov?: Provenance): PeakHeadFigure => ({
-        figure: null,
         note: <span {...{ [hook]: "" }}>{prov ? <Prov info={prov}>{text}</Prov> : text}</span>,
-        state: text,
       });
       if (read === "failed") return words(READ_FAILED, "data-card-unavailable");
       // A done read with no timeline is an empty one: nothing recorded. A
@@ -166,13 +153,13 @@ export function useClosedPeaks(
       if (!peaks)
         return read === "done" && !timeline
           ? words(NOT_RECORDED, "data-card-not-recorded")
-          : { figure: <SkeletonBar width={96} figure />, state: "loading" };
+          : { figure: <SkeletonBar width={96} figure /> };
       const result = peaks.out[side];
       const state = peakState(result);
       if (state === "unpriced")
         return words(unavailableWords(true), "data-card-unavailable", {
           kind: "derived",
-          summary: `Peak ${label.toLowerCase()}. No day the side was held has a dollar figure.`,
+          summary: `Peak value, ${label.toLowerCase()}. No day the side was held has a dollar figure.`,
           inputs: [
             {
               label: "assets without a price",
@@ -186,7 +173,7 @@ export function useClosedPeaks(
       const { peak, unpriced } = result;
       if (state === "not-recorded" || !peak) return words(NOT_RECORDED, "data-card-not-recorded");
       const at = formatDate(peak.day * 86_400);
-      const prov = heldDayProv(`Peak ${label.toLowerCase()}`, at, peak.rows, formatCompactUsd);
+      const prov = heldDayProv(`Peak value, ${label.toLowerCase()}`, at, peak.rows, formatCompactUsd);
       // Days a held asset had no price carry no dollar figure, so the peak
       // is the highest of the others.
       const info: Provenance = unpriced.length
@@ -203,36 +190,44 @@ export function useClosedPeaks(
             ],
           }
         : prov;
-      return {
-        figure: <PeakFigure usd={peak.usd} info={info} />,
-        note: <span data-card-peak-day="">Peak · {at}</span>,
-        total: { usd: peak.usd, info, at },
-      };
+      return { total: { usd: peak.usd, info, at } };
     },
     [closed, has, read, timeline, peaks],
   );
 }
 
-/** How the main asset was picked, in the receipt and the button's name:
- *  "largest by value at the oracle price, block 21,345,678". */
-export const rankingWords = (block: number | null | undefined) =>
-  block != null
-    ? `largest by value at the oracle price, block ${block.toLocaleString("en-US")}`
-    : "largest by value at the latest oracle price";
+/** How the main asset was picked: "largest by value at the oracle price,
+ *  block 21,345,678" in the receipt, "largest by value at the oracle price"
+ *  in the button's name (`withBlock` false). Where the pick passed over
+ *  assets with no price or no decimals, "largest priced …; 2 unpriced". */
+function rankingWords(block: number | null | undefined, skipped: number, withBlock: boolean): string {
+  const head = skipped > 0 ? "largest priced" : "largest by value";
+  const basis = !withBlock
+    ? "at the oracle price"
+    : block != null
+      ? `at the oracle price, block ${block.toLocaleString("en-US")}`
+      : "at the latest oracle price";
+  return `${head} ${basis}${skipped > 0 ? `; ${skipped} unpriced` : ""}`;
+}
 
+/** The face's figure for a side's main asset, and `info`: its receipt with
+ *  the ranking row, which the dropdown's line for the asset carries too. */
 export function mainAssetFigure(o: {
   main: { symbol: string; address: string | null; amount: number; exact?: string };
   /** The asset's highest-recorded receipt (the dropdown line's). */
   receipt: Provenance;
-  ranking: string;
+  /** The block the prices were read at, where the read names one. */
+  block: number | null | undefined;
+  /** Assets the pick passed over (`pickMainAsset`). */
+  skipped: number;
   side: "supply" | "debt";
-}): { figure: ReactNode; main: AssetMark; state: string; also: string } {
+}): { figure: ReactNode; main: AssetMark; state: string; also: string; info: Provenance } {
   const { main } = o;
   const info: Provenance = {
     ...o.receipt,
     inputs: [
       ...(o.receipt.inputs ?? []),
-      { label: "shown first", value: main.symbol, kind: "derived", note: o.ranking },
+      { label: "shown first", value: main.symbol, kind: "derived", note: rankingWords(o.block, o.skipped, true) },
     ],
   };
   return {
@@ -249,8 +244,9 @@ export function mainAssetFigure(o: {
       </span>
     ),
     main: { symbol: main.symbol, address: main.address },
-    state: `${formatCompact(main.amount)} ${main.symbol}, largest by value`,
+    state: `${formatCompact(main.amount)} ${main.symbol}, ${rankingWords(o.block, o.skipped, false)}`,
     also: o.side === "debt" ? "Also borrowed" : "Also supplied",
+    info,
   };
 }
 

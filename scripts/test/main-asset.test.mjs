@@ -20,16 +20,16 @@ const listingRow = [
 const pageView = listingRow.map((r) => ({ ...r, amountRaw: String(r.amount), decimals: 18, address: r.key }));
 
 test("the largest by value wins, the same asset from either surface's shape", () => {
-  assert.equal(pickMainAsset(listingRow, prices).symbol, "USDC");
-  assert.equal(pickMainAsset(pageView, prices).symbol, "USDC");
+  assert.equal(pickMainAsset(listingRow, prices).main.symbol, "USDC");
+  assert.equal(pickMainAsset(pageView, prices).main.symbol, "USDC");
 });
 
 test("an unpriced asset, or one whose decimals did not load, is not a candidate", () => {
   const noUsdc = { ...prices };
   delete noUsdc[USDC.toLowerCase()];
-  assert.equal(pickMainAsset(listingRow, noUsdc).symbol, "WETH");
+  assert.equal(pickMainAsset(listingRow, noUsdc).main.symbol, "WETH");
   const unread = listingRow.map((r) => (r.symbol === "USDC" ? { ...r, decimalsUnread: true } : r));
-  assert.equal(pickMainAsset(unread, prices).symbol, "WETH");
+  assert.equal(pickMainAsset(unread, prices).main.symbol, "WETH");
 });
 
 test("no price for any asset: no pick", () => {
@@ -42,7 +42,7 @@ test("a tie keeps the side's first", () => {
     { symbol: "USDC", key: USDC, amount: 3000 },
     { symbol: "WETH", key: WETH, amount: 1 },
   ];
-  assert.equal(pickMainAsset(tie, prices).symbol, "USDC");
+  assert.equal(pickMainAsset(tie, prices).main.symbol, "USDC");
 });
 
 test("two markets sharing a symbol stay apart by key", () => {
@@ -50,7 +50,7 @@ test("two markets sharing a symbol stay apart by key", () => {
     { symbol: "WBTC", key: "cwbtc", amount: 1 },
     { symbol: "WBTC", key: "cwbtc2", amount: 2 },
   ];
-  assert.equal(pickMainAsset(markets, { cwbtc: 60000, cwbtc2: 60000 }).key, "cwbtc2");
+  assert.equal(pickMainAsset(markets, { cwbtc: 60000, cwbtc2: 60000 }).main.key, "cwbtc2");
 });
 
 test("the supplied dropdown: collateral first, then the not-collateral supplies, each in order", () => {
@@ -67,4 +67,14 @@ test("the supplied dropdown: collateral first, then the not-collateral supplies,
     splitSupplied(["USDC"], () => true),
     { first: [], others: ["USDC"] },
   );
+});
+
+test("the pick counts the assets it passed over for want of a price or decimals", () => {
+  assert.equal(pickMainAsset(listingRow, prices).skipped, 0);
+  const noUsdc = { ...prices };
+  delete noUsdc[USDC.toLowerCase()];
+  const unread = listingRow.map((r) => (r.symbol === "WBTC" ? { ...r, decimalsUnread: true } : r));
+  const out = pickMainAsset(unread, noUsdc);
+  assert.equal(out.main.symbol, "WETH");
+  assert.equal(out.skipped, 2);
 });

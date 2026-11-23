@@ -29,13 +29,7 @@
 // $14.4263): their lines carry the flag, and any USD headline they contribute
 // to says so in its receipt.
 
-import {
-  mainAssetFigure,
-  rankingWords,
-  useClosedPeaks,
-  withPeaks,
-  type ClosedPeakFlows,
-} from "@/components/shared/closed-peak";
+import { mainAssetFigure, useClosedPeaks, withPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
 import { pickMainAsset } from "@/lib/shared/main-asset";
 import { positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
@@ -304,22 +298,25 @@ function UsdFigure({ usd, info, form }: { usd: number; info: Provenance; form: "
   );
 }
 
+/** A market's highest-recorded receipt. */
+const peakProvOf = (r: CompoundV2PeakAmount, side: "supply" | "debt"): Provenance =>
+  side === "supply" ? peakSupplyProv(r.symbol, ctokenOf(r.market)) : peakDebtProv(r.symbol, ctokenOf(r.market));
+
 /** One market's peak amounts (highest recorded), each traced to the lane's
  *  maximum (the supply balance at a row on supply, emitted accountBorrows on
  *  debt); no USD, the token amount only. Null where nothing was recorded. */
-function peakValue(lines: CompoundV2PeakAmount[], side: "supply" | "debt"): ReactNode | null {
+function peakValue(
+  lines: CompoundV2PeakAmount[],
+  side: "supply" | "debt",
+  /** A line whose receipt differs (the face's main market, with its ranking). */
+  receiptFor?: (r: CompoundV2PeakAmount) => Provenance | undefined,
+): ReactNode | null {
   if (lines.length === 0) return null;
   return (
     <div className="flex flex-col gap-1">
       {lines.map((r) => (
         <div key={r.market}>
-          <Prov
-            info={
-              side === "supply"
-                ? peakSupplyProv(r.symbol, ctokenOf(r.market))
-                : peakDebtProv(r.symbol, ctokenOf(r.market))
-            }
-          >
+          <Prov info={receiptFor?.(r) ?? peakProvOf(r, side)}>
             <AssetAmount
               value={r.amount}
               symbol={r.symbol}
@@ -491,47 +488,51 @@ export function useCompoundV2CardSlots({
   if (ended) {
     // Each side leads with its main market at its highest recorded balance,
     // the same on the listing row and the position page (both read the
-    // listing's prices, keyed by market, `pickMainAsset`).
-    const figureOf = (lines: CompoundV2PeakAmount[], side: "supply" | "debt") => {
-      const main = pickMainAsset(
-        lines.map((r) => ({ ...r, key: r.market })),
-        v.priceByMarket,
-      );
-      return main
-        ? mainAssetFigure({
-            main: {
-              ...markOf(main),
-              amount: main.amount,
-              exact: formatUnitsExact(main.amountRaw, main.decimals),
-            },
-            receipt:
-              side === "supply"
-                ? peakSupplyProv(main.symbol, ctokenOf(main.market))
-                : peakDebtProv(main.symbol, ctokenOf(main.market)),
-            ranking: rankingWords(null),
-            side: side,
-          })
-        : undefined;
-    };
+    // listing's prices, keyed by market, `pickMainAsset`, at the market
+    // read's block).
     const peakHead = (
       id: string,
       label: string,
       peakLabel: string,
       lines: CompoundV2PeakAmount[],
       side: "supply" | "debt",
-    ) => ({
-      id,
-      label,
-      value: null,
-      ...(lines.length > 0
-        ? assetsHead(
-            peakLabel,
-            lines.map(markOf),
-            <span className="text-sm font-semibold tabular-nums text-foreground">{peakValue(lines, side)}</span>,
-            figureOf(lines, side),
-          )
-        : {}),
-    });
+    ) => {
+      const pick = pickMainAsset(
+        lines.map((r) => ({ ...r, key: r.market })),
+        v.priceByMarket,
+      );
+      const figure = pick
+        ? mainAssetFigure({
+            main: {
+              ...markOf(pick.main),
+              amount: pick.main.amount,
+              exact: formatUnitsExact(pick.main.amountRaw, pick.main.decimals),
+            },
+            receipt: peakProvOf(pick.main, side),
+            block: v.marketRead?.blockNumber ?? null,
+            skipped: pick.skipped,
+            side,
+          })
+        : undefined;
+      // The main market's line carries the ranking row its figure carries.
+      const receiptFor = (r: CompoundV2PeakAmount) =>
+        figure && pick && r.market === pick.main.market ? figure.info : undefined;
+      return {
+        id,
+        label,
+        value: null,
+        ...(lines.length > 0
+          ? assetsHead(
+              peakLabel,
+              lines.map(markOf),
+              <span className="text-sm font-semibold tabular-nums text-foreground">
+                {peakValue(lines, side, receiptFor)}
+              </span>,
+              figure,
+            )
+          : {}),
+      };
+    };
     const heads: PositionCardHead[] = withPeaks(
       [
         peakHead("peak-collateral", SUPPLIED, CARD_VOCAB.peakSupplied, v.peakSupplies, "supply"),

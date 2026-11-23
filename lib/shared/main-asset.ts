@@ -1,5 +1,5 @@
 // A closed account side's main asset (rails-ops ui-jobs 803): the asset the
-// head leads with, in its own token, on the listing row and the position page
+// head leads with, in its token, on the listing row and the position page
 // alike. Both surfaces pass the same inputs (each asset's highest recorded
 // amount and the row's price for it, as the position listing serves them), so
 // both pick the same asset. The pick is the largest by value: amount × price.
@@ -16,24 +16,28 @@ export interface MainAssetCandidate {
 }
 
 /** `prices` maps a lowercased key to USD per token. Null where no candidate
- *  has a price. */
+ *  has a price; else the pick and how many assets it passed over for want
+ *  of a price or their decimals (`skipped`), which the ranking states. */
 export function pickMainAsset<T extends MainAssetCandidate>(
   assets: readonly T[],
   prices: Readonly<Record<string, number>> | undefined,
-): T | null {
+): { main: T; skipped: number } | null {
   let best: T | null = null;
   let bestUsd = -1;
+  let skipped = 0;
   for (const a of assets) {
-    if (a.decimalsUnread) continue;
-    const p = prices?.[a.key.toLowerCase()] ?? prices?.[a.key];
-    if (p == null || !(p > 0)) continue;
+    const p = a.decimalsUnread ? undefined : (prices?.[a.key.toLowerCase()] ?? prices?.[a.key]);
+    if (p == null || !(p > 0)) {
+      skipped++;
+      continue;
+    }
     const usd = a.amount * p;
     if (usd > bestUsd) {
       best = a;
       bestUsd = usd;
     }
   }
-  return best;
+  return best ? { main: best, skipped } : null;
 }
 
 /** A closed account's supplied peaks in its dropdown's order: those that

@@ -37,20 +37,14 @@ import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { TokenAmountNotLoaded, loadedMarks } from "@/components/shared/not-loaded";
-import {
-  mainAssetFigure,
-  rankingWords,
-  useClosedPeaks,
-  withPeaks,
-  type ClosedPeakFlows,
-} from "@/components/shared/closed-peak";
+import { mainAssetFigure, useClosedPeaks, withPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
 import { pickMainAsset, splitSupplied } from "@/lib/shared/main-asset";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { Icon } from "@/components/icons/icon";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
   positionSupplyProv,
   positionDebtProv,
@@ -97,6 +91,9 @@ export interface SparkPositionView {
    *  lowercased token address. A reserve the oracle didn't price is absent
    *  (the side's total then omits). */
   priceByAddress?: Record<string, number>;
+  /** The block `priceByAddress` was read at, where the listing's read names
+   *  one. */
+  priceBlock?: number | null;
   /** The block each price merged in later was read at (null: the read named
    *  none), by lowercased address (ui-jobs 743). */
   priceBlockByAddress?: Record<string, number | null>;
@@ -286,12 +283,25 @@ function TokenStack({
  *  the scaled-delta reducer's largest running claim, valued at the index of
  *  the moment it stood. No USD: the peaks are maxima at different moments, so
  *  pricing them at one block would assert a portfolio that never existed. */
-function PeakLines({ reserves, side }: { reserves: SparkReserveAmount[]; side: "supply" | "debt" }) {
+function PeakLines({
+  reserves,
+  side,
+  receiptFor,
+}: {
+  reserves: SparkReserveAmount[];
+  side: "supply" | "debt";
+  /** A line whose receipt differs (the face's main asset, with its ranking). */
+  receiptFor?: (r: SparkReserveAmount) => Provenance | undefined;
+}) {
   return (
     <span className="flex flex-col gap-1">
       {reserves.map((r) => (
         <span key={r.address}>
-          <Prov info={side === "supply" ? sparkPeakSupplyProv(r.symbol) : sparkPeakBorrowProv(r.symbol)}>
+          <Prov
+            info={
+              receiptFor?.(r) ?? (side === "supply" ? sparkPeakSupplyProv(r.symbol) : sparkPeakBorrowProv(r.symbol))
+            }
+          >
             {r.decimalsUnread ? (
               <TokenAmountNotLoaded address={r.address} label={r.symbol} />
             ) : (
@@ -465,49 +475,51 @@ export function useSparkCardSlots({
     const peaksRead = v.peakSupplies.length + v.peakBorrows.length > 0;
     // Each side leads with its main asset at its highest recorded balance,
     // the same on the listing row and the position page (both read the
-    // listing's prices, `pickMainAsset`).
-    const figureOf = (reserves: SparkReserveAmount[], side: "supply" | "debt") => {
-      const main = pickMainAsset(
+    // listing's prices, `pickMainAsset`, at the listing read's oracle block).
+    const { first, others } = splitSupplied(v.peakSupplies, notCollateral != null ? isOther : undefined);
+    const held = (reserves: SparkReserveAmount[], side: "supply" | "debt") => {
+      if (reserves.length === 0) return {};
+      const pick = pickMainAsset(
         reserves.map((r) => ({ ...r, key: r.address })),
         v.priceByAddress,
       );
-      return main
+      const figure = pick
         ? mainAssetFigure({
-            main: { ...main, exact: formatUnitsExact(main.amountRaw, main.decimals) },
-            receipt: side === "supply" ? sparkPeakSupplyProv(main.symbol) : sparkPeakBorrowProv(main.symbol),
-            ranking: rankingWords(null),
-            side: side,
+            main: { ...pick.main, exact: formatUnitsExact(pick.main.amountRaw, pick.main.decimals) },
+            receipt: side === "supply" ? sparkPeakSupplyProv(pick.main.symbol) : sparkPeakBorrowProv(pick.main.symbol),
+            block: v.priceBlock,
+            skipped: pick.skipped,
+            side,
           })
         : undefined;
-    };
-    const { first, others } = splitSupplied(v.peakSupplies, notCollateral != null ? isOther : undefined);
-    const panelOf = (side: "supply" | "debt") =>
-      side === "debt" ? (
-        <span className="text-sm font-semibold tabular-nums text-foreground">
-          <PeakLines reserves={v.peakBorrows} side="debt" />
-        </span>
-      ) : (
-        <span className="flex flex-col gap-3 text-sm font-semibold tabular-nums text-foreground">
-          {first.length > 0 && <PeakLines reserves={first} side="supply" />}
-          {others.length > 0 && (
-            <span className="flex flex-col gap-1" data-spark-peak-breakdown="">
-              <span className="text-xs font-medium text-rb-500">
-                <HeadingTip text="Supplied, not collateral" tip={PEAK_NOT_COLLATERAL_TIP} />
+      // The main asset's line carries the ranking row its figure carries.
+      const receiptFor = (r: SparkReserveAmount) =>
+        figure && pick && r.address === pick.main.address ? figure.info : undefined;
+      const panel =
+        side === "debt" ? (
+          <span className="text-sm font-semibold tabular-nums text-foreground">
+            <PeakLines reserves={v.peakBorrows} side="debt" receiptFor={receiptFor} />
+          </span>
+        ) : (
+          <span className="flex flex-col gap-3 text-sm font-semibold tabular-nums text-foreground">
+            {first.length > 0 && <PeakLines reserves={first} side="supply" receiptFor={receiptFor} />}
+            {others.length > 0 && (
+              <span className="flex flex-col gap-1" data-spark-peak-breakdown="">
+                <span className="text-xs font-medium text-rb-500">
+                  <HeadingTip text="Supplied, not collateral" tip={PEAK_NOT_COLLATERAL_TIP} />
+                </span>
+                <PeakLines reserves={others} side="supply" receiptFor={receiptFor} />
               </span>
-              <PeakLines reserves={others} side="supply" />
-            </span>
-          )}
-        </span>
+            )}
+          </span>
+        );
+      return assetsHead(
+        side === "debt" ? CARD_VOCAB.peakDebt : CARD_VOCAB.peakSupplied,
+        reserves.map((r) => ({ symbol: r.symbol, address: r.address })),
+        panel,
+        figure,
       );
-    const held = (reserves: SparkReserveAmount[], side: "supply" | "debt") =>
-      reserves.length > 0
-        ? assetsHead(
-            side === "debt" ? CARD_VOCAB.peakDebt : CARD_VOCAB.peakSupplied,
-            reserves.map((r) => ({ symbol: r.symbol, address: r.address })),
-            panelOf(side),
-            figureOf(reserves, side),
-          )
-        : {};
+    };
     heads = withPeaks(
       [
         {
@@ -818,6 +830,7 @@ export function viewFromSummary(s: SparkPositionSummary): SparkPositionView {
     txCount: s.txCount,
     lastActivityAt: s.lastActivityAt,
     priceByAddress: s.priceByAddress,
+    priceBlock: s.priceBlock ?? null,
     // A listing view never carries a health factor (0018): the row's snapshot
     // HF is not read, and the position page's own live read is the only one
     // the card shows.

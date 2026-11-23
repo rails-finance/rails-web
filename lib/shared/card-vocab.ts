@@ -63,6 +63,6 @@ export function notRecordedNote(open: "position" | "wallet" = "position"): strin
   return `${NOT_RECORDED} on this lane; open the ${open} for its whole history`;
 }
 
-/** The note's words alone, where the reader is already on the position's
+/** The note's words alone, where the reader is on the position's
  *  page: its history holds no figure for the column. */
 export const NOT_RECORDED = "not recorded";
