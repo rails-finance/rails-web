@@ -322,7 +322,7 @@ function CompoundMenuRows({ pagePath }: { pagePath: string }) {
 /** The heads in Compound's docs' words (rails-ops reference/official-docs/compound.md). */
 const SUPPLIED = "Supplied";
 const BORROW_BALANCE = "Borrow balance";
-const PEAK_BORROW_BALANCE = "Highest recorded borrow balance";
+const PEAK_BORROW_BALANCE = "Peak borrow balance";
 
 /** What the card's count counts, beside the timeline's event count. */
 const COUNT_TIP =

@@ -21,7 +21,7 @@
 //
 // The fields the Pool cannot supply — the peaks a closed card shows, and the
 // activity metadata in its meta cluster — come from the sweep, and ONLY when
-// the sweep read the whole life: a "highest recorded" over a horizoned or
+// the sweep read the whole life: a "peak" over a horizoned or
 // holed history would name a maximum the wallet may have exceeded before the
 // sweep could see. Without a whole sweep they stay at their empty values,
 // never guessed.

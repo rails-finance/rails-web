@@ -137,7 +137,7 @@ export function makeListedMoonwellIdentity(id: ListedMoonwellIdentityArgs): Moon
   const notRecorded = (what: string): Provenance => ({
     kind: "chain-derived",
     pclass: "state",
-    summary: `${what} is not recorded on this lane. A listing row is a chain read at one block with no replay of the wallet's history behind it, so its highest recorded amounts are unknown here; the position page sweeps the wallet's whole history and states them.`,
+    summary: `${what} is not recorded on this lane. A listing row is a chain read at one block with no replay of the wallet's history behind it, so its peak amounts are unknown here; the position page sweeps the wallet's whole history and states them.`,
     contract: id.comptroller,
     via: custody,
   });

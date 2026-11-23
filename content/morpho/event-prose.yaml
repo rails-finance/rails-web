@@ -1138,7 +1138,7 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Highest recorded
+          Peak
         text: |-
           each peak is the highest of the running balances replayed from the position's events; the debt peak is principal, without interest.
         text_owed: |-

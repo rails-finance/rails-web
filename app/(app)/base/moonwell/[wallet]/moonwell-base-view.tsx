@@ -271,7 +271,7 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
   // the wallet has more transactions than one request expands — leaves the
   // events contiguous but the history starting later than the protocol, which
   // is enough to disqualify a lifetime total from the words "all time" and a
-  // peak from "highest recorded".
+  // peak from "peak".
   // Which half captured the history — the index once it holds the whole
   // life, the sweep until then — as the route said, and as the receipts'
   // custody line and the export name it.

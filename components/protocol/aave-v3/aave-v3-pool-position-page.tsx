@@ -406,7 +406,7 @@ export function AaveV3PoolPositionView({
   // needed: no holes inside the span, AND the span reaching the Pool's own
   // first block. A horizon leaves the events contiguous but the history
   // starting later than the protocol, which is enough to disqualify a lifetime
-  // total from the words "all time" — and a peak from "highest recorded".
+  // total from the words "all time" — and a peak from "peak".
   // Which store the events reached the page through — the coverage says.
   // The route serves the index when it can vouch for the whole life and
   // sweeps the chain otherwise, and the receipts' custody line and the

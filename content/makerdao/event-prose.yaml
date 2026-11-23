@@ -1464,7 +1464,7 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Highest recorded
+          Peak
         text: |-
           each peak is its highest point over the vault's events, so the two need not have stood together.
       - bold: |-
@@ -1500,7 +1500,7 @@ L5:
         text: |-
           the auction raises the debt plus a penalty and returns any collateral left to the vault.
       - bold: |-
-          Highest recorded
+          Peak
         text: |-
           each peak is its highest point over the vault's events, so the two need not have stood together.
       - bold: |-

@@ -44,7 +44,7 @@ export function moonwellViewFromChain(
   timeline?: MoonwellChainTimelineResponse | null,
   /** True when the sweep read every block of the Comptroller's life (no
    *  holes, from the deployment block). Only then are the peaks and the
-   *  transaction count stated: a "highest recorded" over a horizoned history
+   *  transaction count stated: a "peak" over a horizoned history
    *  would name a maximum the wallet may have exceeded before the sweep could
    *  see. The principal beside each supply is still taken from whatever the
    *  sweep read — the page withholds the lifetime layer separately. */

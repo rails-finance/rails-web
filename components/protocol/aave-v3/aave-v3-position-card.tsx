@@ -343,7 +343,7 @@ export interface AaveV3PositionCardProps {
    *  receipts behind every figure. Ethereum's indexed lane by default; a Base
    *  lender passes its own (lib/aave-v3/card-deployment.tsx). */
   deployment?: AaveV3CardDeployment;
-  /** Whether this lane records "highest recorded" balances at all. The
+  /** Whether this lane records "peak" balances at all. The
    *  Arbitrum listing carries none, so its closed cards say so instead of
    *  showing a dash as if nothing was ever held. */
   peaks?: boolean;

@@ -140,11 +140,11 @@ export function aaveV3PositionToMarkdown(args: AaveV3PositionMarkdownArgs): stri
       ? `> Snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
           `The position is ${view.status} — no open balances remain. Balances below are each reserve's ` +
           (swept
-            ? `HIGHEST recorded principal (the largest running balance replayed from the wallet's own Pool events, ` +
+            ? `PEAK principal (the largest running balance replayed from the wallet's own Pool events, ` +
               (stored
                 ? `read from rails-server's store of the Pool's logs from its first block; interest accrued between events is not included). `
                 : `swept live from the Pool's logs from its first block; interest accrued between events is not included). `)
-            : `HIGHEST recorded balance (largest running scaled claim over every captured flow, aToken transfers ` +
+            : `PEAK balance (largest running scaled claim over every captured flow, aToken transfers ` +
               `included, valued at the index of the moment it stood — interest to then included). `) +
           `Not financial advice.`
       : `> Point-in-time snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
@@ -194,7 +194,7 @@ export function aaveV3PositionToMarkdown(args: AaveV3PositionMarkdownArgs): stri
       lines.push(`- **Closed** — closed with no liquidation in the record.`);
     }
     lines.push("");
-    lines.push("## Highest recorded balances (per reserve)");
+    lines.push("## Peak balances (per reserve)");
     const peakLines = (label: string, reserves: AaveV3ReserveAmount[]) => {
       if (reserves.length === 0) {
         lines.push(`- **${label}:** none recorded`);

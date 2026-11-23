@@ -1307,7 +1307,7 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Highest recorded
+          Peak
         text: |-
           the most pETH and debt the position held after any touch, once the legs that had built up were written in.
       - bold: |-
@@ -1351,7 +1351,7 @@ L5:
         text: |-
           collateral left after the pool's take and the liquidator's share is set aside for the owner to claim.
       - bold: |-
-          Highest recorded
+          Peak
         text: |-
           the most pETH and debt the position held after any touch, the liquidation's included.
     links:

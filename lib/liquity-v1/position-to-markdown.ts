@@ -105,7 +105,7 @@ export function liquityV1PositionToMarkdown(args: LiquityV1PositionMarkdownArgs)
       lines.push(`- **Closed by its owner** — the LUSD debt repaid and the ETH collateral withdrawn.`);
     }
     lines.push("");
-    lines.push("## Highest recorded balances");
+    lines.push("## Peak balances");
     if (view.peakCollateral > 0) lines.push(`- **Collateral (peak):** ${amt(view.peakCollateral)} ETH`);
     if (view.peakDebt > 0) lines.push(`- **Debt (peak):** ${num(view.peakDebt, 2)} LUSD`);
     lines.push(`- Each peak is its own lifetime maximum — the two can come from different moments of the life.`);

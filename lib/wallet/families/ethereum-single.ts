@@ -124,7 +124,7 @@ export const morphoEthereum: FamilyModule = {
           history: {
             ...historyBase(r),
             size: parts.length ? parts.join(" / ") : undefined,
-            sizeNote: parts.length ? "highest recorded" : undefined,
+            sizeNote: parts.length ? "peak" : undefined,
             result: s.badDebt > 0 ? `${amountText(s.badDebt, s.loanSymbol)} bad debt` : undefined,
           },
         },
@@ -213,7 +213,7 @@ export const makerdao: FamilyModule = {
         history: {
           ...historyBase(r),
           size: parts.length ? parts.join(" / ") : undefined,
-          sizeNote: parts.length ? "highest recorded" : undefined,
+          sizeNote: parts.length ? "peak" : undefined,
           result: s.everLiquidated ? "liquidated by auction" : undefined,
         },
       };
@@ -292,7 +292,7 @@ export const fluid: FamilyModule = {
         history: {
           ...historyBase(r),
           size: parts.length ? parts.join(" / ") : undefined,
-          sizeNote: parts.length ? "highest recorded" : undefined,
+          sizeNote: parts.length ? "peak" : undefined,
           result: (r.liquidationCount ?? 0) > 0 ? plural(r.liquidationCount!, "liquidation") : undefined,
         },
       };
@@ -382,7 +382,7 @@ export const liquityV2: FamilyModule = {
         history: {
           ...historyBase(r),
           size: parts.length ? parts.join(" / ") : undefined,
-          sizeNote: parts.length ? "highest recorded" : undefined,
+          sizeNote: parts.length ? "peak" : undefined,
           result: n > 0 ? plural(n, "redemption") : undefined,
           txCount: Number.isFinite(txCount) ? txCount : undefined,
         },

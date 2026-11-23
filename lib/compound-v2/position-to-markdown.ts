@@ -87,10 +87,10 @@ export function compoundV2PositionToMarkdown(args: CompoundV2PositionMarkdownArg
     // Unwound: the headline is what each market held at its height (chain-state
     // token amounts only — the oracle prices the PRESENT, not history).
     for (const p of view.peakSupplies) {
-      lines.push(`- **Highest recorded supply (${p.symbol}):** ${amt(p.amount)} ${p.symbol}`);
+      lines.push(`- **Peak supplied (${p.symbol}):** ${amt(p.amount)} ${p.symbol}`);
     }
     for (const p of view.peakBorrows) {
-      lines.push(`- **Highest recorded debt (${p.symbol}):** ${amt(p.amount)} ${p.symbol}`);
+      lines.push(`- **Peak debt (${p.symbol}):** ${amt(p.amount)} ${p.symbol}`);
     }
     lines.push("");
   } else {

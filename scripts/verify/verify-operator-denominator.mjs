@@ -255,16 +255,16 @@ async function inspect(path) {
   const { opened, added, bullets, idx } = await openAndRead();
   const chips = await actorChips();
   // A position whose record has ended renders the terminal card and its own
-  // terminal explainer, which carries no operator bullet by design. "Highest
-  // recorded …" is that card's peak grammar house-wide, and an open card never
-  // uses it — so it is the cross-protocol way to tell the two apart, and it
-  // keeps a closed subject from being read as a contradiction. An account
-  // family's closed heads read "Peak supplied" and "Peak debt", "Highest
-  // recorded" only inside their dropdowns (ui-jobs 803), so their `peak-`
-  // head ids are the same signal.
+  // terminal explainer, which carries no operator bullet by design. "Peak
+  // collateral / supplied / debt" is that card's peak grammar house-wide
+  // (ui-jobs 809), and an open card never uses it, so it is the
+  // cross-protocol way to tell the two apart, and it keeps a closed subject
+  // from being read as a contradiction; the `peak-` head ids are the same
+  // signal.
+  const PEAK = /\bPeak (collateral|supplied|debt)\b/;
   const terminal =
-    bullets.some((b) => /Highest recorded/.test(b)) ||
-    (await page.getByText("Highest recorded").count()) > 0 ||
+    bullets.some((b) => PEAK.test(b)) ||
+    (await page.getByText(PEAK).count()) > 0 ||
     (await page.locator('[data-card-head^="peak-"]').count()) > 0;
   const base = { opened, added: added.length, chips, terminal };
   if (opened === 0) return { kind: "closed-pane", ...base };

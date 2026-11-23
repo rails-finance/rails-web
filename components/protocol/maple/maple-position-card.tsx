@@ -368,7 +368,7 @@ export function mapleCardSlots({
     const heads: PositionCardHead[] = [
       {
         id: "peak-shares",
-        label: "Highest recorded pool shares",
+        label: "Peak pool shares",
         value: <PeakLines lines={v.peakPools} />,
         sub: <PeakDepositedLines lines={v.peakPools} />,
       },
