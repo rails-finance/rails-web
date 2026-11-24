@@ -325,7 +325,7 @@ export const atRisk = (p: WalletPosition): boolean => (p.buffer != null && p.buf
  *  its holder page's explorer (Morpho Blue, Aave vaults, Yearn V3). */
 export const protocolId = (p: WalletPosition): string =>
   PROTOCOLS.find((e) => e.chainId === p.chain && e.slug === p.family)?.id ??
-  protocolForPathname(p.href.split("?")[0])?.id ??
+  (p.href ? protocolForPathname(p.href.split("?")[0])?.id : undefined) ??
   p.family;
 
 export function WalletPositionCard({ position: p }: { position: WalletPosition }) {
@@ -377,15 +377,26 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
       data-head-read={p.headRead}
     >
       <PositionCardEdgeContext.Provider value={edge}>
-        <Link
-          href={p.href}
-          prefetch={false}
-          className="group/listing-row block"
-          data-anatomy="N2"
-          aria-label={`${p.familyName} on ${chain}${p.market ? `, ${p.market}` : ""}`}
-        >
-          <FamilyCard card={p.card} state={stateOf(p)} />
-        </Link>
+        {p.href ? (
+          <Link
+            href={p.href}
+            prefetch={false}
+            className="group/listing-row block"
+            data-anatomy="N2"
+            aria-label={`${p.familyName} on ${chain}${p.market ? `, ${p.market}` : ""}`}
+          >
+            <FamilyCard card={p.card} state={stateOf(p)} />
+          </Link>
+        ) : (
+          <div
+            role="group"
+            className="block"
+            data-anatomy="N2"
+            aria-label={`${p.familyName} on ${chain}${p.market ? `, ${p.market}` : ""}`}
+          >
+            <FamilyCard card={p.card} state={stateOf(p)} />
+          </div>
+        )}
       </PositionCardEdgeContext.Provider>
     </div>
   );

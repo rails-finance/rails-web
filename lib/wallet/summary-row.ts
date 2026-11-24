@@ -30,22 +30,15 @@ export interface WalletSummaryRow {
   liquidationCount: number | null;
   readBlock: number | null;
   readAt: string | null;
-  href: string;
+  /** Null on a row with no page (a Morpho Vault V2 holding). */
+  href: string | null;
   /** The family listing route's row, as rails-server's family route answers it. */
   card: unknown;
   writtenAt: string;
 }
 
-/** The summary rows' testnet chains: their positions are drawn, and no
- *  wallet count or total takes them in (WALLET_COUNTS_SCOPE). */
-export type WalletTestnetChain = "sepolia";
-export const TESTNET_ROW_CHAINS: ReadonlySet<WalletSummaryRow["chain"]> = new Set<WalletTestnetChain>(["sepolia"]);
-
-/** A row on a mainnet, which the counts take in. */
-export const countedRow = (
-  r: WalletSummaryRow,
-): r is WalletSummaryRow & { chain: Exclude<WalletSummaryRow["chain"], WalletTestnetChain> } =>
-  !TESTNET_ROW_CHAINS.has(r.chain);
+/** Sepolia rows are drawn and never counted (WALLET_COUNTS_SCOPE). */
+export const countedRow = (r: Pick<WalletSummaryRow, "chain">): boolean => r.chain !== "sepolia";
 
 export interface WalletSummaryAnswer {
   address: string;

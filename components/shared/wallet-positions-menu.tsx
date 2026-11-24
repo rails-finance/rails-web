@@ -31,17 +31,15 @@ import {
   ARC_CHAIN_ID,
   BASE_CHAIN_ID,
   MAINNET_CHAIN_ID,
+  SEPOLIA_CHAIN_ID,
   chainMeta,
   type ChainId,
 } from "@/lib/shared/chains";
-import { PROTOCOLS, listingHrefForWallet, protocolForPathname } from "@/lib/shared/protocols";
+import { menuProtocolOf, protocolEntryOf, protocolLabelOf } from "@/lib/wallet/position-protocol";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
-import { walletProtocolHref } from "@/lib/wallet/wallet-filters";
 import {
   MENU_TESTNETS,
   rowIsPage,
-  VAULT_SHARES_FAMILY,
-  vaultProtocolOfHref,
   walletProtocolMenu,
   type MenuProtocol,
   type WalletCounts,
@@ -56,6 +54,7 @@ const CHAIN_ID: Record<WalletCountsChain, ChainId> = {
   base: BASE_CHAIN_ID,
   arbitrum: ARBITRUM_CHAIN_ID,
   arc: ARC_CHAIN_ID,
+  sepolia: SEPOLIA_CHAIN_ID,
 };
 
 // One read per address per page load; the route keeps its answer 60 s.
@@ -77,33 +76,14 @@ function readCounts(address: string): Promise<WalletCounts | null> {
 
 type Menu = NonNullable<ReturnType<typeof walletProtocolMenu<WalletCountsPosition>>>;
 
-/** A position's explorer on the roster: its name, its place, and its listing
- *  searched by the wallet (every wallet family's listing reads `q`). A
- *  vault-share row names its vault protocol ("MetaMorpho vaults" under
- *  Morpho's door) and opens the holder listing of the explorer's Vaults tab,
- *  where it has one; Yearn V3 has none, so its row opens the wallet view
- *  narrowed to the vault shares. */
-function protocolOf(p: WalletCountsPosition, address: string): MenuProtocol | undefined {
-  const entry = protocolForPathname(p.href.split("?")[0]);
-  if (!entry) return undefined;
-  const vault = vaultProtocolOfHref(p.href);
-  return {
-    name: vault ?? entry.label,
-    order: PROTOCOLS.indexOf(entry),
-    listing: vault
-      ? (listingHrefForWallet(entry.session, address, "vaults") ?? walletProtocolHref(address, VAULT_SHARES_FAMILY))
-      : listingHrefForWallet(entry.session, address),
-  };
-}
-
 const ROW = "mx-1 my-0.5 flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-left";
 const ROW_LINK = `${ROW} transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]`;
 const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />;
 
 /** The protocol's and the chain's icons, each named for screen readers and on hover. */
 function ProtocolIcons({ p }: { p: WalletCountsPosition }) {
-  const entry = protocolForPathname(p.href.split("?")[0]);
-  const protocol = vaultProtocolOfHref(p.href) ?? entry?.label ?? p.family;
+  const entry = protocolEntryOf(p);
+  const protocol = protocolLabelOf(p);
   const chain = chainMeta(CHAIN_ID[p.chain]).name;
   return (
     <span className="flex shrink-0 items-center gap-1">
@@ -153,7 +133,7 @@ export function WalletPositionsMenu({ wallet }: { wallet: string }) {
         walletProtocolMenu(
           c.positions,
           (p) => rowIsPage(p.href, pathname, search),
-          (p) => protocolOf(p, address),
+          (p) => menuProtocolOf(p, address),
           `/wallet/${address}`,
         ),
       );

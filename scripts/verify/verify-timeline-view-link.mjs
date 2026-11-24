@@ -125,7 +125,8 @@ const dateLabel = async (page) => {
  *  position-link.ts, ui-jobs 807). Pressed until the menu opens: a press
  *  before hydration is lost. */
 async function copyLink(page) {
-  const menu = page.locator('[data-card-menu] [role="menu"]');
+  // At 390 px the ⋮ opens a MobileSheet portalled to body, outside the card.
+  const menu = page.getByRole("menu").first();
   for (let i = 0; i < 6 && !(await menu.isVisible().catch(() => false)); i++) {
     await page
       .locator("[data-card-menu] > button")

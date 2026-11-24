@@ -363,6 +363,7 @@ export function WalletView({
   // AIM (ui-jobs 557): the positions naming an AIM asset (lib/wallet/aim-assets.ts),
   // the reader's own wallet included.
   const scoped = useScopedRows(read.positions, walletPositionAssetKeys, (p) => p.chain as number);
+  const scope = useAssetScope();
   const [kinds, setKinds] = useState<WalletKind[]>(initialKinds);
   const [status, setStatus] = useState<WalletStatus | undefined>(initialStatus);
   // A protocol change reads the page again: the page stays and dims meanwhile.
@@ -384,7 +385,10 @@ export function WalletView({
   // A testnet's positions are not counted (WALLET_COUNTS_SCOPE).
   const counted = scoped.rows.filter((p) => !onTestnet(p));
   // The positions the read counted and did not draw.
-  const undrawn: Undrawn[] = read.families.flatMap((r) => (r.undrawn ? [{ ...r.undrawn, chain: r.chain }] : []));
+  // Under Focus, only those on a chain in focus, as the drawn rows.
+  const undrawn: Undrawn[] = read.families.flatMap((r) =>
+    r.undrawn && (!focused || scope.chainOk(r.chain)) ? [{ ...r.undrawn, chain: r.chain }] : [],
+  );
   // Counted whenever rows are cut, as the line under the section says.
   const notDrawn = (k: "open" | "closed") => undrawn.reduce((n, u) => n + u[k], 0);
   const wallet = {
@@ -400,7 +404,6 @@ export function WalletView({
   const blocking = unanswered.filter((u) => u.total !== false).map((u) => u.what);
   const sections = walletSections(all, { bands: !filtered, unanswered });
   const open = sections.flatMap((s) => s.open);
-  const scope = useAssetScope();
   // Under Focus, only the families on a chain in focus.
   const unread = read.families.filter(
     (r) => r.headRead === "failed" && !r.unanswered && (!focused || scope.chainOk(r.chain)),

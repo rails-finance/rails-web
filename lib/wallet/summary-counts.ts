@@ -5,8 +5,7 @@
 // wallet heading (`components/shared/wallet-positions-menu.tsx`) reads it. Client-safe: the
 // read is `readWalletCounts` in lib/wallet/read-wallet.ts.
 
-/** Every summary row's chain but a testnet's, which the counts leave out. */
-export type WalletCountsChain = "ethereum" | "base" | "arbitrum" | "arc";
+export type WalletCountsChain = "ethereum" | "base" | "arbitrum" | "arc" | "sepolia";
 
 /** One position as the wallet view lists it: its chain, family, id, status and
  *  page. An Arbitrum Compound V3 row is one position per Comet held, as on
@@ -17,7 +16,8 @@ export interface WalletCountsPosition {
   positionId: string;
   /** `moved`: a position the wallet held and passed on (ui-jobs 705). */
   status: "open" | "closed" | "liquidated" | "redeemed" | "moved";
-  href: string;
+  /** Null on a position with no page. */
+  href: string | null;
 }
 
 export interface WalletCountsFamily {
@@ -72,7 +72,8 @@ function pagePath(path: string): string {
  *  must match the page's, which defaults to `core` as the page does; a page
  *  under the href (Morpho Blue Arbitrum's per-market page under the
  *  wallet's one row) is that position's. */
-export function rowIsPage(href: string, pathname: string, search: string): boolean {
+export function rowIsPage(href: string | null, pathname: string, search: string): boolean {
+  if (!href) return false;
   const [rawPath, rawQuery = ""] = href.split("?");
   const row = pagePath(rawPath);
   const page = pagePath(pathname);
@@ -111,14 +112,14 @@ const VAULT_ROOTS: Record<string, string> = { morpho: "MetaMorpho vaults", aave:
 
 /** A vault-share row's protocol root from its href (morpho, aave, yearn);
  *  undefined for a path outside the vault routes. */
-export function vaultRoot(href: string): string | undefined {
-  const m = /^\/[^/]+\/([^/]+)\/vaults\//.exec(href.split("?")[0].toLowerCase());
+export function vaultRoot(href: string | null): string | undefined {
+  const m = href ? /^\/[^/]+\/([^/]+)\/vaults\//.exec(href.split("?")[0].toLowerCase()) : null;
   return m && m[1] in VAULT_ROOTS ? m[1] : undefined;
 }
 
 /** The menu's name for a vault-share row's protocol ("MetaMorpho vaults"), or
- *  undefined where its href names none. */
-export const vaultProtocolOfHref = (href: string): string | undefined => {
+ *  undefined where its href names none (or it has no page). */
+export const vaultProtocolOfHref = (href: string | null): string | undefined => {
   const root = vaultRoot(href);
   return root ? VAULT_ROOTS[root] : undefined;
 };
@@ -169,7 +170,9 @@ export function walletProtocolMenu<P extends WalletCountsPosition>(
   const groups = new Map<string, { protocol: MenuProtocol | undefined; positions: P[] }>();
   for (const p of positions) {
     const key = menuKey(p);
-    const g = groups.get(key) ?? { protocol: protocolOf(p), positions: [] };
+    const g = groups.get(key) ?? { protocol: undefined, positions: [] };
+    // The group takes its name from any row that resolves.
+    g.protocol ??= protocolOf(p);
     g.positions.push(p);
     groups.set(key, g);
   }
@@ -193,7 +196,7 @@ export function walletProtocolMenu<P extends WalletCountsPosition>(
       closed,
       moved,
       counts: parts.filter(Boolean).join(" · "),
-      href: one ? g.positions[0].href : (g.protocol?.listing ?? dashboard),
+      href: (one ? g.positions[0].href : null) ?? g.protocol?.listing ?? dashboard,
       page: onPage,
       current: one && onPage,
     };

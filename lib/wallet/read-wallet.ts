@@ -61,6 +61,7 @@ import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
+import { apiHop } from "@/lib/wallet/api-hop";
 import { kindOfRow, WALLET_PROTOCOLS } from "@/lib/wallet/wallet-filters";
 
 /** The whole read's budget, the summary route's time included. */
@@ -236,7 +237,8 @@ export async function readListingRows(
   ];
   const settled = await Promise.allSettled(
     reads.map(async (r) => {
-      const page = await withBudget(budgetMs, (own) => r.read(AbortSignal.any([signal, own])));
+      // The listing's budget runs from the slot, not from the queue.
+      const page = await apiHop(() => withBudget(budgetMs, (own) => r.read(AbortSignal.any([signal, own]))), signal);
       if (page.total > page.rows.length) throw new Error(`answered ${page.rows.length} of ${page.total} rows`);
       return page.rows;
     }),
@@ -257,6 +259,17 @@ export async function readListingRows(
 }
 
 /**
+ * The opt-in rails-server's wallet positions route needs to answer every
+ * family and chain; without it the route answers only the pairs production
+ * web draws. Later wallet branches reuse this constant.
+ */
+export const WALLET_API_SCOPE = "families=all&chains=ethereum,base,arbitrum,arc,sepolia";
+
+/** The summary route's URL for one page of an address's rows. */
+export const walletSummaryUrl = (base: string, address: string, limit: number, offset: number): string =>
+  `${base}/api/wallet/${address}/positions?limit=${limit}&offset=${offset}&former=${WALLET_FORMER_FAMILIES}&${WALLET_API_SCOPE}`;
+
+/**
  * The wallet's rows: rails-server's summary route, and beside it the listing
  * reads for the kinds the summary table does not hold (readListingRows).
  * Decision 0050 departure; ui-jobs 795 moves it into wallet_positions. Both
@@ -266,33 +279,43 @@ export async function readListingRows(
  * (family, positionId).
  */
 export async function readSummary(address: string, signal: AbortSignal, readerIp?: string): Promise<Summary> {
-  const listing = readListingRows(address, signal, readerIp);
   const base = process.env.RAILS_API_URL?.replace(/\/$/, "");
   if (!base) throw new Error("RAILS_API_URL is not set");
+  // The summary's first page takes the first slot to the api host, ahead of
+  // the listing reads (ui-jobs 813); each page is retried once on a reset
+  // connection.
+  const pageAt = (offset: number) =>
+    apiHop(async () => {
+      const res = await fetch(walletSummaryUrl(base, address, PAGE, offset), {
+        ...createAuthFetchOptions({ signal }, readerIp),
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`/api/wallet/${address}/positions answered ${res.status}`);
+      return (await res.json()) as WalletSummaryAnswer;
+    }, signal);
+  const firstPage = pageAt(0);
+  const listing = readListingRows(address, signal, readerIp);
+  // Settled beside the summary, so a failed summary leaves no rejection unheard.
+  listing.catch(() => {});
   let first: WalletSummaryAnswer | null = null;
   const rows: WalletSummaryRow[] = [];
   for (let offset = 0; offset < MAX_ROWS; offset += PAGE) {
-    const res = await fetch(
-      `${base}/api/wallet/${address}/positions?limit=${PAGE}&offset=${offset}&former=${WALLET_FORMER_FAMILIES}`,
-      {
-        ...createAuthFetchOptions({ signal }, readerIp),
-        cache: "no-store",
-      },
-    );
-    if (!res.ok) throw new Error(`/api/wallet/${address}/positions answered ${res.status}`);
-    const page = (await res.json()) as WalletSummaryAnswer;
+    const page = offset === 0 ? await firstPage : await pageAt(offset);
     first ??= page;
     rows.push(...page.rows);
     if (rows.length >= page.total || page.rows.length < PAGE) break;
   }
   const extra = await listing;
   const open = extra.rows.filter((r) => r.status === "open").length;
+  // Testnet rows stay in `rows` and leave the totals.
+  const testnet = rows.filter((r) => !countedRow(r));
+  const testnetOpen = testnet.filter((r) => r.status === "open").length;
   return {
     ...first!,
     rows: [...rows, ...extra.rows],
-    total: first!.total + extra.rows.length,
-    open: first!.open + open,
-    closed: first!.closed + extra.rows.length - open,
+    total: first!.total - testnet.length + extra.rows.length,
+    open: first!.open - testnetOpen + open,
+    closed: first!.closed - (testnet.length - testnetOpen) + extra.rows.length - open,
     listingFailed: extra.failed,
   };
 }
@@ -523,7 +546,6 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
       }
     }
     for (const r of summary.rows) {
-      // A testnet's rows are not counted (WALLET_COUNTS_SCOPE).
       if (!taken.has(r) && countedRow(r))
         positions.push({
           chain: r.chain,
