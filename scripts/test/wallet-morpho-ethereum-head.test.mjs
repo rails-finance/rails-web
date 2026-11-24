@@ -286,7 +286,8 @@ test("the debt receipt names the visit's head read", () => {
   assert.match(stored.summary, /has not refreshed them since/);
 });
 
-test("the head reads hold at most four in flight", async () => {
+// The cap on api-host requests sits in route-gate.ts, under withServerHead (wallet-api-cap.test.mjs).
+test("every open row's head read goes out together, with no limiter of the family's", async () => {
   let inFlight = 0;
   let most = 0;
   globalThis.__morphoHead = async () => {
@@ -305,5 +306,5 @@ test("the head reads hold at most four in flight", async () => {
   const out = await morphoEthereum.head(shaped, W, new AbortController().signal, 1000, { rows });
   assert.equal(out.reads, 11);
   assert.ok(out.positions.every((p) => p.headRead === "read"));
-  assert.equal(most, 4);
+  assert.equal(most, 11);
 });

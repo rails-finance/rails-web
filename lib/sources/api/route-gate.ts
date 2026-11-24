@@ -15,7 +15,13 @@
 // (rails-ops TO-DO-ui-jobs.md item 686). A caller that catches errors around a
 // gate call rethrows this one.
 //
+// Inside a wallet read the fetch takes a slot of the cap every wallet-page
+// request to the api host shares (lib/wallet/api-hop.ts, ui-jobs 814),
+// released before the caller reads the chain.
+//
 // SERVER-ONLY.
+
+import { apiSlot } from "@/lib/wallet/api-hop";
 
 /** How long a client waits for the route before reading the chain. */
 export const ROUTE_WAIT_MS = 3_000;
@@ -65,24 +71,29 @@ export function routeGate() {
   ): Promise<{ body: T } | { status: number } | null> {
     if (!process.env.RAILS_API_URL || (downUntil.get(key) ?? 0) > Date.now()) return null;
     try {
-      const timeout = AbortSignal.timeout(opts.timeoutMs ?? ROUTE_WAIT_MS);
-      // No `cache` option: Next 15 caches no fetch by default, and an explicit
-      // "no-store" throws its dynamic-usage error inside a static or ISR render,
-      // which the catch below took for the route failing, so those pages read the chain.
-      const res = await fetch(url, {
-        ...init,
-        signal: opts.signal ? AbortSignal.any([timeout, opts.signal]) : timeout,
-      });
-      if (!res.ok) {
-        void res.body?.cancel().catch(() => undefined);
-        if (res.status >= 500 || res.status === 429) {
-          if (atBuild()) throw new RouteDownAtBuild(key, `status ${res.status}`);
-          markDown(key);
-          return null;
+      // Inside a wallet read the fetch waits for a slot (lib/wallet/api-hop.ts)
+      // and holds it until the body is read; the wait starts once it is granted.
+      const got = await apiSlot(async (): Promise<{ body: T } | { status: number }> => {
+        const timeout = AbortSignal.timeout(opts.timeoutMs ?? ROUTE_WAIT_MS);
+        // No `cache` option: Next 15 caches no fetch by default, and an explicit
+        // "no-store" throws its dynamic-usage error inside a static or ISR render,
+        // which the catch below took for the route failing, so those pages read the chain.
+        const res = await fetch(url, {
+          ...init,
+          signal: opts.signal ? AbortSignal.any([timeout, opts.signal]) : timeout,
+        });
+        if (!res.ok) {
+          void res.body?.cancel().catch(() => undefined);
+          return { status: res.status };
         }
-        return { status: res.status };
+        return { body: (await res.json()) as T };
+      }, opts.signal);
+      if ("status" in got && (got.status >= 500 || got.status === 429)) {
+        if (atBuild()) throw new RouteDownAtBuild(key, `status ${got.status}`);
+        markDown(key);
+        return null;
       }
-      return { body: (await res.json()) as T };
+      return got;
     } catch (err) {
       // The caller's own abort (the wallet page's budget) is not the route failing.
       if (opts.signal?.aborted) return null;

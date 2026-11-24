@@ -45,7 +45,7 @@ import type { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle"
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { morphoHasDebt } from "@/lib/morpho/position-legs";
 import { morphoCardAtHead, storedMorphoCard } from "./morpho-card";
-import { API_CONCURRENCY, createLimiter } from "@/lib/wallet/api-hop";
+import { apiHop } from "@/lib/wallet/api-hop";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, opt, plural, storeStamp } from "@/lib/wallet/summary-row";
 import { formerHoldOf, movedHistory } from "@/lib/wallet/moved-row";
@@ -145,11 +145,10 @@ export const morphoEthereum: FamilyModule = {
     const atHead = new Map<string, RawMorphoPositionRow>();
     // The chain's block, read once and only when a position needs the chain.
     let block: Promise<bigint> | null = null;
-    // Every open row is read: at most API_CONCURRENCY at once, to the api
-    // route or, past it, the chain. Not apiHop: its slots are the api host's,
-    // and its retry would repeat a chain read.
-    const limit = createLimiter(API_CONCURRENCY);
-    const r = await eachOpen(open, (p) => limit(() => readOne(p), signal));
+    // Every open row is read at once: each route request takes a slot of the
+    // wallet page's cap on the api host inside route-gate.ts, released before
+    // its chain read, with no retry.
+    const r = await eachOpen(open, readOne);
     async function readOne(p: WalletPosition): Promise<WalletPosition> {
       const s = (p.card as { row: MorphoPositionSummary }).row;
       const served = await withServerHead(
@@ -371,13 +370,16 @@ const priceOf = (type: string, p: OraclePricesData | null): number | undefined =
 async function liquityPrices(signal: AbortSignal): Promise<OraclePricesData | null> {
   const base = process.env.RAILS_API_URL?.replace(/\/$/, "");
   if (!base) throw new Error("RAILS_API_URL is not set");
-  const res = await fetch(`${base}/api/oracle/liquity-v2`, {
-    ...createAuthFetchOptions({ signal }),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`/api/oracle/liquity-v2 answered ${res.status}`);
-  const json = (await res.json()) as OraclePricesResponse;
-  return json.success && json.data ? json.data : null;
+  // One slot of the wallet page's cap on the api host, retried once on a reset (lib/wallet/api-hop.ts).
+  return apiHop(async () => {
+    const res = await fetch(`${base}/api/oracle/liquity-v2`, {
+      ...createAuthFetchOptions({ signal }),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`/api/oracle/liquity-v2 answered ${res.status}`);
+    const json = (await res.json()) as OraclePricesResponse;
+    return json.success && json.data ? json.data : null;
+  }, signal);
 }
 
 export const liquityV2: FamilyModule = {

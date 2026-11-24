@@ -27,6 +27,7 @@ import type { StoredHeadRead } from "@/lib/shared/server-head-read";
 import { parseHeadSnapshot, recordingHeadClient, snapshotClient, type HeadRecord } from "./head-reads-client";
 import { serverHeadStampAt } from "./server-head-stamps";
 import { ROUTE_WAIT_MS, routeGate } from "./route-gate";
+import { apiSlot } from "@/lib/wallet/api-hop";
 
 /** One POST per surface per this long: the stored row is a fallback, a minute old is fine. */
 const POST_EVERY_MS = 60_000;
@@ -57,16 +58,20 @@ function servedAtOneBlock(chainId: ChainId, record: HeadRecord): { block: number
 
 async function postSnapshot(scope: HeadSnapshotScope, block: number, rounds: string[]): Promise<void> {
   try {
-    const res = await fetch(
-      `${process.env.RAILS_API_URL}/api/at-block/head/snapshot`,
-      createAuthFetchOptions({
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chain: scope.chainId, surface: scope.surface, block, rounds }),
-        signal: AbortSignal.timeout(POST_TIMEOUT_MS),
-      }),
-    );
-    void res.body?.cancel().catch(() => undefined);
+    // Inside a wallet read, one slot of the api host's cap (lib/wallet/api-hop.ts).
+    const res = await apiSlot(async () => {
+      const r = await fetch(
+        `${process.env.RAILS_API_URL}/api/at-block/head/snapshot`,
+        createAuthFetchOptions({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chain: scope.chainId, surface: scope.surface, block, rounds }),
+          signal: AbortSignal.timeout(POST_TIMEOUT_MS),
+        }),
+      );
+      void r.body?.cancel().catch(() => undefined);
+      return r;
+    });
     if (!res.ok) console.warn(`head snapshot ${scope.surface} at ${block}: ${res.status}, not stored`);
   } catch (err) {
     console.warn(`head snapshot ${scope.surface} at ${block}: ${(err as Error).message}`);

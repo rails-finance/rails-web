@@ -67,7 +67,7 @@ import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
-import { apiHop } from "@/lib/wallet/api-hop";
+import { apiHop, inWalletRead } from "@/lib/wallet/api-hop";
 import { kindOfRow, WALLET_PROTOCOLS } from "@/lib/wallet/wallet-filters";
 
 /** The whole read's budget, the summary route's time included. */
@@ -420,12 +420,17 @@ function heldOf(rows: WalletSummaryRow[], visited: WalletPosition[] = []): Walle
 }
 
 /** `protocol`: read that protocol's families alone (ui-jobs 738); the summary
- *  route still answers every row, which names the others for the pill. */
-export async function readWalletUncached(
+ *  route still answers every row, which names the others for the pill. Every
+ *  request it makes to the api host shares the page's cap (lib/wallet/api-hop.ts). */
+export function readWalletUncached(
   address: string,
   readerIp?: string,
   opts: { protocol?: string } = {},
 ): Promise<WalletRead> {
+  return inWalletRead(() => readWalletInScope(address, readerIp, opts));
+}
+
+async function readWalletInScope(address: string, readerIp: string | undefined, opts: { protocol?: string }) {
   const t0 = Date.now();
   const deadline = t0 + WALLET_BUDGET_MS;
   let summary: Summary;

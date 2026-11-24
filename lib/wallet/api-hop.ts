@@ -1,14 +1,24 @@
-// The wallet read's requests to the api host (ui-jobs 813). The host resets
-// bursts of new TLS handshakes from one address, so the read keeps at most
-// API_CONCURRENCY requests open at once and tries a request once more when its
-// connection failed before any answer. An HTTP answer, whatever its status, is
-// an answer and is not retried.
+// Every request the wallet page makes to the api host (ui-jobs 813, 814). The
+// host resets bursts of new TLS handshakes from one address, so the server
+// process keeps at most API_CONCURRENCY of them open at once: the summary and
+// listing reads, each family's head read, the families read at visit and the
+// Liquidity section share one queue. A request whose connection failed before
+// any answer is tried once more where no chain read stands behind it (apiHop);
+// an HTTP answer, whatever its status, is an answer and is not retried.
+//
+// A shared client that other pages also call (route-gate.ts, the listing
+// proxies, the token-metadata route) takes a slot through `apiSlot`, which
+// queues only inside a wallet read (`inWalletRead`) and holds the slot around
+// the fetch alone, so a chain fallback runs after it is released. A request
+// made while its caller already holds a slot runs in that slot.
 //
 // A limiter in plain code holds whatever fetch each reader calls. Next's
 // server fetch wraps undici, and a shared Agent passed to it as `dispatcher`
 // is not a stable contract across Next releases.
 //
-// Import-free, so scripts/test/wallet-api-hop.test.mjs loads it directly.
+// Imports node alone, so scripts/test/wallet-api-hop.test.mjs loads it directly.
+
+import { AsyncLocalStorage } from "node:async_hooks";
 
 /** At most this many wallet-read requests to the api host at once. */
 export const API_CONCURRENCY = 4;
@@ -120,12 +130,42 @@ export async function retryOnConnectionFailure<T>(
   }
 }
 
-const limit = createLimiter(API_CONCURRENCY);
+/** What a wallet read carries down its calls: whether this call already holds a slot. */
+interface WalletScope {
+  holding: boolean;
+}
 
-/** One wallet-read request to the api host: queued behind the cap (leaving
- *  the queue where `signal` aborts), retried once on a connection failure.
- *  `fn` starts only once the slot is granted, so a budget it sets runs from
- *  then. */
+/** The one queue and the wallet read's context, kept on globalThis so every
+ *  bundle that loads this module in the server process shares them. */
+const shared = ((globalThis as { [k: symbol]: unknown })[Symbol.for("rails.wallet.apiCap")] ??= {
+  limit: createLimiter(API_CONCURRENCY),
+  scope: new AsyncLocalStorage<WalletScope>(),
+}) as { limit: ReturnType<typeof createLimiter>; scope: AsyncLocalStorage<WalletScope> };
+
+/** Run `fn` as part of a wallet read: api-host requests it makes through
+ *  `apiSlot` queue behind the cap. */
+export function inWalletRead<T>(fn: () => Promise<T>): Promise<T> {
+  return shared.scope.run({ holding: false }, fn);
+}
+
+/** `fn` in a slot: queued behind the cap (leaving the queue where `signal`
+ *  aborts) and run once granted, so a budget it sets runs from then. A call
+ *  already holding a slot runs at once. */
+function inSlot<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (shared.scope.getStore()?.holding) return fn();
+  return shared.limit(() => shared.scope.run({ holding: true }, fn), signal);
+}
+
+/** One request to the api host from a client other pages share: inside a
+ *  wallet read it takes a slot for `fn`, which is the fetch and its body and
+ *  nothing after; anywhere else `fn` runs as before. No retry: the caller may
+ *  read the chain in its place. */
+export function apiSlot<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  return shared.scope.getStore() ? inSlot(fn, signal) : fn();
+}
+
+/** One wallet-page request to the api host with no chain read behind it:
+ *  always in a slot, and retried once on a connection failure. */
 export function apiHop<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
-  return limit(() => retryOnConnectionFailure(fn, signal), signal);
+  return inSlot(() => retryOnConnectionFailure(fn, signal), signal);
 }

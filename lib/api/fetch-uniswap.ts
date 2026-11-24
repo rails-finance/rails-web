@@ -12,6 +12,7 @@ import "server-only";
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { isReadCeiling } from "@/lib/shared/read-ceiling";
+import { apiSlot } from "@/lib/wallet/api-hop";
 import type { UniChainId, UniProtocol } from "@/lib/uniswap/deployments";
 import type { UniPairRead, UniPositionRead, UniPositionsRead, UniswapVersion } from "@/lib/uniswap/types";
 
@@ -29,14 +30,17 @@ export async function readAtBlock<T>(path: string, revalidate: number, who = "un
   const base = process.env.RAILS_API_URL;
   if (!base) return { kind: "error" };
   try {
-    const res = await fetch(`${base}${path}`, createAuthFetchOptions({ next: { revalidate } }));
-    if (res.status === 404) return { kind: "not-found" };
-    if (res.status === 503 && isReadCeiling(503, await res.json().catch(() => null))) return { kind: "ceiling" };
-    if (!res.ok) {
-      console.error(`${who}: ${path} answered ${res.status}`);
-      return { kind: "error" };
-    }
-    return { kind: "ok", data: (await res.json()) as T };
+    // Inside a wallet read, one slot of the api host's cap (lib/wallet/api-hop.ts).
+    return await apiSlot(async (): Promise<UniAnswer<T>> => {
+      const res = await fetch(`${base}${path}`, createAuthFetchOptions({ next: { revalidate } }));
+      if (res.status === 404) return { kind: "not-found" };
+      if (res.status === 503 && isReadCeiling(503, await res.json().catch(() => null))) return { kind: "ceiling" };
+      if (!res.ok) {
+        console.error(`${who}: ${path} answered ${res.status}`);
+        return { kind: "error" };
+      }
+      return { kind: "ok", data: (await res.json()) as T };
+    });
   } catch (error) {
     console.error(`${who}: ${path} did not answer`, error);
     return { kind: "error" };
