@@ -26,6 +26,7 @@ import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { historyBase, plural, storeStamp, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import { DOLLAR_LOANS } from "./ethereum-single";
+import { storedMorphoCard } from "./morpho-card";
 import type { FamilyModule, HeadResult } from "./module";
 
 const BLUE_ABI = parseAbi([
@@ -37,12 +38,7 @@ const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 
-/** The stored card with its market totals left out. */
-const storedRow = (r: WalletSummaryRow): RawMorphoPositionRow => ({
-  ...(r.card as RawMorphoPositionRow),
-  total_borrow_assets: null,
-  total_borrow_shares: null,
-});
+const storedRow = (r: WalletSummaryRow): RawMorphoPositionRow => storedMorphoCard(r.card);
 
 const lane: MorphoListedLane = { chainId: BASE_CHAIN_ID, markets: [] };
 
