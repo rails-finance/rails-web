@@ -160,7 +160,16 @@ export interface RouteNowAnswer {
 }
 
 const ROUTE_NOT_READ = "not read";
-const NOT_ANSWERED = "The oracle did not answer at this block.";
+const NOT_ANSWERED = "The oracle returned no price at this block.";
+const ROUTE_STOPPED = "stopped";
+const STOPPED = "The OSM is stopped.";
+
+/** The route's reason for an unread line, as the cell's sentence. */
+function routeReason(reason: string | undefined): string {
+  if (!reason || reason === ROUTE_NOT_READ) return NOT_ANSWERED;
+  if (reason === ROUTE_STOPPED) return STOPPED;
+  return reason;
+}
 
 /** An integer string at `decimals` as a number: whole and fraction divided
  *  apart in BigInt, so a 36-digit price loses nothing before the division.
@@ -184,7 +193,7 @@ export function routePricesNow(answer: RouteNowAnswer): AssetPricesNow {
       // Only a known stale marks the line; a missing `stale` or freshness
       // "unknown" claims nothing.
       ...(ok && (l.stale === true || l.freshness === "stale") ? { stale: true } : {}),
-      ...(ok ? {} : { reason: !l.reason || l.reason === ROUTE_NOT_READ ? NOT_ANSWERED : l.reason }),
+      ...(ok ? {} : { reason: routeReason(l.reason) }),
       block: answer.block,
       timestamp: answer.timestamp,
       read: l.read,
@@ -208,4 +217,21 @@ export function pricesNowSource(status: number | null): "route" | "stub" | "unre
   if (status === 200) return "route";
   if (status === 502) return "unread";
   return "stub";
+}
+
+/** The read in two stages, each with a deadline of `timeoutMs` from its start:
+ *  the route call, then (where `pricesNowSource` says stub) the stored-rounds
+ *  fallback. A route call that stalls to its deadline leaves the fallback its
+ *  full time. */
+export async function readPricesNow<T>(stages: {
+  route: (signal: AbortSignal) => Promise<{ status: number | null; answer: T | null }>;
+  fallback: (signal: AbortSignal) => Promise<T>;
+  unread: () => T;
+  timeoutMs: number;
+}): Promise<T> {
+  const route = await stages.route(AbortSignal.timeout(stages.timeoutMs));
+  const source = pricesNowSource(route.status);
+  if (source === "route" && route.answer) return route.answer;
+  if (source === "unread") return stages.unread();
+  return stages.fallback(AbortSignal.timeout(stages.timeoutMs));
 }

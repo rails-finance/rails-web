@@ -13,7 +13,7 @@ import "server-only";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { ROUNDS_REVALIDATE_S } from "@/lib/api/fetch-asset-prices-server";
 import {
-  pricesNowSource,
+  readPricesNow,
   RECENT_DAYS,
   routePricesNow,
   type RouteNowAnswer,
@@ -25,7 +25,7 @@ import {
 } from "@/lib/shared/asset-prices-now";
 import type { PageLine } from "@/lib/shared/asset-roster";
 
-/** One deadline for the whole read: the route call and the fallback share it. */
+/** Each stage's deadline: the route call, then the fallback from its own start. */
 const TIMEOUT_MS = 10_000;
 /** The route call's cache time: the server's round is 60 s. */
 const ROUTE_REVALIDATE_S = 60;
@@ -73,31 +73,44 @@ export async function fetchAssetPricesNow(
   readerIp?: string | null,
 ): Promise<AssetPricesNow> {
   try {
-    const signal = AbortSignal.timeout(TIMEOUT_MS);
-    const route = await getRoute(chain, token, signal, readerIp);
-    const source = pricesNowSource(route.status);
-    if (source === "route" && route.body) return routePricesNow(route.body);
-    if (source === "unread") return unreadPricesNow(chain, lines, "The prices were not read");
-    const now = Math.floor(Date.now() / 1000);
-    const oracles = [...new Set(lines.map((l) => l.oracle.address.toLowerCase()))].slice(0, MAX_ORACLES);
-    const keys = [...new Set(lines.flatMap((l) => (l.drawn ? [l.drawn.key] : [])))].slice(0, MAX_SERIES);
-    const rq = new URLSearchParams({
-      chain: String(chain),
-      oracles: oracles.join(","),
-      max: "2",
-      from: String(now - ROUND_DAYS * DAY_S),
+    return await readPricesNow({
+      timeoutMs: TIMEOUT_MS,
+      route: async (signal) => {
+        const r = await getRoute(chain, token, signal, readerIp);
+        return { status: r.status, answer: r.body ? routePricesNow(r.body) : null };
+      },
+      unread: () => unreadPricesNow(chain, lines, "The prices were not read"),
+      fallback: (signal) => storedNow(chain, lines, signal, readerIp),
     });
-    const dq = new URLSearchParams({
-      chain: String(chain),
-      series: keys.join(","),
-      from: String(Math.floor(now / DAY_S) - RECENT_DAYS),
-    });
-    const [rounds, daily] = await Promise.all([
-      oracles.length ? get<StoredRounds>(`/api/prices/rounds?${rq.toString()}`, signal, readerIp) : null,
-      keys.length ? get<StoredDaily>(`/api/prices/daily?${dq.toString()}`, signal, readerIp) : null,
-    ]);
-    return storedPricesNow(chain, lines, rounds, daily);
   } catch {
     return unreadPricesNow(chain, lines, "The prices were not read");
   }
+}
+
+/** Each line's latest stored value at its block: the read where the route is not served. */
+async function storedNow(
+  chain: number,
+  lines: readonly PageLine[],
+  signal: AbortSignal,
+  readerIp?: string | null,
+): Promise<AssetPricesNow> {
+  const now = Math.floor(Date.now() / 1000);
+  const oracles = [...new Set(lines.map((l) => l.oracle.address.toLowerCase()))].slice(0, MAX_ORACLES);
+  const keys = [...new Set(lines.flatMap((l) => (l.drawn ? [l.drawn.key] : [])))].slice(0, MAX_SERIES);
+  const rq = new URLSearchParams({
+    chain: String(chain),
+    oracles: oracles.join(","),
+    max: "2",
+    from: String(now - ROUND_DAYS * DAY_S),
+  });
+  const dq = new URLSearchParams({
+    chain: String(chain),
+    series: keys.join(","),
+    from: String(Math.floor(now / DAY_S) - RECENT_DAYS),
+  });
+  const [rounds, daily] = await Promise.all([
+    oracles.length ? get<StoredRounds>(`/api/prices/rounds?${rq.toString()}`, signal, readerIp) : null,
+    keys.length ? get<StoredDaily>(`/api/prices/daily?${dq.toString()}`, signal, readerIp) : null,
+  ]);
+  return storedPricesNow(chain, lines, rounds, daily);
 }

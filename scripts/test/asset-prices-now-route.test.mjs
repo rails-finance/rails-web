@@ -3,7 +3,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { routePricesNow, scaledPrice, pricesNowSource } = await import("../../lib/shared/asset-prices-now.ts");
+const { routePricesNow, scaledPrice, pricesNowSource, readPricesNow } = await import(
+  "../../lib/shared/asset-prices-now.ts"
+);
 
 const line = (over) => ({
   lineId: "1:0xaa",
@@ -69,7 +71,7 @@ test("a not-read line is unread with the house sentence", () => {
   const p = a.prices["1:0xaa"];
   assert.equal(p.ok, false);
   assert.equal(p.price, null);
-  assert.equal(p.reason, "The oracle did not answer at this block.");
+  assert.equal(p.reason, "The oracle returned no price at this block.");
   assert.equal(p.block, 26483745);
 });
 
@@ -102,4 +104,49 @@ test("a missing stale is unknown, never fresh; freshness and hop are accepted", 
   assert.equal(a.prices["1:0xdd"].stale, undefined);
   assert.equal(a.prices["1:0xee"].stale, true);
   assert.equal(a.prices["1:0xff"].stale, undefined);
+});
+
+test("the route's stopped reason reads as a sentence", () => {
+  const a = routePricesNow(answer([line({ ok: false, price: null, reason: "stopped" })]));
+  assert.equal(a.prices["1:0xaa"].reason, "The OSM is stopped.", "a stopped OSM names its state");
+});
+
+test("a route call that stalls to its deadline leaves the fallback its full time", async () => {
+  let fallbackSignal = null;
+  // AbortSignal.timeout's timer does not hold the event loop open; this one does.
+  const keep = setTimeout(() => {}, 1000);
+  const out = await readPricesNow({
+    timeoutMs: 50,
+    // The route never answers: it rejects when its signal aborts, as fetch does.
+    route: (signal) =>
+      new Promise((resolve) => signal.addEventListener("abort", () => resolve({ status: null, answer: null }))),
+    fallback: async (signal) => {
+      fallbackSignal = signal;
+      await new Promise((r) => setTimeout(r, 20));
+      return { from: "fallback", aborted: signal.aborted };
+    },
+    unread: () => ({ from: "unread" }),
+  });
+  assert.deepEqual(out, { from: "fallback", aborted: false }, "the fallback answers on a fresh deadline");
+  assert.ok(fallbackSignal, "the fallback ran");
+  clearTimeout(keep);
+});
+
+test("readPricesNow takes the route's answer on a 200 and reads nothing on a 502", async () => {
+  const base = { timeoutMs: 1000, fallback: async () => "fallback", unread: () => "unread" };
+  assert.equal(
+    await readPricesNow({ ...base, route: async () => ({ status: 200, answer: "route" }) }),
+    "route",
+    "200 is the route",
+  );
+  assert.equal(
+    await readPricesNow({ ...base, route: async () => ({ status: 502, answer: null }) }),
+    "unread",
+    "502 is unread",
+  );
+  assert.equal(
+    await readPricesNow({ ...base, route: async () => ({ status: 404, answer: null }) }),
+    "fallback",
+    "404 falls back",
+  );
 });

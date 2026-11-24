@@ -79,7 +79,7 @@ for (const e of explorers) {
   ]);
   const wrong = alsoHrefs.filter(([, h]) => !(h.startsWith("/") && h.endsWith(`/assets/${token}`)));
   // A page whose table has rows for other protocols (a row href is set) must
-  // link them; the protocol's own page-row has no link, so no row reads own.
+  // link them; a row of the page's protocol has no link, so no link names it.
   const linkable = [...page.html.matchAll(/data-asset-oracle-href="(\/[^"]*)"/g)].length;
   const own = alsoHrefs.filter(([id]) => id === e.id);
   check(

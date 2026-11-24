@@ -341,7 +341,7 @@ const pillStatus = await Promise.all(pills.slice(0, 4).map(([, h]) => status(h))
 check(
   "4c the other oracles name their protocols, each link answering",
   pills.length > 2 &&
-    // The page's own protocol has no link in its own table (it is a row, not a pill).
+    // The page's protocol has no link in its table: its rows are unlinked.
     pills.every(([id]) => id !== "aave-v3") &&
     pills.every(([, h]) => /^\/ethereum\/[a-z0-9-]+\/assets\/0x[0-9a-f]{40}$/.test(h)) &&
     pillStatus.every((x) => x === 200 || x === 307 || x === 308),

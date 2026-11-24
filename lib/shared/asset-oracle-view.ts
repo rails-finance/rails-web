@@ -143,9 +143,9 @@ export function alsoReads(
   });
 }
 
-/** `pageOf` for the table's rows: the page's own protocol has no page to open
- *  from its own page, so a row it owns (Compound V3's cWETHv3 on Compound V3's
- *  USDC page) stays in the table with no link. */
+/** `pageOf` for the table's rows: a row of the page's protocol (Compound V3's
+ *  cWETHv3 on Compound V3's USDC page) would link to the page it sits on, so it
+ *  stays in the table with no link. */
 export function rowPageOf(
   own: string | null,
   pageOf: (explorer: string) => string | null,
