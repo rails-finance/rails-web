@@ -215,6 +215,7 @@ import { fileURLToPath } from "node:url";
 import { readPositionsRoute, retriedReads } from "../lib/read-positions-route.mjs";
 import { expectedRoster } from "./lib/served-vault-roster.mjs";
 import { pageBlockRecent, serverHeadBlock } from "./lib/server-head.mjs";
+import { closeFilterSheet, filterSheet, openFilterSheet, openSheetRow } from "./lib/listing-toolbar.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3801";
@@ -1130,21 +1131,27 @@ check(
 // the rest did not show, the input narrowed to its symbol — the option must
 // appear. A label that neither the rest nor its own search shows is a vault
 // no selection can reach (2026-09-09: 236 held vaults on the full census).
+// An unset Vault group draws no pill: the Filters panel's Vault row opens the
+// options (ui-jobs 801; scripts/verify/lib/listing-toolbar.mjs).
 const readMenuItems = (page) =>
-  page
-    .locator("[role='menuitemradio']")
+  filterSheet(page)
+    .locator('[data-filter-sheet-view="vault"] [data-filter-sheet-option] span.flex-1')
     .evaluateAll((els) => els.map((e) => (e.textContent ?? "").replace(/\s+/g, " ").trim()));
 async function vaultMenuOptions(expected) {
   const page = await context.newPage();
   await page.goto(LISTING, { waitUntil: "networkidle", timeout: 120_000 });
-  await page
-    .locator("button", { hasText: /^Vault$/ })
+  const opened = (await openFilterSheet(page)) && (await openSheetRow(page, "vault"));
+  if (!opened) {
+    await page.close();
+    return { atRest: [], foundBySearch: [], notFound: expected, searchable: false };
+  }
+  await filterSheet(page)
+    .locator('[data-filter-sheet-view="vault"] [data-filter-sheet-option]')
     .first()
-    .click();
-  await page.waitForSelector("[role='menuitemradio']", { timeout: 30_000 });
+    .waitFor({ timeout: 30_000 });
   const atRest = await readMenuItems(page);
   const restSet = new Set(atRest);
-  const search = page.locator("input[placeholder='Filter options']");
+  const search = filterSheet(page).locator("input[placeholder='Filter options']");
   const searchable = (await search.count()) > 0;
   const foundBySearch = [];
   const notFound = [];
@@ -1159,6 +1166,7 @@ async function vaultMenuOptions(expected) {
     (items.includes(label) ? foundBySearch : notFound).push(label);
   }
   if (searchable) await search.fill("");
+  await closeFilterSheet(page);
   await page.close();
   return { atRest, foundBySearch, notFound, searchable };
 }
