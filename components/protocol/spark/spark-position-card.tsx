@@ -15,7 +15,7 @@
 // carries no health factor (rails-ops decision 0018): the position page's
 // Pool.getUserAccountData read is the only health factor the card shows.
 
-import { TitleTip } from "@/components/shared/reveal-tip";
+import { RevealTip, TitleTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Link2 } from "lucide-react";
@@ -162,6 +162,34 @@ function LivesLines({ lives }: { lives: readonly SparkLife[] }) {
   );
 }
 
+/** Whether a reserve states no amount: its decimals did not load, or no index
+ *  was read to accrue its scaled balance (lib/spark/scaled-accrual.ts). */
+const noAmount = (r: SparkReserveAmount) => r.decimalsUnread === true || r.amountUnread === true;
+
+/** The stand-in for a reserve's amount where no index was read to accrue its
+ *  stored scaled balance: the wallet's "Not read" words, and the token. */
+function TokenAmountNotRead({ label }: { label: string }) {
+  return (
+    <RevealTip
+      tip={`SparkLend's ${label} index was not read on this visit. The amount shows once it is.`}
+      className="text-rb-500"
+    >
+      <span data-spark-amount-not-read="">
+        Not read <span className="font-mono text-sm font-normal">{label}</span>
+      </span>
+    </RevealTip>
+  );
+}
+
+/** A reserve's stand-in where it states no amount. */
+function NoAmount({ r }: { r: SparkReserveAmount }) {
+  return r.amountUnread ? (
+    <TokenAmountNotRead label={r.symbol} />
+  ) : (
+    <TokenAmountNotLoaded address={r.address} label={r.symbol} />
+  );
+}
+
 /** On-chain oracle USD for one reserve; null when SparkLend didn't price it. */
 function reserveUsd(v: SparkPositionView, address: string, amount: number): number | null {
   const p = v.priceByAddress?.[address.toLowerCase()];
@@ -174,7 +202,7 @@ function totalUsd(v: SparkPositionView, reserves: SparkReserveAmount[]): number 
   let sum = 0;
   let any = false;
   for (const r of reserves) {
-    if (r.decimalsUnread) return null;
+    if (noAmount(r)) return null;
     if (r.amount <= 0) continue;
     const u = reserveUsd(v, r.address, r.amount);
     if (u == null) return null;
@@ -191,7 +219,7 @@ function totalUsd(v: SparkPositionView, reserves: SparkReserveAmount[]): number 
 function rankByValue(v: SparkPositionView, reserves: SparkReserveAmount[]): SparkReserveAmount[] {
   const usd = new Map<string, number>();
   for (const r of reserves) {
-    const u = r.decimalsUnread ? null : reserveUsd(v, r.address, r.amount);
+    const u = noAmount(r) ? null : reserveUsd(v, r.address, r.amount);
     if (u == null) return reserves;
     usd.set(r.address, u);
   }
@@ -203,7 +231,7 @@ function rankByValue(v: SparkPositionView, reserves: SparkReserveAmount[]): Spar
 const dustUsdOf =
   (v: SparkPositionView) =>
   (r: SparkReserveAmount): number | null =>
-    r.decimalsUnread ? null : reserveUsd(v, r.address, r.amount);
+    noAmount(r) ? null : reserveUsd(v, r.address, r.amount);
 
 /** One reserve's amount, traced to its balance read; `withIcon` puts the
  *  asset's icon after it (a panel row), where the breakdown's row draws its
@@ -219,7 +247,7 @@ function ReserveAmountText({
   atBlock?: number;
   withIcon?: boolean;
 }) {
-  if (r.decimalsUnread) return <TokenAmountNotLoaded address={r.address} label={r.symbol} />;
+  if (noAmount(r)) return <NoAmount r={r} />;
   const exact = formatUnitsExact(r.amountRaw, r.decimals);
   const amount = (
     <Prov info={side === "supply" ? positionSupplyProv(r.symbol, atBlock) : positionDebtProv(r.symbol, atBlock)}>
@@ -259,8 +287,8 @@ function TokenStack({
     <span className="flex flex-col gap-1">
       {lines.map((r) => (
         <span key={r.address}>
-          {r.decimalsUnread ? (
-            <TokenAmountNotLoaded address={r.address} label={r.symbol} />
+          {noAmount(r) ? (
+            <NoAmount r={r} />
           ) : (
             <Prov
               info={side === "supply" ? positionSupplyProv(r.symbol, atBlock) : positionDebtProv(r.symbol, atBlock)}
@@ -550,7 +578,7 @@ export function useSparkCardSlots({
     ): PositionCardHead => {
       // One reserve: its amount with its icon, the dollars beneath (the
       // Liquity V2 headline).
-      const one = reserves.length === 1 && !reserves[0].decimalsUnread ? reserves[0] : null;
+      const one = reserves.length === 1 && !noAmount(reserves[0]) ? reserves[0] : null;
       if (one)
         return {
           id,
@@ -665,7 +693,7 @@ export function useSparkCardSlots({
     s: "supply" | "debt",
   ): AssetBreakdown => ({
     assets: lines.lines.map((r) => {
-      const usd = r.decimalsUnread ? null : reserveUsd(v, r.address, r.amount);
+      const usd = noAmount(r) ? null : reserveUsd(v, r.address, r.amount);
       return {
         id: `${s}-${r.address.toLowerCase()}`,
         symbol: r.symbol,

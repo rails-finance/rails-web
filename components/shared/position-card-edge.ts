@@ -24,6 +24,9 @@ export interface PositionCardEdge {
   atRisk?: boolean;
   /** The read's recency (H6), at the top right of the card's heading row. */
   stamp?: ReactNode;
+  /** An open position the chain has not been read for: the stamp says so,
+   *  and the card draws no lifecycle pill beside it. */
+  unread?: true;
 }
 export const PositionCardEdgeContext = createContext<PositionCardEdge | null>(null);
 

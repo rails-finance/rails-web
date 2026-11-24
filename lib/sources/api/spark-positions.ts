@@ -23,6 +23,7 @@ import {
 import { sanityCheckAaveBalances } from "@/lib/sources/chain/aave-family-balances";
 import { SPARK_ADDRESSES } from "@/lib/spark/asset-catalog";
 import { readSparkNotCollateral } from "@/lib/sources/chain/spark-position";
+import type { SparkAccruedReserve } from "@/lib/spark/scaled-accrual";
 
 export type SparkPositionStatus = "open" | "closed" | "liquidated";
 // Mirrors the rails route's sortBy allowlist (mig 183's debt_usd/collateral_usd
@@ -45,6 +46,10 @@ export interface SparkReserveAmount {
   /** The token's `decimals` did not load (the RPC did not answer), so `amount`
    *  is scaled by a stand-in and the card states no amount for this reserve. */
   decimalsUnread?: true;
+  /** The wallet card holds this reserve as a scaled balance and no index was
+   *  read to accrue it (lib/spark/scaled-accrual.ts): `amount` is 0 and the
+   *  card draws "Not read" in its place. */
+  amountUnread?: true;
 }
 
 export interface SparkPositionSummary {
@@ -84,12 +89,10 @@ export interface SparkPositionSummary {
   notCollateral?: string[];
 }
 
-/** One open (wallet, reserve) balance pair as returned by the rails route. */
-export interface RawSparkReserve {
-  reserve: string;
-  supplyBalanceRaw: string;
-  debtBalanceRaw: string;
-}
+/** One open (wallet, reserve) balance pair as returned by the rails route, or
+ *  as the wallet page accrues it from a stored scaled balance, where a side
+ *  marked unread had no index to accrue it with. */
+export type RawSparkReserve = SparkAccruedReserve;
 
 /** One (wallet, reserve) peak pair (highest-recorded supply/debt) from the route. */
 export interface RawSparkPeakReserve {
@@ -116,6 +119,7 @@ export interface RawSparkWalletRow {
 }
 
 const ZERO = BigInt(0);
+const ONE = BigInt(1);
 
 function bigintOf(raw: string | null): bigint {
   if (raw == null || raw === "") return ZERO;
@@ -160,7 +164,7 @@ export async function buildSparkPositionRows(raw: RawSparkWalletRow[]): Promise<
     readSparkNotCollateral(
       raw.map((w) => ({
         wallet: w.wallet,
-        supplied: w.reserves.filter((r) => bigintOf(r.supplyBalanceRaw) > ZERO).map((r) => r.reserve),
+        supplied: w.reserves.filter((r) => r.supplyUnread || bigintOf(r.supplyBalanceRaw) > ZERO).map((r) => r.reserve),
       })),
     ),
   ]);
@@ -172,13 +176,15 @@ export async function buildSparkPositionRows(raw: RawSparkWalletRow[]): Promise<
   sanityCheckAaveBalances(
     "spark-positions",
     raw.flatMap((w) =>
-      w.reserves.map((r) => ({
-        pool: SPARK_ADDRESSES.POOL,
-        wallet: w.wallet,
-        reserve: r.reserve,
-        supplyRaw: bigintOf(r.supplyBalanceRaw),
-        debtRaw: bigintOf(r.debtBalanceRaw),
-      })),
+      w.reserves
+        .filter((r) => !r.supplyUnread && !r.debtUnread)
+        .map((r) => ({
+          pool: SPARK_ADDRESSES.POOL,
+          wallet: w.wallet,
+          reserve: r.reserve,
+          supplyRaw: bigintOf(r.supplyBalanceRaw),
+          debtRaw: bigintOf(r.debtBalanceRaw),
+        })),
     ),
   );
 
@@ -197,7 +203,9 @@ export async function buildSparkPositionRows(raw: RawSparkWalletRow[]): Promise<
       // drops the reserve entirely (a fully-exited or transferred-out position — no
       // phantom line survives). The exact figure rides the reveal; the compact
       // headline never renders a non-zero as "0".
-      if (supplyRaw > ZERO) {
+      // A side whose scaled balance no index accrued is listed with no
+      // amount, ranked last.
+      if (supplyRaw > ZERO || r.supplyUnread) {
         supplies.push({
           symbol: meta.symbol,
           address: addr,
@@ -206,10 +214,11 @@ export async function buildSparkPositionRows(raw: RawSparkWalletRow[]): Promise<
           amountRaw: supplyRaw.toString(),
           balanceSource: "reduced",
           ...decimalsUnreadFlag(metas.get(addr)),
-          _rank: supplyRaw,
+          ...(r.supplyUnread ? { amountUnread: true as const } : {}),
+          _rank: r.supplyUnread ? -ONE : supplyRaw,
         });
       }
-      if (debtRaw > ZERO) {
+      if (debtRaw > ZERO || r.debtUnread) {
         borrows.push({
           symbol: meta.symbol,
           address: addr,
@@ -218,7 +227,8 @@ export async function buildSparkPositionRows(raw: RawSparkWalletRow[]): Promise<
           amountRaw: debtRaw.toString(),
           balanceSource: "reduced",
           ...decimalsUnreadFlag(metas.get(addr)),
-          _rank: debtRaw,
+          ...(r.debtUnread ? { amountUnread: true as const } : {}),
+          _rank: r.debtUnread ? -ONE : debtRaw,
         });
       }
     }

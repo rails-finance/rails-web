@@ -98,6 +98,7 @@ import { CompoundV3OptimismWalletCard } from "@/components/protocol/compound-v3-
 import { MorphoAtBlockWalletCard } from "@/components/protocol/morpho-at-block/morpho-at-block-wallet-card";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { unreadEdge } from "@/lib/wallet/unread-edge";
 import type { WalletCard, WalletPosition } from "@/lib/wallet/types";
 import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 import { walletBranchState } from "@/lib/wallet/trove-shutdown";
@@ -372,6 +373,8 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
     chain: { id: p.chain, name: chain },
     atRisk: atRisk(p),
     // The Arbitrum cards carry their stored read's block in the card.
+    // One mark for an unread open position: the stamp, with no lifecycle pill beside it.
+    ...unreadEdge(p),
     stamp: p.notRead ? (
       // An Aave V3 Base account the chain has not been read for (open point 8),
       // or an f(x) position with no read stored.

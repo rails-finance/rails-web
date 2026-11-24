@@ -64,6 +64,7 @@ export type SpineIcon =
   | "swap" // A position swap: one asset became another under an order the owner signed, both legs staying in the position (rails-ops TO-DO-ui-jobs §15, §19) — a bare arrow-down-up at 45° in its axis hues, the legs stacked on the right flank (`swapLegs`)
   | "market" // A market note — a receipted fact about the MARKET between two of the account's events (components/shared/market-note-row.tsx): the glyph `noteGlyph` names (a rate's `chart-line`, a vault's terms `scroll-text`, a PSM share `chart-pie`), thin neutral ink, never a party colour
   | "protocol-change" // A protocol change in the event history (components/shared/protocol-change-row.tsx, ui-jobs 448): a setting the protocol moved for every position, the pink diamond of the Lifetime flows events row. Lucide `sliders-horizontal` in neutral ink, the governance badge in its corner. A reserve's change log (components/shared/config-change-timeline.tsx, M3.6) names the setting's family with `changeGlyph`: caps `gauge`, rates and fees the rate-change % mark, collateral terms `shield`, liquidation settings `shield-alert`, a freeze `snowflake`, a pause `pause` (`play` on unpause), a switch `plug` / `unplug`, the price source `radio-tower`, a listing `list-plus`, eMode membership `layers`; the default `sliders-horizontal` for anything else. Caps, rates and fees, and collateral terms moved one way take `iconDirection`'s arrow on the right; a freeze, a pause, a line off or halted and borrowing off draw the glyph in `changeTone`, the node alone
+  | "cooldown" // A Liquity V2 Trove's rate-change cooldown while it runs, in the timeline's head slot (components/protocol/liquity-family/rate-cooldown-row.tsx, ui-jobs 831): lucide `hourglass` in the notes' thin neutral ink, no actor, so no badge
   | "live-window" // The live window between ONE position's last touch and now, pinned in the timeline's head slot (components/protocol/polaris/polaris-since-last-touch.tsx). Its own class, not a market note: lucide `timer` (the time since the last touch) in the notes' thin neutral ink — the holder did nothing inside the window, which is what lets its causes be stated as facts
   | "none" // No node of its own: a group whose members moved no asset (a run of rate changes), or the boundary, draws no node
   | "moment" // The state card (components/shared/flow-moment-card.tsx) — the position at a moment between its events, where "Sync to chart" cut the timeline: lucide `clock`, neutral ink, not an event
@@ -1030,7 +1031,15 @@ export function SpineColumn({
   // party with nothing to draw is the mark already, a delegation's node keeps
   // its join/leave badge, and the boundary, the state card and the live
   // window are no one's act.
-  const NO_BADGE: (SpineIcon | undefined)[] = ["external", "delegate", "live-window", "moment", "boundary", "none"];
+  const NO_BADGE: (SpineIcon | undefined)[] = [
+    "external",
+    "delegate",
+    "live-window",
+    "cooldown",
+    "moment",
+    "boundary",
+    "none",
+  ];
   const badged = !NO_BADGE.includes(effectiveIcon);
   const shownActor: SpineActor = badged ? actor : "owner";
   /** A glyph with the actor's badge in its corner. */
@@ -1225,6 +1234,17 @@ export function SpineColumn({
           ) : undefined,
         );
       }
+      case "cooldown":
+        return nodeRow(
+          <Hourglass
+            size={T}
+            strokeWidth={1.25}
+            absoluteStrokeWidth
+            color={SPINE_COLORS.default}
+            aria-hidden="true"
+            data-spine-cooldown-glyph=""
+          />,
+        );
       case "live-window":
         // The live window's node: the notes' register (the account did
         // nothing here), its own glyph.
