@@ -663,6 +663,9 @@ export interface FxPositionCardProps {
   bodyExtra?: ReactNode;
   /** The listing's price for this pool (FxListing). */
   listingPx?: FxListingPrice | null;
+  /** No collateral dollar line: the wallet page states no f(x) dollars, which
+   *  its section says once. */
+  noUsd?: boolean;
   /** The card ⋮'s export shapes (Copy Position, Markdown, CSV). */
   exports?: PositionCardExports | null;
 }
@@ -676,6 +679,7 @@ export function useFxCardSlots({
   inTxFunding,
   bodyExtra,
   listingPx,
+  noUsd = false,
   exports,
 }: FxPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
@@ -787,11 +791,13 @@ export function useFxCardSlots({
           : {}),
         tier: "amount",
         value: collateralValue,
-        usd: collateralUsd(
-          v,
-          detail ? fxAnchorOf(pxRead, v.settled.block) : (listingPx ?? null),
-          detail && !pxState.settled,
-        ),
+        usd: noUsd
+          ? null
+          : collateralUsd(
+              v,
+              detail ? fxAnchorOf(pxRead, v.settled.block) : (listingPx ?? null),
+              detail && !pxState.settled,
+            ),
       },
       // fxUSD is not pinned to a dollar, so the debt carries no USD line.
       { id: "debt", label: CARD_VOCAB.debt, tier: "amount", value: debtValue },

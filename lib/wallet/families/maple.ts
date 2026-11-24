@@ -1,6 +1,6 @@
 // Maple on Ethereum, for the wallet view (decision 0071; SERVER-ONLY). One row
-// per lender wallet (mig 524), its syrupUSDC and syrupUSDT pools in the card:
-// the listing's raw row, built with the listing's builder. Shaping reads no
+// per lender wallet (mig 524): the card is the listing's raw row, built with
+// the listing's builder. Shaping reads no
 // chain, so an open card states the pool shares (held plus escrowed in the
 // withdrawal queue) and no asset amount. The head read is the listing's: one
 // read of both pools' exit rates at a head block (resolveMaplePoolState,

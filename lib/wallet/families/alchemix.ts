@@ -10,9 +10,10 @@
 // read is the listing's read of the holder on the chain
 // (/api/alchemix/positions with the owner and the chain, one call to
 // rails-server): each position's figures at the line's head reading. A
-// position it reads closed holds nothing at that block; one it does not list
-// (its NFT passed to another holder) keeps its stored card. No dollars: the
-// listing prices none (decision 0041).
+// position it reads closed holds nothing at that block. One it does not list
+// (its NFT passed to another holder), or lists refused or with no reading,
+// keeps its stored card; a whole answer then holds nothing for it at its
+// line's head block. No dollars: the listing prices none (decision 0041).
 
 import { readAlchemixPositionsFromBackend } from "@/lib/sources/api/alchemix-positions-backend";
 import { ALCHEMIX_BASE, ALCHEMIX_ETHEREUM, type AlchemixDeployment } from "@/lib/alchemix/lines";
@@ -20,11 +21,15 @@ import type { ChainId } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import type { WalletSummaryRow } from "@/lib/wallet/summary-row";
 import { historyBase, plural, storeStamp } from "@/lib/wallet/summary-row";
-import type { AlchemixStoredPositionSummary, AlchemixV2PositionSummary } from "@/types/api/alchemix";
+import type {
+  AlchemixPositionSummary,
+  AlchemixStoredPositionSummary,
+  AlchemixV2PositionSummary,
+} from "@/types/api/alchemix";
 import type { FamilyModule, HeadResult } from "./module";
 
 /** The listing route's most rows in one answer. */
-const LIMIT = 100;
+const LIMIT = 500;
 
 const isV2 = (card: unknown) => (card as { version?: unknown } | null)?.version === "v2";
 
@@ -82,24 +87,41 @@ function module(dep: AlchemixDeployment, lane: "ethereum" | "base"): FamilyModul
         signal,
       );
       if (!read.ok) throw new Error(`/api/alchemix/positions answered ${read.status}`);
-      const listed = new Map(read.result.data.map((s) => [`${s.lineKey}:${s.tokenId}`, s]));
+      const data = read.result.data;
+      const listed = new Map(data.map((s) => [`${s.lineKey}:${s.tokenId}`, s]));
+      // A reading's block: the line's head reading, or the debt's own block
+      // where that reading is stale.
+      const blockOf = (s: AlchemixPositionSummary): number | null =>
+        (s.chainReading && !s.chainReading.stale ? s.chainReading.blockNumber : null) ??
+        s.figures.debt?.asOfBlock ??
+        null;
+      // Each line's head block, from the answer's rows on it.
+      const lineBlock = new Map<string, number>();
+      for (const s of data) {
+        const b = blockOf(s);
+        if (b != null && b > (lineBlock.get(s.lineKey) ?? 0)) lineBlock.set(s.lineKey, b);
+      }
+      const whole = read.result.pagination.total <= data.length;
       return {
         reads: 1,
         positions: open.map((p): WalletPosition => {
           const stored = rowOf(p);
           const s = listed.get(`${stored.lineKey}:${stored.tokenId}`);
-          const block = s?.chainReading?.blockNumber ?? s?.figures.debt?.asOfBlock ?? null;
-          // Not listed for the holder, refused, with no current reading, or
-          // with no block: the stored card stands.
-          if (!s || block == null || (s.status !== "open" && s.status !== "closed"))
-            return { ...p, headRead: "failed" };
-          if (s.status === "closed") return { ...p, closedSince: { block }, headRead: "stored" };
-          return {
-            ...p,
-            card: { kind: "alchemix", lane, row: s },
-            headRead: "read",
-            readAtBlock: block,
-          };
+          const block = s ? blockOf(s) : null;
+          if (s && block != null && s.status === "closed") return { ...p, closedSince: { block }, headRead: "stored" };
+          if (s && block != null && s.status === "open")
+            return {
+              ...p,
+              card: { kind: "alchemix", lane, row: s },
+              headRead: "read",
+              readAtBlock: block,
+              readAt: undefined,
+            };
+          // The read answered without figures for it: the stored card stands.
+          // Not listed in a whole answer, the wallet holds nothing there at
+          // the line's head block.
+          const head = !s && whole ? lineBlock.get(stored.lineKey) : undefined;
+          return { ...p, ...(head != null ? { closedSince: { block: head } } : {}), headRead: "stored" };
         }),
       };
     },

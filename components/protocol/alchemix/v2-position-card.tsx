@@ -33,6 +33,8 @@ import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
 import { AlchemixIdentity, AlchemixTag, alchemixChip } from "@/components/protocol/alchemix/alchemix-position-card";
 import { V2_WORDS } from "@/lib/alchemix/transmuter-words";
+import type { ChainId } from "@/lib/shared/chains";
+import { v2FrozenDebtProv, v2UnderlyingProv, type AlchemixV2Coords } from "@/lib/alchemix/v2-provenance";
 
 /** alUSD and alETH are 18 decimals each, read from the tokens. */
 const SYNTHETIC_DECIMALS = 18;
@@ -172,19 +174,54 @@ export function v2Outcome(p: AlchemixV2PositionSummary, links?: ReactNode): Posi
   };
 }
 
-export function v2ListingSlots(p: AlchemixV2PositionSummary, session: SessionProtocol): PositionCardListingSlots {
+/** `receipts`: the frozen debt and the lead collateral carry their receipts
+ *  at the frozen block (the wallet page). */
+export function v2ListingSlots(
+  p: AlchemixV2PositionSummary,
+  session: SessionProtocol,
+  receipts = false,
+): PositionCardListingSlots {
+  const coords: AlchemixV2Coords = { chainId: p.chainId as ChainId, lineKey: p.lineKey, account: p.account };
+  const debtProv =
+    receipts && p.frozenDebt
+      ? v2FrozenDebtProv(p.syntheticSymbol, p.frozenDebt.raw, p.frozenDebt.asOfBlock, coords)
+      : undefined;
+  const collProvAt = (i: number) => {
+    const c = p.collateral[i];
+    const u = c?.underlying;
+    if (!receipts || !c || !u) return undefined;
+    return v2UnderlyingProv(
+      u.symbol,
+      u.raw,
+      u.decimals,
+      c.yieldToken.symbol,
+      c.yieldToken.decimals,
+      u.perShareRaw,
+      p.frozenAtBlock,
+      coords,
+    );
+  };
   return {
     surface: "listing",
     status: V2_STATUS,
     tag: <AlchemixTag market={p.syntheticSymbol} id={alchemixV2AccountLabel(p.account)} />,
     identity: <AlchemixIdentity chain={p.chainName ?? `chain ${p.chainId}`} wallet={p.account} session={session} />,
-    heads: [v2DebtHead(p), v2CollateralHead(p)],
+    heads: [v2DebtHead(p, debtProv), v2CollateralHead(p, collProvAt)],
     outcome: v2Outcome(p),
     counters: null,
     menu: null,
   };
 }
 
-export function AlchemixV2PositionCard({ p, session }: { p: AlchemixV2PositionSummary; session: SessionProtocol }) {
-  return <PositionCard slots={v2ListingSlots(p, session)} />;
+export function AlchemixV2PositionCard({
+  p,
+  session,
+  receipts = false,
+}: {
+  p: AlchemixV2PositionSummary;
+  session: SessionProtocol;
+  /** The figures carry their receipts (the wallet page). */
+  receipts?: boolean;
+}) {
+  return <PositionCard slots={v2ListingSlots(p, session, receipts)} />;
 }

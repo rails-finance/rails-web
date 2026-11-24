@@ -172,14 +172,15 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
         <AlchemixPositionCard
           p={card.row}
           session={(card.lane === "base" ? ALCHEMIX_BASE : ALCHEMIX_ETHEREUM).session}
+          receipts
         />
       );
     case "alchemix-v2":
-      return <AlchemixV2PositionCard p={card.row} session={ALCHEMIX_ETHEREUM.session} />;
+      return <AlchemixV2PositionCard p={card.row} session={ALCHEMIX_ETHEREUM.session} receipts />;
     case "maple":
       return <MaplePositionCard v={mapleView(card.row)} surface="listing" />;
     case "fx":
-      return <FxPositionCard v={fxView(card.row)} surface="listing" />;
+      return <FxPositionCard v={fxView(card.row)} surface="listing" noUsd />;
     case "morpho-arbitrum":
       return <ArbitrumReadCard row={card.row} family="morpho" />;
     case "spark":

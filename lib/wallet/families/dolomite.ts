@@ -5,7 +5,7 @@
 // the listing's: one read of every market's index, price and rates at a head
 // block (resolveDolomiteMarketState, through rails-server's head reads), and
 // each leg's tokens now are its par times the market's index, its dollars at
-// the core's own oracle (getMarketPrice). Par moves only at the account's
+// the core's oracle (getMarketPrice). Par moves only at the account's
 // events, which the store follows, so this read cannot find an account emptied
 // since the sweep. A closed account's card states its peaks from the store,
 // with no read.
