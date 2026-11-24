@@ -7,9 +7,10 @@
 // one call to rails-server): each position's sweep read, with its block, debt
 // ratio and the pool's oracle price. It fills a position not read where the
 // sweep has read it. A position the sweep reads closed holds nothing at that
-// block; one the read does not list (passed to another holder) keeps its
-// stored card. No dollars: the listing prices at visit in the browser
-// (decision 0041).
+// block. One the read does not list (passed to another holder), or lists
+// unswept, keeps its stored card; a whole answer then holds nothing for it at
+// its pool's sweep block. No dollars: the listing prices at visit in the
+// browser (decision 0041).
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { toFxSummary, type FxPositionSummary, type RawFxPositionRow } from "@/lib/sources/api/fx-positions";
@@ -79,16 +80,28 @@ export const fx: FamilyModule = {
     if (open.length === 0) return { positions: open, reads: 0 };
     const answer = await readHolder(address, signal, readerIp);
     const listed = new Map(answer.positions.map((raw) => [`${raw.pool_key}-${raw.position}`, toFxSummary(raw)]));
+    // Each pool's sweep block, from the answer's rows in it.
+    const poolBlock = new Map<string, number>();
+    for (const s of listed.values()) {
+      const b = s.settled.block;
+      if (b != null && b > (poolBlock.get(s.pool) ?? 0)) poolBlock.set(s.pool, b);
+    }
+    const whole = answer.total <= answer.positions.length;
     return {
       reads: 1,
       positions: open.map((p): WalletPosition => {
-        const s = listed.get(keyOf(rowOf(p)));
-        // Not listed for the holder, or not swept yet: the stored card stands.
-        if (!s || s.status === "unknown" || s.settled.block == null)
-          return p.notRead ? p : { ...p, headRead: "failed" };
-        if (s.status === "closed")
+        const stored = rowOf(p);
+        const s = listed.get(keyOf(stored));
+        if (s && s.settled.block != null && s.status === "closed")
           return { ...p, notRead: undefined, closedSince: { block: s.settled.block }, headRead: "stored" };
-        if (s.settled.colls == null) return p.notRead ? p : { ...p, headRead: "failed" };
+        if (!s || s.status !== "open" || s.settled.block == null || s.settled.colls == null) {
+          // The read answered without a sweep read for it: the stored card
+          // stands, a position not read stays so. Not listed in a whole
+          // answer, the wallet holds nothing there at the pool's sweep block.
+          const head = !s && whole ? poolBlock.get(stored.pool) : undefined;
+          if (head != null) return { ...p, notRead: undefined, closedSince: { block: head }, headRead: "stored" };
+          return p.notRead ? p : { ...p, headRead: "stored" };
+        }
         return {
           ...p,
           notRead: undefined,
