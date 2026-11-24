@@ -29,7 +29,20 @@ const DEFAULT_ATTEMPT_TIMEOUT_MS = 15_000;
 /** Delay before each retry — attempt N+2 waits RETRY_DELAYS_MS[N]. */
 const RETRY_DELAYS_MS = [500, 2000];
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** Wait `ms`, or reject at once where `signal` aborts first. */
+const sleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal!.reason);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 
 function isRetryableStatus(status: number): boolean {
   return status === 429 || status >= 500;
@@ -38,12 +51,14 @@ function isRetryableStatus(status: number): boolean {
 export async function fetchWithRetry(
   url: string,
   init: RequestInit,
-  opts?: { attemptTimeoutMs?: number },
+  opts?: { attemptTimeoutMs?: number; signal?: AbortSignal },
 ): Promise<Response> {
   const attemptTimeoutMs = opts?.attemptTimeoutMs ?? DEFAULT_ATTEMPT_TIMEOUT_MS;
+  // The caller's signal ends the whole call: the attempt in flight, the pause and every retry.
+  const signal = opts?.signal;
   let lastError: unknown;
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
-    if (attempt > 0) await sleep(RETRY_DELAYS_MS[attempt - 1]);
+    if (attempt > 0) await sleep(RETRY_DELAYS_MS[attempt - 1], signal);
 
     // Next memoizes identical fetches for the length of a render pass — a
     // resolved 500 included — so a retry with the same url + options can be
@@ -54,7 +69,8 @@ export async function fetchWithRetry(
 
     const isLast = attempt === RETRY_DELAYS_MS.length;
     try {
-      const res = await fetch(url, { ...init, headers, signal: AbortSignal.timeout(attemptTimeoutMs) });
+      const timeout = AbortSignal.timeout(attemptTimeoutMs);
+      const res = await fetch(url, { ...init, headers, signal: signal ? AbortSignal.any([timeout, signal]) : timeout });
       if (isRetryableStatus(res.status) && !isLast) {
         // The dropped answer's body would hold its pool connection (lib/api/api-pool.ts).
         void res.body?.cancel().catch(() => undefined);
@@ -64,7 +80,7 @@ export async function fetchWithRetry(
       return res;
     } catch (err) {
       lastError = err;
-      if (isLast) throw err;
+      if (isLast || signal?.aborted) throw err;
       console.warn(`resilient-fetch: retry ${attempt + 1} for ${url} — ${err instanceof Error ? err.message : err}`);
     }
   }

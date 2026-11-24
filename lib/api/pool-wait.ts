@@ -1,7 +1,8 @@
 // Where a request to the api host is waiting, for a caller that times its wait
 // (lib/sources/api/route-gate.ts). The keep-alive pool (lib/api/api-pool.ts)
-// marks a request `queued` when the router takes it and `granted` when the
-// pool hands it to one of its connections; outside the pool it stays `unsent`.
+// marks a request `queued` when the router takes it, `granted` when the pool
+// hands it to one of its connections, and `queued` again when a stale-socket
+// retry sends it back to the pool; outside the pool it stays `unsent`.
 // A wait that runs out while `queued` was spent behind other requests of this
 // process, and the api host has not been asked.
 //

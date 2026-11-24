@@ -37,7 +37,7 @@
 // scripts/test/api-pool.test.mjs loads it with a hook that adds the .ts.
 
 import { Client, Dispatcher, Pool, getGlobalDispatcher, setGlobalDispatcher } from "undici";
-import { currentPoolWait } from "./pool-wait";
+import { currentPoolWait, type PoolWait } from "./pool-wait";
 
 /** At most this many open connections to the api host per server process.
  *  Above 814's wallet cap of 4, so a wallet read leaves a render on the same
@@ -53,6 +53,8 @@ export const API_KEEPALIVE_MS = 30_000;
 export interface ApiPoolOptions {
   connections?: number;
   keepAliveMs?: number;
+  /** In place of STALE_RETRY_DELAY_MS. */
+  staleRetryDelayMs?: number;
 }
 
 /** The pause before a stale socket's request is sent again (ms). */
@@ -61,19 +63,32 @@ export const STALE_RETRY_DELAY_MS = 10;
 const STALE_SOCKET_CODES = new Set(["UND_ERR_SOCKET", "ECONNRESET"]);
 const IDEMPOTENT = new Set(["GET", "HEAD"]);
 
+/** The wait record (lib/api/pool-wait.ts) the router puts on a request's
+ *  options: `granted` when the pool hands the request to a connection, back to
+ *  `queued` when a stale-socket retry sends it to the pool again. */
+const POOL_WAIT = Symbol("rails.api.poolWait");
+type WaitOptions = Dispatcher.DispatchOptions & { [POOL_WAIT]?: PoolWait };
+
 /** Sends a request again, once, where its socket failed before any response
  *  headers arrived. Every other outcome passes to `handler` unchanged. */
 class RetryStaleSocket implements Dispatcher.DispatchHandler {
   #answered = false;
   #retried = false;
   readonly #dispatch: Dispatcher.Dispatch;
-  readonly #opts: Dispatcher.DispatchOptions;
+  readonly #opts: WaitOptions;
   readonly #handler: Dispatcher.DispatchHandler;
+  readonly #delayMs: number;
 
-  constructor(dispatch: Dispatcher.Dispatch, opts: Dispatcher.DispatchOptions, handler: Dispatcher.DispatchHandler) {
+  constructor(
+    dispatch: Dispatcher.Dispatch,
+    opts: Dispatcher.DispatchOptions,
+    handler: Dispatcher.DispatchHandler,
+    delayMs: number,
+  ) {
     this.#dispatch = dispatch;
     this.#opts = opts;
     this.#handler = handler;
+    this.#delayMs = delayMs;
   }
 
   onRequestStart(controller: Dispatcher.DispatchController, context: unknown): void {
@@ -97,40 +112,70 @@ class RetryStaleSocket implements Dispatcher.DispatchHandler {
     this.#handler.onResponseEnd?.(...args);
   }
 
-  onResponseError(controller: Dispatcher.DispatchController, err: Error): void {
+  /** `controller` is undefined where the request failed before it reached a
+   *  socket (a refused or timed-out connect, DNS, TLS, a closed pool); that
+   *  failure passes through. */
+  onResponseError(controller: Dispatcher.DispatchController | undefined, err: Error): void {
     const code = (err as { code?: string }).code;
-    if (this.#answered || this.#retried || controller.aborted || !code || !STALE_SOCKET_CODES.has(code)) {
-      this.#handler.onResponseError?.(controller, err);
+    if (
+      !controller ||
+      this.#answered ||
+      this.#retried ||
+      controller.aborted ||
+      !code ||
+      !STALE_SOCKET_CODES.has(code)
+    ) {
+      this.#handler.onResponseError?.(controller as Dispatcher.DispatchController, err);
       return;
     }
     this.#retried = true;
     setTimeout(() => {
+      // The caller aborted during the pause: the request is not sent again.
+      if (controller.aborted) {
+        this.#handler.onResponseError?.(controller, (controller.reason as Error | null) ?? err);
+        return;
+      }
+      const wait = this.#opts[POOL_WAIT];
+      if (wait) wait.state = "queued";
       try {
         this.#dispatch(this.#opts, this);
       } catch (e) {
         this.#handler.onResponseError?.(controller, e as Error);
       }
-    }, STALE_RETRY_DELAY_MS);
+    }, this.#delayMs);
   }
 }
 
-/** An interceptor that sends a GET or HEAD once more where it failed with
- *  UND_ERR_SOCKET or ECONNRESET before any response headers arrived. Other
- *  methods, later failures and every status code pass through. */
-export const retryStaleSocket: Dispatcher.DispatcherComposeInterceptor = (dispatch) => (opts, handler) =>
-  IDEMPOTENT.has(opts.method) ? dispatch(opts, new RetryStaleSocket(dispatch, opts, handler)) : dispatch(opts, handler);
-
-/** The mark the router sets on a request's options: called when the pool
- *  hands the request to a connection. */
-const ON_GRANT = Symbol("rails.api.onGrant");
-type GrantOptions = Dispatcher.DispatchOptions & { [ON_GRANT]?: () => void };
+/** An interceptor that sends a GET or HEAD once more, after `delayMs`, where
+ *  it failed with UND_ERR_SOCKET or ECONNRESET before any response headers
+ *  arrived. Other methods, later failures and every status code pass through. */
+export const retryStaleSocket =
+  (delayMs: number = STALE_RETRY_DELAY_MS): Dispatcher.DispatcherComposeInterceptor =>
+  (dispatch) =>
+  (opts, handler) =>
+    IDEMPOTENT.has(opts.method)
+      ? dispatch(opts, new RetryStaleSocket(dispatch, opts, handler, delayMs))
+      : dispatch(opts, handler);
 
 /** One of the pool's connections. The pool calls `dispatch` when it hands a
- *  request over, straight away where a connection is free and otherwise when
- *  one frees. */
+ *  request over, at once where a connection is free, otherwise when one frees. */
 class GrantingClient extends Client {
+  #logged = false;
+
+  constructor(url: URL, opts: Client.Options) {
+    super(url, opts);
+    // undici emits 'error' on a client where a request's handler throws; with
+    // no listener that would end the process. Logged once per connection.
+    (this as unknown as NodeJS.EventEmitter).on("error", (err: Error) => {
+      if (this.#logged) return;
+      this.#logged = true;
+      console.error("api-pool: a request handler threw", err);
+    });
+  }
+
   dispatch(opts: Dispatcher.DispatchOptions, handler: Dispatcher.DispatchHandler): boolean {
-    (opts as GrantOptions)[ON_GRANT]?.();
+    const wait = (opts as WaitOptions)[POOL_WAIT];
+    if (wait) wait.state = "granted";
     return super.dispatch(opts, handler);
   }
 }
@@ -144,8 +189,8 @@ export function createApiPool(origin: string, opts: ApiPoolOptions = {}): Dispat
     pipelining: 1,
     keepAliveTimeout: keepAlive,
     keepAliveMaxTimeout: keepAlive,
-    factory: (url, clientOpts) => new GrantingClient(url, clientOpts),
-  }).compose(retryStaleSocket);
+    factory: (url, clientOpts) => new GrantingClient(url, clientOpts as Client.Options),
+  }).compose(retryStaleSocket(opts.staleRetryDelayMs));
 }
 
 const originOf = (o: unknown): string | undefined => {
@@ -177,12 +222,7 @@ export class OriginRouter extends Dispatcher {
     const wait = currentPoolWait();
     if (!wait) return this.pool.dispatch(opts, handler);
     wait.state = "queued";
-    const marked: GrantOptions = {
-      ...opts,
-      [ON_GRANT]: () => {
-        wait.state = "granted";
-      },
-    };
+    const marked: WaitOptions = { ...opts, [POOL_WAIT]: wait };
     return this.pool.dispatch(marked, handler);
   }
 

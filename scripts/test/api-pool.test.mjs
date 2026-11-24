@@ -26,11 +26,12 @@ const { API_CONNECTIONS, API_KEEPALIVE_MS, OriginRouter, createApiPool, installA
   ROOT + "lib/api/api-pool.ts"
 );
 const { withPoolWait } = await import(ROOT + "lib/api/pool-wait.ts");
-const { COUNT_CONCURRENCY, countSlot } = await import(ROOT + "lib/home/count-slot.ts");
+const { COUNT_CONCURRENCY, countLeg } = await import(ROOT + "lib/home/count-slot.ts");
 const { fetchWithRetry } = await import(ROOT + "lib/api/resilient-fetch.ts");
 
 /** A server on 127.0.0.1 that answers after `delayMs` (or `?ms=`), cuts the
- *  socket on /reset, cuts a reused socket on /stale, sends 8 MB on /big, and
+ *  socket on /reset, cuts a reused socket on /stale, sends 8 MB on /big, never
+ *  answers /hang, and
  *  counts the connections it accepts and the requests in flight. */
 async function startServer(delayMs = 40) {
   const stats = { connections: 0, open: 0, maxOpen: 0, inFlight: 0, maxInFlight: 0, seen: [] };
@@ -49,6 +50,7 @@ async function startServer(delayMs = 40) {
     stats.inFlight++;
     stats.maxInFlight = Math.max(stats.maxInFlight, stats.inFlight);
     res.on("close", () => stats.inFlight--);
+    if (req.url.startsWith("/hang")) return;
     const ms = Number(new URL(req.url, "http://x").searchParams.get("ms") ?? delayMs);
     setTimeout(() => {
       res.setHeader("content-type", "application/json");
@@ -369,15 +371,139 @@ test("the home count's fan-out has at most four legs in flight", async () => {
     assert.equal(COUNT_CONCURRENCY, 4);
     await withPool(origin, async () => {
       const legs = Array.from({ length: 60 }, (_, i) =>
-        countSlot(async () => {
-          const res = await fetchWithRetry(`${origin}/leg/${i}`, {});
+        countLeg(AbortSignal.timeout(10_000), async (signal) => {
+          const res = await fetchWithRetry(`${origin}/leg/${i}`, {}, { signal });
           return res.json();
         }),
       );
       const bodies = await Promise.all(legs);
-      assert.equal(bodies.length, 60);
+      assert.equal(bodies.filter((b) => b?.url).length, 60);
     });
     assert.equal(stats.maxInFlight, COUNT_CONCURRENCY);
+  } finally {
+    await stop();
+  }
+});
+
+test("with the api hung, the home fan-out settles to null at its deadline", async () => {
+  const { origin, stats, stop } = await startServer();
+  try {
+    await withPool(origin, async () => {
+      const started = Date.now();
+      const deadline = AbortSignal.timeout(300);
+      const legs = Array.from({ length: 60 }, (_, i) =>
+        countLeg(deadline, async (signal) => {
+          try {
+            const res = await fetchWithRetry(`${origin}/hang/${i}`, {}, { signal });
+            return await res.json();
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const results = await Promise.all(legs);
+      const took = Date.now() - started;
+      assert.deepEqual(new Set(results), new Set([null]));
+      assert.ok(took < 1_000, `settled after ${took} ms`);
+      assert.equal(stats.seen.length, COUNT_CONCURRENCY, "only the first four legs were sent");
+    });
+  } finally {
+    await stop();
+  }
+});
+
+/** A port nothing listens on. */
+async function closedPort() {
+  const server = http.createServer();
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+  await new Promise((resolve) => server.close(resolve));
+  return `http://127.0.0.1:${port}`;
+}
+
+/** `p`, or a rejection naming `what` after `ms`. */
+const within = (p, ms, what) => {
+  let timer;
+  return Promise.race([
+    p.finally(() => clearTimeout(timer)),
+    new Promise((_, reject) => (timer = setTimeout(() => reject(new Error(`${what} hung`)), ms))),
+  ]);
+};
+
+test("a fetch to a closed port rejects, and the process lives", async () => {
+  const origin = await closedPort();
+  await withPool(origin, async () => {
+    const err = await within(fetch(`${origin}/x`), 3_000, "the fetch").then(
+      () => assert.fail("a closed port answered"),
+      (e) => e,
+    );
+    assert.equal(err.name, "TypeError");
+    assert.equal(err.cause?.code, "ECONNREFUSED");
+  });
+});
+
+test("concurrent requests to a closed port all reject, and none hangs", async () => {
+  const origin = await closedPort();
+  await withPool(origin, async () => {
+    const n = API_CONNECTIONS * 3;
+    const results = await within(
+      Promise.allSettled(Array.from({ length: n }, (_, i) => fetch(`${origin}/c/${i}`))),
+      5_000,
+      "a request",
+    );
+    assert.equal(results.filter((r) => r.status === "rejected").length, n);
+  });
+});
+
+test("an abort during the retry pause stops the retry", async () => {
+  const { origin, stats, stop } = await startServer(5);
+  try {
+    await withPool(
+      origin,
+      async () => {
+        assert.equal((await read(`${origin}/warm`)).url, "/warm");
+        const ctl = new AbortController();
+        const pending = fetch(`${origin}/stale`, { signal: ctl.signal });
+        await until(() => stats.seen.includes("GET /stale"));
+        await new Promise((r) => setTimeout(r, 50));
+        ctl.abort();
+        await assert.rejects(pending, { name: "AbortError" });
+        await new Promise((r) => setTimeout(r, 400));
+        assert.deepEqual(
+          stats.seen.filter((x) => x === "GET /stale"),
+          ["GET /stale"],
+        );
+        // Without the check the retry would be dispatched, open a connection
+        // and abort on it.
+        assert.equal(stats.connections, 1, "the retry opened no connection");
+      },
+      { connections: 1, staleRetryDelayMs: 200 },
+    );
+  } finally {
+    await stop();
+  }
+});
+
+test("a retried request queues again and is marked queued", async () => {
+  const { origin, stats, stop } = await startServer(5);
+  try {
+    await withPool(
+      origin,
+      async () => {
+        assert.equal((await read(`${origin}/warm`)).url, "/warm");
+        let wait;
+        const pending = withPoolWait(
+          (w) => ((wait = w), fetch(`${origin}/stale`, { signal: AbortSignal.timeout(450) })),
+        );
+        await until(() => stats.seen.includes("GET /stale"));
+        // During the retry's pause another request takes the only connection.
+        const hold = read(`${origin}/hold?ms=700`);
+        await assert.rejects(pending, { name: "TimeoutError" });
+        assert.equal(wait.state, "queued");
+        await hold;
+      },
+      { connections: 1, staleRetryDelayMs: 200 },
+    );
   } finally {
     await stop();
   }
