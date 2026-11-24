@@ -60,6 +60,7 @@ import {
   walletSections,
   walletTotal,
   andList,
+  onTestnet,
   type WalletSection,
   type WalletTotal,
 } from "@/lib/wallet/wallet-sections";
@@ -355,10 +356,12 @@ export function WalletView({
   const all = narrow(kinds, status);
   const chosen = walletProtocol(read.protocol);
   // The heading counts the wallet's positions whatever the pills hold.
+  // A testnet's positions are not counted (WALLET_COUNTS_SCOPE).
+  const counted = scoped.rows.filter((p) => !onTestnet(p));
   const wallet = {
-    open: scoped.rows.filter((p) => p.status === "open").length,
-    moved: scoped.rows.filter((p) => p.status === "moved").length,
-    closed: scoped.rows.filter((p) => p.status !== "open" && p.status !== "moved").length,
+    open: counted.filter((p) => p.status === "open").length,
+    moved: counted.filter((p) => p.status === "moved").length,
+    closed: counted.filter((p) => p.status !== "open" && p.status !== "moved").length,
   };
   // The bands state a protocol's whole holding: drawn while no pill narrows it.
   // The listing reads that did not answer (read-wallet.ts, readListingRows).
@@ -554,7 +557,9 @@ export function WalletView({
             {filterBar}
             {body(
               <>
-                {open.length > 0 && <Totals sections={sections} filtered={filtered} unanswered={blocking} />}
+                {open.some((p) => !onTestnet(p)) && (
+                  <Totals sections={sections} filtered={filtered} unanswered={blocking} />
+                )}
                 {sections.map((s) => (
                   <Section key={s.slug} s={s} />
                 ))}

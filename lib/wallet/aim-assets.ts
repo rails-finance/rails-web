@@ -14,6 +14,9 @@
 //   alchemix-v2            the synthetic
 //   maple                  each held or peak pool's asset symbol
 //   fx                     the pool's collateral token symbol, and fxUSD
+//   frankencoin            the collateral token's address, and ZCHF
+//   pwn                    the collateral and credit addresses of the loan's ERC20 legs
+//   polaris-*              nothing: AIM's universe has no Sepolia token
 //   compound-v3            base token + each collateral line's address
 //   spark                  each supplied and borrowed reserve's address (peaks for a closed one)
 //   aave-v3, seamless      the dominant supply and debt addresses only (the row carries counts, not the list)
@@ -130,6 +133,13 @@ export function walletPositionAssetKeys(p: WalletPosition): string[] {
       break;
     case "fx":
       symbols.push(c.row.poolSymbol, "fxUSD");
+      break;
+    case "frankencoin":
+      addresses.push(c.row.collateralToken);
+      symbols.push("ZCHF");
+      break;
+    case "pwn":
+      for (const a of [c.row.collateral, c.row.credit]) if (a?.category === "ERC20") addresses.push(a.address);
       break;
     default:
       break;

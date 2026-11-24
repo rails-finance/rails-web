@@ -395,3 +395,30 @@ test("the unread note reads for all, some and none of a section's open positions
   assert.equal(unreadNote(1, 2), `1 of the 2 open positions${tail}`);
   assert.equal(unreadNote(0, 5), undefined);
 });
+
+test("a testnet's section stands outside the wallet totals and the risk tile, after every mainnet one", async () => {
+  const { closestToLiquidation, onTestnet } = await import("../../lib/wallet/wallet-sections.ts");
+  const s = walletSections(
+    [
+      pos("polaris", { chain: 11155111, buffer: 0.01, riskFigure: { value: "101%" } }),
+      pos("aave-v3", { buffer: 0.5, collateralUsd: 100, debtUsd: 10, riskFigure: { value: "2.0" } }),
+    ],
+    { bands: true },
+  );
+  assert.deepEqual(
+    s.map((x) => [x.slug, x.testnet]),
+    [
+      ["aave-v3", false],
+      ["polaris", true],
+    ],
+  );
+  // Polaris states no dollars, yet the wallet total stands over Aave V3 alone.
+  const coll = walletTotal(s, "collateral");
+  assert.equal(coll.figure.usd, 100);
+  assert.equal(coll.of, 1);
+  assert.equal(closestToLiquidation(s).family, "aave-v3");
+  assert.equal(onTestnet({ chain: 11155111 }), true);
+  assert.equal(onTestnet({ chain: 1 }), false);
+  // A wallet holding Polaris alone has no wallet total.
+  assert.equal(walletTotal(walletSections([pos("polaris", { chain: 11155111 })], { bands: true }), "debt"), null);
+});

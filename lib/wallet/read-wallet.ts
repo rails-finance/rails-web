@@ -41,6 +41,9 @@ import { dolomite } from "@/lib/wallet/families/dolomite";
 import { alchemixBase, alchemixEthereum } from "@/lib/wallet/families/alchemix";
 import { maple } from "@/lib/wallet/families/maple";
 import { fx } from "@/lib/wallet/families/fx";
+import { frankencoin } from "@/lib/wallet/families/frankencoin";
+import { pwn } from "@/lib/wallet/families/pwn";
+import { polaris } from "@/lib/wallet/families/polaris";
 import { morphoBase } from "@/lib/wallet/families/morpho-base";
 import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/families/ethereum-single";
 import { aaveV3Arbitrum, compoundV3Arbitrum, morphoArbitrum } from "@/lib/wallet/families/arbitrum";
@@ -105,6 +108,9 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   alchemixBase,
   maple,
   fx,
+  frankencoin,
+  pwn,
+  polaris,
 ];
 
 /** The families the page reads, by chain, in one sentence for the empty
@@ -118,13 +124,14 @@ export function walletFamiliesLine(): string {
     byChain.set(f.summaryChain, names);
   }
   const list = (n: string[]) => (n.length < 2 ? n.join("") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`);
-  // No wallet module reads Arc or Sepolia, so neither has a phrase.
-  const where: Partial<Record<WalletSummaryRow["chain"], string>> = {
+  const where: Record<WalletSummaryRow["chain"], string> = {
     ethereum: "on Ethereum",
     base: "on Base",
     arbitrum: "on Arbitrum where Rails has read the wallet",
+    arc: "on Arc",
+    sepolia: "on Sepolia (testnet)",
   };
-  return [...byChain].map(([chain, names]) => `${list(names)} ${where[chain] ?? `on ${chain}`}`).join("; ");
+  return [...byChain].map(([chain, names]) => `${list(names)} ${where[chain]}`).join("; ");
 }
 
 /** A listing read that did not answer, or answered part of the wallet: its
@@ -459,7 +466,10 @@ export async function readWalletUncached(
     address,
     positions,
     families,
-    total: opts.protocol ? groups.reduce((s, g) => s + g.rows.length, 0) : summary.total,
+    // A testnet's rows are not counted (WALLET_COUNTS_SCOPE).
+    total: opts.protocol
+      ? groups.reduce((s, g) => s + g.rows.filter(countedRow).length, 0)
+      : summary.total - summary.rows.filter((r) => !countedRow(r)).length,
     readAt: Math.floor(Date.now() / 1000),
     serverMs,
     ms: Date.now() - t0,
@@ -513,7 +523,7 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
     const positions: WalletCountsPosition[] = [];
     const taken = new Set<WalletSummaryRow>();
     for (const f of WALLET_FAMILIES) {
-      if (f.head) continue;
+      if (f.head || f.summaryChain === "sepolia") continue;
       const rows = summary.rows.filter((r) => takesRow(f, r));
       if (rows.length === 0) continue;
       try {

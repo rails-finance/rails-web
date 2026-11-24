@@ -77,6 +77,17 @@ import { AlchemixV2PositionCard } from "@/components/protocol/alchemix/v2-positi
 import { ALCHEMIX_BASE, ALCHEMIX_ETHEREUM } from "@/lib/alchemix/lines";
 import { MaplePositionCard, viewFromSummary as mapleView } from "@/components/protocol/maple/maple-position-card";
 import { FxPositionCard, viewFromSummary as fxView } from "@/components/protocol/fx/fx-position-card";
+import {
+  FrankencoinPositionCard,
+  viewFromSummary as frankencoinView,
+} from "@/components/protocol/frankencoin/frankencoin-position-card";
+import { PwnPositionCard, viewFromSummary as pwnView } from "@/components/protocol/pwn/pwn-position-card";
+import {
+  PolarisPositionCard,
+  viewFromSummary as polarisView,
+} from "@/components/protocol/polaris/polaris-position-card";
+import { PolarisLoanCard } from "@/components/protocol/polaris/polaris-loan-card";
+import { PolarisDepositCard } from "@/components/protocol/polaris/polaris-deposit-card";
 import { ArbitrumReadCard, CometReadCard } from "@/components/shared/arbitrum-positions-listing";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
@@ -184,6 +195,33 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
       return <MaplePositionCard v={mapleView(card.row)} surface="listing" />;
     case "fx":
       return <FxPositionCard v={fxView(card.row)} surface="listing" noUsd />;
+    case "frankencoin":
+      return <FrankencoinPositionCard v={frankencoinView(card.row)} surface="listing" />;
+    case "pwn":
+      return <PwnPositionCard v={pwnView(card.row)} />;
+    case "polaris-cdp":
+      // The board gives the ratio; the wallet page states no Polaris dollars.
+      return (
+        <PolarisPositionCard
+          v={{ ...polarisView(card.row, card.markets, false), collUsd: null, debtUsd: null }}
+          surface="listing"
+        />
+      );
+    case "polaris-loan":
+      return (
+        <PolarisLoanCard
+          row={card.row}
+          surface="listing"
+          receipts={{
+            via: card.via,
+            debtAt: card.via === "listing" ? "index" : "touch",
+            collBlock: card.blocks.coll,
+            debtBlock: card.blocks.debt,
+          }}
+        />
+      );
+    case "polaris-deposit":
+      return <PolarisDepositCard row={card.row} surface="listing" receipts={{ via: card.via, block: card.block }} />;
     case "morpho-arbitrum":
       return <ArbitrumReadCard row={card.row} family="morpho" />;
     case "spark":

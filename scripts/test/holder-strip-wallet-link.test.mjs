@@ -1,6 +1,6 @@
 // The holder strip's "Everything this wallet holds" link is drawn only for a
-// protocol the /wallet page reads (WALLET_PROTOCOLS): Polaris on Sepolia is
-// not read there (ui-jobs 691), so its strip draws no link to an empty page.
+// protocol the /wallet page reads (WALLET_PROTOCOLS), so a strip draws no link
+// to an empty page. Polaris on Sepolia is read there since wallet batch 4.
 // The adapters import through `@/`, resolved here as
 // polaris-holder-strip-kinds.test.mjs does.
 // Run: npm test
@@ -75,21 +75,22 @@ const W = "0x66fd591ae065dafc1c84c5bf6cda64f2f29d9c16";
 
 test("a protocol the wallet page reads links it; one it leaves out does not", () => {
   for (const p of WALLET_PROTOCOLS) assert.equal(walletPageHref(p.slug, W), `/wallet/${W}`, p.slug);
-  assert.equal(walletPageHref("polaris", W), null);
+  assert.equal(walletPageHref("polaris", W), `/wallet/${W}`);
+  assert.equal(walletPageHref("cow", W), null);
   assert.equal(walletPageHref(undefined, W), null);
   assert.equal(walletPageHref("liquity-v2", undefined), null);
   assert.equal(walletPageHref("liquity-v2", "vitalik.eth"), "/wallet/vitalik.eth");
 });
 
-test("each listing adapter names its protocol, and only Polaris's goes unlinked", () => {
+test("each listing adapter names its protocol, and links the wallet page", () => {
   const polaris = polarisHolderStrip([cdp("1", "open"), cdp("2", "open")], 2, board, 20, 0, W);
   assert.equal(polaris.protocol, "polaris");
-  assert.equal(walletPageHref(polaris.protocol, polaris.wallet), null);
+  assert.equal(walletPageHref(polaris.protocol, polaris.wallet), `/wallet/${W}`);
   // Past one page too.
   const many = Array.from({ length: 20 }, (_, i) => cdp(String(i), "open"));
   const slice = polarisHolderStrip(many, 30, board, 20, 0, W);
   assert.equal(slice.truncated, true);
-  assert.equal(walletPageHref(slice.protocol, slice.wallet), null);
+  assert.equal(walletPageHref(slice.protocol, slice.wallet), `/wallet/${W}`);
 
   const v2 = liquityV2HolderStrip([], 0, { weth: 1, wsteth: 1, reth: 1 }, 20, 0, W);
   assert.equal(walletPageHref(v2.protocol, v2.wallet), `/wallet/${W}`);

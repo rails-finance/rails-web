@@ -22,6 +22,11 @@ import type { EulerWalletCardRow } from "@/lib/euler/wallet-card";
 import type { DolomitePositionSummary } from "@/lib/sources/api/dolomite-positions";
 import type { MaplePositionSummary } from "@/lib/sources/api/maple-positions";
 import type { FxPositionSummary } from "@/lib/sources/api/fx-positions";
+import type { FrankencoinPositionSummary } from "@/lib/sources/api/frankencoin-positions";
+import type { PwnPositionSummary } from "@/lib/sources/api/pwn-positions";
+import type { PolarisPositionSummary } from "@/lib/sources/api/polaris-positions";
+import type { PolarisDepositRow, PolarisLoanRow } from "@/lib/sources/api/polaris-sp-loans";
+import type { PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-position";
 import type { AlchemixStoredPositionSummary, AlchemixV2PositionSummary } from "@/types/api/alchemix";
 import type { MorphoBaseVaultOwnerNote } from "@/lib/morpho-base/vault-owner-note";
 import type { MorphoPositionSummary } from "@/lib/sources/api/morpho-positions";
@@ -103,6 +108,27 @@ export type WalletCard =
   /** An f(x) position: getPosition at its last event, or the sweep's read
    *  where the head read answered. */
   | { kind: "fx"; row: FxPositionSummary }
+  /** A Frankencoin position contract: the listing's row at its last
+   *  MintingUpdate. A denied position keeps its status in the row. */
+  | { kind: "frankencoin"; row: FrankencoinPositionSummary }
+  /** One side of a PWN loan, the wallet its lender or its borrower: the
+   *  listing's row. */
+  | { kind: "pwn"; row: PwnPositionSummary }
+  /** A Polaris CDP on Sepolia: the listing's row, with the market board where
+   *  the head read answered, which gives the card its ratio. */
+  | { kind: "polaris-cdp"; row: PolarisPositionSummary; markets: PolarisMarketsChainResponse | null }
+  /** A Polaris reserve loan or Stability Pool deposit: the stored card holds
+   *  the fields the listing card draws (mig 529), the head read the listing
+   *  route's whole row (`via`). A loan's debt is at its last touch, or at the
+   *  deployment's latest index on a listing row. */
+  | {
+      kind: "polaris-loan";
+      row: PolarisLoanRow;
+      via: "wallet" | "listing";
+      /** The blocks its collateral, and its debt and cost, are at. */
+      blocks: { coll?: number; debt?: number };
+    }
+  | { kind: "polaris-deposit"; row: PolarisDepositRow; via: "wallet" | "listing"; block?: number }
   | { kind: "morpho-arbitrum"; row: ArbitrumReadRow }
   | { kind: "spark"; row: SparkPositionSummary }
   | { kind: "fluid"; row: FluidPositionSummary }

@@ -36,6 +36,7 @@ import { formatUsdValue } from "@/lib/utils/format";
 import { walletProtocol } from "@/lib/wallet/wallet-filters";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { onEmptiedBranch, recordedCollateralLeg } from "@/lib/wallet/trove-shutdown";
+import { CHAINS } from "@/lib/shared/chains";
 import { SP_DEPLOYMENTS, spPool, type SpDeploymentId } from "@/lib/liquity-v2/sp-deployment";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
@@ -90,7 +91,13 @@ export interface WalletSection {
    *  no dollars at the protocol's oracle. */
   collateral?: SectionFigure;
   debt?: SectionFigure;
+  /** Every position on a testnet (Polaris on Sepolia): the section stands
+   *  outside the wallet's totals and its risk tile (WALLET_COUNTS_SCOPE). */
+  testnet: boolean;
 }
+
+/** A position on a testnet, which no wallet count or total takes in. */
+export const onTestnet = (p: Pick<WalletPosition, "chain">): boolean => CHAINS[p.chain]?.testnet === true;
 
 /** "A", "A and B", "A, B and C". */
 export const andList = (xs: string[]) =>
@@ -511,10 +518,13 @@ export function walletSections(
       band,
       collateral,
       debt,
+      testnet: mine.every(onTestnet),
     });
   }
   const tier = (s: WalletSection) => (s.ranked.some((p) => p.buffer != null) ? 0 : s.open.length > 0 ? 1 : 2);
   return sections.sort((a, b) => {
+    // A testnet's sections follow every mainnet one.
+    if (a.testnet !== b.testnet) return Number(a.testnet) - Number(b.testnet);
     const t = tier(a) - tier(b);
     if (t !== 0) return t;
     if (tier(a) === 0) return byRisk(a.ranked[0], b.ranked[0]);
@@ -529,6 +539,7 @@ export function walletSections(
  *  one; undefined where no position states one. */
 export function closestToLiquidation(sections: WalletSection[]): WalletPosition | undefined {
   return sections
+    .filter((s) => !s.testnet)
     .flatMap((s) => s.ranked)
     .filter((p) => p.buffer != null && p.riskFigure)
     .sort(byRisk)[0];
@@ -553,7 +564,7 @@ export function walletTotal(
   /** What the listing reads that did not answer read ("Liquity V1 Troves"). */
   unanswered: string[] = [],
 ): WalletTotal | null {
-  const holding = sections.filter((s) => s.open.length > 0);
+  const holding = sections.filter((s) => s.open.length > 0 && !s.testnet);
   if (holding.length === 0 && unanswered.length === 0) return null;
   // One rule for both figures: a section missing either leaves both, and
   // Net, without a wallet total (Miles, 18 Nov 2026). A listing read that
