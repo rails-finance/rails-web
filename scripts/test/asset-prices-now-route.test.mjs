@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { routePricesNow, scaledPrice, pricesNowSource, readPricesNow } = await import(
+const { routePricesNow, scaledPrice, pricesNowSource, readPricesNow, storedRequest, MAX_ORACLES } = await import(
   "../../lib/shared/asset-prices-now.ts"
 );
 
@@ -149,4 +149,19 @@ test("readPricesNow takes the route's answer on a 200 and reads nothing on a 502
     "fallback",
     "404 falls back",
   );
+});
+
+test("the stored fallback keeps the roster's first lines past its cap, whatever their addresses", () => {
+  const hex = (n) => `0x${n.toString(16).padStart(40, "0")}`;
+  // The main line first, as assetPage orders it, with the address that sorts last.
+  const main = { id: "1:0xff", oracle: { address: `0x${"f".repeat(40)}` }, drawn: { key: "main:weth" } };
+  const rest = Array.from({ length: 14 }, (_, i) => ({
+    id: `1:${hex(i + 1)}`,
+    oracle: { address: hex(i + 1) },
+    drawn: { key: `s${i}` },
+  }));
+  const { oracles, keys } = storedRequest([main, ...rest]);
+  assert.equal(oracles.length, MAX_ORACLES, "the request is capped");
+  assert.equal(oracles[0], main.oracle.address, "the main line's oracle is read although it sorts last by address");
+  assert.ok(keys.includes("main:weth"), "the main line's series is read");
 });

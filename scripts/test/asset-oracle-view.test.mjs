@@ -646,3 +646,40 @@ test("a row the page's own protocol owns stays in the table with no link", () =>
   assert.equal(comp.protocol.href, null);
   assert.equal(view.rowPageOf("compound", pageOf)("aave-v3"), pageOf("aave-v3"));
 });
+
+// The streamed table (ui-jobs 829): the placeholder carries no hook a verifier
+// reads and no row link; the settled table carries them all.
+test("the pending table emits no oracle, price, gap or link hooks", () => {
+  const row = {
+    id: "1:0xabc:Aave V3",
+    group: "other",
+    protocol: { name: "Aave V3", explorer: "aave-v3", href: "/ethereum/aave-v3/assets/0xc02a" },
+    price: { text: "$3,412.18", value: 3412.18, reason: null, stale: false },
+    gap: { text: "+0.01%", value: 0.01, reason: null },
+  };
+  const hookNames = (h) => [...Object.keys(h.row), ...Object.keys(h.price), ...Object.keys(h.gap)];
+  const pending = view.oracleRowHooks(row, true);
+  assert.equal(pending.href, undefined, "no href, so no data-asset-oracle-link");
+  assert.deepEqual(hookNames(pending), []);
+  assert.deepEqual(Object.keys(view.oracleTableHooks(true, true)), ["data-asset-oracles-pending"]);
+
+  const settled = view.oracleRowHooks(row, false);
+  assert.equal(settled.href, row.protocol.href);
+  assert.deepEqual(hookNames(settled), [
+    "data-asset-oracle",
+    "data-asset-oracle-group",
+    "data-asset-oracle-href",
+    "data-asset-price-now",
+    "data-asset-gap",
+  ]);
+  assert.deepEqual(view.oracleTableHooks(false, false), { "data-asset-oracles": "", "data-asset-gaps": "off" });
+});
+
+// The shared 60 s answer (ui-jobs 829): an answer with no block is not cached.
+test("only an answer at a block is shared from the cache", async () => {
+  const { cachedPricesNow } = await import("../../lib/shared/asset-prices-now.ts");
+  const line = { id: "1:0xabc", oracle: { address: "0xabc" }, series: [], drawn: null };
+  assert.equal(cachedPricesNow(unreadPricesNow(1, [line], "The prices were not read")), false);
+  assert.equal(cachedPricesNow(storedPricesNow(1, [line], null, null)), false);
+  assert.equal(cachedPricesNow({ block: 26483745 }), true);
+});

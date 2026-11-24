@@ -12,10 +12,15 @@
 // receipts. Where the prices stand at different blocks (the stored stub) the
 // table shows the price only and draws no as-of line. Below sm each row is a
 // card (D6).
+//
+// The page streams the table and the as-of line (ui-jobs 829): until the
+// price-now read answers it draws `OracleTable pending`, the same rows with a
+// bar in each Price now and Gap cell, and `AsOfPending`.
 
 import { Info } from "lucide-react";
 import { Prov } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import {
   DataTable,
   DataTableBody,
@@ -33,6 +38,8 @@ import {
   AS_OF_NOTE,
   asOfText,
   gapProv,
+  oracleRowHooks,
+  oracleTableHooks,
   priceProv,
   rowLabel,
   tableIntro,
@@ -104,6 +111,7 @@ export function OracleTable({
   gapFrom,
   chainName,
   now,
+  pending = false,
 }: {
   rows: OracleRow[];
   lines: readonly PageLine[];
@@ -117,22 +125,37 @@ export function OracleTable({
   gapFrom: string;
   chainName: string;
   now: AssetPricesNow;
+  /** The price-now read is out: the rows' structure with a bar where each
+   *  price and gap goes, the Gap column drawn (a same-block read is the usual
+   *  answer), the intro a bar over its line, and no hook a verifier reads
+   *  (`oracleRowHooks`). Where the answer is the stored fallback (`sameBlock`
+   *  false, only after the route times out or is not served), the settled
+   *  table drops the Gap column, the intro takes its shorter form and no
+   *  as-of line is drawn, so the content under them moves up on settle. */
+  pending?: boolean;
 }) {
   if (rows.length === 0) return null;
-  const gaps = now.sameBlock;
+  const gaps = pending || now.sameBlock;
+  const intro = tableIntro({ chain: chainName, symbol, sameBlock: true, gapFrom });
   const lineOf = (id: string) => lines.find((l) => l.id === id)!;
   const refPrice = now.prices[pageLine]?.price ?? null;
   return (
-    <section className="mt-8" data-asset-oracles="" data-asset-gaps={gaps ? "on" : "off"} data-anatomy="A2.4">
+    <section className="mt-8" {...oracleTableHooks(pending, gaps)} data-anatomy="A2.4">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="max-w-3xl text-sm leading-relaxed text-rb-500" data-asset-oracles-intro="">
-          {tableIntro({
-            chain: chainName,
-            symbol,
-            sameBlock: gaps,
-            gapFrom,
-          })}
-        </p>
+        {pending ? (
+          // The sentence's words wait on the read (same block or not); its
+          // same-block form, kept invisible, holds the lines it takes.
+          <p className="relative max-w-3xl text-sm leading-relaxed" aria-hidden>
+            <span className="invisible">{intro}</span>
+            <span className="absolute inset-x-0 top-0">
+              <SkeletonBar width="60%" height={22} />
+            </span>
+          </p>
+        ) : (
+          <p className="max-w-3xl text-sm leading-relaxed text-rb-500" data-asset-oracles-intro="">
+            {now.sameBlock ? intro : tableIntro({ chain: chainName, symbol, sameBlock: false, gapFrom })}
+          </p>
+        )}
       </div>
       <DataTable
         label={`How other protocols price ${symbol}`}
@@ -151,7 +174,8 @@ export function OracleTable({
           {rows.map((r) => {
             const line = r.lineId ? lineOf(r.lineId) : null;
             const listed = r.group === "listed";
-            const href = r.protocol.href ?? undefined;
+            const hooks = oracleRowHooks(r, pending);
+            const href = hooks.href;
             const explorer = r.protocol.explorer ?? "";
             const nameText = (
               <span data-asset-used-by="">
@@ -160,14 +184,7 @@ export function OracleTable({
               </span>
             );
             return (
-              <DataTableRow
-                key={r.id}
-                href={href}
-                data-asset-oracle={r.id}
-                data-asset-oracle-group={r.group}
-                data-asset-oracle-href={href ?? ""}
-                data-anatomy="A2.5"
-              >
+              <DataTableRow key={r.id} href={href} {...hooks.row} data-anatomy="A2.5">
                 <DataTableLeadCell
                   protocol={explorer}
                   protocolName={r.protocol.name}
@@ -218,9 +235,11 @@ export function OracleTable({
                   align="right"
                   valign="middle"
                   className="whitespace-nowrap tabular-nums sm:w-[130px]"
-                  data-asset-price-now={r.price.value ?? ""}
+                  {...hooks.price}
                 >
-                  {line ? (
+                  {pending && line ? (
+                    <SkeletonBar width={64} height={20} />
+                  ) : line ? (
                     <PriceFigure cell={r.price} line={line} symbol={symbol} now={now} />
                   ) : (
                     <span className="text-rb-500">–</span>
@@ -232,10 +251,12 @@ export function OracleTable({
                     align="right"
                     valign="middle"
                     className="whitespace-nowrap tabular-nums text-rb-500 sm:w-[110px]"
-                    data-asset-gap={r.gap.value ?? ""}
+                    {...hooks.gap}
                   >
                     {listed ? (
                       "–"
+                    ) : pending ? (
+                      <SkeletonBar width={44} height={20} />
                     ) : r.gap.value != null && r.price.value != null && refPrice != null ? (
                       <Prov info={gapProv(r, r.price.value, refPrice, refName, now.block)} value={String(r.gap.value)}>
                         <span className="text-foreground">{r.gap.text}</span>
@@ -251,6 +272,19 @@ export function OracleTable({
         </DataTableBody>
       </DataTable>
     </section>
+  );
+}
+
+/** The as-of line's placeholder while the read is out: its hairline and its line's height. */
+export function AsOfPending() {
+  return (
+    <p
+      className="mt-8 flex items-center border-t border-rb-200 pt-4 text-sm dark:border-rb-700"
+      aria-hidden
+      data-asset-as-of-pending=""
+    >
+      <SkeletonBar width={260} height={20} />
+    </p>
   );
 }
 

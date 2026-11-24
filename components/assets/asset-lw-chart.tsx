@@ -21,6 +21,8 @@ import { legName, roundName, roundTime } from "@/components/assets/round-time";
 import { LINE_HUE } from "@/components/shared/lifetime-flows-combined";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { fmtChange } from "@/components/assets/price-sparkline";
+import { NowStream } from "@/components/assets/asset-now-stream";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { lwTickLabel, useLwColors, useLwLib } from "@/components/shared/lw-chart-kit";
 import { fetchPriceRounds, type RoundsAnswer } from "@/lib/api/fetch-price-rounds";
@@ -107,62 +109,91 @@ export interface HeadPrice {
 
 const PANEL = "rounded-xl bg-raised p-3 sm:p-4 dark:bg-[var(--surface-sunken)]";
 
-/** The panel's header (A3.8): the figure large, then beside it the change
- *  and time, or the hovered moment (`hover`); the range buttons at the right. */
+/** The price now in the panel's header: the figure large, then the stale
+ *  mark, the change and the time. */
+function HeadNow({ head }: { head: HeadPrice }) {
+  const p = head.price;
+  return (
+    <>
+      <span className="text-3xl font-semibold leading-none text-foreground sm:text-4xl" data-asset-head-price="">
+        {p.value != null && head.info ? (
+          <Prov info={head.info} value={String(p.value)} symbol={head.symbol}>
+            {p.text}
+          </Prov>
+        ) : (
+          <span title={p.reason ?? undefined}>–</span>
+        )}
+      </span>
+      {p.stale && (
+        <span
+          className="rounded border border-[var(--caution)] px-1 text-[11px] leading-4 text-[var(--caution)]"
+          title="The oracle's last update is older than its heartbeat"
+          data-asset-stale=""
+        >
+          stale
+        </span>
+      )}
+      {head.change != null && (
+        <span
+          className={`text-sm ${head.change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+          data-asset-price-change={head.change}
+        >
+          {fmtChange(head.change)} <span className="text-rb-500">30D</span>
+        </span>
+      )}
+      {head.updated && (
+        <span className="text-sm text-rb-500" data-asset-head-time="">
+          {head.updated}
+        </span>
+      )}
+    </>
+  );
+}
+
+/** The header's placeholder while the price-now read is out (ui-jobs 829):
+ *  the figure's line at its height and about its width, then the change and
+ *  the time as text-line bars. */
+function HeadPending() {
+  return (
+    <span className="contents" data-asset-head-pending="">
+      <span className="inline-flex h-[1em] min-w-[7ch] items-center text-3xl leading-none sm:text-4xl">
+        <SkeletonBar width="100%" figure />
+      </span>
+      <SkeletonBar width={64} height={20} />
+      <SkeletonBar width={116} height={20} />
+    </span>
+  );
+}
+
+/** The panel's header (A3.8): the price now from the page's one price-now
+ *  read (streamed: `HeadPending` until it answers), or the hovered moment
+ *  (`hover`); the range buttons at the right, drawn at once. */
 export function ChartHead({
   head,
   hover,
   controls,
 }: {
-  head: HeadPrice;
+  head: Promise<HeadPrice>;
   /** The price at the cursor and its moment, while the cursor lies in the window. */
   hover?: { value: number | null; stamp: ReactNode } | null;
   controls?: ReactNode;
 }) {
-  const p = head.price;
   return (
     <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2" data-anatomy="A3.8">
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 tabular-nums" data-asset-lw-head="">
-        <span className="text-3xl font-semibold leading-none text-foreground sm:text-4xl" data-asset-head-price="">
-          {hover ? (
-            <span data-asset-lw-value={hover.value ?? ""}>
-              {hover.value == null ? "–" : formatPrice(hover.value, "USD")}
-            </span>
-          ) : p.value != null && head.info ? (
-            <Prov info={head.info} value={String(p.value)} symbol={head.symbol}>
-              {p.text}
-            </Prov>
-          ) : (
-            <span title={p.reason ?? undefined}>–</span>
-          )}
-        </span>
         {hover ? (
-          <span className="text-sm text-rb-500">{hover.stamp}</span>
-        ) : (
           <>
-            {p.stale && (
-              <span
-                className="rounded border border-[var(--caution)] px-1 text-[11px] leading-4 text-[var(--caution)]"
-                title="The oracle's last update is older than its heartbeat"
-                data-asset-stale=""
-              >
-                stale
+            <span className="text-3xl font-semibold leading-none text-foreground sm:text-4xl" data-asset-head-price="">
+              <span data-asset-lw-value={hover.value ?? ""}>
+                {hover.value == null ? "–" : formatPrice(hover.value, "USD")}
               </span>
-            )}
-            {head.change != null && (
-              <span
-                className={`text-sm ${head.change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-                data-asset-price-change={head.change}
-              >
-                {fmtChange(head.change)} <span className="text-rb-500">30D</span>
-              </span>
-            )}
-            {head.updated && (
-              <span className="text-sm text-rb-500" data-asset-head-time="">
-                {head.updated}
-              </span>
-            )}
+            </span>
+            <span className="text-sm text-rb-500">{hover.stamp}</span>
           </>
+        ) : (
+          <NowStream read={head} pending={<HeadPending />}>
+            {(h) => <HeadNow head={h} />}
+          </NowStream>
         )}
       </div>
       {controls}
@@ -179,7 +210,7 @@ export function AssetLwChart({
 }: {
   line: LwLine;
   chain: number;
-  head: HeadPrice;
+  head: Promise<HeadPrice>;
   help: LearnMoreContent;
   /** The join under the chart ("From 25 Oct 2026 the line is…"), its source line. */
   joinNote: string | null;

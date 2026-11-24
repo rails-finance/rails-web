@@ -12,6 +12,11 @@
 //                                   other oracles with their prices now, and
 //                                   the as-of line.
 //
+// The asset page draws at once and streams what the price-now read feeds
+// (ui-jobs 829): the read starts once, unawaited, and its one promise feeds
+// the panel header's price (inside the client chart, `ChartHead`) and, under
+// one boundary, the oracle table and the as-of line (`AssetSectionBody`).
+//
 // One token's pages under several protocols share the price section, so each
 // names one canonical URL: the page under the first explorer, by the roster's
 // order (alphabetical by name), that uses it on that chain.
@@ -22,11 +27,13 @@ import { RailHeader } from "@/components/shared/rail-header";
 import { ProtocolAssets } from "@/components/assets/assets-by-protocol";
 import { AssetTitle, SourceRow, UnpricedPanel, type RelationGroup } from "@/components/assets/asset-page-head";
 import { AssetPriceChart } from "@/components/assets/asset-price-chart";
-import { AsOfLine, OracleTable } from "@/components/assets/asset-oracles";
+import { AsOfLine, AsOfPending, OracleTable } from "@/components/assets/asset-oracles";
+import { AssetSectionBody } from "@/components/assets/asset-now-stream";
 import { AssetReceipts } from "@/components/assets/asset-receipts";
 import { BoldLivePrice } from "@/components/assets/bold-live-price";
 import { fetchAssetExplorerServer, fetchAssetHeadServer } from "@/lib/api/fetch-asset-explorer-server";
 import { fetchAssetPricesNow } from "@/lib/api/fetch-asset-prices-now";
+import type { AssetPricesNow } from "@/lib/shared/asset-prices-now";
 import { fetchAssetRosterServer } from "@/lib/api/fetch-asset-roster-server";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { unpricedPage } from "@/lib/api/asset-explorer-chips";
@@ -239,10 +246,11 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
   }
 
   const own = view?.lineId != null;
-  const [head, now] = await Promise.all([
-    fetchAssetHeadServer(chain, t, via ? e.id : null, readerIp).catch(() => null),
-    fetchAssetPricesNow(chain, t, section.lines, readerIp),
-  ]);
+  // The one price-now read, started here and not awaited: the header and the
+  // table stream from it (ui-jobs 829).
+  // The roster's order (before viaPage), the same on every page: the cached read's lines.
+  const rosterLines = opened?.chains.find((c) => c.chain === chain)?.lines ?? section.lines;
+  const nowRead = fetchAssetPricesNow(chain, t, rosterLines, readerIp);
   // Each explorer's page for the token: this protocol's, and the others' from the chips.
   const hrefs: Record<string, string> = Object.fromEntries(
     line.also.flatMap((ch) => {
@@ -252,53 +260,79 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
   );
   hrefs[e.id] = protocolAssetsHref(e.href, t);
   const pageOf = (id: string) => hrefs[id] ?? null;
-  const nowMs = Date.now();
-  const read = now.prices[pageLine.id];
   const symbol = page.symbol;
   const reads = alsoReads(pageLine, e.id, pageOf, multiLineFamilies(section.lines));
-  const other = oracleRows(section.lines, pageLine, now, rowPageOf(e.id, pageOf));
-  const rows = tableRows(
-    sameRows(pageLine, reads, own ? e.label : null, now),
-    other,
-    listedRows(alsoListed(line.line.chips, chain, e.id, { reads, rows: other }, pageOf), now),
+  const rowsFor = (now: AssetPricesNow) => {
+    const other = oracleRows(section.lines, pageLine, now, rowPageOf(e.id, pageOf));
+    return tableRows(
+      sameRows(pageLine, reads, own ? e.label : null, now),
+      other,
+      listedRows(alsoListed(line.line.chips, chain, e.id, { reads, rows: other }, pageOf), now),
+    );
+  };
+  // The header and the table are two boundaries and may land at different
+  // moments (this also waits on the head read), but both read `nowRead`, so
+  // their prices are one answer.
+  const headRead = Promise.all([
+    fetchAssetHeadServer(chain, t, via ? e.id : null, readerIp).catch(() => null),
+    nowRead,
+  ]).then(([head, now]) => {
+    const read = now.prices[pageLine.id];
+    return {
+      price: priceCell(read),
+      info: read?.ok ? priceProv(pageLine, read, symbol) : null,
+      symbol,
+      change: head?.row?.change ?? null,
+      updated: headTime(read, Date.now()),
+    };
+  });
+  const table = (now: AssetPricesNow, pending: boolean) => (
+    <OracleTable
+      rows={rowsFor(now)}
+      lines={section.lines}
+      pageLine={pageLine.id}
+      chain={chain}
+      symbol={symbol}
+      refName={own ? `${e.label}'s price` : "the price most protocols read"}
+      gapFrom={own ? `${e.label}'s price` : "the price charted above"}
+      chainName={CHAINS[chain].name}
+      now={now}
+      pending={pending}
+    />
   );
+  // The rows before the read: their structure needs no price (each cell a bar).
+  const unread: AssetPricesNow = { chain, block: null, timestamp: null, sameBlock: true, prices: {} };
   return (
     <Frame protocol={e}>
       <AssetTitle chain={chain} token={t} symbol={symbol} backHref={backHref} />
       <AssetReceipts>
         <section data-asset-chain={chain} data-asset-via={view?.lineId ?? "none"} data-anatomy="A2">
-          <AssetPriceChart
-            chain={chain}
-            line={pageLine}
-            symbol={symbol}
-            head={{
-              price: priceCell(read),
-              info: read?.ok ? priceProv(pageLine, read, symbol) : null,
-              symbol,
-              change: head?.row?.change ?? null,
-              updated: headTime(read, nowMs),
-            }}
+          <AssetSectionBody
+            chart={<AssetPriceChart chain={chain} line={pageLine} symbol={symbol} head={headRead} />}
+            source={
+              <SourceRow
+                chain={chain}
+                token={t}
+                source={sourceLine(pageLine, own ? e.id : null, own ? undefined : { protocol: e.label, symbol })}
+                relations={relationsFor(page)}
+                markets={line.markets}
+                history={historyLine(pageLine, own ? e.id : null)}
+              />
+            }
+            read={nowRead}
+            pending={
+              <>
+                {table(unread, true)}
+                <AsOfPending />
+              </>
+            }
+            priced={(now) => (
+              <>
+                {table(now, false)}
+                <AsOfLine now={now} />
+              </>
+            )}
           />
-          <SourceRow
-            chain={chain}
-            token={t}
-            source={sourceLine(pageLine, own ? e.id : null, own ? undefined : { protocol: e.label, symbol })}
-            relations={relationsFor(page)}
-            markets={line.markets}
-            history={historyLine(pageLine, own ? e.id : null)}
-          />
-          <OracleTable
-            rows={rows}
-            lines={section.lines}
-            pageLine={pageLine.id}
-            chain={chain}
-            symbol={symbol}
-            refName={own ? `${e.label}'s price` : "the price most protocols read"}
-            gapFrom={own ? `${e.label}'s price` : "the price charted above"}
-            chainName={CHAINS[chain].name}
-            now={now}
-          />
-          <AsOfLine now={now} />
         </section>
       </AssetReceipts>
     </Frame>

@@ -404,6 +404,36 @@ export function listedRows(entries: readonly AlsoListedEntry[], now: AssetPrices
   }));
 }
 
+/** The hooks a verifier reads on the table (A2.4) and its rows (A2.5), and
+ *  the row's link (`href`; the row draws `data-asset-oracle-link` only with
+ *  one). While the price-now read is out (`pending`, ui-jobs 829) the
+ *  placeholder table carries none of them and no link, so a reader of the
+ *  page's HTML counts each row once, on the settled table. */
+export function oracleTableHooks(pending: boolean, gaps: boolean): Record<string, string> {
+  return pending
+    ? { "data-asset-oracles-pending": "" }
+    : { "data-asset-oracles": "", "data-asset-gaps": gaps ? "on" : "off" };
+}
+
+export function oracleRowHooks(
+  r: Pick<OracleRow, "id" | "group" | "protocol" | "price" | "gap">,
+  pending: boolean,
+): {
+  href: string | undefined;
+  row: Record<string, string>;
+  price: Record<string, string | number>;
+  gap: Record<string, string | number>;
+} {
+  if (pending) return { href: undefined, row: {}, price: {}, gap: {} };
+  const href = r.protocol.href ?? undefined;
+  return {
+    href,
+    row: { "data-asset-oracle": r.id, "data-asset-oracle-group": r.group, "data-asset-oracle-href": href ?? "" },
+    price: { "data-asset-price-now": r.price.value ?? "" },
+    gap: { "data-asset-gap": r.gap?.value ?? "" },
+  };
+}
+
 /** The table in its order: the page line's readers, the other lines, the listed-only protocols. */
 export const tableRows = (same: OracleRow[], other: OracleRow[], listed: OracleRow[]): OracleRow[] => [
   ...same,
