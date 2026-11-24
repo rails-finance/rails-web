@@ -157,7 +157,7 @@ export function AssetPriceRow({
           className={onPage ? "h-10 w-20 sm:w-36" : "h-7 w-20 sm:w-28"}
         />
         <span
-          className={`w-14 shrink-0 text-right tabular-nums ${onPage ? "text-sm" : "text-xs"} ${
+          className={`${onPage ? "min-w-14" : "w-14"} shrink-0 text-right tabular-nums ${onPage ? "text-sm" : "text-xs"} ${
             row.change == null
               ? "text-rb-500"
               : row.change >= 0
@@ -166,6 +166,7 @@ export function AssetPriceRow({
           }`}
           data-asset-price-change={row.change ?? ""}
         >
+          {onPage && row.change != null && <span className="mr-1 text-rb-500">30D</span>}
           {row.change == null ? "–" : fmtChange(row.change)}
         </span>
       </RowLink>

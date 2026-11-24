@@ -349,3 +349,56 @@ test("liquidatable at a health of exactly 1, on the raw values", () => {
   assert.equal(atOne.liquidatable, true);
   assert.equal(healthText(atOne.health), "1.000");
 });
+
+// The wallet view's Euler V2 Base head read (rails-ops decision 0071):
+// lib/euler/wallet-card.ts eulerPairOf finds a stored (account, vault) pair in
+// the explorer's wallet read, its deposit and its loan, and names a pair the
+// read lists holding nothing as holding nothing.
+const { eulerPairOf } = await import("../../lib/euler/wallet-card.ts");
+
+const ACC = "0xff020680284f9e941aba0cbafcd57de78e01c829";
+const V1 = "0xD4A80526000000000000000000000000000d14";
+const V2 = "0x859160db0000000000000000000000000000b410";
+const asset = { address: "0xa", symbol: "USDC", decimals: 6 };
+const holding = (vault, shares, assets, debt, controller, collateral = false) => ({
+  vault,
+  vaultSymbol: "eUSDC-1",
+  asset,
+  shares,
+  assets,
+  debt,
+  collateral,
+  controller,
+});
+const read = (holdings) => ({
+  chainId: 8453,
+  accounts: [{ index: 1, account: ACC, controllers: [], collaterals: [], holdings }],
+});
+
+test("a loan vault the account also supplies to gives both rows", () => {
+  const p = eulerPairOf(read([holding(V1, "5", "2000000", "1000000", true)]), ACC.toUpperCase(), V1.toLowerCase());
+  assert.equal(p.loan.amount, 1);
+  assert.equal(p.deposit.amount, 2);
+});
+
+test("a deposit alone gives no loan", () => {
+  const p = eulerPairOf(read([holding(V2, "5", "3000000", "0", false, true)]), ACC, V2);
+  assert.equal(p.loan, null);
+  assert.equal(p.deposit.amount, 3);
+});
+
+test("a controller with no debt and no shares holds nothing", () => {
+  const p = eulerPairOf(read([holding(V1, "0", "0", "0", true)]), ACC, V1);
+  assert.deepEqual(p, { deposit: null, loan: null });
+});
+
+test("a pair the read does not list is null", () => {
+  assert.equal(eulerPairOf(read([holding(V1, "5", "1", "0", false)]), ACC, V2), null);
+});
+
+test("the wallet page's empty line follows EULER_INDEXED", async () => {
+  const { FRONT_DOOR } = await import("../../lib/euler/words.ts");
+  const { EULER_INDEXED } = await import("../../lib/euler/types.ts");
+  for (const chain of [8453, 42161])
+    assert.match(FRONT_DOOR.none(chain), EULER_INDEXED[chain] ? /any of its 256 accounts\.$/ : /on account 0\.$/);
+});

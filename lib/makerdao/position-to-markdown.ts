@@ -97,9 +97,9 @@ export function makerVaultToMarkdown(args: MakerVaultMarkdownArgs): string {
   lines.push("## Headlines");
   if (view.status !== "open") {
     // Settled to ~0: the headline is what the vault held at its height.
-    if (view.peakInk > 0) lines.push(`- **Highest recorded collateral:** ${amt(view.peakInk)} ${sym}`);
+    if (view.peakInk > 0) lines.push(`- **Peak collateral:** ${amt(view.peakInk)} ${sym}`);
     if (view.peakDebtDai != null && view.peakDebtDai > 0) {
-      lines.push(`- **Highest recorded debt:** ${num(view.peakDebtDai, 2)} ${dsym}`);
+      lines.push(`- **Peak debt:** ${num(view.peakDebtDai, 2)} ${dsym}`);
     }
   } else {
     // The card's figure: ink × the OSM price as shown, to the cent (ui-jobs 743).

@@ -1,4 +1,4 @@
-// A closed Compound V2-family card's "highest recorded" figures, read from the
+// A closed Compound V2-family card's "peak" figures, read from the
 // rows the page holds: per market, the largest balance before or after any
 // row, interest included. The balance just before a repayment or a withdrawal
 // is the highest the debt or the supply stood at, and a post-row maximum

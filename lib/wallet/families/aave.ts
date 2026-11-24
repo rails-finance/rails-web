@@ -1,6 +1,7 @@
-// Aave V3 on Ethereum and Base, and SparkLend, for the wallet view (decision
-// 0050, step 3; SERVER-ONLY). The card is the family's listing row, built from
-// the summary row's `card` by the family's listing builder. The head read is
+// Aave V3 on Ethereum and Base, SparkLend, and Seamless on Base, for the wallet
+// view (decisions 0050 step 3 and 0071; SERVER-ONLY). The card is the family's
+// listing row, built from the summary row's `card` by the family's listing
+// builder. The head read is
 // the Pool's getUserAccountData for each open account (the health factor and
 // the oracle dollars the position page reads) and the debt's rate from each
 // borrowed reserve's getReserveData. It is asked of rails-server first
@@ -19,6 +20,7 @@ import type { AaveV3PositionRow, AaveV3ReserveSummary } from "@/lib/api/fetch-aa
 import { MARKET_NAME, POOL_BY_MARKET, asV3Market } from "@/lib/aave-v3/asset-catalog";
 import { AAVE_V3_BASE_CHAIN_ID, AAVE_V3_BASE_ORACLE, AAVE_V3_BASE_POOL } from "@/lib/aave-v3-base/asset-catalog";
 import { SPARK_ADDRESSES } from "@/lib/spark/asset-catalog";
+import { SEAMLESS_CHAIN_ID, SEAMLESS_ORACLE, SEAMLESS_POOL } from "@/lib/seamless/asset-catalog";
 import { hfLabelV3 } from "@/lib/aave-v3/position-state";
 import { chainClient } from "@/lib/sources/chain/rpc";
 import {
@@ -66,7 +68,7 @@ const sparkLegs = (legs: SparkReserveAmount[]) =>
 
 function sizeOf(supply: string | undefined, debt: string | undefined) {
   if (!supply && !debt) return {};
-  return { size: [supply ?? "nothing supplied", debt].filter(Boolean).join(" / "), sizeNote: "highest recorded" };
+  return { size: [supply ?? "nothing supplied", debt].filter(Boolean).join(" / "), sizeNote: "peak" };
 }
 
 const liquidations = (n: number | null | undefined) => (n != null && n > 0 ? plural(n, "liquidation") : undefined);
@@ -406,6 +408,80 @@ export const spark: FamilyModule = {
         const row = rowOf(p);
         const rate = weightedRate(row.borrows, row.priceByAddress, got.rateOf);
         return applyAccount(p, got.account, got.block, got.at, rate);
+      }),
+    };
+  },
+};
+
+// ── Seamless, Base ──────────────────────────────────────────────────────────
+
+const SEAMLESS_POOL_KEY = SEAMLESS_POOL.toLowerCase();
+
+/** Seamless on Base (decision 0071): an Aave V3 fork the listing serves through
+ *  the Aave V3 Base builder against Seamless's Pool and oracle (mig 514). The
+ *  head read is Aave V3 Base's against that Pool: rails-server's answer for the
+ *  `seamless` market first, then one Multicall. */
+export const seamless: FamilyModule = {
+  id: "seamless",
+  name: "Seamless",
+  chain: BASE_CHAIN_ID,
+  summaryChain: "base",
+  summaryFamily: "seamless",
+  async shape(rows) {
+    const cards = await buildAaveV3PositionRows(
+      rows.map((r) => r.card as RawV3WalletRow),
+      { chainId: SEAMLESS_CHAIN_ID, oracle: SEAMLESS_ORACLE, pool: SEAMLESS_POOL },
+    );
+    return rows.map((r, i): WalletPosition => {
+      const row = cards[i];
+      const status = asStatus(r.status);
+      const base: WalletPosition = {
+        chain: BASE_CHAIN_ID,
+        family: "seamless",
+        familyName: "Seamless",
+        positionId: r.positionId,
+        href: r.href,
+        status,
+        card: { kind: "seamless", row },
+        collateralUsd: opt(r.collateralUsd),
+        debtUsd: opt(r.debtUsd),
+        usdSource: r.usdSource ?? "Seamless oracle",
+        usdOwnOracle: r.collateralUsd != null || r.debtUsd != null,
+        notRead: row.status === "unread" ? true : undefined,
+        headRead: "none",
+        ...storeStamp(r),
+      };
+      if (status !== "open") {
+        // The Base lane records no peaks (mig 514), so the History row states no size.
+        return { ...base, history: { ...historyBase(r), result: liquidations(r.liquidationCount) } };
+      }
+      return base;
+    });
+  },
+  async head(open, address, signal, apiMs): Promise<HeadResult> {
+    const read = open.filter((p) => !p.notRead);
+    if (read.length === 0) return { positions: open, reads: 0 };
+    const rowOf = (p: WalletPosition) => (p.card as { row: AaveV3PositionRow }).row;
+    const reserves = new Set<string>();
+    for (const p of read)
+      for (const x of rowOf(p).reserves)
+        if (scaled(x.debtBalanceRaw, x.decimals) > 0) reserves.add(x.address.toLowerCase());
+    const r = await readAccounts(
+      BASE_CHAIN_ID,
+      address.toLowerCase(),
+      [{ pool: SEAMLESS_POOL_KEY, reserves: [...reserves] }],
+      signal,
+      apiMs,
+    );
+    const got = r.byPool.get(SEAMLESS_POOL_KEY);
+    return {
+      reads: r.reads,
+      positions: open.map((p) => {
+        if (p.notRead) return p;
+        if (!got) return { ...p, headRead: "failed" };
+        const row = rowOf(p);
+        const legs = row.reserves.map((x) => ({ address: x.address, amount: scaled(x.debtBalanceRaw, x.decimals) }));
+        return applyAccount(p, got.account, got.block, got.at, weightedRate(legs, row.priceByAddress, got.rateOf));
       }),
     };
   },

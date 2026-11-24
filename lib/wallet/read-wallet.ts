@@ -5,12 +5,14 @@
 // family's listing builder and reads the head state of its open positions,
 // one batched read per family. Every family runs at once under one 8 s budget
 // (allSettled): a family whose head read does not answer keeps its store
-// figures and says `headRead: "failed"`. Answers are kept 60 s per address.
+// figures and says `headRead: "failed"`. The families with no store are read
+// at visit inside the same budget (lib/wallet/families/visit.ts). Answers are
+// kept 60 s per address.
 
 import { WALLET_FORMER_FAMILIES } from "@/lib/wallet/moved-row";
 import { walletRowStatus } from "@/lib/wallet/moved-row";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
-import { takesRow, walletApiWait, type HeadResult, type FamilyModule } from "@/lib/wallet/families/module";
+import { drawn, takesRow, walletApiWait, type HeadResult, type FamilyModule } from "@/lib/wallet/families/module";
 import {
   liquityV1,
   liquityV1Deposits,
@@ -30,8 +32,26 @@ import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-posi
 import { readLiquityV1Sp, type LiquityV1DepositListResponse } from "@/lib/sources/api/liquity-v1-sp";
 import { readLiquityV2Sp, type LiquityV2DepositListResponse } from "@/lib/sources/api/liquity-v2-sp";
 import { readLiquityV1Staking, type LiquityV1StakeListResponse } from "@/lib/sources/api/liquity-v1-staking";
-import { aaveV3Base, aaveV3Ethereum, spark } from "@/lib/wallet/families/aave";
+import { aaveV3Base, aaveV3Ethereum, seamless, spark } from "@/lib/wallet/families/aave";
+import { ARC_ON_WALLET, aaveV4Arc, aaveV4Base, aaveV4Ethereum } from "@/lib/wallet/families/aave-v4";
 import { compoundV3Base, compoundV3Ethereum } from "@/lib/wallet/families/compound";
+import { compoundV2 } from "@/lib/wallet/families/compound-v2";
+import { moonwellBase, moonwellEthereum } from "@/lib/wallet/families/moonwell";
+import { eulerV2Arbitrum, eulerV2Base } from "@/lib/wallet/families/euler";
+import { aaveV3Optimism, compoundV3Optimism } from "@/lib/wallet/families/optimism";
+import { morphoArc, morphoOptimism } from "@/lib/wallet/families/morpho-at-block";
+import { readVisitFamilies, visitFamiliesLine, type VisitModule } from "@/lib/wallet/families/visit";
+import { skySavings } from "@/lib/wallet/families/sky-savings";
+import { llamalend } from "@/lib/wallet/families/llamalend";
+import { dolomite } from "@/lib/wallet/families/dolomite";
+import { alchemixBase, alchemixEthereum } from "@/lib/wallet/families/alchemix";
+import { maple } from "@/lib/wallet/families/maple";
+import { fx } from "@/lib/wallet/families/fx";
+import { frankencoin } from "@/lib/wallet/families/frankencoin";
+import { pwn } from "@/lib/wallet/families/pwn";
+import { polaris } from "@/lib/wallet/families/polaris";
+import { morphoBase } from "@/lib/wallet/families/morpho-base";
+import { vaultsBase, vaultsEthereum } from "@/lib/wallet/families/vaults";
 import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/families/ethereum-single";
 import { aaveV3Arbitrum, compoundV3Arbitrum, morphoArbitrum } from "@/lib/wallet/families/arbitrum";
 import {
@@ -63,10 +83,14 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   aaveV3Ethereum,
   aaveV3Base,
   aaveV3Arbitrum,
+  aaveV4Ethereum,
+  aaveV4Base,
+  aaveV4Arc,
   compoundV3Ethereum,
   compoundV3Base,
   compoundV3Arbitrum,
   morphoEthereum,
+  morphoBase,
   morphoArbitrum,
   liquityV2,
   liquityV2Deposits,
@@ -82,27 +106,60 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   asymmetryDeposits,
   basedollar,
   basedollarDeposits,
+  compoundV2,
+  moonwellBase,
+  seamless,
+  moonwellEthereum,
+  eulerV2Base,
+  eulerV2Arbitrum,
+  skySavings,
+  llamalend,
+  dolomite,
+  alchemixEthereum,
+  alchemixBase,
+  maple,
+  fx,
+  frankencoin,
+  pwn,
+  polaris,
+  vaultsEthereum,
+  vaultsBase,
 ];
 
+/** The families read at visit, with no store (lib/wallet/families/visit.ts),
+ *  in the decision's order. Each makes no call while its explorer is
+ *  unlaunched. */
+export const WALLET_VISIT_FAMILIES: VisitModule[] = [aaveV3Optimism, compoundV3Optimism, morphoOptimism, morphoArc];
+
 /** The families the page reads, by chain, in one sentence for the empty
- *  state: "Aave V3, … and Asymmetry on Ethereum; … on Base; …". The Arbitrum
- *  rows are written when Rails reads the wallet there, which the sentence says. */
+ *  state: "Aave V3, … and Asymmetry on Ethereum; … on Base; …". A module whose
+ *  rows are written when Rails reads the wallet there (`storedOnVisit`) is
+ *  named apart, which the sentence says. */
 export function walletFamiliesLine(): string {
-  const byChain = new Map<WalletSummaryRow["chain"], string[]>();
+  const byChain = new Map<string, { chain: WalletSummaryRow["chain"]; onVisit: boolean; names: string[] }>();
   for (const f of WALLET_FAMILIES) {
-    const names = byChain.get(f.summaryChain) ?? [];
-    if (!names.includes(f.name)) names.push(f.name);
-    byChain.set(f.summaryChain, names);
+    if (f.summaryChain === "arc" && !ARC_ON_WALLET) continue;
+    const key = `${f.summaryChain}:${f.storedOnVisit === true}`;
+    const g = byChain.get(key) ?? { chain: f.summaryChain, onVisit: f.storedOnVisit === true, names: [] };
+    for (const n of f.lineNames ?? [f.name]) if (!g.names.includes(n)) g.names.push(n);
+    byChain.set(key, g);
   }
   const list = (n: string[]) => (n.length < 2 ? n.join("") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`);
-  // No wallet module reads Arc or Sepolia, so neither has a phrase.
-  const where: Partial<Record<WalletSummaryRow["chain"], string>> = {
+  const where: Record<WalletSummaryRow["chain"], string> = {
     ethereum: "on Ethereum",
     base: "on Base",
-    arbitrum: "on Arbitrum where Rails has read the wallet",
+    arbitrum: "on Arbitrum",
+    arc: "on Arc",
+    sepolia: "on Sepolia (testnet)",
   };
-  return [...byChain].map(([chain, names]) => `${list(names)} ${where[chain] ?? `on ${chain}`}`).join("; ");
+  return [...byChain.values()]
+    .map((g) => `${list(g.names)} ${where[g.chain]}${g.onVisit ? " once the wallet has been opened there" : ""}`)
+    .join("; ");
 }
+
+/** The families read at each visit, by chain, for the empty state: "Aave V3,
+ *  Compound V3 and Morpho Blue on Optimism"; empty while none is on. */
+export const walletVisitLine = (): string => visitFamiliesLine(WALLET_VISIT_FAMILIES);
 
 /** A listing read that did not answer, or answered part of the wallet: its
  *  module's part of the answer says so, and no total stands while it does. */
@@ -274,15 +331,18 @@ export async function readSummary(address: string, signal: AbortSignal, readerIp
   }
   const extra = await listing;
   const open = extra.rows.filter((r) => r.status === "open").length;
-  // Testnet rows stay in `rows` and leave the totals.
+  // Testnet rows stay in `rows` and leave the totals. Arc's rows, while its
+  // explorer is unlaunched, leave the rows and the totals.
   const testnet = rows.filter((r) => !countedRow(r));
-  const testnetOpen = testnet.filter((r) => r.status === "open").length;
+  const hidden = ARC_ON_WALLET ? [] : rows.filter((r) => r.chain === "arc");
+  const left = [...testnet, ...hidden];
+  const leftOpen = left.filter((r) => r.status === "open").length;
   return {
     ...first!,
-    rows: [...rows, ...extra.rows],
-    total: first!.total - testnet.length + extra.rows.length,
-    open: first!.open - testnetOpen + open,
-    closed: first!.closed - (testnet.length - testnetOpen) + extra.rows.length - open,
+    rows: [...rows.filter((r) => !hidden.includes(r)), ...extra.rows],
+    total: first!.total - left.length + extra.rows.length,
+    open: first!.open - leftOpen + open,
+    closed: first!.closed - (left.length - leftOpen) + extra.rows.length - open,
     listingFailed: extra.failed,
   };
 }
@@ -300,6 +360,7 @@ async function readFamily(
   rows: WalletSummaryRow[],
   address: string,
   deadline: number,
+  readerIp?: string,
 ): Promise<{ read: WalletFamilyRead; positions: WalletPosition[] }> {
   const t0 = Date.now();
   const byId = new Map(rows.map((r) => [r.positionId, r]));
@@ -314,12 +375,12 @@ async function readFamily(
   const rest = positions.filter((p) => p.status !== "open");
   let head: HeadResult = { positions: open, reads: 0 };
   let error: string | undefined;
-  const readable = open.filter((p) => !p.notRead);
+  const readable = f.readsNotRead ? open : open.filter((p) => !p.notRead);
   if (f.head && readable.length > 0) {
     try {
       const remaining = deadline - Date.now();
       head = await withBudget(Math.max(500, remaining), (signal) =>
-        f.head!(open, address, signal, walletApiWait(remaining)),
+        f.head!(open, address, signal, walletApiWait(remaining), { rows, readerIp }),
       );
     } catch (err) {
       error = publicErrorMessage(err);
@@ -330,7 +391,7 @@ async function readFamily(
   const headKinded = head.positions.map((p) =>
     p.headRead === "read" && p.kind === "deposits" && (p.debtUsd ?? 0) > 0 ? { ...p, kind: "loans" as const } : p,
   );
-  const all = [...headKinded, ...rest];
+  const { drawn: all, undrawn } = drawn(f, [...headKinded, ...rest]);
   return {
     positions: all,
     read: {
@@ -343,16 +404,18 @@ async function readFamily(
       ms: Date.now() - t0,
       reads: head.reads,
       error,
+      ...(undrawn ? { undrawn } : {}),
     },
   };
 }
 
-/** The protocols the rows name, in the read's order, with their row counts. */
-function heldOf(rows: WalletSummaryRow[]): WalletRead["held"] {
+/** The protocols the rows and the positions read at visit name, in the
+ *  read's order, with their counts. */
+function heldOf(rows: WalletSummaryRow[], visited: WalletPosition[] = []): WalletRead["held"] {
   return WALLET_PROTOCOLS.map((p) => ({
     slug: p.slug,
     name: p.name,
-    positions: rows.filter((r) => r.family === p.slug).length,
+    positions: rows.filter((r) => r.family === p.slug).length + visited.filter((v) => v.family === p.slug).length,
   })).filter((p) => p.positions > 0);
 }
 
@@ -383,15 +446,20 @@ export async function readWalletUncached(
     };
   }
   const serverMs = Date.now() - t0;
-  const held = heldOf(summary.rows);
   const reading = opts.protocol ? WALLET_FAMILIES.filter((f) => f.summaryFamily === opts.protocol) : WALLET_FAMILIES;
+  // The families read at visit start here, once the summary and the listing
+  // reads have settled, beside the stored families' head reads.
+  const visiting = WALLET_VISIT_FAMILIES.filter((m) => !opts.protocol || m.family === opts.protocol);
+  const visits = readVisitFamilies(visiting, address, Math.max(500, deadline - Date.now()), readerIp);
   const groups = reading
     .map((f) => ({
       f,
       rows: summary.rows.filter((r) => takesRow(f, r)),
     }))
     .filter((g) => g.rows.length > 0);
-  const settled = await Promise.allSettled(groups.map((g) => readFamily(g.f, g.rows, address, deadline)));
+  const settled = await Promise.allSettled(groups.map((g) => readFamily(g.f, g.rows, address, deadline, readerIp)));
+  const visited = await visits;
+  const held = heldOf(summary.rows, visited.positions);
   const families: WalletFamilyRead[] = [];
   const positions: WalletPosition[] = [];
   settled.forEach((s, i) => {
@@ -413,6 +481,8 @@ export async function readWalletUncached(
       });
     }
   });
+  positions.push(...visited.positions);
+  families.push(...visited.families);
   // A listing read that did not answer: its module's part says so.
   const failed = summary.listingFailed.filter((x) => !opts.protocol || x.module.summaryFamily === opts.protocol);
   for (const { module: f, what, error, heldOnly } of failed) {
@@ -435,13 +505,17 @@ export async function readWalletUncached(
     address,
     positions,
     families,
-    total: opts.protocol ? groups.reduce((s, g) => s + g.rows.length, 0) : summary.total,
+    // A testnet's rows are not counted (WALLET_COUNTS_SCOPE): readSummary's
+    // total already leaves them out. The positions read at visit count beside them.
+    total:
+      (opts.protocol ? groups.reduce((s, g) => s + g.rows.filter(countedRow).length, 0) : summary.total) +
+      visited.positions.length,
     readAt: Math.floor(Date.now() / 1000),
     serverMs,
     ms: Date.now() - t0,
     protocol: opts.protocol,
     held,
-    ...(failed.length ? { partial: failed.map((x) => x.what) } : {}),
+    ...(failed.length || visited.failed.length ? { partial: [...failed.map((x) => x.what), ...visited.failed] } : {}),
   };
 }
 
@@ -489,7 +563,7 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
     const positions: WalletCountsPosition[] = [];
     const taken = new Set<WalletSummaryRow>();
     for (const f of WALLET_FAMILIES) {
-      if (f.head) continue;
+      if (f.head || f.summaryChain === "sepolia") continue;
       const rows = summary.rows.filter((r) => takesRow(f, r));
       if (rows.length === 0) continue;
       try {

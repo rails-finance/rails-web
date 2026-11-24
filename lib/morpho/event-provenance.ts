@@ -419,42 +419,42 @@ export const morphoCurrentDebtProv = (
   totalBorrowShares: string,
   coords?: MorphoCoords,
   index?: MorphoIndexRead,
-): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  summary:
-    `Current debt (${sym}) with accrued interest — the position's borrow shares converted to assets through Morpho's share index (toAssetsUp), reading ${index ? `the market's totals at block ${index.block.toLocaleString("en-US")}` : "the live per-market totals"}. Both operands are chain reads, with no forward projection; the accrued-interest portion is this minus the Σ(borrow − repay) principal.` +
-    (index?.stale
-      ? ` Rails read those totals on ${formatDate(index.readAt)} and has not refreshed them since, so interest after that date is missing from this figure.`
-      : ""),
-  source: index ? { block: index.block } : undefined,
-  contract: blueOf(coords),
-  via: `${captureVia(coords)} · borrowShares → assets (toAssetsUp)`,
-  formula: "shares × (totalBorrowAssets + 1) ÷ (totalBorrowShares + 1e6), rounded up",
-  inputs: [
-    {
-      label: "borrowShares",
-      value: sharesHuman,
-      kind: "chain",
-      pclass: "state",
-      note: "position.borrowShares slot (Σ borrow − repay − liquidation shares)",
-    },
-    {
-      label: "totalBorrowAssets",
-      value: totalBorrowAssets,
-      kind: "chain",
-      pclass: "state",
-      note: index ? `market slot at block ${index.block}` : "market slot — live",
-    },
-    {
-      label: "totalBorrowShares",
-      value: totalBorrowShares,
-      kind: "chain",
-      pclass: "state",
-      note: index ? `market slot at block ${index.block}` : "market slot — live",
-    },
-  ],
-});
+): Provenance => {
+  const totalsAt = !index
+    ? "the live per-market totals"
+    : index.atHead
+      ? `the market's totals from this visit's head read at block ${index.block.toLocaleString("en-US")}, interest accrued to that block`
+      : `the market's totals at block ${index.block.toLocaleString("en-US")}`;
+  const slotNote = !index
+    ? "market slot — live"
+    : index.atHead
+      ? `market slot at block ${index.block}, accrued to that block (this visit's head read)`
+      : `market slot at block ${index.block}`;
+  return {
+    kind: "chain",
+    pclass: "state",
+    summary:
+      `Current debt (${sym}) with accrued interest — the position's borrow shares converted to assets through Morpho's share index (toAssetsUp), reading ${totalsAt}. Both operands are chain reads, with no forward projection; the accrued-interest portion is this minus the Σ(borrow − repay) principal.` +
+      (index?.stale
+        ? ` Rails read those totals on ${formatDate(index.readAt)} and has not refreshed them since, so interest after that date is missing from this figure.`
+        : ""),
+    source: index ? { block: index.block } : undefined,
+    contract: blueOf(coords),
+    via: `${captureVia(coords)} · borrowShares → assets (toAssetsUp)${index?.atHead ? " · totals read at the chain head on this visit" : ""}`,
+    formula: "shares × (totalBorrowAssets + 1) ÷ (totalBorrowShares + 1e6), rounded up",
+    inputs: [
+      {
+        label: "borrowShares",
+        value: sharesHuman,
+        kind: "chain",
+        pclass: "state",
+        note: "position.borrowShares slot (Σ borrow − repay − liquidation shares)",
+      },
+      { label: "totalBorrowAssets", value: totalBorrowAssets, kind: "chain", pclass: "state", note: slotNote },
+      { label: "totalBorrowShares", value: totalBorrowShares, kind: "chain", pclass: "state", note: slotNote },
+    ],
+  };
+};
 
 // ── Liquidation forensics (the valued legs — loan-token denominated) ─────────
 //

@@ -103,12 +103,12 @@ export function dolomitePositionToMarkdown(args: DolomitePositionMarkdownArgs): 
     // prices the PRESENT, not history).
     for (const p of view.peakSupplies) {
       lines.push(
-        `- **Highest recorded balance (${p.symbol}, market ${p.marketId}):** ${p.decimalsUnread ? notLoaded(p.symbol, p.marketId) : `${amt(p.amount)} ${p.symbol}${p.tokens ? "" : " (par)"}`}`,
+        `- **Peak balance (${p.symbol}, market ${p.marketId}):** ${p.decimalsUnread ? notLoaded(p.symbol, p.marketId) : `${amt(p.amount)} ${p.symbol}${p.tokens ? "" : " (par)"}`}`,
       );
     }
     for (const p of view.peakBorrows) {
       lines.push(
-        `- **Highest recorded debt (${p.symbol}, market ${p.marketId}):** ${p.decimalsUnread ? notLoaded(p.symbol, p.marketId) : `${amt(p.amount)} ${p.symbol}${p.tokens ? "" : " (par)"}`}`,
+        `- **Peak debt (${p.symbol}, market ${p.marketId}):** ${p.decimalsUnread ? notLoaded(p.symbol, p.marketId) : `${amt(p.amount)} ${p.symbol}${p.tokens ? "" : " (par)"}`}`,
       );
     }
     if (view.peakSupplies.length > 0 || view.peakBorrows.length > 0) lines.push("");

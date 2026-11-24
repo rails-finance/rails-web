@@ -47,12 +47,20 @@ import {
   computeSupplyBreakdown,
   type CalcPositionInputs,
 } from "@/lib/aave-v4/utils/position-calculation";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { isOnChainPriceSource } from "@/lib/aave-v4/position-provenance";
 import { aaveV4UsdReceipt, type AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
 import { aaveV4NoPriceLine, type AaveV4PriceSource as AaveV4OnChainSource } from "@/lib/aave-v4/price-notes";
 
-export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow }) {
+export function AaveV4PositionListingCard({
+  row,
+  storedAtBlock,
+}: {
+  row: AaveV4SpokePositionRow;
+  /** The wallet page's stored read of the row (wallet_positions' readBlock):
+   *  the receipts name the block (ui-jobs 811). */
+  storedAtBlock?: number;
+}) {
   // Build the calculation's inputs from the server's chain-state reserves[]. Same inputs the
   // detail page passes to calculateAaveV4Position inside patchSpokeCardWithChain.
   const calc = useMemo(() => {
@@ -167,6 +175,22 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
       face: reserves.length === 1 ? "cents" : "compact",
       via: "the listing's chain read × the oracle map, as served",
     });
+  // A token amount's and the health factor's receipt: the row's read, and on
+  // the wallet page the block rails-server stored it at.
+  const stored =
+    storedAtBlock != null
+      ? ` Rails stored this row for the wallet at block ${storedAtBlock.toLocaleString("en-US")}.`
+      : "";
+  const rowReadProv = (what: string, getter: string): Provenance => ({
+    kind: chainBalances ? "chain" : "derived",
+    pclass: chainBalances ? "state" : "indexed",
+    summary: chainBalances
+      ? `${what}. The spoke's ${getter}, read when the row was served.${stored}`
+      : `${what}. The indexed balance; the read failed when the row was served.${stored}`,
+    contract: { name: "Aave V4 spoke" },
+    via: `Rails' Aave V4 spoke-positions row · spoke ${getter}`,
+    ...(storedAtBlock != null ? { source: { block: storedAtBlock } } : {}),
+  });
   const collR = sideReceipt(collateralReserves, "supply", supplyOnly ? "Supplied in USD" : "Collateral in USD");
   const debtR = sideReceipt(debtReserves, "debt", "Debt in USD");
   const sideValue = (r: AaveV4UsdResult | null) =>
@@ -209,8 +233,8 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   // ⇒ A LISTING ROW: the shell declares its <Prov> figures unscoped, so they
   // trace nothing, the contract of every listing render.
   if (!isOpen) {
-    // Closed / liquidated: the all-time high-water mark (Highest recorded
-    // supply or collateral, Highest recorded debt) as the detail card shows
+    // Closed / liquidated: the all-time high-water mark (Peak
+    // supply or collateral, Peak debt) as the detail card shows
     // it, with no debt head when the position never carried real debt. The
     // Outcome column's word and date say how it ended.
     const status: PositionCardStatus = closedByLiquidation
@@ -253,13 +277,22 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   // beneath in cents; a side of several, compact dollars with the icons.
   const oneAsset = (
     r: AaveV4SpokeReserveSummary,
-    raw: string,
+    side: "supply" | "debt",
     receipt: AaveV4UsdResult | null,
   ): Pick<PositionCardHead, "value" | "usd"> => {
+    const debt = side === "debt";
+    const raw = debt ? r.debtBalanceRaw : r.supplyBalanceRaw;
     const amount = scaleChainBalance(raw, r.decimals);
     return {
       value: (
-        <AssetAmount value={amount} symbol={r.symbol} address={r.address} exact={formatUnitsExact(raw, r.decimals)} />
+        <Prov
+          info={rowReadProv(
+            `${r.symbol} ${debt ? "owed" : "supplied"}`,
+            debt ? "getUserTotalDebt" : "getUserSuppliedAssets",
+          )}
+        >
+          <AssetAmount value={amount} symbol={r.symbol} address={r.address} exact={formatUnitsExact(raw, r.decimals)} />
+        </Prov>
       ),
       usd:
         receipt?.prov == null ? (
@@ -283,7 +316,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
       id: supplyOnly ? "supplied" : "collateral",
       label: supplyOnly ? "Supplied" : CARD_VOCAB.collateral,
       ...(oneColl
-        ? oneAsset(oneColl, oneColl.supplyBalanceRaw, collR)
+        ? oneAsset(oneColl, "supply", collR)
         : {
             assets: symbols.length > 0 ? <InlineAssetCluster assets={symbols.map(symbolOnly)} /> : undefined,
             value: collateralValue,
@@ -297,7 +330,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
             id: "debt",
             label: CARD_VOCAB.debt,
             ...(oneDebt
-              ? oneAsset(oneDebt, oneDebt.debtBalanceRaw, debtR)
+              ? oneAsset(oneDebt, "debt", debtR)
               : {
                   assets:
                     calc.borrowingSymbols.length > 0 ? (
@@ -322,10 +355,10 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
               </span>
             ) : undefined,
             value: hasDebt ? (
-              <>
+              <Prov info={rowReadProv("Health factor", "getUserAccountData · healthFactor · ÷10^18")}>
                 {hfStale ? "~" : ""}
                 {hfLabelV4(healthFactor)}
-              </>
+              </Prov>
             ) : (
               <span className="text-rb-500">∞</span>
             ),

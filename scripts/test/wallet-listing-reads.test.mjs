@@ -152,7 +152,9 @@ globalThis.fetch = async (input, init = {}) => {
   return json({ error: `no stub for ${url.pathname}` }, 404);
 };
 
-const { readListingRows, readSummary, readWalletCounts } = await import("../../lib/wallet/read-wallet.ts");
+const { readListingRows, readSummary, readWalletCounts, readWalletUncached } = await import(
+  "../../lib/wallet/read-wallet.ts"
+);
 
 const signal = () => new AbortController().signal;
 
@@ -271,9 +273,13 @@ test("counts: a row with a null href counts and passes through without throwing"
   const c = await readWalletCounts(W2);
   assert.equal(c.error, undefined);
   // The listings add their own rows. The Sepolia row is a testnet and is not
-  // counted; the Arc row is.
+  // counted; the Arc row is counted once Arc is on the wallet (ui-jobs 811).
+  const { ARC_ON_WALLET } = await import("../../lib/wallet/families/aave-v4.ts");
   const noPage = c.positions.filter((p) => p.href === null);
-  assert.deepEqual(noPage.map((p) => p.chain).sort(), ["arc", "ethereum", "ethereum"]);
+  assert.deepEqual(
+    noPage.map((p) => p.chain).sort(),
+    ARC_ON_WALLET ? ["arc", "ethereum", "ethereum"] : ["ethereum", "ethereum"],
+  );
 });
 
 test("summary: Sepolia rows stay in the rows and leave the totals", async () => {
@@ -287,6 +293,15 @@ test("summary: Sepolia rows stay in the rows and leave the totals", async () => 
   assert.equal(s.total, counted.length);
   assert.equal(s.open, counted.filter((r) => r.status === "open").length);
   assert.equal(s.closed, 0);
+});
+
+test("the wallet read's total leaves a Sepolia row out once", async () => {
+  v2sp = "ok";
+  const s = await readSummary(W2, signal());
+  const counted = s.rows.filter((r) => r.chain !== "sepolia").length;
+  const read = await readWalletUncached(W2);
+  assert.equal(read.total, counted);
+  assert.equal(read.total, s.total);
 });
 
 test("menu: a null-href row resolves its protocol by chain and family, through the real roster", async () => {

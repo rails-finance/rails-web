@@ -322,7 +322,7 @@ function CompoundMenuRows({ pagePath }: { pagePath: string }) {
 /** The heads in Compound's docs' words (rails-ops reference/official-docs/compound.md). */
 const SUPPLIED = "Supplied";
 const BORROW_BALANCE = "Borrow balance";
-const PEAK_BORROW_BALANCE = "Highest recorded borrow balance";
+const PEAK_BORROW_BALANCE = "Peak borrow balance";
 
 /** What the card's count counts, beside the timeline's event count. */
 const COUNT_TIP =
@@ -479,7 +479,7 @@ export function useCompoundCardSlots({
         if (line.kind === "caption")
           return (
             <div key="lent-caption" className="mt-1 text-xs font-normal text-rb-500">
-              Highest supplied {v.base.symbol} (earns interest)
+              Peak supplied {v.base.symbol} (earns interest)
             </div>
           );
         if (line.kind === "base")

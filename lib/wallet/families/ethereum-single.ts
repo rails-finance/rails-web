@@ -2,12 +2,16 @@
 // (decision 0050, step 3; SERVER-ONLY). Each card is the family's listing row,
 // built from the summary row's `card` by the family's listing builder (the
 // Liquity V2 TroveSummary is the row as served). The head reads:
-//   Morpho Blue  the existing position reader once per open position with
-//                debt: LTV against LLTV at the market's own oracle (no
+//   Morpho Blue  the existing position reader once per open position: LTV
+//                against LLTV at the market's own oracle where it owes (no
 //                dollars). It runs over rails-server's answer first
 //                (/api/at-block/morpho/position, every market at the chain's
 //                block B), waiting up to 3.5 s (walletApiWait); a position the route
 //                does not answer is read on the chain, all of those at one block.
+//                The card's debt with interest takes the market totals from
+//                that read, and every open card its stamp: the stored card's
+//                totals are not read, and the row's stamp is its last event
+//                (mig 532, morpho-card.ts).
 //   MakerDAO     the existing Vat reader once per open vault: the collateral
 //                at the OSM price, the debt in DAI, the liquidation price.
 //   Fluid        the existing VaultResolver reader once per open NFT with
@@ -39,6 +43,9 @@ import { shutDownTrove } from "@/lib/wallet/trove-shutdown";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { morphoHasDebt } from "@/lib/morpho/position-legs";
+import { morphoCardAtHead, storedMorphoCard } from "./morpho-card";
+import { API_CONCURRENCY, createLimiter } from "@/lib/wallet/api-hop";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, opt, plural, storeStamp } from "@/lib/wallet/summary-row";
 import { formerHoldOf, movedHistory } from "@/lib/wallet/moved-row";
@@ -49,7 +56,7 @@ const now = () => Math.floor(Date.now() / 1000);
 
 /** Loan tokens whose unit the dust floor may read as a dollar. Ranks only:
  *  the figure is never displayed (decision 0041). */
-const DOLLAR_LOANS = new Set([
+export const DOLLAR_LOANS = new Set([
   "USDC",
   "USDT",
   "DAI",
@@ -96,7 +103,7 @@ export const morphoEthereum: FamilyModule = {
   async shape(rows) {
     // The builder leaves out a row whose market it cannot parse, so each card
     // finds its summary row by id.
-    const cards = await buildMorphoPositionRows(rows.map((r) => r.card as RawMorphoPositionRow));
+    const cards = await buildMorphoPositionRows(rows.map((r) => storedMorphoCard(r.card)));
     const byId = new Map(rows.map((r) => [r.positionId, r]));
     return cards.flatMap((s): WalletPosition[] => {
       const r = byId.get(s.positionId);
@@ -124,22 +131,26 @@ export const morphoEthereum: FamilyModule = {
           history: {
             ...historyBase(r),
             size: parts.length ? parts.join(" / ") : undefined,
-            sizeNote: parts.length ? "highest recorded" : undefined,
+            sizeNote: parts.length ? "peak" : undefined,
             result: s.badDebt > 0 ? `${amountText(s.badDebt, s.loanSymbol)} bad debt` : undefined,
           },
         },
       ];
     });
   },
-  async head(open, address, signal, apiMs): Promise<HeadResult> {
-    const owing = open.filter((p) => {
-      const s = (p.card as { row: MorphoPositionSummary }).row;
-      return (s.currentDebt?.amount ?? s.borrowed.amount) > 0 && !s.isIdle;
-    });
-    if (owing.length === 0) return { positions: open, reads: 0 };
+  async head(open, address, signal, apiMs, { rows }): Promise<HeadResult> {
+    if (open.length === 0) return { positions: open, reads: 0 };
+    const storedById = new Map(rows.map((r) => [r.positionId, r.card]));
+    // Each read position's stored card with the head read's totals.
+    const atHead = new Map<string, RawMorphoPositionRow>();
     // The chain's block, read once and only when a position needs the chain.
     let block: Promise<bigint> | null = null;
-    const r = await eachOpen(owing, async (p) => {
+    // Every open row is read: at most API_CONCURRENCY at once, to the api
+    // route or, past it, the chain. Not apiHop: its slots are the api host's,
+    // and its retry would repeat a chain read.
+    const limit = createLimiter(API_CONCURRENCY);
+    const r = await eachOpen(open, (p) => limit(() => readOne(p), signal));
+    async function readOne(p: WalletPosition): Promise<WalletPosition> {
       const s = (p.card as { row: MorphoPositionSummary }).row;
       const served = await withServerHead(
         {
@@ -157,6 +168,17 @@ export const morphoEthereum: FamilyModule = {
         live = await loadMorphoPositionFromChain(s.marketId, address, undefined, await block);
       }
       if (live.chainStale) return { ...p, headRead: "failed" };
+      // A row stored owing nothing that the chain finds owing is behind the
+      // chain: its card states no debt, so it is not a head read.
+      if (!morphoHasDebt(s.borrowSharesRaw) && morphoHasDebt(live.borrowSharesRaw)) return { ...p, headRead: "failed" };
+      const stored = storedById.get(p.positionId);
+      const card = stored != null ? morphoCardAtHead(storedMorphoCard(stored), live) : null;
+      if (card) atHead.set(p.positionId, card);
+      // The share leg, as the server words the status: the principal can read
+      // through zero while a debt is open (position-legs.ts). A row owing
+      // nothing takes the read's stamp and states no risk.
+      if (!morphoHasDebt(s.borrowSharesRaw) || s.isIdle)
+        return { ...p, headRead: "read", readAtBlock: live.blockNumber, readAt: live.timestamp };
       const dollarLoan = DOLLAR_LOANS.has((live.loanSymbol ?? "").toUpperCase());
       return {
         ...p,
@@ -169,8 +191,20 @@ export const morphoEthereum: FamilyModule = {
         readAtBlock: live.blockNumber,
         readAt: live.timestamp,
       };
-    });
-    const byId = new Map(r.positions.map((p) => [p.positionId, p]));
+    }
+    // One build for every card the head read reached; a card it did not keeps
+    // the stored row's figures, and its section states no total (unreadAtHead).
+    const rebuilt = await buildMorphoPositionRows([...atHead.values()]);
+    const cardById = new Map(rebuilt.map((s) => [s.positionId, s]));
+    // A failed read states no stamp: the row's is its last event (mig 532),
+    // a time no one read the chain, and the page's "Updated" takes the oldest.
+    const byId = new Map(
+      r.positions.map((p): [string, WalletPosition] => {
+        if (p.headRead === "failed") return [p.positionId, { ...p, readAt: undefined, readAtBlock: undefined }];
+        const s = p.headRead === "read" ? cardById.get(p.positionId) : undefined;
+        return [p.positionId, s ? { ...p, card: { kind: "morpho" as const, row: s } } : p];
+      }),
+    );
     return { reads: r.reads, positions: open.map((p) => byId.get(p.positionId) ?? p) };
   },
 };
@@ -213,7 +247,7 @@ export const makerdao: FamilyModule = {
         history: {
           ...historyBase(r),
           size: parts.length ? parts.join(" / ") : undefined,
-          sizeNote: parts.length ? "highest recorded" : undefined,
+          sizeNote: parts.length ? "peak" : undefined,
           result: s.everLiquidated ? "liquidated by auction" : undefined,
         },
       };
@@ -292,7 +326,7 @@ export const fluid: FamilyModule = {
         history: {
           ...historyBase(r),
           size: parts.length ? parts.join(" / ") : undefined,
-          sizeNote: parts.length ? "highest recorded" : undefined,
+          sizeNote: parts.length ? "peak" : undefined,
           result: (r.liquidationCount ?? 0) > 0 ? plural(r.liquidationCount!, "liquidation") : undefined,
         },
       };
@@ -382,7 +416,7 @@ export const liquityV2: FamilyModule = {
         history: {
           ...historyBase(r),
           size: parts.length ? parts.join(" / ") : undefined,
-          sizeNote: parts.length ? "highest recorded" : undefined,
+          sizeNote: parts.length ? "peak" : undefined,
           result: n > 0 ? plural(n, "redemption") : undefined,
           txCount: Number.isFinite(txCount) ? txCount : undefined,
         },

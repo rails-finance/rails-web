@@ -2,8 +2,8 @@
 
 // Moonwell Base listing — client half. The shared Moonwell listing driver
 // pointed at the Base route, the shared Moonwell card bound to the Base lane
-// (session, sweep receipts, no replay peaks), and the one thing the Ethereum
-// listing never has to say: how complete the lane is.
+// (session, sweep receipts, the row's per-market peaks), and the one thing
+// the Ethereum listing never has to say: how complete the lane is.
 //
 // A row is one wallet's standing across every market under the one
 // Comptroller, as on Ethereum: every balance a chain read at the block the row
@@ -24,17 +24,11 @@ import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain
 import { MoonwellPositionCard, viewFromSummary } from "@/components/protocol/moonwell/moonwell-position-card";
 import { MoonwellBorrowFrozenNote } from "@/components/protocol/moonwell/moonwell-borrow-frozen-note";
 import { MoonwellDeploymentProvider } from "@/lib/moonwell/deployment-context";
-import { makeListedMoonwellIdentity } from "@/lib/moonwell/swept-card-provenance";
-import {
-  MOONWELL_BASE_COMPTROLLER,
-  MOONWELL_BASE_DEPLOY_BLOCK,
-  MOONWELL_BASE_WETH_ROUTER,
-} from "@/lib/moonwell-base/asset-catalog";
+import { MOONWELL_BASE_LISTED_IDENTITY } from "@/lib/moonwell-base/listed-identity";
 import {
   moonwellBaseListDimensions,
   moonwellBaseFiltersToFetchParams,
   MOONWELL_BASE_LIST_DEFAULTS,
-  MOONWELL_BASE_POSITIONS_ROUTE,
   MOONWELL_BASE_SORT_OPTIONS,
 } from "@/lib/moonwell-base/list-filter-dimensions";
 import { MOONWELL_ITEMS_PER_PAGE, type MoonwellListFilters } from "@/lib/moonwell/list-filter-dimensions";
@@ -47,17 +41,6 @@ export interface MoonwellBaseListingProps {
   /** The facet roster the server render resolved, if it did. */
   initialRoster?: MoonwellBaseRosterState;
 }
-
-/** The lane every card on this page cites: the Base Comptroller, the Base
- *  sweep, this route. Module-level, so the provider value is stable. */
-const DEPLOYMENT = makeListedMoonwellIdentity({
-  session: "moonwell-base",
-  comptroller: { name: "Comptroller (Base)", address: MOONWELL_BASE_COMPTROLLER },
-  positionRoute: "/api/chain/moonwell-base/position",
-  positionsRoute: MOONWELL_BASE_POSITIONS_ROUTE,
-  router: MOONWELL_BASE_WETH_ROUTER,
-  deployBlock: MOONWELL_BASE_DEPLOY_BLOCK,
-});
 
 // One roster fetch per browser session — the option universe behind the
 // Supplying / Borrowing facets. Module scope rather than component state so a
@@ -120,7 +103,7 @@ export function MoonwellBaseListing({
   );
 
   return (
-    <MoonwellDeploymentProvider value={DEPLOYMENT}>
+    <MoonwellDeploymentProvider value={MOONWELL_BASE_LISTED_IDENTITY}>
       <ChainTruthListingPage<MoonwellPositionSummary, MoonwellListFilters, MoonwellBaseRosterState>
         title="Moonwell Positions"
         noun="positions"
@@ -129,7 +112,7 @@ export function MoonwellBaseListing({
         defaults={MOONWELL_BASE_LIST_DEFAULTS}
         sortOptions={MOONWELL_BASE_SORT_OPTIONS}
         searchPlaceholder="Search wallet address"
-        renderCard={(p) => <MoonwellPositionCard v={viewFromSummary(p)} surface="listing" peaks={false} />}
+        renderCard={(p) => <MoonwellPositionCard v={viewFromSummary(p)} surface="listing" />}
         hrefFor={(p) => `/base/moonwell/${p.wallet}`}
         keyFor={(p) => p.wallet}
         strategy={serverStrategy<MoonwellPositionSummary, MoonwellListFilters, MoonwellBaseRosterState>({

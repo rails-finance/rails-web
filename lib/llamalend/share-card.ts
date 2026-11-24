@@ -62,7 +62,7 @@ export function llamalendShareCardModel(
   } else {
     // Closed/liquidated: the last emitted absolutes, usually back at zero —
     // the API carries no peak figures, so the terminal card never claims
-    // "Highest recorded", matching the detail card's own labels.
+    // "Peak", matching the detail card's own labels.
     if (position.collateral != null && position.collateral > 0) {
       stats.push({
         label: CARD_VOCAB.finalCollateral,

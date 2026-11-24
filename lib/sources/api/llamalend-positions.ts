@@ -98,6 +98,9 @@ export interface LlamalendPositionSummary {
   /** Which basis the two figures above carry: "chain" = user_state at head;
    *  "index" = the last emitted UserState absolute. */
   stateBasis: "chain" | "index";
+  /** The live read landed on an open row and found its debt zero: the loan
+   *  was repaid since the index's last event. Set only then. */
+  liveDebtZero?: true;
 
   /** ⇒ Converted amount (borrowed-token units) — collateral the AMM has
    *  already converted: > 0 = in soft-liquidation NOW. Chain-only (no event
@@ -312,6 +315,7 @@ export async function buildLlamalendPositionRows(
       debt,
       debtRaw: debtRaw.toString(),
       stateBasis: useLive ? "chain" : "index",
+      ...(live != null && status === "open" && live[2] === ZERO ? { liveDebtZero: true as const } : {}),
       converted,
       convertedRaw: convertedRaw != null ? convertedRaw.toString() : null,
       inSoftLiq: converted != null ? converted > 0 && debt > 0 : null,

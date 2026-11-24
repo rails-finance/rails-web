@@ -109,6 +109,9 @@ export interface MorphoIndexRead {
   /** ISO time the read was written, seconds after the block. */
   readAt: string;
   stale: boolean;
+  /** The totals are the wallet visit's head read, accrued to `block`, not
+   *  the stored refresh. */
+  atHead?: true;
 }
 
 /** A listed row's chain read — the receipt every figure on it cites. */
@@ -205,6 +208,9 @@ export interface RawMorphoPositionRow {
   state_block?: string | null;
   state_read_at?: string | null;
   state_stale?: boolean | null;
+  /** Set where the index above is a head read made at visit (the wallet card,
+   *  lib/wallet/families/morpho-card.ts); never on a served row. */
+  state_at_head?: boolean | null;
   /** Peak (highest-recorded) collateral / borrowed principal, raw (closed rows). */
   peak_coll_raw?: string | null;
   peak_borr_raw?: string | null;
@@ -329,7 +335,12 @@ export async function buildMorphoPositionRows(
         totalBorrowShares: r.total_borrow_shares,
         index:
           r.state_block != null && r.state_read_at != null
-            ? { block: Number(r.state_block), readAt: r.state_read_at, stale: r.state_stale === true }
+            ? {
+                block: Number(r.state_block),
+                readAt: r.state_read_at,
+                stale: r.state_stale === true,
+                ...(r.state_at_head === true ? { atHead: true as const } : {}),
+              }
             : undefined,
       };
     }

@@ -217,7 +217,7 @@ export interface ChainLifetimeFlows {
    *  is scaled by the 18 stand-in and is not stated. */
   decimalsUnread?: true;
   /** The highest running PRINCIPAL the replay recorded on each axis — the
-   *  closed card's "highest recorded" figures. Principal because the replay
+   *  closed card's "peak" figures. Principal because the replay
    *  sums emitted amounts; the interest that accrued between events is not
    *  in it, so the true maximum of the rebased balance sat at or above this. */
   peakSupplied?: number;
@@ -1291,7 +1291,7 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     // The row's own figures: the chain's where the lane is valued.
     const fig = mv ? { before: mv.before, after: mv.after } : run;
     // Each row's balance before and after counts toward the peak, interest to
-    // the block included, so no row shows a balance above "highest recorded".
+    // the block included, so no row shows a balance above "peak".
     if (mv) {
       notePeak(isSupplySide ? "supply" : "debt", rMeta, mv.before);
       notePeak(isSupplySide ? "supply" : "debt", rMeta, mv.after);

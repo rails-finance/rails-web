@@ -5,7 +5,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { ARC_CHAIN_ID, CHAINS, SEPOLIA_CHAIN_ID } from "../../lib/shared/chains.ts";
-import { MENU_TESTNETS, WALLET_COUNTS_SCOPE, rowIsPage, walletProtocolMenu } from "../../lib/wallet/summary-counts.ts";
+import {
+  MENU_TESTNETS,
+  WALLET_COUNTS_SCOPE,
+  menuKey,
+  rowIsPage,
+  vaultProtocolOfHref,
+  vaultRoot,
+  walletProtocolMenu,
+} from "../../lib/wallet/summary-counts.ts";
 
 const W = "0x3df83ec9d2b62bb9bb83eba1218a202564bb67da";
 const DASHBOARD = `/wallet/${W}`;
@@ -165,4 +173,68 @@ test("a position passed to another wallet counts as moved, never open or closed 
     onlyMoved.rows.map((r) => r.counts),
     ["1 open", "1 moved"],
   );
+});
+
+// Vault shares (ui-jobs 783): one summary family, "vaults", over MetaMorpho,
+// Aave's vaults and Yearn V3; the menu gives each vault protocol its row.
+const vault = (chain, root, n, status = "open") => ({
+  chain,
+  family: "vaults",
+  positionId: `0xv${n}-${W}`,
+  status,
+  href: `/${chain}/${root}/vaults/0xv${n}/${W}`,
+});
+const VAULT_ROSTER = { morpho: ["Morpho Blue", 3], aave: ["Aave vaults", 4], yearn: ["Yearn V3", 5] };
+const vaultProtocolOf = (p) => {
+  if (p.family !== "vaults") return protocolOf(p);
+  const root = vaultRoot(p.href);
+  const [label, order] = VAULT_ROSTER[root];
+  return {
+    name: vaultProtocolOfHref(p.href) ?? label,
+    order,
+    // Yearn V3 has no holder listing: the wallet view narrowed to the vault shares.
+    listing: root === "yearn" ? `${DASHBOARD}?protocol=vaults` : `/${p.chain}/${root}/vaults/positions?q=${W}`,
+  };
+};
+
+test("vault rows take one menu row per vault protocol and chain, each named", () => {
+  const m = walletProtocolMenu(
+    [
+      vault("ethereum", "morpho", 1),
+      vault("ethereum", "morpho", 2, "closed"),
+      vault("ethereum", "aave", 3),
+      vault("ethereum", "yearn", 4),
+      vault("ethereum", "yearn", 5),
+      vault("base", "morpho", 6),
+      pos("morpho", "open", 7),
+    ],
+    (p) => rowIsPage(p.href, "/x", ""),
+    vaultProtocolOf,
+    DASHBOARD,
+  );
+  const rows = Object.fromEntries(m.rows.map((r) => [r.key, r]));
+  assert.deepEqual(Object.keys(rows).sort(), [
+    "base:vaults:morpho",
+    "ethereum:morpho",
+    "ethereum:vaults:aave",
+    "ethereum:vaults:morpho",
+    "ethereum:vaults:yearn",
+  ]);
+  assert.equal(rows["ethereum:vaults:morpho"].name, "MetaMorpho vaults");
+  assert.equal(rows["ethereum:vaults:morpho"].counts, "1 open · 1 closed");
+  assert.equal(rows["ethereum:vaults:morpho"].href, `/ethereum/morpho/vaults/positions?q=${W}`);
+  assert.equal(rows["ethereum:morpho"].name, "Morpho Blue");
+  assert.equal(rows["ethereum:vaults:aave"].name, "Aave vaults");
+  assert.equal(rows["ethereum:vaults:aave"].href, `/ethereum/aave/vaults/0xv3/${W}`);
+  // Yearn V3 has no holder listing: past one holding, the wallet view's vault shares.
+  assert.equal(rows["ethereum:vaults:yearn"].name, "Yearn V3");
+  assert.equal(rows["ethereum:vaults:yearn"].href, `${DASHBOARD}?protocol=vaults`);
+  assert.equal(rows["base:vaults:morpho"].name, "MetaMorpho vaults");
+});
+
+test("menuKey splits vault rows by their href's root and leaves other families whole", () => {
+  assert.equal(menuKey(vault("base", "morpho", 1)), "base:vaults:morpho");
+  assert.equal(menuKey(pos("aave-v3", "open", 1)), "ethereum:aave-v3");
+  assert.equal(vaultRoot("/ethereum/aave-v3/0xabc"), undefined);
+  assert.equal(vaultProtocolOfHref("/ethereum/yearn/vaults/0xv/0xh?x=1"), "Yearn V3");
 });

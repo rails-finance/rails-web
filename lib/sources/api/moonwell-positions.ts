@@ -85,6 +85,10 @@ export interface MoonwellPositionSummary {
   borrows: MoonwellBorrowAmount[];
   peakSupplies: MoonwellPeakAmount[];
   peakBorrows: MoonwellPeakAmount[];
+  /** Set where the server withheld a plumbing wallet's peaks; the
+   *  transaction cap, the read budget and a failed read arrive as empty peak
+   *  arrays. Either way the closed face reads "not recorded". */
+  peakWithheld?: boolean;
   supplyCount: number;
   borrowCount: number;
   liquidationCount: number;
@@ -125,6 +129,10 @@ export interface RawMoonwellWalletRow {
   status: string;
   markets: RawMoonwellMarketRow[];
   peakMarkets?: RawMoonwellPeakRow[];
+  /** Set where the server withheld a plumbing wallet's peaks; the
+   *  transaction cap, the read budget and a failed read arrive as empty peak
+   *  arrays. Either way the closed face reads "not recorded". */
+  peakWithheld?: string | boolean | null;
   lastActivityAt: number;
   lastBlockNumber: number;
   lastTxHash: string | null;
@@ -295,6 +303,7 @@ export async function buildMoonwellPositionRows(
       borrows,
       peakSupplies,
       peakBorrows,
+      peakWithheld: !!w.peakWithheld,
       supplyCount: supplies.length,
       borrowCount: borrows.length,
       liquidationCount: w.liquidationCount,

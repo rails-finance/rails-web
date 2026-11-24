@@ -19,7 +19,7 @@ import { poolPosition } from "@/lib/uniswap/position";
 import { cardProv } from "@/lib/uniswap/provenance";
 import { uniExplorerId, type UniProtocol } from "@/lib/uniswap/deployments";
 import type { UniPositionRead } from "@/lib/uniswap/types";
-import { CARD_WORDS, cardExplainer, cardStatus, isClosed, num, shown } from "@/lib/uniswap/words";
+import { CARD_WORDS, cardExplainer, cardStatus, isClosed, num, rangeWord, shown } from "@/lib/uniswap/words";
 
 /** The range against the price, on a log scale padded around both. Uniswap's and Aerodrome's cards
  *  share it: `s` is the prices as shown (lib/uniswap/words.ts `shown`). */
@@ -68,13 +68,35 @@ export function RangeBar({
   );
 }
 
-function slots(r: UniPositionRead, protocol: UniProtocol): PositionCardSlots {
+/** The listing card's range headline (the wallet page, W9): the state at the head block in the
+ *  risk slot, the range's prices under it. Uniswap's and Aerodrome's cards share it. */
+export function rangeHead(
+  p: Parameters<typeof shown>[0] & Parameters<typeof rangeWord>[0],
+  info: Provenance,
+): PositionCardHead {
+  const s = shown(p);
+  return {
+    id: "range",
+    label: CARD_WORDS.rangeLabel,
+    labelTip: CARD_WORDS.rangeHeadTip,
+    tier: "measure",
+    value: <Prov info={info}>{rangeWord(p)}</Prov>,
+    sub: p.range.full ? undefined : (
+      <span data-figure="range-prices">
+        <Prov info={info}>{CARD_WORDS.rangeSpan(s.low, s.high, s.unit)}</Prov>
+      </span>
+    ),
+  };
+}
+
+function slots(r: UniPositionRead, protocol: UniProtocol, surface: "detail" | "listing"): PositionCardSlots {
   const p = poolPosition(r, protocol);
   const c = { p, r };
   const B = p.base.symbol;
   const Q = p.quote.symbol;
   const words = cardExplainer(p);
   const closed = isClosed(p);
+  const listing = surface === "listing";
   const heads: PositionCardHead[] = [
     {
       id: "holds",
@@ -121,22 +143,16 @@ function slots(r: UniPositionRead, protocol: UniProtocol): PositionCardSlots {
             {num(p.uncollected)} <span className="text-base font-medium">{Q}</span>
           </Prov>
         ),
+      // On a listing card the range takes the fourth headline, so a staked position's CAKE stands here.
+      sub:
+        listing && p.staked ? (
+          <span data-figure="cake">
+            <Prov info={cardProv("cake", c)}>
+              {CARD_WORDS.cakeSub(num(p.staked.pendingCake), p.staked.cake.symbol)}
+            </Prov>
+          </span>
+        ) : undefined,
     },
-    // PancakeSwap: CAKE rewards not yet harvested, where the position is staked in the farm.
-    ...(p.staked
-      ? [
-          {
-            id: "cake",
-            label: CARD_WORDS.cake,
-            labelTip: CARD_WORDS.cakeTip,
-            value: (
-              <Prov info={cardProv("cake", c)}>
-                {num(p.staked.pendingCake)} <span className="text-base font-medium">{p.staked.cake.symbol}</span>
-              </Prov>
-            ),
-          },
-        ]
-      : []),
   ];
   const status = cardStatus(p);
   // The position's name: the pair and the NFT id (lib/shared/position-name.ts).
@@ -145,20 +161,46 @@ function slots(r: UniPositionRead, protocol: UniProtocol): PositionCardSlots {
     noun: POSITION_NOUN[uniExplorerId(p.protocol, p.chainId, p.version) as SessionProtocol],
     id: p.id,
   });
+  // PancakeSwap: whether the farm holds it.
+  const identity =
+    p.staked !== undefined ? (
+      <span className="text-xs text-rb-500">
+        <Prov info={cardProv("cake", c)}>{p.staked ? CARD_WORDS.staked : CARD_WORDS.unstaked}</Prov>
+      </span>
+    ) : undefined;
+  // The NFT id as the tag, the listing's form (ui-jobs 807).
+  const tag = <ListingTag id={p.id} />;
+  // A listing card has no range bar: the range headline states the state and the prices.
+  if (listing)
+    return {
+      surface: "listing",
+      status: closed ? { word: CARD_WORDS.closed, tone: "muted", tip: CARD_WORDS.closedTip } : null,
+      name,
+      tag,
+      identity,
+      heads: closed ? heads : [...heads, rangeHead(p, cardProv("range", c))],
+      counters: null,
+      menu: null,
+    };
+  // PancakeSwap: CAKE rewards not yet harvested, where the position is staked in the farm.
+  if (p.staked)
+    heads.push({
+      id: "cake",
+      label: CARD_WORDS.cake,
+      labelTip: CARD_WORDS.cakeTip,
+      value: (
+        <Prov info={cardProv("cake", c)}>
+          {num(p.staked.pendingCake)} <span className="text-base font-medium">{p.staked.cake.symbol}</span>
+        </Prov>
+      ),
+    });
   return {
     surface: "detail",
     heading: CARD_WORDS.heading,
     status: status ? { word: status.word, tone: "muted", tip: status.tip } : null,
     name,
-    // The NFT id as the tag, the listing's form (ui-jobs 807).
-    tag: <ListingTag id={p.id} />,
-    // PancakeSwap: whether the farm holds it.
-    identity:
-      p.staked !== undefined ? (
-        <span className="text-xs text-rb-500">
-          <Prov info={cardProv("cake", c)}>{p.staked ? CARD_WORDS.staked : CARD_WORDS.unstaked}</Prov>
-        </span>
-      ) : undefined,
+    tag,
+    identity,
     heads,
     counters: null,
     menu: { exports: null },
@@ -195,7 +237,16 @@ function slots(r: UniPositionRead, protocol: UniProtocol): PositionCardSlots {
   };
 }
 
-export function UniswapPositionCard({ r, protocol = "uniswap" }: { r: UniPositionRead; protocol?: UniProtocol }) {
+/** `surface: "listing"`: the card as a listing row, inside one link (the wallet page's Liquidity section). */
+export function UniswapPositionCard({
+  r,
+  protocol = "uniswap",
+  surface = "detail",
+}: {
+  r: UniPositionRead;
+  protocol?: UniProtocol;
+  surface?: "detail" | "listing";
+}) {
   return (
     <div
       data-anatomy="U1"
@@ -204,7 +255,7 @@ export function UniswapPositionCard({ r, protocol = "uniswap" }: { r: UniPositio
       data-liquidity-raw={r.liquidity}
       data-live-block={r.head.block}
     >
-      <PositionCard slots={slots(r, protocol)} />
+      <PositionCard slots={slots(r, protocol, surface)} />
     </div>
   );
 }

@@ -28,7 +28,14 @@ import { positionName, shortPositionId } from "@/lib/shared/position-name";
 import { FPETH, POLARIS_WETH } from "@/lib/polaris/asset-catalog";
 import { polarisLoanHref, polarisLoanNftUrl, POLARIS_LOANS_PATH } from "@/lib/polaris/routes";
 import { big, type LoanLifetime } from "@/lib/polaris/sp-loan-math";
-import { loanAtFloorProv, loanCostProv, loanLiveProv, loanSumProv } from "@/lib/polaris/sp-loan-provenance";
+import {
+  loanAtFloorProv,
+  loanCostProv,
+  loanLiveProv,
+  loanRowProv,
+  loanSumProv,
+  type PolarisRowVia,
+} from "@/lib/polaris/sp-loan-provenance";
 import type { PolarisLoanRow } from "@/lib/sources/api/polaris-sp-loans";
 import { RawFigure, tokenIcon } from "./polaris-sp-loan-parts";
 import { positionLink } from "@/lib/shared/position-link";
@@ -50,6 +57,16 @@ export interface PolarisLoanCardProps {
   now?: PolarisLoanNow | null;
   pending?: boolean;
   explanation?: ReactNode;
+  /** The wallet page: each listing figure carries its receipt, the row read
+   *  through `via` with its debt at the loan's last touch or at the
+   *  deployment's latest index. */
+  receipts?: {
+    via: PolarisRowVia;
+    debtAt: "touch" | "index";
+    /** The blocks the row states its collateral, and its debt and cost, at. */
+    collBlock?: number;
+    debtBlock?: number;
+  };
 }
 
 function LoanMenuRows({ row }: { row: PolarisLoanRow }) {
@@ -94,6 +111,7 @@ export function polarisLoanSlots({
   now,
   pending = false,
   explanation,
+  receipts,
 }: PolarisLoanCardProps): PositionCardSlots {
   const detail = surface === "detail";
   const closed = row.status === "closed";
@@ -112,12 +130,23 @@ export function polarisLoanSlots({
     const coll = big(row.coll_raw);
     const debt = big(row.debt_at_index_raw);
     const cost = big(row.cost_raw);
+    // The wallet page's stored row states the debt at the loan's last touch;
+    // a listing row states it at the deployment's latest index.
+    const atTouch = receipts?.debtAt === "touch";
+    const prov = (what: Parameters<typeof loanRowProv>[0], figure: ReactNode) =>
+      receipts ? (
+        <Prov info={loanRowProv(what, receipts.via, what === "coll" ? receipts.collBlock : receipts.debtBlock)}>
+          {figure}
+        </Prov>
+      ) : (
+        figure
+      );
     const heads: PositionCardHead[] = closed
       ? [
           {
             id: "cost",
             label: "Cost",
-            value: <RawFigure raw={cost} symbol={W.symbol} />,
+            value: prov(atTouch ? "costAtTouch" : "costAtIndex", <RawFigure raw={cost} symbol={W.symbol} />),
             assets: tokenIcon(W.symbol, W.address, cost),
           },
         ]
@@ -125,21 +154,23 @@ export function polarisLoanSlots({
           {
             id: "collateral",
             label: "Collateral",
-            value: <RawFigure raw={coll} symbol={F.symbol} />,
+            value: prov("coll", <RawFigure raw={coll} symbol={F.symbol} />),
             assets: tokenIcon(F.symbol, F.address, coll),
           },
           {
             id: "debt",
             label: "Debt",
-            labelTip: "As of the last touch. Fees accrued since are left out.",
+            labelTip: atTouch
+              ? "As of the last touch. Fees accrued since are left out."
+              : "At the deployment's latest fee index. Fees accrued since that log are left out.",
             labelTipOnListing: true,
-            value: <RawFigure raw={debt} symbol={W.symbol} approx />,
+            value: prov(atTouch ? "debtAtTouch" : "debtAtIndex", <RawFigure raw={debt} symbol={W.symbol} approx />),
             assets: tokenIcon(W.symbol, W.address, debt),
           },
           {
             id: "cost",
             label: "Cost so far",
-            value: <RawFigure raw={cost} symbol={W.symbol} approx />,
+            value: prov(atTouch ? "costAtTouch" : "costAtIndex", <RawFigure raw={cost} symbol={W.symbol} approx />),
             assets: tokenIcon(W.symbol, W.address, cost),
           },
         ];

@@ -26,7 +26,7 @@ import { MorphoPositionCard, viewFromSummary } from "@/components/protocol/morph
 import { MorphoMarketPageLine } from "@/components/protocol/morpho/morpho-market-link";
 import { makeListedMorphoReceipts } from "@/lib/morpho/listed-card-provenance";
 import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
-import { morphoBasePositionHref } from "@/lib/morpho-base/routes";
+import { MORPHO_BASE_POSITIONS_ROUTE, morphoBasePositionHref } from "@/lib/morpho-base/routes";
 // A row's owner is any address the singleton has ever named, and a handful of
 // them are catalogued MetaMorpho vaults, not people — 505 rows, ~26 KB
 // gzipped. This is the one client component on the explorer that imports the
@@ -45,7 +45,6 @@ import {
   morphoBaseSortOptions,
   MORPHO_BASE_ITEMS_PER_PAGE,
   MORPHO_BASE_LIST_DEFAULTS,
-  MORPHO_BASE_POSITIONS_ROUTE,
   type MorphoBaseListFilters,
 } from "@/lib/morpho-base/list-filter-dimensions";
 

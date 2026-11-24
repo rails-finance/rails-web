@@ -66,8 +66,7 @@ import {
   statusChoice,
 } from "@/lib/morpho-base/listing-visibility";
 import { ENDED_BY_LIQUIDATION, setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
-
-export const MORPHO_BASE_POSITIONS_ROUTE = "/api/morpho-base/positions";
+import { MORPHO_BASE_POSITIONS_ROUTE } from "@/lib/morpho-base/routes";
 
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const MORPHO_BASE_ITEMS_PER_PAGE = 20;

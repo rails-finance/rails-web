@@ -80,6 +80,10 @@ export interface AaveV3PositionRow {
    *  closed / liquidated accounts (whose current `reserves` are empty). Chain-state
    *  token amounts only, no USD (the Tier-3 rule). */
   peakReserves: AaveV3ReserveSummary[];
+  /** Set where the server withheld a plumbing wallet's peaks; the
+   *  transaction cap, the read budget and a failed read arrive as empty peak
+   *  arrays. Either way the closed face reads "not recorded". */
+  peakWithheld?: boolean;
   /** Chain-state USD layer: Aave's own on-chain oracle price (IAaveOracle
    *  getAssetPrice, chain-derived) per reserve, keyed by lowercased token address.
    *  Resolved server-side in the positions route; omits any reserve the oracle

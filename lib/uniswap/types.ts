@@ -162,7 +162,26 @@ export interface UniPositionsRead {
     liquidity: string;
     /** PancakeSwap only: held by MasterChefV3 for this owner. */
     staked?: boolean;
+    // The head-only fields the wallet page's listing card draws (rails-ops decisions/0071), read at `head`.
+    /** V3 the pool's address; V4 the pool id. */
+    pool: string;
+    /** The NFT's holder on record: the owner, or MasterChefV3 where the position is staked. */
+    owner: string;
+    tickLower: number;
+    tickUpper: number;
+    /** V4's PoolKey; null on V3. */
+    tickSpacing: number | null;
+    hooks: string | null;
+    hasSubscriber: boolean;
+    /** The pool and the position's fee bookkeeping at the head; null past the first 25 rows, or
+     *  where the pool answered no state. */
+    now: UniPoolRead | null;
+    /** PancakeSwap only: the stake where MasterChefV3 holds the NFT; null where unstaked, or past
+     *  the first 25 rows. */
+    stake?: UniStake | null;
   }[];
+  /** How many rows carry the head-only fields (25): a row at or past it has `now` null by design. */
+  headRows?: number;
   /** More than 200 ids in a version; V4 newest first, then V3. */
   truncated: boolean;
 }

@@ -83,9 +83,8 @@ export function morphoPositionToMarkdown(args: MorphoPositionMarkdownArgs): stri
   lines.push("## Headlines");
   if (view.status !== "open") {
     // Unwound: the headline is what the position held at its height.
-    if (view.peakCollateral > 0) lines.push(`- **Highest recorded collateral:** ${collFigure(view.peakCollateral)}`);
-    if (view.peakBorrowed > 0)
-      lines.push(`- **Highest recorded borrowed principal:** ${loanFigure(view.peakBorrowed)}`);
+    if (view.peakCollateral > 0) lines.push(`- **Peak collateral:** ${collFigure(view.peakCollateral)}`);
+    if (view.peakBorrowed > 0) lines.push(`- **Peak borrowed principal:** ${loanFigure(view.peakBorrowed)}`);
   } else {
     const collValue =
       scaled && chain && !chain.chainStale && chain.oraclePrice > 0 ? view.collateral * chain.oraclePrice : null;

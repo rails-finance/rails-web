@@ -1338,7 +1338,7 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Highest recorded
+          Peak
         text: |-
           each peak is the highest balance the account held just before or after any event, as the chain read it with interest.
         text_base: |-
@@ -1384,7 +1384,7 @@ L5:
         text: |-
           an account that closes with a liquidation in its record reads as liquidated.
       - bold: |-
-          Highest recorded
+          Peak
         text: |-
           each peak is the highest balance the account held just before or after any event, as the chain read it with interest.
         text_base: |-

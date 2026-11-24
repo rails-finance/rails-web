@@ -34,7 +34,7 @@ export function fluidPositionContent(opts: {
           text: "Fluid liquidates price-band 'ticks' — one sweep can touch many positions at once, and it takes only what brings the band back to its liquidation threshold, so 'liquidated' rarely means emptied outright.",
         },
         {
-          bold: "Highest recorded",
+          bold: "Peak",
           text:
             opts.peakBasis === "chain"
               ? "each peak is the highest balance the vault settled for the position just before or after any of its events, interest included. The collateral peak and the debt peak can come from different dates."

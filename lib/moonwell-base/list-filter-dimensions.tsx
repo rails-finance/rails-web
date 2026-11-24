@@ -45,6 +45,7 @@ import {
 } from "@/lib/moonwell/list-filter-dimensions";
 import type { FetchMoonwellPositionsParams } from "@/lib/api/fetch-moonwell-positions";
 import type { MoonwellBaseRosterMarket, MoonwellBaseRosterState } from "@/lib/api/fetch-moonwell-base-markets";
+import { MOONWELL_BASE_POSITIONS_ROUTE } from "@/lib/moonwell-base/routes";
 
 // This lane's own constant, NOT Ethereum's MOONWELL_SORT_OPTIONS: the two
 // backends page different tables (rails-server's /api/moonwell-base/positions
@@ -67,8 +68,6 @@ const MOONWELL_BASE_TX_TOP = 2000000;
 /** The Size panel's price line: the Base route values each account at its
  *  markets' price feed at a pinned block. */
 const MOONWELL_BASE_SIZE_NOTE = "At the market's own price feed at the pinned block.";
-
-export const MOONWELL_BASE_POSITIONS_ROUTE = "/api/moonwell-base/positions";
 
 export const MOONWELL_BASE_LIST_DEFAULTS: MoonwellListFilters = {
   ...MOONWELL_LIST_DEFAULTS,

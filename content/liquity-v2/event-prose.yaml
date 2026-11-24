@@ -924,7 +924,7 @@ trove_words:
   closed_peak_debt: |-
     This trove reached a maximum debt of {debt} during its lifetime
   closed_peak_coll: |-
-    The highest recorded collateral was {coll}
+    The peak collateral was {coll}
   closed_lifecycle: |-
     Trove was active for {duration} from {range}
   open_lead: |-

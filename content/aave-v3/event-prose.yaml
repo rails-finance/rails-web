@@ -256,11 +256,11 @@ placeholders:
   peak_supply:
     rounding: token_pos
     means: |-
-      The highest recorded supply of up to three reserves.
+      The peak supply of up to three reserves.
   peak_borrow:
     rounding: token_pos
     means: |-
-      The highest recorded debt of up to three reserves.
+      The peak debt of up to three reserves.
   liq_count:
     rounding: count
     means: |-
@@ -2134,12 +2134,12 @@ L5:
     title: |-
       About this position
     intro: |-
-      This account repaid its debt and withdrew its collateral. The panel lists the reserves it held; a press on them opens each reserve's highest recorded balance over its life.
+      This account repaid its debt and withdrew its collateral. The panel lists the reserves it held; a press on them opens each reserve's peak balance over its life.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
-          Highest recorded
+          Peak
         text: |-
           each reserve's highest balance at the event that reached it, interest included; the peaks need not have stood together.
       - bold: |-
@@ -2174,7 +2174,7 @@ L5:
     title: |-
       About this position
     intro: |-
-      Liquidation took collateral from this account after its health factor fell below 1. The panel lists the reserves it held; a press on them opens each reserve's highest recorded balance over its life.
+      Liquidation took collateral from this account after its health factor fell below 1. The panel lists the reserves it held; a press on them opens each reserve's peak balance over its life.
     detailsHeading: |-
       Key concepts:
     details:

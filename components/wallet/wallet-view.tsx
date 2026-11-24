@@ -60,6 +60,9 @@ import {
   walletSections,
   walletTotal,
   andList,
+  onTestnet,
+  undrawnCount,
+  undrawnLine,
   type WalletSection,
   type WalletTotal,
 } from "@/lib/wallet/wallet-sections";
@@ -67,6 +70,9 @@ import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { useAssetScope } from "@/lib/shared/asset-scope";
 import { walletPositionAssetKeys } from "@/lib/wallet/aim-assets";
 import { COW_TERMS } from "@/lib/cow/terms";
+import { LiquidityBoundary, LiquidityReading, LiquiditySection } from "@/components/wallet/wallet-liquidity";
+import { walletLiquidityLine } from "@/lib/wallet/liquidity/sources";
+import type { WalletLiquidity } from "@/lib/wallet/types";
 
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
 const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
@@ -103,7 +109,8 @@ function Figure({ f }: { f: { usd: number; prov: Provenance } | null }) {
 const across = (t: WalletTotal | null) => (t?.figure ? `across ${plural(t.of, "protocol")}` : undefined);
 
 /** The wallet's totals (W2): each figure the sum of the protocol sections'
- *  figures below it, with its receipt. */
+ *  figures below it, with its receipt; the sections it leaves out named
+ *  under the row (`walletTotal`). */
 function Totals({
   sections,
   filtered,
@@ -117,9 +124,12 @@ function Totals({
   const coll = walletTotal(sections, "collateral", unanswered);
   const debt = walletTotal(sections, "debt", unanswered);
   const net = walletNet(coll, debt);
-  // Each reason a total is absent, said once under the row.
+  // Each reason a total is absent, or what it leaves out, said once under the row.
   const gaps = [...new Set([coll?.gap, debt?.gap].filter((g): g is string => g != null))];
+  const leaves = [...new Set([coll?.leaves, debt?.leaves].filter((g): g is string => g != null))];
+  // The rate reads over the sections the totals sum.
   const owing = sections
+    .filter((s) => !s.testnet && s.collateral != null && s.debt != null)
     .flatMap((s) => s.open)
     .filter((p) => p.usdOwnOracle && !unreadAtHead(p) && (p.debtUsd ?? 0) > 0);
   const rated = owing.filter((p) => p.debtRate != null);
@@ -165,18 +175,32 @@ function Totals({
         ))
       ) : (
         <p className="mt-2 text-xs text-rb-500">
-          {filtered ? "The positions shown" : "Each protocol’s total below"}, summed in dollars at the sources each
-          receipt names.
+          {filtered
+            ? "The positions shown"
+            : leaves.length > 0
+              ? "Each protocol’s total below that states both figures"
+              : "Each protocol’s total below"}
+          , summed in dollars at the sources each receipt names.
+          {leaves.map((l) => (
+            <span key={l} data-wallet-total-leaves="">
+              {" "}
+              {l}
+            </span>
+          ))}
         </p>
       )}
     </section>
   );
 }
 
+/** A family's positions the read did not draw (a module's draw limit; the
+ *  vault shares, ui-jobs 783), with its chain. */
+type Undrawn = NonNullable<WalletFamilyRead["undrawn"]> & { chain: ChainId };
+
 /** One protocol's section (W3): its name, the listing's band (N7) where it
  *  holds two positions or more, then its cards, open by risk, then closed
- *  newest first. */
-function Section({ s }: { s: WalletSection }) {
+ *  newest first; under them, how many more the read did not draw. */
+function Section({ s, undrawn, status }: { s: WalletSection; undrawn: Undrawn[]; status?: WalletStatus }) {
   const atRiskCount = s.open.filter(atRisk).length;
   const id = `wallet-section-${s.slug}`;
   return (
@@ -191,7 +215,7 @@ function Section({ s }: { s: WalletSection }) {
         <h2 id={id} className={H2}>
           {s.name}{" "}
           <span className="font-medium text-rb-500" data-prov-exempt="">
-            {s.positions.length}
+            {(s.positions.length + undrawn.reduce((n, u) => n + undrawnCount(u, status), 0)).toLocaleString("en-US")}
           </span>
         </h2>
         {s.open.length > 1 && (
@@ -207,6 +231,17 @@ function Section({ s }: { s: WalletSection }) {
           <WalletPositionCard key={`${p.chain}:${p.family}:${p.positionId}`} position={p} />
         ))}
       </div>
+      {undrawn.map((u) => {
+        // As the heading's count, the Status pill's positions alone.
+        const n = undrawnCount(u, status);
+        return (
+          n > 0 && (
+            <p key={u.chain} className="mt-3 text-xs text-rb-500" data-wallet-undrawn={n}>
+              {undrawnLine(u, chainMeta(u.chain).name, status)}
+            </p>
+          )
+        );
+      })}
     </section>
   );
 }
@@ -307,7 +342,9 @@ export function WalletView({
   ensName,
   read,
   cow,
+  liquidity,
   reads,
+  visits,
   back,
   kinds: initialKinds = [],
   status: initialStatus,
@@ -318,18 +355,25 @@ export function WalletView({
   /** The wallet's CoW trades, unawaited (`readCowWalletEntry`); W7. Null
    *  where one protocol is chosen, which is read alone. */
   cow: Promise<CowWalletEntry | null> | null;
+  /** The wallet's liquidity positions, read at visit after the page's main read and
+   *  unawaited (`readWalletLiquidity`); W9. Null where one protocol is chosen. */
+  liquidity: Promise<WalletLiquidity> | null;
   /** `?kind=`: the Kind pill's selection on arrival (ui-jobs 738). */
   kinds?: WalletKind[];
   /** `?status=`: the Status pill's selection on arrival. */
   status?: WalletStatus;
   /** The families the page reads, by chain (`walletFamiliesLine`). */
   reads: string;
+  /** The families with no store it reads at each visit, by chain
+   *  (`walletVisitLine`); empty while none is on. */
+  visits: string;
   /** The explorer the reader came from, for the empty state's link back. */
   back: { href: string; name: string } | null;
 }) {
   // AIM (ui-jobs 557): the positions naming an AIM asset (lib/wallet/aim-assets.ts),
   // the reader's own wallet included.
   const scoped = useScopedRows(read.positions, walletPositionAssetKeys, (p) => p.chain as number);
+  const scope = useAssetScope();
   const [kinds, setKinds] = useState<WalletKind[]>(initialKinds);
   const [status, setStatus] = useState<WalletStatus | undefined>(initialStatus);
   // A protocol change reads the page again: the page stays and dims meanwhile.
@@ -348,10 +392,19 @@ export function WalletView({
   const all = narrow(kinds, status);
   const chosen = walletProtocol(read.protocol);
   // The heading counts the wallet's positions whatever the pills hold.
+  // A testnet's positions are not counted (WALLET_COUNTS_SCOPE).
+  const counted = scoped.rows.filter((p) => !onTestnet(p));
+  // The positions the read counted and did not draw.
+  // Under Focus, only those on a chain in focus, as the drawn rows.
+  const undrawn: Undrawn[] = read.families.flatMap((r) =>
+    r.undrawn && (!focused || scope.chainOk(r.chain)) ? [{ ...r.undrawn, chain: r.chain }] : [],
+  );
+  // Counted whenever rows are cut, as the line under the section says.
+  const notDrawn = (k: "open" | "closed") => undrawn.reduce((n, u) => n + u[k], 0);
   const wallet = {
-    open: scoped.rows.filter((p) => p.status === "open").length,
-    moved: scoped.rows.filter((p) => p.status === "moved").length,
-    closed: scoped.rows.filter((p) => p.status !== "open" && p.status !== "moved").length,
+    open: counted.filter((p) => p.status === "open").length + notDrawn("open"),
+    moved: counted.filter((p) => p.status === "moved").length,
+    closed: counted.filter((p) => p.status !== "open" && p.status !== "moved").length + notDrawn("closed"),
   };
   // The bands state a protocol's whole holding: drawn while no pill narrows it.
   // The listing reads that did not answer (read-wallet.ts, readListingRows).
@@ -361,7 +414,6 @@ export function WalletView({
   const blocking = unanswered.filter((u) => u.total !== false).map((u) => u.what);
   const sections = walletSections(all, { bands: !filtered, unanswered });
   const open = sections.flatMap((s) => s.open);
-  const scope = useAssetScope();
   // Under Focus, only the families on a chain in focus.
   const unread = read.families.filter(
     (r) => r.headRead === "failed" && !r.unanswered && (!focused || scope.chainOk(r.chain)),
@@ -374,6 +426,21 @@ export function WalletView({
     <Suspense fallback={null}>
       <Trades address={address} cow={cow} />
     </Suspense>
+  );
+  // The liquidity positions (W9), below the protocol sections: drawn, like the trades, with
+  // neither Kind nor Status chosen.
+  const liquiditySection = liquidity && !byKind && status == null && (
+    <LiquidityBoundary
+      fallback={
+        <p className="text-xs text-rb-500" data-wallet-liquidity-unanswered="">
+          Liquidity positions could not be read.
+        </p>
+      }
+    >
+      <Suspense fallback={<LiquidityReading />}>
+        <LiquiditySection read={liquidity} />
+      </Suspense>
+    </LiquidityBoundary>
   );
   const filterBar = read.held.length > 0 && (
     <WalletFilterBar
@@ -418,7 +485,7 @@ export function WalletView({
           // decision 0050's step 3 is built from.
           read.families.map((r) => {
             const mine = open.filter(
-              (p) => `${p.family}:${p.chain}` === `${r.id.replace(/-(base|arbitrum)$/, "")}:${r.chain}`,
+              (p) => `${p.family}:${p.chain}` === `${r.id.replace(/-(base|arbitrum|arc|optimism)$/, "")}:${r.chain}`,
             );
             return {
               id: r.id,
@@ -469,6 +536,7 @@ export function WalletView({
             <section className="flex max-w-xl flex-col gap-3" data-wallet-error="">
               <IndexNotice className="text-sm text-foreground/80" />
             </section>
+            {liquiditySection}
             {trades}
           </>
         ) : filtered && all.length === 0 && read.positions.length > 0 ? (
@@ -499,11 +567,14 @@ export function WalletView({
                     </p>
                   ) : chosen ? (
                     <p className="text-sm text-foreground/80" data-wallet-reads="">
-                      Rails holds no {chosen.name} position for this wallet.
+                      {chosen.slug === "vaults"
+                        ? "Rails holds no vault shares for this wallet."
+                        : `Rails holds no ${chosen.name} position for this wallet.`}
                     </p>
                   ) : (
                     <p className="text-sm text-foreground/80" data-wallet-reads="">
-                      Rails holds no position for this wallet. This page reads {reads}.
+                      Rails holds no stored position for this wallet. This page reads {reads}. At each visit it reads{" "}
+                      {visits && `${visits}, and `}the liquidity positions on {walletLiquidityLine()}.
                     </p>
                   )}
                   {back && (
@@ -520,6 +591,7 @@ export function WalletView({
                   <WalletLookup positionHref={(w) => `/wallet/${w}`} placeholder="Wallet address or ENS name" />
                   <StartHereLine />
                 </section>
+                {liquiditySection}
                 {trades}
               </>,
             )}
@@ -529,15 +601,18 @@ export function WalletView({
             {filterBar}
             {body(
               <>
-                {open.length > 0 && <Totals sections={sections} filtered={filtered} unanswered={blocking} />}
+                {open.some((p) => !onTestnet(p)) && (
+                  <Totals sections={sections} filtered={filtered} unanswered={blocking} />
+                )}
                 {sections.map((s) => (
-                  <Section key={s.slug} s={s} />
+                  <Section key={s.slug} s={s} undrawn={undrawn.filter((u) => u.family === s.slug)} status={status} />
                 ))}
                 {/* What the filter bar leaves shown, with its noun: the bar
                     draws no count (ui-jobs 801; Miles, 22 Nov 2026). */}
                 <p className="text-sm text-rb-500" data-wallet-shown={all.length} data-prov-exempt="">
                   {plural(all.length, status ? `${status} position` : "position")}
                 </p>
+                {liquiditySection}
                 {trades}
               </>,
             )}

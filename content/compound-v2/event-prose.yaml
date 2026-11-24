@@ -1210,7 +1210,7 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Highest recorded
+          Peak
         text: |-
           each market's peak is the highest of its running balance, replayed from the account's events.
       - bold: |-
@@ -1246,7 +1246,7 @@ L5:
         text: |-
           the Comptroller adds each entered market's value times its collateral factor, then subtracts the debt; a shortfall can be liquidated.
       - bold: |-
-          Highest recorded
+          Peak
         text: |-
           each market's peak is the highest of its running balance, replayed from the account's events.
       - bold: |-
