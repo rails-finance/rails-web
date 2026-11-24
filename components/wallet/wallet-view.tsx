@@ -174,10 +174,14 @@ function Totals({
   );
 }
 
+/** A family's positions the read did not draw (a module's draw limit; the
+ *  vault shares, ui-jobs 783), with its chain. */
+type Undrawn = NonNullable<WalletFamilyRead["undrawn"]> & { chain: ChainId };
+
 /** One protocol's section (W3): its name, the listing's band (N7) where it
  *  holds two positions or more, then its cards, open by risk, then closed
- *  newest first. */
-function Section({ s }: { s: WalletSection }) {
+ *  newest first; under them, how many more the read did not draw. */
+function Section({ s, undrawn }: { s: WalletSection; undrawn: Undrawn[] }) {
   const atRiskCount = s.open.filter(atRisk).length;
   const id = `wallet-section-${s.slug}`;
   return (
@@ -192,7 +196,7 @@ function Section({ s }: { s: WalletSection }) {
         <h2 id={id} className={H2}>
           {s.name}{" "}
           <span className="font-medium text-rb-500" data-prov-exempt="">
-            {s.positions.length}
+            {(s.positions.length + undrawn.reduce((n, u) => n + u.open + u.closed, 0)).toLocaleString("en-US")}
           </span>
         </h2>
         {s.open.length > 1 && (
@@ -208,6 +212,18 @@ function Section({ s }: { s: WalletSection }) {
           <WalletPositionCard key={`${p.chain}:${p.family}:${p.positionId}`} position={p} />
         ))}
       </div>
+      {undrawn.map((u) => (
+        <p key={u.chain} className="mt-3 text-xs text-rb-500" data-wallet-undrawn={u.open + u.closed}>
+          {plural(
+            u.open + u.closed,
+            `more holding on ${chainMeta(u.chain).name}`,
+            `more holdings on ${chainMeta(u.chain).name}`,
+          )}{" "}
+          {u.open + u.closed === 1 ? "is" : "are"} not drawn
+          {u.open > 0 ? `, ${u.open.toLocaleString("en-US")} of them open` : ""}; the page draws the open ones with the
+          largest census value first.
+        </p>
+      ))}
     </section>
   );
 }
@@ -351,10 +367,13 @@ export function WalletView({
   // The heading counts the wallet's positions whatever the pills hold.
   // A testnet's positions are not counted (WALLET_COUNTS_SCOPE).
   const counted = scoped.rows.filter((p) => !onTestnet(p));
+  // The positions the read counted and did not draw.
+  const undrawn: Undrawn[] = read.families.flatMap((r) => (r.undrawn ? [{ ...r.undrawn, chain: r.chain }] : []));
+  const notDrawn = (k: "open" | "closed") => (scoped.on ? 0 : undrawn.reduce((n, u) => n + u[k], 0));
   const wallet = {
-    open: counted.filter((p) => p.status === "open").length,
+    open: counted.filter((p) => p.status === "open").length + notDrawn("open"),
     moved: counted.filter((p) => p.status === "moved").length,
-    closed: counted.filter((p) => p.status !== "open" && p.status !== "moved").length,
+    closed: counted.filter((p) => p.status !== "open" && p.status !== "moved").length + notDrawn("closed"),
   };
   // The bands state a protocol's whole holding: drawn while no pill narrows it.
   // The listing reads that did not answer (read-wallet.ts, readListingRows).
@@ -502,7 +521,9 @@ export function WalletView({
                     </p>
                   ) : chosen ? (
                     <p className="text-sm text-foreground/80" data-wallet-reads="">
-                      Rails holds no {chosen.name} position for this wallet.
+                      {chosen.slug === "vaults"
+                        ? "Rails holds no vault shares for this wallet."
+                        : `Rails holds no ${chosen.name} position for this wallet.`}
                     </p>
                   ) : (
                     <p className="text-sm text-foreground/80" data-wallet-reads="">
@@ -536,7 +557,7 @@ export function WalletView({
                   <Totals sections={sections} filtered={filtered} unanswered={blocking} />
                 )}
                 {sections.map((s) => (
-                  <Section key={s.slug} s={s} />
+                  <Section key={s.slug} s={s} undrawn={filtered ? [] : undrawn.filter((u) => u.family === s.slug)} />
                 ))}
                 {/* What the filter bar leaves shown, with its noun: the bar
                     draws no count (ui-jobs 801; Miles, 22 Nov 2026). */}

@@ -6,6 +6,9 @@
 // 323, 324): `vaultCardSlots` turns the census row and the listing's live read
 // into one `PositionCardSlots` object and the shared `PositionCard` draws it.
 // The holder page draws components/vaults/vault-holding-plain-card.tsx (V8).
+// The wallet page draws it with no live read (`lane`): the holder's census
+// answer at the census block, its share of the vault the census's, or the
+// stored row alone (ui-jobs 783).
 //
 // Heads: Balance (the shares, with the census's USD beneath) and Share of the
 // vault; a closed holding has one head, Closed by, and the Outcome column. The
@@ -39,6 +42,7 @@ import {
 } from "@/lib/aave-vaults/vault-position";
 import {
   aaveVaultCensusBalanceProv,
+  aaveVaultCensusFractionProv,
   aaveVaultHolderFractionProv,
   aaveVaultHolderSharesProv,
   aaveVaultPositionDivergenceProv,
@@ -88,17 +92,27 @@ function Figure({ name, tip, children }: { name?: string; tip?: string; children
 
 export interface VaultPositionCardProps {
   row: VaultPositionRow;
+  /** The wallet page's lane, which reads no chain: "census" where the
+   *  holder's census answer was read (figures at the census block), "stored"
+   *  where the card holds the wallet's stored row alone. Absent on the
+   *  listing, which reads the live overlay. */
+  lane?: "census" | "stored";
 }
 
+/** The holder's share of the vault at the census block, from the census's
+ *  parts per million; null where it stored none. */
+const censusFraction = (row: VaultPositionRow): number | null =>
+  row.census.sharePpm == null ? null : Number(row.census.sharePpm) / 1e6;
+
 /** The vault card's slots for the shared position card. */
-function vaultCardSlots({ row }: VaultPositionCardProps): PositionCardSlots {
+function vaultCardSlots({ row, lane }: VaultPositionCardProps): PositionCardSlots {
   const status = vaultPositionStatus(row);
   const chainId = chainOf(row);
   const shareDecimals = row.shareDecimals ?? 18;
   const shareSymbol = row.symbol ?? shortAddress(row.vault);
   const assetSymbol = row.asset?.symbol ?? "the vault's asset";
-  const fraction = vaultPositionFraction(row);
-  const dust = vaultPositionIsDust(row);
+  const fraction = lane === "census" ? censusFraction(row) : vaultPositionFraction(row);
+  const dust = lane === "census" ? fraction != null && fraction > 0 && fraction < 0.000001 : vaultPositionIsDust(row);
 
   // Two coord sets in one: a receipt takes whichever block its figure was
   // read at, the live read's or the census's.
@@ -158,15 +172,28 @@ function vaultCardSlots({ row }: VaultPositionCardProps): PositionCardSlots {
   const priced = row.value.usdE8 != null && usd != null;
   const pricedBlock = row.value.pricedBlock ?? row.census.block;
   const censusShares = Number(row.census.balance) / 10 ** shareDecimals;
+  const worth =
+    "Beneath it, what the holding was worth at the census block, through the vault's convertToAssets and the chain's Aave V3 oracle.";
   const balanceHead: PositionCardHead = {
     id: "balance",
     label: "Balance",
-    labelTip: row.live
-      ? `The ${shareSymbol} this address holds: the vault's balanceOf() for it, read at the page's block. Beneath it, what the holding was worth at the census block, through the vault's convertToAssets and the chain's Aave V3 oracle.`
-      : `The ${shareSymbol} this address held at the census block: the live read did not answer, so the census's balance stands in. Beneath it, what the holding was worth at the census block, through the vault's convertToAssets and the chain's Aave V3 oracle.`,
+    labelTip:
+      lane === "census"
+        ? `The ${shareSymbol} this address held at census block ${n(row.census.block)}, from the vault's holder census. ${worth}`
+        : lane === "stored"
+          ? `The ${shareSymbol} this address has held since its last transfer of this vault, at block ${n(row.census.lastBlock)}. The census was not read for it on this visit, so no value is stated.`
+          : row.live
+            ? `The ${shareSymbol} this address holds: the vault's balanceOf() for it, read at the page's block. ${worth}`
+            : `The ${shareSymbol} this address held at the census block: the live read did not answer, so the census's balance stands in. ${worth}`,
     value: (
       <Figure>
-        <Prov info={row.live ? aaveVaultHolderSharesProv(coords) : aaveVaultCensusBalanceProv(coords)}>
+        <Prov
+          info={
+            row.live
+              ? aaveVaultHolderSharesProv(coords)
+              : aaveVaultCensusBalanceProv(coords, lane === "census" ? "wallet" : (lane ?? "unread"))
+          }
+        >
           <AssetAmount
             value={row.live ? row.live.shares.value : censusShares}
             symbol={shareSymbol}
@@ -176,37 +203,51 @@ function vaultCardSlots({ row }: VaultPositionCardProps): PositionCardSlots {
         </Prov>
       </Figure>
     ),
-    usd: priced ? (
-      <Figure tip={`${usdText(row.value.usdE8!)} at census block ${n(pricedBlock)}, via the chain's Aave V3 oracle`}>
-        <Prov info={aaveVaultValueUsdProv(coords, row.value, shareDecimals)}>
-          <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
-        </Prov>
-      </Figure>
-    ) : (
-      <Figure>
-        <Prov info={aaveVaultUnpricedProv(coords, row.value)}>
-          <Unread what="not priced" />
-        </Prov>
-      </Figure>
-    ),
+    usd:
+      lane === "stored" ? (
+        <Figure>
+          <span data-prov-exempt="">
+            <Unread what="not read" />
+          </span>
+        </Figure>
+      ) : priced ? (
+        <Figure tip={`${usdText(row.value.usdE8!)} at census block ${n(pricedBlock)}, via the chain's Aave V3 oracle`}>
+          <Prov info={aaveVaultValueUsdProv(coords, row.value, shareDecimals)}>
+            <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
+          </Prov>
+        </Figure>
+      ) : (
+        <Figure>
+          <Prov info={aaveVaultUnpricedProv(coords, row.value)}>
+            <Unread what="not priced" />
+          </Prov>
+        </Figure>
+      ),
     sub: [
-      priced
-        ? `Aave V3 oracle at census block ${n(pricedBlock)}`
-        : row.value.pricedBlock == null
-          ? "the census has not priced this vault yet"
-          : `the oracle declined ${row.value.assetSymbol ?? "the asset"}`,
+      lane === "stored"
+        ? "the census was not read on this visit"
+        : priced
+          ? `Aave V3 oracle at census block ${n(pricedBlock)}`
+          : row.value.pricedBlock == null
+            ? "the census has not priced this vault yet"
+            : `the oracle declined ${row.value.assetSymbol ?? "the asset"}`,
     ].join(" · "),
   };
   const fractionHead: PositionCardHead = {
     id: "share-of-vault",
     label: "Share of the vault",
-    labelTip: "This holding's shares over the vault's totalSupply(), both read at the page's block.",
+    labelTip:
+      lane === "census"
+        ? "This holding's shares over the vault's totalSupply(), both at the census block."
+        : "This holding's shares over the vault's totalSupply(), both read at the page's block.",
     value: (
       <Figure>
         {dust ? (
           <Unread what="less than 0.0001%" />
         ) : fraction != null ? (
-          <Prov info={aaveVaultHolderFractionProv(coords)}>{pctText(fraction)}</Prov>
+          <Prov info={lane === "census" ? aaveVaultCensusFractionProv(coords) : aaveVaultHolderFractionProv(coords)}>
+            {pctText(fraction)}
+          </Prov>
         ) : (
           <NotLoaded className="text-base font-normal text-rb-500" />
         )}
@@ -227,7 +268,10 @@ function vaultCardSlots({ row }: VaultPositionCardProps): PositionCardSlots {
         </span>
       </Prov>
     ),
-    sub: `nothing is held at ${status.at === row.census.block ? "the census block" : `block ${n(status.at)}`}`,
+    sub:
+      lane === "stored"
+        ? "nothing held since this transfer"
+        : `nothing is held at ${status.at === row.census.block ? "the census block" : `block ${n(status.at)}`}`,
   };
 
   const common = {

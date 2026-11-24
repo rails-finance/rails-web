@@ -50,6 +50,7 @@ import type { ArbitrumReadRow } from "@/components/shared/arbitrum-positions-lis
 import type { CometCard } from "@/lib/compound-arbitrum/comet-cards";
 import type { WalletKind } from "@/lib/wallet/wallet-filters";
 import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
+import type { VaultPositionRow } from "@/lib/aave-vaults/vault-position";
 
 /** "redeemed" is in the type for the families that end a position by
  *  redemption; no store states it as an ending yet (a fully redeemed Liquity
@@ -135,7 +136,12 @@ export type WalletCard =
   | { kind: "basedollar"; row: BasedollarTroveSummary }
   /** A Liquity V2 fork's Stability Pool deposit: its deposit listing's row,
    *  as stored (no head read). */
-  | { kind: "fork-deposit"; fork: "ebisu" | "asymmetry" | "basedollar"; row: LiquityV2DepositRow<string> };
+  | { kind: "fork-deposit"; fork: "ebisu" | "asymmetry" | "basedollar"; row: LiquityV2DepositRow<string> }
+  /** A vault-share holding (MetaMorpho, Yearn V3, Aave's vaults): the holder
+   *  listing's row. `lane`: "census" where the visit read the holder's census
+   *  answer (its figures at the census block), "stored" where the card holds
+   *  the stored row alone (the balance since the last transfer). */
+  | { kind: "vault"; row: VaultPositionRow; lane: "census" | "stored" };
 
 /** A closed position's row in the History table: what the store states, each
  *  field absent where it states nothing. */
@@ -258,6 +264,9 @@ export interface WalletFamilyRead {
   /** `total: false` where the read cannot hold a position the wallet total
    *  needs: a fork's deposit read for a wallet holding nothing on that fork. */
   unanswered?: { family: string; what: string; total?: false };
+  /** Positions the family read and the page does not draw (a module's
+   *  `drawLimit`): the protocol's slug and how many open and closed. */
+  undrawn?: { family: string; open: number; closed: number };
 }
 
 /** The answer of /api/chain/wallet/<address>. */

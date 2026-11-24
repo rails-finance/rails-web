@@ -558,16 +558,43 @@ const atCensus = (c: AaveVaultCoords): string =>
    receipt: those are below, and the card mounts the inspector on the pages that
    draw it. */
 
+/** Why a card states the census's balance: the listing's live read did not
+ *  answer, the wallet page read the holder's census answer, or the wallet
+ *  page holds the stored row alone (the balance since the last transfer). */
+type CensusBalanceWhy = "unread" | "wallet" | "stored";
+
+const CENSUS_BALANCE_WHY: Record<CensusBalanceWhy, string> = {
+  unread:
+    "It is stated because the live read for this card did not answer, and an unread figure is stated as unread. What the address holds now is not answered on this page.",
+  wallet:
+    "The wallet page reads the holder's census answer and no chain at visit, so the figure is the census's at its block.",
+  stored:
+    "The wallet page states it from its stored row for the holding, at the holder's last transfer of this vault; the census answer was not read for it on this visit.",
+};
+
 /** The census's own `balanceOf` — what this card falls back to when the live
- *  read did not answer, labelled as the census's figure at the census block. */
-const aaveVaultCensusBalanceProv_ = (c: AaveVaultCoords): Provenance => ({
+ *  read did not answer, or what the wallet page states (`why`), labelled as
+ *  the census's figure at its block. */
+const aaveVaultCensusBalanceProv_ = (c: AaveVaultCoords, why: CensusBalanceWhy = "unread"): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.censusBlock },
   verify: recompute("balanceOf(the holder)", { ...c, blockNumber: c.censusBlock }),
-  summary: `Shares held at the census block — this address's balance of the vault's share token${atCensus(c)}, read by the census and kept. It is stated because the live read for this card did not answer, and an unread figure is stated as unread. What the address holds now is not answered on this page.`,
+  summary: `Shares held at the census block — this address's balance of the vault's share token${atCensus(c)}, read by the census and kept. ${CENSUS_BALANCE_WHY[why]}`,
   contract: vaultContract(c),
   via: `${censusLane(c)} · balanceOf(holder) @ the census block`,
+});
+
+/** The holder's share of the vault at the census block, as the census
+ *  stored it (parts per million), for the wallet page. */
+const aaveVaultCensusFractionProv_ = (c: AaveVaultCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: c.censusBlock },
+  summary: `Share of the vault at the census block — this address's shares over all shares issued${atCensus(c)}, both read by the census and the ratio kept in parts per million.`,
+  contract: vaultContract(c),
+  via: `${censusLane(c)} · balanceOf(holder) ÷ totalSupply() @ the census block`,
+  formula: "balanceOf(holder) ÷ totalSupply()",
 });
 
 /* The transfer COUNT has no receipt builder here any more. It is stated on the
@@ -727,6 +754,7 @@ export const aaveVaultCooldownStateProv = withServerRead(aaveVaultCooldownStateP
 export const aaveAttestedNameProv = withServerRead(aaveAttestedNameProv_);
 export const aaveVaultCatalogueMemberProv = withServerRead(aaveVaultCatalogueMemberProv_);
 export const aaveVaultCensusBalanceProv = withServerRead(aaveVaultCensusBalanceProv_);
+export const aaveVaultCensusFractionProv = withServerRead(aaveVaultCensusFractionProv_);
 export const aaveVaultPositionSeenProv = withServerRead(aaveVaultPositionSeenProv_);
 export const aaveVaultPositionShapeProv = withServerRead(aaveVaultPositionShapeProv_);
 export const aaveVaultPositionDivergenceProv = withServerRead(aaveVaultPositionDivergenceProv_);

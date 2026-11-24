@@ -422,3 +422,29 @@ test("a testnet's section stands outside the wallet totals and the risk tile, af
   // A wallet holding Polaris alone has no wallet total.
   assert.equal(walletTotal(walletSections([pos("polaris", { chain: 11155111 })], { bands: true }), "debt"), null);
 });
+
+test("a vault-share section states no total: its values are the census's (ui-jobs 783)", async () => {
+  const { CENSUS_NOTE } = await import("../../lib/wallet/wallet-sections.ts");
+  const vault = (extra = {}) =>
+    pos("vaults", { card: { kind: "vault" }, headRead: "stored", usdOwnOracle: false, debtUsd: undefined, ...extra });
+  const s = walletSections(
+    [vault({ collateralUsd: 500 }), vault({ collateralUsd: 20 }), pos("aave-v3", { collateralUsd: 100, debtUsd: 10 })],
+    { bands: true },
+  );
+  const v = s.find((x) => x.slug === "vaults");
+  assert.equal(v.census, true);
+  assert.equal(v.collateral, undefined);
+  assert.equal(v.band.note, CENSUS_NOTE);
+  // The biggest census value first.
+  assert.deepEqual(
+    v.open.map((p) => p.collateralUsd),
+    [500, 20],
+  );
+  const t = walletTotal(s, "collateral");
+  assert.equal(t.figure, undefined);
+  assert.equal(t.gap, "No wallet total: vault shares are valued at their census blocks");
+  // A head read that failed is said as one.
+  const failed = walletSections([vault({ headRead: "failed" })], { bands: true });
+  assert.equal(failed[0].census, false);
+  assert.equal(failed[0].band.note, unreadNote(1, 1));
+});

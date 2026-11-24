@@ -21,6 +21,10 @@
 // band carries its collateral as "Recorded collateral" in its token, and the
 // note names it once per branch. A Trove on a shut-down branch states no
 // buffer, so the risk sort and "Closest to liquidation" leave it out.
+//
+// A vault share's dollars are the holder census's at its census block (ui-jobs
+// 783), a stored figure: its card states them, and its section and the wallet
+// state no total (`census`), as with any open position not read at head.
 
 import type { HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
@@ -94,7 +98,17 @@ export interface WalletSection {
   /** Every position on a testnet (Polaris on Sepolia): the section stands
    *  outside the wallet's totals and its risk tile (WALLET_COUNTS_SCOPE). */
   testnet: boolean;
+  /** Every open position is a vault share at its census block, read on this
+   *  visit: the section states no total for that reason (`CENSUS_NOTE`). */
+  census: boolean;
 }
+
+/** A vault share's figures are the holder census's, at its block. */
+const atCensus = (p: WalletPosition) => p.card.kind === "vault" && p.headRead === "stored";
+
+/** The band's note for a vault-share section, which states no total. */
+export const CENSUS_NOTE =
+  "The vault values are the census's at each vault's census block, so the section states no total.";
 
 /** A position on a testnet, which no wallet count or total takes in. */
 export const onTestnet = (p: Pick<WalletPosition, "chain">): boolean => CHAINS[p.chain]?.testnet === true;
@@ -416,6 +430,7 @@ export function walletSections(
     const open = [...ranked, ...dust, ...notRead];
     const closed = mine.filter((p) => p.status !== "open").sort((a, b) => closedAt(b) - closedAt(a));
     const unread = open.filter(unreadAtHead).length;
+    const census = open.length > 0 && open.every(atCensus);
     // An open Trove on an emptied branch leaves the collateral dollars: its
     // recorded collateral is the band's own leg (ui-jobs 802).
     const emptied = open.filter(onEmptiedBranch);
@@ -478,7 +493,7 @@ export function walletSections(
       band = {
         ...band,
         legs: [],
-        note: unreadNote(unread, open.length),
+        note: census ? CENSUS_NOTE : unreadNote(unread, open.length),
       };
     } else if (open.length > 0 && (collateral == null) !== (debt == null)) {
       // One figure stands: the band says the other states none, so a lone
@@ -515,6 +530,7 @@ export function walletSections(
       collateral,
       debt,
       testnet: mine.every(onTestnet),
+      census,
     });
   }
   const tier = (s: WalletSection) => (s.ranked.some((p) => p.buffer != null) ? 0 : s.open.length > 0 ? 1 : 2);
@@ -568,10 +584,12 @@ export function walletTotal(
   const missing = holding.filter((s) => s.collateral == null || s.debt == null);
   if (missing.length > 0 || unanswered.length > 0) {
     const unreadOrPriced = missing.filter((s) => !unanswered.some((u) => u.startsWith(`${s.name} `)));
-    const unread = unreadOrPriced.filter((s) => s.unread > 0).map((s) => s.name);
-    const priced = unreadOrPriced.filter((s) => s.unread === 0).map((s) => s.name);
+    const census = unreadOrPriced.some((s) => s.census);
+    const unread = unreadOrPriced.filter((s) => !s.census && s.unread > 0).map((s) => s.name);
+    const priced = unreadOrPriced.filter((s) => !s.census && s.unread === 0).map((s) => s.name);
     const why = [
       unanswered.length ? `${andList(unanswered)} could not be read` : null,
+      census ? "vault shares are valued at their census blocks" : null,
       priced.length ? `${andList(priced)} ${priced.length === 1 ? "states" : "state"} no dollars` : null,
       unread.length ? `${andList(unread)} ${unread.length === 1 ? "was" : "were"} not read at the chain head` : null,
     ].filter(Boolean);

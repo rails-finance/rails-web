@@ -39,6 +39,7 @@ import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import {
   MENU_TESTNETS,
   rowIsPage,
+  vaultProtocolOfHref,
   walletProtocolMenu,
   type MenuProtocol,
   type WalletCounts,
@@ -75,11 +76,19 @@ function readCounts(address: string): Promise<WalletCounts | null> {
 type Menu = NonNullable<ReturnType<typeof walletProtocolMenu<WalletCountsPosition>>>;
 
 /** A position's explorer on the roster: its name, its place, and its listing
- *  searched by the wallet (every wallet family's listing reads `q`). */
+ *  searched by the wallet (every wallet family's listing reads `q`). A
+ *  vault-share row names its vault protocol ("MetaMorpho" under Morpho's
+ *  door) and opens the holder listing of the explorer's Vaults tab, where
+ *  it has one (Yearn V3 has none: the wallet view). */
 function protocolOf(p: WalletCountsPosition, address: string): MenuProtocol | undefined {
   const entry = protocolForPathname(p.href.split("?")[0]);
   if (!entry) return undefined;
-  return { name: entry.label, order: PROTOCOLS.indexOf(entry), listing: listingHrefForWallet(entry.session, address) };
+  const vault = vaultProtocolOfHref(p.href);
+  return {
+    name: vault ?? entry.label,
+    order: PROTOCOLS.indexOf(entry),
+    listing: listingHrefForWallet(entry.session, address, vault ? "vaults" : undefined),
+  };
 }
 
 const ROW = "mx-1 my-0.5 flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-left";
@@ -89,7 +98,7 @@ const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-30
 /** The protocol's and the chain's icons, each named for screen readers and on hover. */
 function ProtocolIcons({ p }: { p: WalletCountsPosition }) {
   const entry = protocolForPathname(p.href.split("?")[0]);
-  const protocol = entry?.label ?? p.family;
+  const protocol = vaultProtocolOfHref(p.href) ?? entry?.label ?? p.family;
   const chain = chainMeta(CHAIN_ID[p.chain]).name;
   return (
     <span className="flex shrink-0 items-center gap-1">

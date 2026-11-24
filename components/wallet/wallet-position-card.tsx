@@ -15,7 +15,7 @@
 
 import Link from "next/link";
 import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
-import { PROTOCOLS } from "@/lib/shared/protocols";
+import { PROTOCOLS, protocolForPathname } from "@/lib/shared/protocols";
 import {
   AaveV3PositionCard,
   notCollateralOf,
@@ -86,6 +86,7 @@ import {
 import { PolarisLoanCard } from "@/components/protocol/polaris/polaris-loan-card";
 import { PolarisDepositCard } from "@/components/protocol/polaris/polaris-deposit-card";
 import { ArbitrumReadCard, CometReadCard } from "@/components/shared/arbitrum-positions-listing";
+import { VaultPositionCard } from "@/components/vaults/vault-position-card";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletCard, WalletPosition } from "@/lib/wallet/types";
@@ -281,6 +282,8 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
       );
     case "fork-deposit":
       return forkDepositWalletCard(SP_DEPLOYMENTS[card.fork])(card.row, state);
+    case "vault":
+      return <VaultPositionCard row={card.row} lane={card.lane} />;
   }
 }
 
@@ -313,12 +316,17 @@ const stateOf = (p: WalletPosition): BranchShutdownState | null => {
  *  family says it can be liquidated. */
 export const atRisk = (p: WalletPosition): boolean => (p.buffer != null && p.buffer < 0) || p.liquidatable === true;
 
-/** The roster id of a position's explorer, the glyph key. */
+/** The roster id of a position's explorer, the glyph key; a vault share's is
+ *  its holder page's explorer (Morpho Blue, Aave vaults, Yearn V3). */
 export const protocolId = (p: WalletPosition): string =>
-  PROTOCOLS.find((e) => e.chainId === p.chain && e.slug === p.family)?.id ?? p.family;
+  PROTOCOLS.find((e) => e.chainId === p.chain && e.slug === p.family)?.id ??
+  protocolForPathname(p.href.split("?")[0])?.id ??
+  p.family;
 
 export function WalletPositionCard({ position: p }: { position: WalletPosition }) {
   const chain = chainMeta(p.chain).name;
+  // A vault share's figures are the holder census's.
+  const read = p.card.kind === "vault" ? "census" : "sweep";
   const edge: PositionCardEdge = {
     surface: "wallet",
     protocol: { id: protocolId(p), name: p.familyName },
@@ -335,16 +343,25 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
       <span
         className="text-[11px] font-medium text-rb-500"
         data-wallet-holds-nothing-since={p.closedSince.block}
-        title={`At block ${p.closedSince.block.toLocaleString("en-US")} the position holds nothing; the card shows the sweep's earlier read.`}
+        title={`At block ${p.closedSince.block.toLocaleString("en-US")} the position holds nothing; the card shows the ${read}'s earlier read.`}
       >
-        Holds nothing since the sweep
+        Holds nothing since the {read}
       </span>
     ) : (
       // A closed position's card states its ending; the read's age is an
       // open position's.
+      // A vault share's stored row states its last transfer, not a read.
       p.status === "open" &&
       !p.card.kind.endsWith("-arbitrum") &&
-      (p.readAtBlock != null || p.readAt != null) && <ReadStamp block={p.readAtBlock} at={p.readAt} inLink />
+      !(p.card.kind === "vault" && p.card.lane === "stored") &&
+      (p.readAtBlock != null || p.readAt != null) && (
+        <ReadStamp
+          block={p.readAtBlock}
+          at={p.readAt}
+          inLink
+          label={p.card.kind === "vault" && p.card.lane === "census" ? "Census" : undefined}
+        />
+      )
     ),
   };
   return (
