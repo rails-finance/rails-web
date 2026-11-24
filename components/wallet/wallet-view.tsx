@@ -15,6 +15,7 @@
 
 import { IndexNotice } from "@/components/shared/index-notice";
 import Link from "next/link";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { Suspense, use, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
@@ -71,7 +72,6 @@ import { useAssetScope } from "@/lib/shared/asset-scope";
 import { walletPositionAssetKeys } from "@/lib/wallet/aim-assets";
 import { COW_TERMS } from "@/lib/cow/terms";
 import { LiquidityBoundary, LiquidityReading, LiquiditySection } from "@/components/wallet/wallet-liquidity";
-import { walletLiquidityLine } from "@/lib/wallet/liquidity/sources";
 import type { WalletLiquidity } from "@/lib/wallet/types";
 
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
@@ -343,8 +343,6 @@ export function WalletView({
   read,
   cow,
   liquidity,
-  reads,
-  visits,
   back,
   kinds: initialKinds = [],
   status: initialStatus,
@@ -362,11 +360,6 @@ export function WalletView({
   kinds?: WalletKind[];
   /** `?status=`: the Status pill's selection on arrival. */
   status?: WalletStatus;
-  /** The families the page reads, by chain (`walletFamiliesLine`). */
-  reads: string;
-  /** The families with no store it reads at each visit, by chain
-   *  (`walletVisitLine`); empty while none is on. */
-  visits: string;
   /** The explorer the reader came from, for the empty state's link back. */
   back: { href: string; name: string } | null;
 }) {
@@ -573,8 +566,11 @@ export function WalletView({
                     </p>
                   ) : (
                     <p className="text-sm text-foreground/80" data-wallet-reads="">
-                      Rails holds no stored position for this wallet. This page reads {reads}. At each visit it reads{" "}
-                      {visits && `${visits}, and `}the liquidity positions on {walletLiquidityLine()}.
+                      Rails found no positions for this wallet on the{" "}
+                      <Link href="/coverage" className={`underline-offset-2 ${INLINE_LINK}`} data-wallet-coverage="">
+                        protocols and chains it covers
+                      </Link>
+                      .
                     </p>
                   )}
                   {back && (
