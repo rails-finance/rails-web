@@ -59,7 +59,7 @@ function fromCounts(c: WalletCounts, readAt: number): WalletSummary {
       open: f.open,
       closed: f.closed,
       moved: f.moved,
-      ...(held.length === 1 ? { href: held[0].href } : {}),
+      ...(held.length === 1 && held[0].href ? { href: held[0].href } : {}),
     };
   }
   return { address: c.address, protocols, readAt };

@@ -924,7 +924,8 @@ try {
       body,
     ) && /The debt is cleared and the loan closed\./.test(body),
   );
-  check("spot N11: market kind beside the pair", /WETH \/ crvUSD · mint market/.test(body));
+  // The pair is the card's tag and the kind its identity since ui-jobs 807.
+  check("spot N11: market kind beside the pair", /WETH \/ crvUSD\s*mint market/.test(body));
 
   const CRVSPOT = "/0xeda215b7666936ded834f76f3fbc6f323295110a/0xcbce52b5576771c7c8f5c21e29640d29e9636a8f";
   await page.goto(`${BASE}${EXPLORER}${CRVSPOT}`, { waitUntil: "networkidle", timeout: 180000 });
@@ -940,7 +941,7 @@ try {
       body,
     ),
   );
-  check("spot N11: lend market beside the pair", /CRV \/ crvUSD · lend market/.test(body));
+  check("spot N11: lend market beside the pair", /CRV \/ crvUSD\s*lend market/.test(body));
 
   // ── 8. round 4 ────────────────────────────────────────────────────────────
   const R4 = {
@@ -1034,7 +1035,8 @@ try {
     body = await wholeText(p5);
     check(
       "r4 P4: the shortfall line names the converted crvUSD apart from the collateral left",
-      /receive the [\d,.]+ crvUSD the AMM holds and [\d.]+ sDOLA/.test(body),
+      /receive the [\d,.]+ crvUSD the AMM holds and [\d,.]+ sDOLA/.test(body),
+      /receive the [^.]{0,80}/.exec(body)?.[0] ?? "no shortfall line",
     );
     check(
       "r4 P3: the shortfall line says nobody is obliged to liquidate",
