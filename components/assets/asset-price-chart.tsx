@@ -33,7 +33,8 @@ export function AssetPriceChart({
   /** The page's line: the one its protocol reads, else the most read. */
   line: PageLine;
   symbol: string;
-  head: HeadPrice;
+  /** The header's price now: the page's one price-now read, streamed (ui-jobs 829). */
+  head: Promise<HeadPrice>;
 }) {
   const section = useMemo(() => ({ chain, lines: [mainLine] }), [chain, mainLine]);
   const drawn = useMemo(() => section.lines.filter((l) => l.drawn != null), [section]);

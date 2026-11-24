@@ -7,6 +7,13 @@
 // block (`sameBlock: false`, `stub: true`). A 502 (the round failed past its
 // grace) answers every line unread.
 //
+// The calls carry no reader IP (ui-jobs 829): the answer is the same for every
+// reader, and X-Rails-Reader-IP is part of Next's fetch cache key, so naming
+// the reader would make each visitor miss the cache. Without it the box
+// budgets these calls on the deployment's token bucket, where the cache holds
+// them to one call per URL per cache time (60 s on the route, 300 s on the
+// stored reads).
+//
 // SERVER-ONLY. Reads `RAILS_API_URL` + `API_BEARER_TOKEN`.
 
 import "server-only";
@@ -35,12 +42,12 @@ const ROUND_DAYS = 40;
 const MAX_ORACLES = 12;
 const MAX_SERIES = 40;
 
-async function get<T>(path: string, signal: AbortSignal, readerIp?: string | null): Promise<T | null> {
+async function get<T>(path: string, signal: AbortSignal): Promise<T | null> {
   const base = process.env.RAILS_API_URL;
   if (!base) throw new Error("RAILS_API_URL environment variable is not set");
   const res = await fetch(
     `${base}${path}`,
-    createAuthFetchOptions({ next: { revalidate: ROUNDS_REVALIDATE_S }, signal }, readerIp ?? undefined),
+    createAuthFetchOptions({ next: { revalidate: ROUNDS_REVALIDATE_S }, signal }),
   ).catch(() => null);
   return res?.ok ? ((await res.json()) as T) : null;
 }
@@ -50,14 +57,13 @@ async function getRoute(
   chain: number,
   token: string,
   signal: AbortSignal,
-  readerIp?: string | null,
 ): Promise<{ status: number | null; body: RouteNowAnswer | null }> {
   const base = process.env.RAILS_API_URL;
   if (!base) throw new Error("RAILS_API_URL environment variable is not set");
   const q = new URLSearchParams({ chain: String(chain), token: token.toLowerCase() });
   const res = await fetch(
     `${base}/api/prices/assets/now?${q.toString()}`,
-    createAuthFetchOptions({ next: { revalidate: ROUTE_REVALIDATE_S }, signal }, readerIp ?? undefined),
+    createAuthFetchOptions({ next: { revalidate: ROUTE_REVALIDATE_S }, signal }),
   ).catch(() => null);
   if (!res) return { status: null, body: null };
   const body = res.status === 200 ? ((await res.json().catch(() => null)) as RouteNowAnswer | null) : null;
@@ -70,17 +76,16 @@ export async function fetchAssetPricesNow(
   chain: number,
   token: string,
   lines: readonly PageLine[],
-  readerIp?: string | null,
 ): Promise<AssetPricesNow> {
   try {
     return await readPricesNow({
       timeoutMs: TIMEOUT_MS,
       route: async (signal) => {
-        const r = await getRoute(chain, token, signal, readerIp);
+        const r = await getRoute(chain, token, signal);
         return { status: r.status, answer: r.body ? routePricesNow(r.body) : null };
       },
       unread: () => unreadPricesNow(chain, lines, "The prices were not read"),
-      fallback: (signal) => storedNow(chain, lines, signal, readerIp),
+      fallback: (signal) => storedNow(chain, lines, signal),
     });
   } catch {
     return unreadPricesNow(chain, lines, "The prices were not read");
@@ -88,12 +93,7 @@ export async function fetchAssetPricesNow(
 }
 
 /** Each line's latest stored value at its block: the read where the route is not served. */
-async function storedNow(
-  chain: number,
-  lines: readonly PageLine[],
-  signal: AbortSignal,
-  readerIp?: string | null,
-): Promise<AssetPricesNow> {
+async function storedNow(chain: number, lines: readonly PageLine[], signal: AbortSignal): Promise<AssetPricesNow> {
   const now = Math.floor(Date.now() / 1000);
   const oracles = [...new Set(lines.map((l) => l.oracle.address.toLowerCase()))].slice(0, MAX_ORACLES);
   const keys = [...new Set(lines.flatMap((l) => (l.drawn ? [l.drawn.key] : [])))].slice(0, MAX_SERIES);
@@ -109,8 +109,8 @@ async function storedNow(
     from: String(Math.floor(now / DAY_S) - RECENT_DAYS),
   });
   const [rounds, daily] = await Promise.all([
-    oracles.length ? get<StoredRounds>(`/api/prices/rounds?${rq.toString()}`, signal, readerIp) : null,
-    keys.length ? get<StoredDaily>(`/api/prices/daily?${dq.toString()}`, signal, readerIp) : null,
+    oracles.length ? get<StoredRounds>(`/api/prices/rounds?${rq.toString()}`, signal) : null,
+    keys.length ? get<StoredDaily>(`/api/prices/daily?${dq.toString()}`, signal) : null,
   ]);
   return storedPricesNow(chain, lines, rounds, daily);
 }
