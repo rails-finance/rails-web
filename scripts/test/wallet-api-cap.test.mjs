@@ -4,7 +4,8 @@
 // API_CONCURRENCY. A many-family wallet read, with every visit module launched and the Liquidity
 // section beside it, holds the api host to that many requests at once and finishes every request;
 // a route-gate request frees its slot before the caller's chain read and is not retried; its wait
-// runs from the slot. The backend and the chains are a stubbed fetch: the chains refuse every call,
+// runs from the slot; a key marked down while requests queued skips them to the chain; past the
+// read's deadline a queued request is refused without a fetch. The backend and the chains are a stubbed fetch: the chains refuse every call,
 // so each chain fallback runs and fails fast. Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -44,7 +45,7 @@ for (const v of [
   "SEPOLIA_RPC_URL",
 ])
   process.env[v] = "http://rpc.test";
-// The modules log each refused chain call and missing route; the assertions say what matters.
+// The modules log each refused chain call and missing route.
 console.error = console.warn = () => {};
 
 const W = "0xb32cb14f2a5b17d1f1343749e302316be5133321";
@@ -402,7 +403,9 @@ globalThis.fetch = async (input, init = {}) => {
 
 const { readWalletUncached, WALLET_FAMILIES } = await import("../../lib/wallet/read-wallet.ts");
 const { readWalletLiquidity } = await import("../../lib/wallet/liquidity/read-liquidity.ts");
-const { API_CONCURRENCY, apiHop, inWalletRead } = await import("../../lib/wallet/api-hop.ts");
+const { API_CONCURRENCY, apiHop, apiSlot, inWalletRead, isPastReadDeadline } = await import(
+  "../../lib/wallet/api-hop.ts"
+);
 const { routeGate } = await import("../../lib/sources/api/route-gate.ts");
 const { protocolForSession } = await import("../../lib/shared/protocols.ts");
 
@@ -543,4 +546,68 @@ test("outside a wallet read a route-gate request takes no slot", async () => {
   assert.deepEqual(await gate.json("explorer", "http://box.test/api/at-block/test/explorer", {}), { ok: true });
   free();
   await Promise.all(holds);
+});
+
+test("a slow route marked down while rows queue: the rows after the first round go to the chain at once", async () => {
+  reset();
+  const gate = routeGate();
+  // The route answers nothing until the caller's wait runs out.
+  route = (path, init) =>
+    path === "/api/at-block/test/slow-head"
+      ? new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason)))
+      : null;
+  const t0 = Date.now();
+  const done = [];
+  await inWalletRead(
+    () =>
+      Promise.all(
+        Array.from({ length: 11 }, async () => {
+          const served = await gate.json(
+            "lender",
+            "http://box.test/api/at-block/test/slow-head",
+            {},
+            { timeoutMs: 200 },
+          );
+          done.push({ served, ms: Date.now() - t0 });
+        }),
+      ),
+    Date.now() + 8000,
+  );
+  assert.equal(
+    api.paths.filter((p) => p === "/api/at-block/test/slow-head").length,
+    API_CONCURRENCY,
+    "one round asked",
+  );
+  assert.ok(
+    done.every((d) => d.served === null),
+    "every row goes to the chain",
+  );
+  assert.ok(Math.max(...done.map((d) => d.ms)) < 600, "the queued rows skip within the first round's wait");
+});
+
+test("past the read's deadline the requests still queued are refused and never fetch", async () => {
+  reset();
+  const gate = routeGate();
+  route = (path) => (path === "/api/at-block/test/late" ? json({ ok: true }) : null);
+  const outcomes = await inWalletRead(async () => {
+    let free;
+    const held = new Promise((r) => (free = r));
+    // Every slot held until the read's 100 ms budget has run out.
+    const holds = Array.from({ length: API_CONCURRENCY }, () => apiHop(() => held));
+    const queued = [
+      gate.json("late", "http://box.test/api/at-block/test/late", {}),
+      gate.json("late", "http://box.test/api/at-block/test/late", {}),
+      apiSlot(() => fetch("http://box.test/api/at-block/test/late")).catch((e) => e),
+    ];
+    await pause(150);
+    free();
+    await Promise.all(holds);
+    return Promise.all(queued);
+  }, Date.now() + 100);
+  assert.equal(outcomes[0], null);
+  assert.equal(outcomes[1], null);
+  assert.ok(isPastReadDeadline(outcomes[2]));
+  assert.equal(api.paths.filter((p) => p === "/api/at-block/test/late").length, 0, "no queued entry fetched");
+  // The refusal marks nothing down: the next ask, outside any wallet read, reaches the route.
+  assert.deepEqual(await gate.json("late", "http://box.test/api/at-block/test/late", {}), { ok: true });
 });

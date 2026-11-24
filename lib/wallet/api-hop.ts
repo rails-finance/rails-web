@@ -9,14 +9,15 @@
 // A shared client that other pages also call (route-gate.ts, the listing
 // proxies, the token-metadata route) takes a slot through `apiSlot`, which
 // queues only inside a wallet read (`inWalletRead`) and holds the slot around
-// the fetch alone, so a chain fallback runs after it is released. A request
-// made while its caller already holds a slot runs in that slot.
+// the fetch, so a chain fallback runs after it is released. A request made
+// while its caller already holds a slot runs in that slot. Past the wallet
+// read's deadline a request is refused when its turn comes, without a fetch.
 //
 // A limiter in plain code holds whatever fetch each reader calls. Next's
 // server fetch wraps undici, and a shared Agent passed to it as `dispatcher`
 // is not a stable contract across Next releases.
 //
-// Imports node alone, so scripts/test/wallet-api-hop.test.mjs loads it directly.
+// Its one import is node's, so scripts/test/wallet-api-hop.test.mjs loads it directly.
 
 import { AsyncLocalStorage } from "node:async_hooks";
 
@@ -130,9 +131,11 @@ export async function retryOnConnectionFailure<T>(
   }
 }
 
-/** What a wallet read carries down its calls: whether this call already holds a slot. */
+/** What a wallet read carries down its calls: whether this call already holds
+ *  a slot, and when the read gives up (epoch ms). */
 interface WalletScope {
   holding: boolean;
+  deadline?: number;
 }
 
 /** The one queue and the wallet read's context, kept on globalThis so every
@@ -142,24 +145,44 @@ const shared = ((globalThis as { [k: symbol]: unknown })[Symbol.for("rails.walle
   scope: new AsyncLocalStorage<WalletScope>(),
 }) as { limit: ReturnType<typeof createLimiter>; scope: AsyncLocalStorage<WalletScope> };
 
-/** Run `fn` as part of a wallet read: api-host requests it makes through
- *  `apiSlot` queue behind the cap. */
-export function inWalletRead<T>(fn: () => Promise<T>): Promise<T> {
-  return shared.scope.run({ holding: false }, fn);
+/** Run `fn` as part of a wallet read that gives up at `deadline` (epoch ms):
+ *  api-host requests it makes through `apiSlot` queue behind the cap, and
+ *  none is made once the deadline has passed. */
+export function inWalletRead<T>(fn: () => Promise<T>, deadline?: number): Promise<T> {
+  return shared.scope.run({ holding: false, deadline }, fn);
 }
 
+const PAST_DEADLINE = "PastReadDeadline";
+
+/** Whether `err` is a request refused because its wallet read had given up:
+ *  the route did not fail, so nothing marks it down. */
+export const isPastReadDeadline = (err: unknown): boolean => (err as { name?: string } | null)?.name === PAST_DEADLINE;
+
+const pastDeadline = () => Object.assign(new Error("the wallet read's deadline has passed"), { name: PAST_DEADLINE });
+
 /** `fn` in a slot: queued behind the cap (leaving the queue where `signal`
- *  aborts) and run once granted, so a budget it sets runs from then. A call
- *  already holding a slot runs at once. */
+ *  aborts) and run once granted, so a budget it sets runs from then. Past the
+ *  read's deadline it is refused, before the queue or when its turn comes,
+ *  and frees the slot at once. A call already holding a slot runs at once.
+ *
+ *  A slot callback makes one request and must not fan out: an apiSlot or
+ *  apiHop call inside it inherits `holding` and runs uncapped. */
 function inSlot<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (shared.scope.getStore()?.holding) return fn();
-  return shared.limit(() => shared.scope.run({ holding: true }, fn), signal);
+  const store = shared.scope.getStore();
+  if (store?.holding) return fn();
+  const deadline = store?.deadline;
+  const past = () => deadline != null && Date.now() >= deadline;
+  if (past()) return Promise.reject(pastDeadline());
+  return shared.limit(() => {
+    if (past()) return Promise.reject(pastDeadline());
+    return shared.scope.run({ holding: true, deadline }, fn);
+  }, signal);
 }
 
 /** One request to the api host from a client other pages share: inside a
- *  wallet read it takes a slot for `fn`, which is the fetch and its body and
- *  nothing after; anywhere else `fn` runs as before. No retry: the caller may
- *  read the chain in its place. */
+ *  wallet read it takes a slot for `fn`, which is the fetch and its body; anywhere
+ *  else `fn` runs as before. No retry: the caller may read the chain in its
+ *  place. */
 export function apiSlot<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   return shared.scope.getStore() ? inSlot(fn, signal) : fn();
 }

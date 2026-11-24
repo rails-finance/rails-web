@@ -421,13 +421,14 @@ function heldOf(rows: WalletSummaryRow[], visited: WalletPosition[] = []): Walle
 
 /** `protocol`: read that protocol's families alone (ui-jobs 738); the summary
  *  route still answers every row, which names the others for the pill. Every
- *  request it makes to the api host shares the page's cap (lib/wallet/api-hop.ts). */
+ *  request it makes to the api host shares the page's cap (lib/wallet/api-hop.ts),
+ *  and none is made past the read's budget. */
 export function readWalletUncached(
   address: string,
   readerIp?: string,
   opts: { protocol?: string } = {},
 ): Promise<WalletRead> {
-  return inWalletRead(() => readWalletInScope(address, readerIp, opts));
+  return inWalletRead(() => readWalletInScope(address, readerIp, opts), Date.now() + WALLET_BUDGET_MS);
 }
 
 async function readWalletInScope(address: string, readerIp: string | undefined, opts: { protocol?: string }) {
