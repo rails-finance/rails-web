@@ -281,3 +281,13 @@ export function rangePressed(
 ): boolean {
   return chosen && rangeActive(shown, bounds, span);
 }
+
+/** The widest window whose time axis names days ("25 Oct"); wider, it names
+ *  months and years alone. Lightweight Charts drops a month's mark that falls
+ *  too close to the last one placed and may place a day's mark a cell or two
+ *  later in its stead, so a wide axis read "Jun, 8 Sep, 2024". */
+export const DAY_TICKS_MAX_S = 60 * DAY_S;
+
+/** Whether a tick of Lightweight Charts' `type` (0 year, 1 month, 2 day of
+ *  month, 3 time) carries a label on a window `span` seconds wide. */
+export const tickShown = (type: number, span: number) => type !== 2 || span <= DAY_TICKS_MAX_S;

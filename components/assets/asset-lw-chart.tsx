@@ -43,6 +43,7 @@ import {
   needsRegrid,
   rangePressed,
   sampleTrack,
+  tickShown,
   withDetail,
   type Grid,
 } from "@/lib/shared/asset-chart-grid";
@@ -361,7 +362,8 @@ export function AssetLwChart({
         lockVisibleTimeRangeOnResize: true,
         minBarSpacing: 0.05,
         maxBarSpacing: 60,
-        tickMarkFormatter: (t: Time, type: number) => lwTickLabel(t, type),
+        tickMarkFormatter: (t: Time, type: number) =>
+          tickShown(type, view.current.to - view.current.from) ? lwTickLabel(t, type) : "",
       },
       localization: {
         locale: "en-GB",

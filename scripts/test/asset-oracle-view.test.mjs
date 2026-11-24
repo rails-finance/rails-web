@@ -137,14 +137,7 @@ function sameBlock(prices) {
 }
 const ids = Object.fromEntries(page.chains[0].lines.map((l) => [l.oracle.address.slice(0, 6), l.id]));
 
-test("the title names the protocol, the most read, or no price", () => {
-  assert.equal(view.assetTitle("WETH", "Liquity V2", "line"), "WETH price in Liquity V2");
-  assert.equal(view.assetTitle("WETH", "MakerDAO", "line"), "WETH price in MakerDAO");
-  assert.equal(view.assetTitle("USDC", "Morpho Blue", "most-read"), "USDC: the price most protocols read");
-  assert.equal(view.assetTitle("BOLD", "Liquity V2", "unpriced"), "BOLD in Liquity V2");
-});
-
-test("the source line names the oracle and the contract it is read through", () => {
+test("the source names the oracle and the contract it is read through", () => {
   assert.equal(liquity.view.lineId, `1:${LIQUITY_LINE}`);
   assert.deepEqual(view.sourceLine(liquity.line, "liquity"), {
     words: "Chainlink ETH / USD, read through Liquity V2's WETH PriceFeed",
@@ -156,10 +149,16 @@ test("the source line names the oracle and the contract it is read through", () 
     words: "Chronicle median, held 1 hour by Maker's OSM",
     address: OSM,
   });
-  // Morpho stores no line: the most read, named with its address.
-  assert.equal(morpho.view.lineId, null);
-  assert.deepEqual(view.sourceLine(morpho.line, null), {
+  // Aave V3 reads the feed direct: its name and address.
+  const aave = from("aave-v3", "Aave V3");
+  assert.deepEqual(view.sourceLine(aave.line, "aave-v3"), {
     words: "Chainlink ETH / USD",
+    address: "0x5424384b256154046e9667ddfaaa5e550145215e",
+  });
+  // Morpho stores no line: the most read, said so.
+  assert.equal(morpho.view.lineId, null);
+  assert.deepEqual(view.sourceLine(morpho.line, null, { protocol: "Morpho Blue", symbol: "WETH" }), {
+    words: "Morpho Blue has no stored price for WETH here; the price most protocols read is Chainlink ETH / USD",
     address: "0x5424384b256154046e9667ddfaaa5e550145215e",
   });
   assert.equal(view.delayWords(7200), "2 hours");
@@ -326,7 +325,7 @@ test("prices at different blocks: each its stamp, no gap, the as-of line says so
   assert.equal(view.priceStamp(lq, NOW), "07:12 UTC · block 23,860,201");
   assert.equal(view.priceTime(lq, NOW + 86_400_000), "24 Nov 2026, 07:12 UTC");
   assert.equal(view.headTime(lq, NOW), "updated 07:12 UTC");
-  assert.equal(view.headTime(mk, NOW), "at the close of 23 Nov 2026");
+  assert.equal(view.headTime(mk, NOW), "close of 23 Nov 2026");
   assert.equal(view.headTime(now.prices[ids["0x5424"]], NOW), null);
   assert.equal(view.asOfText(now), "Each price is its oracle's latest stored value, at the time and block under it");
   assert.match(view.asOfNote(now), /A gap needs both prices at one block/);

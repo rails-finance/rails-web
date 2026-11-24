@@ -6,8 +6,9 @@
 //      under a protocol and reads from its side) the chart draws one line, the
 //      price Liquity V2 uses, in blue at 2 px, with no legend; the panel's
 //      header (A3.8) carries the price; no second chart.
-//   L2 the page's words (A1, A1.9, A2.3, A2.4, A2.6): the title "WETH price in
-//      Liquity V2", the source line ending on the WETH PriceFeed; "Also reads
+//   L2 the page's words (H7, A1, A1.9, A2.3, A2.4, A2.6): Back falling back
+//      to Liquity V2's Assets list, the title "WETH", the source ending on the
+//      WETH PriceFeed under the chart panel; "Also reads
 //      this oracle" naming Moonwell; one oracle row per other line, Liquity
 //      V2's line left out, each protocol link a page under
 //      /ethereum/<protocol>/assets/<WETH>; the as-of line.
@@ -85,6 +86,8 @@ try {
     // L2 the page's words.
     const words = await page.evaluate(() => ({
       title: document.querySelector("[data-asset-title]")?.textContent.trim() ?? "",
+      back: document.querySelector("[data-asset-back]")?.getAttribute("data-asset-back") ?? "",
+      sourceAfterChart: !!document.querySelector("[data-asset-chart] ~ [data-asset-source-row] [data-asset-source]"),
       source: document.querySelector("[data-asset-source]")?.getAttribute("data-asset-source") ?? "",
       also: [...document.querySelectorAll("[data-asset-also-reads] [data-asset-also-reader]")].map((li) =>
         li.textContent.trim(),
@@ -95,7 +98,9 @@ try {
       })),
       asOf: document.querySelector("[data-asset-as-of]")?.textContent.trim() ?? "",
     }));
-    check(words.title === "WETH price in Liquity V2", "L2 the title", words.title);
+    check(words.title === "WETH", "L2 the title", words.title);
+    check(words.back === "/ethereum/liquity-v2/assets", "L2 Back falls back to Liquity V2's Assets list", words.back);
+    check(words.sourceAfterChart, "L2 the source row sits under the chart panel");
     check(
       words.source === "0xcc5f8102eb670c89a4a3c567c13851260303c24f",
       "L2 the source line ends on Liquity V2's WETH PriceFeed",

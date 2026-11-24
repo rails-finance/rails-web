@@ -4,12 +4,13 @@
 //   /<chain>/<slug>/assets          the assets the explorer uses on its chain,
 //                                   under its heading (ProtocolAssets);
 //   /<chain>/<slug>/assets/<token>  one asset under the protocol, read from
-//                                   its side (`via`; Miles's mockup of 24 Nov
-//                                   2026, ui-jobs 818): the title and the
-//                                   oracle it charts, the chart panel with the
-//                                   price now, the protocols also reading that
-//                                   oracle, the other oracles with their
-//                                   prices now, and the as-of line.
+//                                   its side (`via`; Miles, 24 Nov 2026,
+//                                   ui-jobs 818): Back and the token, the
+//                                   chart panel with the price now, the row
+//                                   naming the oracle it charts, the
+//                                   protocols also reading that oracle, the
+//                                   other oracles with their prices now, and
+//                                   the as-of line.
 //
 // One token's pages under several protocols share the price section, so each
 // names one canonical URL: the page under the first explorer, by the roster's
@@ -19,7 +20,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { RailHeader } from "@/components/shared/rail-header";
 import { ProtocolAssets } from "@/components/assets/assets-by-protocol";
-import { AssetPageHead, UnpricedPanel, type RelationGroup } from "@/components/assets/asset-page-head";
+import { AssetTitle, SourceRow, UnpricedPanel, type RelationGroup } from "@/components/assets/asset-page-head";
 import { AssetPriceChart } from "@/components/assets/asset-price-chart";
 import { AlsoReads, AsOfLine, OracleTable } from "@/components/assets/asset-oracles";
 import { AssetReceipts } from "@/components/assets/asset-receipts";
@@ -36,7 +37,6 @@ import { cardLines, type AssetCard } from "@/lib/shared/asset-explorer";
 import { assetPage, mainLine, type AssetPage } from "@/lib/shared/asset-roster";
 import {
   alsoReads,
-  assetTitle,
   oracleRows,
   priceCell,
   priceProv,
@@ -205,6 +205,8 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
   const { card } = line;
 
   const relationsFor = (page: AssetPage | null) => relations(page, card, chain, data.cards, e);
+  // Back's fresh-tab landing: the protocol's Assets list, the "Assets" entry of its sections menu.
+  const backHref = protocolAssetsHref(e.href);
   const opened = answer ? assetPage(answer, chain) : null;
   // The page under it, read from the protocol's side, and its line on the chain.
   const via = viaExplorer(e.id);
@@ -221,19 +223,12 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
     const figure = unpriced?.figure ?? card.figure;
     return (
       <Frame protocol={e}>
-        <AssetPageHead
-          chain={chain}
-          token={t}
-          symbol={card.symbol}
-          title={assetTitle(card.symbol, e.label, "unpriced")}
-          source={null}
-          relations={relationsFor(opened)}
-          markets={line.markets}
-        />
+        <AssetTitle chain={chain} token={t} symbol={card.symbol} backHref={backHref} />
         <UnpricedPanel
           figure={figure}
           livePrice={bold ? <BoldLivePrice read={boldRead ?? null} figure={unpriced?.figure ?? null} /> : undefined}
         />
+        <SourceRow chain={chain} token={t} source={null} relations={relationsFor(opened)} markets={line.markets} />
       </Frame>
     );
   }
@@ -257,15 +252,7 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
   const symbol = page.symbol;
   return (
     <Frame protocol={e}>
-      <AssetPageHead
-        chain={chain}
-        token={t}
-        symbol={symbol}
-        title={assetTitle(symbol, e.label, own ? "line" : "most-read")}
-        source={sourceLine(pageLine, own ? e.id : null)}
-        relations={relationsFor(page)}
-        markets={line.markets}
-      />
+      <AssetTitle chain={chain} token={t} symbol={symbol} backHref={backHref} />
       <AssetReceipts>
         <section data-asset-chain={chain} data-asset-via={view?.lineId ?? "none"} data-anatomy="A2">
           <AssetPriceChart
@@ -279,6 +266,13 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
               change: head?.row?.change ?? null,
               updated: headTime(read, nowMs),
             }}
+          />
+          <SourceRow
+            chain={chain}
+            token={t}
+            source={sourceLine(pageLine, own ? e.id : null, own ? undefined : { protocol: e.label, symbol })}
+            relations={relationsFor(page)}
+            markets={line.markets}
           />
           <AlsoReads entries={alsoReads(pageLine, e.id, pageOf)} chain={chain} />
           <OracleTable

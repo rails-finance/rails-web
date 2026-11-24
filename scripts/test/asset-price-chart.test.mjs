@@ -20,7 +20,9 @@ export async function resolve(specifier, context, next) {
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
 const { lineSpreads } = await import("../../lib/shared/asset-spread.ts");
-const { DAY_S, cellAt, cellOf, gridFor, legendMoment } = await import("../../lib/shared/asset-chart-grid.ts");
+const { DAY_S, cellAt, cellOf, gridFor, legendMoment, tickShown } = await import(
+  "../../lib/shared/asset-chart-grid.ts"
+);
 const { joinText } = await import("../../lib/shared/asset-captions.ts");
 
 // WETH on Ethereum, 26–30 May 2025 (days 20234–20238), as the stores hold it:
@@ -92,6 +94,15 @@ test("the readout reads the cursor in the window, else the window's last moment 
   const g2 = gridFor(tail, bounds, 600);
   assert.equal(legendMoment(null, tail, bounds.t1, g2).ts, bounds.t1);
   assert.equal(legendMoment(null, shown, bounds.t1, null).ts, shown.to - 1);
+});
+
+test("a wide window's axis names months and years, no day (818)", () => {
+  const all = 1500 * DAY_S;
+  assert.equal(tickShown(0, all), true, "a year");
+  assert.equal(tickShown(1, all), true, "a month");
+  assert.equal(tickShown(2, all), false, "no '8 Sep' among the months");
+  assert.equal(tickShown(2, 30 * DAY_S), true, "30D names days");
+  assert.equal(tickShown(3, DAY_S), true, "1D names times");
 });
 
 test("the join names the day the line becomes its stored rounds", () => {

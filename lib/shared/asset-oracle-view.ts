@@ -1,6 +1,5 @@
-// The words of a protocol's asset page (Miles's mockup of 24 Nov 2026; ui-jobs
-// 818; anatomy A1, A2): the title and the source line naming the oracle the
-// page charts, "Also reads this oracle" (the other protocols on that line),
+// The words of a protocol's asset page (Miles, 24 Nov 2026; ui-jobs 818;
+// anatomy A1.9, A2): the source naming the oracle the page charts, "Also reads this oracle" (the other protocols on that line),
 // the table of the other oracles with each one's price now and gap, and the
 // as-of line. The page's line is the one its protocol reads (`via`), else the
 // line most protocols read. Prices come from the price-now answer
@@ -25,17 +24,6 @@ export interface PageProtocol {
   href: string | null;
 }
 
-/** What a page shows its title from: the protocol's line, the line most
- *  protocols read (the protocol stores none), or no stored price at all. */
-export type TitleMode = "line" | "most-read" | "unpriced";
-
-/** "WETH price in Liquity V2", "USDC: the price most protocols read", "BOLD in Liquity V2". */
-export function assetTitle(symbol: string, protocol: string, mode: TitleMode): string {
-  if (mode === "line") return `${symbol} price in ${protocol}`;
-  if (mode === "most-read") return `${symbol}: the price most protocols read`;
-  return `${symbol} in ${protocol}`;
-}
-
 /** "Liquity V2 WETH PriceFeed" as "Liquity V2's WETH PriceFeed" where it opens with its protocol's name. */
 function owned(name: string, protocol: string): string {
   return name.startsWith(`${protocol} `) && !name.startsWith(`${protocol}'s`)
@@ -49,7 +37,7 @@ export function delayWords(seconds: number): string {
   return `${Math.round(seconds / 60)} minutes`;
 }
 
-/** The line under the title: its words and the contract they end on. */
+/** The source in the row under the chart: its words and the contract they end on. */
 export interface SourceLine {
   words: string;
   address: string;
@@ -59,8 +47,19 @@ export interface SourceLine {
  *  USD, read through Liquity V2's WETH PriceFeed" (the one contract the
  *  explorer reads it through), "Chronicle median, held 1 hour by Maker's OSM"
  *  (a delayed line with its stored delay), else the oracle's name; each ends
- *  on its contract. */
-export function sourceLine(line: Pick<PageLine, "oracle" | "series">, explorer: string | null): SourceLine {
+ *  on its contract. Where the protocol stores no line (`noLine`), the most
+ *  read: "Morpho Blue has no stored price for USDC here; the price most
+ *  protocols read is Chainlink USDC / USD". */
+export function sourceLine(
+  line: Pick<PageLine, "oracle" | "series">,
+  explorer: string | null,
+  noLine?: { protocol: string; symbol: string },
+): SourceLine {
+  if (noLine)
+    return {
+      words: `${noLine.protocol} has no stored price for ${noLine.symbol} here; the price most protocols read is ${line.oracle.name}`,
+      address: line.oracle.address,
+    };
   const own = line.series.filter((s) => explorer != null && seriesExplorer(s.token.chain, s.key) === explorer);
   const through = [...new Set(own.map((s) => (s.via && s.via.kind !== "history" ? s.via.address : "")))];
   if (through.length === 1 && through[0]) {
@@ -161,10 +160,10 @@ export function priceTime(p: Pick<LinePriceNow, "timestamp" | "read">, nowMs: nu
 }
 
 /** The panel header's time words: "updated 07:12 UTC", or for a daily-store
- *  read "at the close of 23 Nov 2026". */
+ *  read "close of 23 Nov 2026". */
 export function headTime(p: LinePriceNow | undefined, nowMs: number): string | null {
   if (!p?.ok || p.timestamp == null) return null;
-  if (p.read === "day") return `at the close of ${formatDate(new Date(p.timestamp * 1000))}`;
+  if (p.read === "day") return `close of ${formatDate(new Date(p.timestamp * 1000))}`;
   return `updated ${priceTime(p, nowMs)}`;
 }
 

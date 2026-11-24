@@ -330,8 +330,8 @@ const reserve = await page.$$eval('[data-anatomy="A1.10"] [data-asset-market]', 
   as.map((a) => a.getAttribute("href")),
 );
 check(
-  '4b "USDC price in Aave V3" links its reserve',
-  titleAave === "USDC price in Aave V3" && reserve[0] === `/ethereum/aave-v3/markets/${USDC}`,
+  '4b the page titled "USDC" links its reserve',
+  titleAave === "USDC" && reserve[0] === `/ethereum/aave-v3/markets/${USDC}`,
   `${titleAave}; ${reserve.join(", ")}`,
 );
 const pills = await page.$$eval("[data-asset-oracles] a[data-asset-oracle-link]", (as) =>
@@ -372,7 +372,10 @@ const otherIn = (await page.locator("[data-asset-title]").textContent())?.trim()
 const canonAaveWeth = await canonical();
 check(
   "4f it lands under Aave V3, and both pages name one canonical URL",
-  otherIn === "WETH price in Aave V3" && canonLiquity != null && canonLiquity === canonAaveWeth,
+  otherIn === "WETH" &&
+    new URL(page.url()).pathname === toAave &&
+    canonLiquity != null &&
+    canonLiquity === canonAaveWeth,
   `${otherIn}; ${canonLiquity} / ${canonAaveWeth}; USDC's ${canonAave}`,
 );
 
