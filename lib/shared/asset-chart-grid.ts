@@ -197,27 +197,19 @@ export function sampleRuns(g: Grid, runs: readonly (readonly (readonly [number, 
   return out;
 }
 
-/** Each cell's deviation of `other` from `main` (a fraction): on both lines'
- *  rounds at the cell's moment, before them the day's spread (`byDay`,
- *  compared only where the store's reads were within ten minutes). */
-export function sampleSpread(
-  g: Grid,
-  main: Track,
-  other: Track,
-  byDay: ReadonlyMap<number, number>,
-): (number | null)[] {
-  const both = main.roundsFrom != null && other.roundsFrom != null ? Math.max(main.roundsFrom, other.roundsFrom) : null;
-  const out: (number | null)[] = new Array(g.count);
-  for (let i = 0; i < g.count; i++) {
-    const at = cellAt(g, i);
-    if (both != null && at >= both) {
-      const end = Math.min(main.end, other.end);
-      const m = cellTime(g, i) > end ? null : inForce(main.points, Math.min(at, end));
-      const o = m == null ? null : inForce(other.points, Math.min(at, end));
-      out[i] = m != null && o != null && m > 0 ? o / m - 1 : null;
-    } else out[i] = byDay.get(Math.floor(at / DAY_S)) ?? null;
-  }
-  return out;
+/** The moment the readout reads: the cursor's where it lies in the window
+ *  shown, else the window's last moment (the checkpoint at most), on the
+ *  grid's cell where there is one (ui-jobs 819). */
+export function legendMoment(
+  cursor: number | null,
+  shown: { from: number; to: number },
+  t1: number,
+  g: Grid | null,
+): { ts: number; cursor: boolean } {
+  if (cursor != null && cursor >= shown.from && cursor <= shown.to) return { ts: cursor, cursor: true };
+  const end = Math.min(shown.to - 1, t1);
+  if (!g) return { ts: end, cursor: false };
+  return { ts: cellAt(g, Math.max(0, Math.min(g.count - 1, cellOf(g, end)))), cursor: false };
 }
 
 /** The detail chunks a grid reads: chunk `k` spans [k·S, (k+1)·S) for S = step·CHUNK_CELLS,
@@ -289,3 +281,13 @@ export function rangePressed(
 ): boolean {
   return chosen && rangeActive(shown, bounds, span);
 }
+
+/** The widest window whose time axis names days ("25 Oct"); wider, it names
+ *  months and years alone. Lightweight Charts drops a month's mark that falls
+ *  too close to the last one placed and may place a day's mark a cell or two
+ *  later in its stead, so a wide axis read "Jun, 8 Sep, 2024". */
+export const DAY_TICKS_MAX_S = 60 * DAY_S;
+
+/** Whether a tick of Lightweight Charts' `type` (0 year, 1 month, 2 day of
+ *  month, 3 time) carries a label on a window `span` seconds wide. */
+export const tickShown = (type: number, span: number) => type !== 2 || span <= DAY_TICKS_MAX_S;

@@ -16,7 +16,6 @@ import {
   needsRegrid,
   rangeActive,
   rangePressed,
-  sampleSpread,
   sampleTrack,
   withDetail,
 } from "../../lib/shared/asset-chart-grid.ts";
@@ -79,31 +78,6 @@ test("the daily part sits before the rounds; on a day grid the day closes alone"
     [10, 11, 12],
   );
   assert.equal(day.roundsFrom, null);
-});
-
-test("the spread compares rounds at the moment and the daily part by its day", () => {
-  const g = { start: 0, step: DAY_S, count: 3, t1: 3 * DAY_S - 1 };
-  const main = {
-    points: [
-      [0, 100],
-      [2 * DAY_S, 100],
-    ],
-    end: g.t1,
-    roundsFrom: 2 * DAY_S,
-  };
-  const other = {
-    points: [
-      [0, 101],
-      [2 * DAY_S, 102],
-    ],
-    end: g.t1,
-    roundsFrom: 2 * DAY_S,
-  };
-  const byDay = new Map([[0, 0.01]]);
-  const s = sampleSpread(g, main, other, byDay);
-  assert.equal(s[0], 0.01);
-  assert.equal(s[1], null); // not read within ten minutes that day
-  assert.ok(Math.abs(s[2] - 0.02) < 1e-12);
 });
 
 test("detail windows replace the thinned points inside them", () => {

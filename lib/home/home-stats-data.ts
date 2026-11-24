@@ -51,6 +51,7 @@ export async function getHomeStats(): Promise<HomeStats | null> {
       { attemptTimeoutMs: 90_000 },
     );
     if (!res.ok) {
+      void res.body?.cancel().catch(() => undefined);
       console.error(`home-stats: /api/stats/overview -> ${res.status} ${res.statusText}`);
       return null;
     }

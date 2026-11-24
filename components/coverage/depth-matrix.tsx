@@ -240,7 +240,7 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
           table fits its frame, and a heading tip opens above the frame. */}
       <DataTable label="Explorer capability matrix" tableClassName="table-fixed" className="overflow-visible!">
         <DataTableHead>
-          <DataTableLeadHeader plain />
+          <DataTableLeadHeader plain chainless />
           <DataTableHeader label={<span className="sr-only">Explorer</span>} className="w-[18%] xl:w-[26%]" />
           {CAPABILITIES.map((cap) => (
             <DataTableHeader key={cap.key} className="align-bottom" data-coverage-heading={cap.key}>

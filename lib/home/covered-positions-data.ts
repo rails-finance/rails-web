@@ -71,6 +71,7 @@ import { CHAINS } from "@/lib/shared/chains";
 import { LAUNCHED_PROTOCOLS } from "@/lib/shared/protocols";
 import type { CoveredPositions } from "./covered-positions";
 import { CENSUS_ENDPOINT, fetchCensusCount, type RosterCount, type RosterState } from "./census-leg";
+import { COUNT_DEADLINE_MS, countLeg } from "./count-slot";
 
 const RAILS_API_URL = process.env.RAILS_API_URL;
 
@@ -192,7 +193,7 @@ function readTotal(json: TotalEnvelope): number | null {
  */
 type Leg = { total: number; pending: string | null };
 
-async function fetchTotal(id: string, path: string, status: string | null): Promise<Leg | null> {
+async function fetchTotal(id: string, path: string, status: string | null, signal: AbortSignal): Promise<Leg | null> {
   // limit=1 — only `total` is read; the row is the smallest page the API will
   // answer with and is discarded.
   const qs = new URLSearchParams({ limit: "1" });
@@ -203,8 +204,11 @@ async function fetchTotal(id: string, path: string, status: string | null): Prom
     // transient failure among the ~50 legs suppresses the whole headline for
     // an ISR cycle. The retry absorbs the transient class only — a 4xx or a
     // malformed envelope still fails here on the first answer.
-    const res = await fetchWithRetry(url, createAuthFetchOptions({ next: { revalidate: REVALIDATE_SECONDS } }));
+    const res = await fetchWithRetry(url, createAuthFetchOptions({ next: { revalidate: REVALIDATE_SECONDS } }), {
+      signal,
+    });
     if (!res.ok) {
+      void res.body?.cancel().catch(() => undefined);
       console.error(`covered-positions: ${id} ${path} [${status ?? "all-time"}] -> ${res.status} ${res.statusText}`);
       return null;
     }
@@ -246,10 +250,10 @@ async function fetchTotal(id: string, path: string, status: string | null): Prom
  * suppresses the figure instead of publishing a negative or nonsense closed
  * count.
  */
-async function fetchRosterCount(id: string, path: string): Promise<RosterState> {
+async function fetchRosterCount(id: string, path: string, deadline: AbortSignal): Promise<RosterState> {
   const [open, allTime] = await Promise.all([
-    fetchTotal(id, path, "open"),
-    fetchTotal(id, path, ALL_TIME_STATUS[id] ?? null),
+    countLeg(deadline, (signal) => fetchTotal(id, path, "open", signal)),
+    countLeg(deadline, (signal) => fetchTotal(id, path, ALL_TIME_STATUS[id] ?? null, signal)),
   ]);
   if (open === null || allTime === null) return null;
   // Both legs read the same coverage row; either saying "not yet" is enough.
@@ -388,20 +392,23 @@ function assertRosterCovered(): string[] | null {
 }
 
 /** One counted explorer's roster, by whichever kind of endpoint it has. */
-function fetchExplorerCount(id: string): Promise<RosterState> {
+function fetchExplorerCount(id: string, deadline: AbortSignal): Promise<RosterState> {
   const census = CENSUS_ENDPOINT[id];
   if (census) {
-    return fetchCensusCount(id, `${RAILS_API_URL}${census}`, (url) =>
-      fetchWithRetry(url, createAuthFetchOptions({ next: { revalidate: REVALIDATE_SECONDS } })),
+    return countLeg(deadline, (signal) =>
+      fetchCensusCount(id, `${RAILS_API_URL}${census}`, (url) =>
+        fetchWithRetry(url, createAuthFetchOptions({ next: { revalidate: REVALIDATE_SECONDS } }), { signal }),
+      ),
     );
   }
-  return fetchRosterCount(id, LISTING_ENDPOINT[id]);
+  return fetchRosterCount(id, LISTING_ENDPOINT[id], deadline);
 }
 
 /**
  * The roster-wide open and closed position counts, or null if any explorer's
- * rosters are unavailable (see the all-or-nothing note above). Fetches every
- * explorer concurrently; each leg retries transient failures with a per-attempt
+ * rosters are unavailable (see the all-or-nothing note above). Asks for every
+ * explorer at once, with at most COUNT_CONCURRENCY legs in flight and one
+ * deadline for them all (./count-slot.ts); each leg retries transient failures with a per-attempt
  * timeout (fetchWithRetry), and failures are not cached, so the next
  * regeneration retries from scratch. A Base explorer still backfilling its
  * history, or an Arbitrum explorer whose census is incomplete, is not a
@@ -422,7 +429,8 @@ export async function getCoveredPositions(): Promise<CoveredPositions | null> {
     return null;
   }
 
-  const counts = await Promise.all(COUNTED_PROTOCOLS.map((p) => fetchExplorerCount(p.id)));
+  const deadline = AbortSignal.timeout(COUNT_DEADLINE_MS);
+  const counts = await Promise.all(COUNTED_PROTOCOLS.map((p) => fetchExplorerCount(p.id, deadline)));
 
   const rosters: RosterCount[] = [];
   for (const [i, c] of counts.entries()) {

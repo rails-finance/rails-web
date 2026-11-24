@@ -23,7 +23,10 @@ export async function readLiquityV2OracleFromBackend(readerIp?: string): Promise
       ...createAuthFetchOptions(undefined, readerIp),
       cache: "no-store",
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      void res.body?.cancel().catch(() => undefined);
+      return null;
+    }
     const json = (await res.json()) as OraclePricesResponse;
     return json.success ? (json.data ?? null) : null;
   } catch {

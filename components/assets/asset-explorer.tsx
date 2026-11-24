@@ -1,9 +1,9 @@
 "use client";
 
 // The asset cells a protocol's Assets pages and asset pages draw (rails-ops
-// decision 0069, ui-jobs 786; anatomy A5.1 to A5.3, A5.8 to A5.11, A6): a
+// decision 0069, ui-jobs 786; anatomy A5.1 to A5.3, A5.9 to A5.11, A6): a
 // line's price on its chain, its 30-day line, a phone's compact row, the
-// explorers' marks and chips, the category and a priceless card's figure.
+// explorers' marks and a priceless card's figure.
 // The cross-protocol /assets list they were first drawn for is retired.
 
 import Link from "next/link";
@@ -18,13 +18,11 @@ import { hasProtocolGlyph, ProtocolIcon } from "@/components/icons/protocol-glyp
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { DataTableCell } from "@/components/shared/data-table/data-table";
-import { ASSET_CATEGORY_LABELS, type AssetCategory } from "@/lib/shared/asset-categories";
 import { type CardLine, type AssetChip, type CardFigure, PRICELESS_WHY } from "@/lib/shared/asset-explorer";
 import { chainName } from "@/lib/shared/asset-roster";
 import type { ChainId } from "@/lib/shared/chains";
 import { MARK_TILE, MARK_TILE_LINK } from "@/lib/shared/ui-grammar";
 
-const CATEGORY_NOTE = "Rails’ classification of the asset";
 /** The Explorers cell draws this many marks, then "+N". */
 const MARKS_SHOWN = 4;
 
@@ -254,43 +252,5 @@ export function FigureRow({ figure: f, info }: { figure: CardFigure; info?: Prov
         </span>
       )}
     </p>
-  );
-}
-
-/** The asset's category (A5.8); the asset page's heading draws it too. */
-export function CategoryBadge({ category }: { category: AssetCategory }) {
-  return (
-    <span
-      className="shrink-0 rounded-full border border-rb-200 px-1.5 py-0.5 text-[10px] leading-none text-rb-500 dark:border-rb-800"
-      title={CATEGORY_NOTE}
-      data-asset-category-badge={category}
-      data-anatomy="A5.8"
-    >
-      {ASSET_CATEGORY_LABELS[category]}
-    </span>
-  );
-}
-
-/** An explorer that lists the asset (A5.9), linking where its chip links; the
- *  chain's mark where the chips span chains (`chainMark`). The asset page's
- *  "Read by" draws it. */
-export function ExplorerChip({ chip: ch, symbol, chainMark }: { chip: AssetChip; symbol: string; chainMark: boolean }) {
-  return (
-    <Link
-      href={ch.href}
-      className="inline-flex items-center gap-1 rounded bg-[var(--surface-hover)] px-1.5 py-0.5 text-xs text-foreground hover:bg-[var(--surface-active)]"
-      title={`${symbol} on ${ch.label}, ${chainName(ch.chain)}`}
-      data-asset-chip={ch.explorer}
-      data-asset-chip-link={ch.link}
-      data-anatomy="A5.9"
-    >
-      {ch.token && !hasProtocolGlyph(ch.explorer) ? (
-        <TokenChipIcon symbol={ch.token.symbol} address={ch.token.address} size={12} filterable={false} untitled />
-      ) : (
-        <ProtocolIcon id={ch.explorer} className="h-3 w-3 shrink-0" />
-      )}
-      {ch.label}
-      {chainMark && <ChainGlyph id={ch.chain as ChainId} className="h-2.5 w-2.5 text-rb-500" />}
-    </Link>
   );
 }

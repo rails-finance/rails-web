@@ -19,6 +19,9 @@ export async function atBlockGet<T>(path: string, qs: URLSearchParams, readerIp?
   const base = process.env.RAILS_API_URL;
   if (!base) throw new AtBlockApiError(500, path);
   const res = await fetch(`${base}/api/at-block/${path}?${qs.toString()}`, createAuthFetchOptions(undefined, readerIp));
-  if (!res.ok) throw new AtBlockApiError(res.status, path);
+  if (!res.ok) {
+    void res.body?.cancel().catch(() => undefined);
+    throw new AtBlockApiError(res.status, path);
+  }
   return (await res.json()) as T;
 }

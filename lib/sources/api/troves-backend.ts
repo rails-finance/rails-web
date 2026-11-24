@@ -122,7 +122,10 @@ export async function readTrovesFromBackend(
 
   const url = `${base}/api/troves${backendParams.toString() ? `?${backendParams.toString()}` : ""}`;
   const response = await fetch(url, { ...createAuthFetchOptions({ signal }, readerIp), cache: "no-store" });
-  if (!response.ok) return { ok: false, status: response.status, statusText: response.statusText };
+  if (!response.ok) {
+    void response.body?.cancel().catch(() => undefined);
+    return { ok: false, status: response.status, statusText: response.statusText };
+  }
   const data = (await response.json()) as TrovesResponse;
   return { ok: true, data, upstream: response };
 }
