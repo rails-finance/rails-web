@@ -146,7 +146,7 @@ export function OracleTable({
         rowHeight="two"
       >
         <DataTableHead>
-          <DataTableLeadHeader plain />
+          <DataTableLeadHeader plain chainless />
           <DataTableHeader label="Used by" />
           <DataTableHeader label="Oracle" />
           <DataTableHeader label="Price now" align="right" />

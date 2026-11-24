@@ -69,6 +69,7 @@ import {
 import { hueStyle, RowZone } from "@/components/shared/row-zone";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
+import { leadHeaderName } from "@/lib/shared/data-table-words";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
 
 export type DataTableDir = "asc" | "desc";
@@ -433,8 +434,17 @@ export function DataTableCell({
   );
 }
 
-/** The lead column's header: no visible label, its name for a screen reader. */
-export function DataTableLeadHeader({ sticky = "", plain }: { sticky?: string; plain?: boolean }) {
+/** The lead column's header: no visible label, its name for a screen reader
+ *  (`chainless` where the column's cells draw no chain glyph). */
+export function DataTableLeadHeader({
+  sticky = "",
+  plain,
+  chainless,
+}: {
+  sticky?: string;
+  plain?: boolean;
+  chainless?: boolean;
+}) {
   const stacked = useContext(Stacked);
   return (
     <th
@@ -442,7 +452,7 @@ export function DataTableLeadHeader({ sticky = "", plain }: { sticky?: string; p
       role={stacked ? "columnheader" : undefined}
       className={`${plain ? "w-[76px]" : "w-[124px]"} p-0 ${sticky ? `${sticky} z-10 bg-background` : ""}`}
     >
-      <span className="sr-only">Protocol and chain</span>
+      <span className="sr-only">{leadHeaderName(chainless)}</span>
     </th>
   );
 }
