@@ -309,10 +309,10 @@ test("prices at different blocks: each its stamp, no gap, the as-of line says so
   const mk = now.prices[`1:${OSM}`];
   assert.deepEqual([mk.price, mk.block, mk.read], [1702.4, 23855000, "day"]);
   assert.equal(mk.timestamp, 20781 * 86400 - 1, "a daily read stands at its day's close");
-  // A line with no rounds and no daily series read: unread, with why.
+  // A line with no rounds and no recent day in the store: no price, with why.
   assert.deepEqual(
     [now.prices[ids["0x5424"]].ok, now.prices[ids["0x5424"]].reason],
-    [false, "The stored prices were not read"],
+    [false, "Rails stores no price for this oracle in the last 10 days"],
   );
   assert.equal(now.block, 23860201, "the latest of the lines' blocks");
   const rows = view.oracleRows(liquity.section.lines, liquity.line, now, pageOf, NOW);
@@ -337,7 +337,7 @@ test("prices at different blocks: each its stamp, no gap, the as-of line says so
   );
   // Neither store read: every line unread.
   const none = storedPricesNow(1, liquity.section.lines, null, null);
-  assert.ok(Object.values(none.prices).every((p) => !p.ok && p.reason));
+  assert.ok(Object.values(none.prices).every((p) => !p.ok && p.reason === "The stored prices were not read"));
 });
 
 test("the figures' formats", () => {

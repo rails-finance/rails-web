@@ -63,7 +63,10 @@ export interface StoredDaily {
 }
 
 const DAY_S = 86_400;
+/** The days back the stub reads the daily store. */
+export const RECENT_DAYS = 10;
 const NO_STORE = "Rails stores no price for this oracle";
+const NOT_RECENT = `Rails stores no price for this oracle in the last ${RECENT_DAYS} days`;
 const NOT_READ = "The stored prices were not read";
 
 /** A line's latest stored value: its last stored round (in force at the
@@ -83,15 +86,15 @@ function storedLine(line: PageLine, rounds: StoredRounds | null, daily: StoredDa
   }
   const s = line.drawn ? daily?.series?.[line.drawn.key] : undefined;
   if (!line.drawn) return { ok: false, price: null, reason: NO_STORE, block: null, timestamp: null, read: "day" };
-  if (!s) return { ok: false, price: null, reason: NOT_READ, block: null, timestamp: null, read: "day" };
+  if (!daily) return { ok: false, price: null, reason: NOT_READ, block: null, timestamp: null, read: "day" };
   let best: { day: number; price: number; block: number } | null = null;
-  for (const [day, raw, block, unit, scale] of s.obs ?? []) {
-    const sc = scale ?? s.scale;
+  for (const [day, raw, block, unit, scale] of s?.obs ?? []) {
+    const sc = scale ?? s?.scale;
     const price = sc != null ? Number(raw) / 10 ** sc : NaN;
-    if ((unit ?? s.unit) !== "usd" || !Number.isFinite(price) || price <= 0) continue;
+    if ((unit ?? s?.unit) !== "usd" || !Number.isFinite(price) || price <= 0) continue;
     if (!best || day > best.day) best = { day, price, block: Number(block) };
   }
-  if (!best) return { ok: false, price: null, reason: NO_STORE, block: null, timestamp: null, read: "day" };
+  if (!best) return { ok: false, price: null, reason: NOT_RECENT, block: null, timestamp: null, read: "day" };
   // A day's read stands at the day's close.
   return { ok: true, price: best.price, block: best.block, timestamp: (best.day + 1) * DAY_S - 1, read: "day" };
 }

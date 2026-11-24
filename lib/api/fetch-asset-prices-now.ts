@@ -13,6 +13,7 @@ import "server-only";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { ROUNDS_REVALIDATE_S } from "@/lib/api/fetch-asset-prices-server";
 import {
+  RECENT_DAYS,
   storedPricesNow,
   unreadPricesNow,
   type AssetPricesNow,
@@ -63,7 +64,7 @@ export async function fetchAssetPricesNow(
     const dq = new URLSearchParams({
       chain: String(chain),
       series: keys.join(","),
-      from: String(Math.floor(now / DAY_S) - 10),
+      from: String(Math.floor(now / DAY_S) - RECENT_DAYS),
     });
     const [rounds, daily] = await Promise.all([
       oracles.length ? get<StoredRounds>(`/api/prices/rounds?${rq.toString()}`, readerIp) : null,
