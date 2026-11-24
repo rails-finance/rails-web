@@ -83,8 +83,8 @@ export const frankencoin: FamilyModule = {
       reads: 1,
       positions: open.map((p): WalletPosition => {
         const s = listed.get(rowOf(p).position);
-        // Not listed for the owner: the stored card stands.
-        if (!s) return { ...p, headRead: "failed" };
+        // Not listed for the owner (passed on): the stored card stands.
+        if (!s) return { ...p, headRead: "stored" };
         if (s.status !== "open") return { ...p, closedSince: { block: s.lastBlockNumber }, headRead: "stored" };
         return {
           ...p,

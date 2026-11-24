@@ -197,11 +197,23 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
     case "pwn":
       return <PwnPositionCard v={pwnView(card.row)} />;
     case "polaris-cdp":
-      return <PolarisPositionCard v={polarisView(card.row, card.markets, false)} surface="listing" />;
+      // The board gives the ratio; the wallet page states no Polaris dollars.
+      return (
+        <PolarisPositionCard
+          v={{ ...polarisView(card.row, card.markets, false), collUsd: null, debtUsd: null }}
+          surface="listing"
+        />
+      );
     case "polaris-loan":
-      return <PolarisLoanCard row={card.row} surface="listing" />;
+      return (
+        <PolarisLoanCard
+          row={card.row}
+          surface="listing"
+          receipts={{ via: card.via, debtAt: card.via === "listing" ? "index" : "touch" }}
+        />
+      );
     case "polaris-deposit":
-      return <PolarisDepositCard row={card.row} surface="listing" />;
+      return <PolarisDepositCard row={card.row} surface="listing" receipts={{ via: card.via }} />;
     case "morpho-arbitrum":
       return <ArbitrumReadCard row={card.row} family="morpho" />;
     case "spark":

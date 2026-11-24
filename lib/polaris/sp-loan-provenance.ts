@@ -232,3 +232,55 @@ export function spFeedProv(market: PolarisMarket): Provenance {
     via: `${SP_VIA} · previewPrice() @ head`,
   };
 }
+
+/** Where a listing row's figures come from on the wallet page: the wallet
+ *  route's stored row (rails-server mig 529), or the listing route's row the
+ *  page's head read took. */
+export type PolarisRowVia = "wallet" | "listing";
+
+const ROW_VIA: Record<"loan" | "sp", Record<PolarisRowVia, string>> = {
+  loan: {
+    wallet: "GET /api/wallet/<address>/positions · card",
+    listing: "GET /api/polaris/reserve-loans · wallet",
+  },
+  sp: {
+    wallet: "GET /api/wallet/<address>/positions · card",
+    listing: "GET /api/polaris/stability-pool · wallet",
+  },
+};
+
+const LOAN_ROW: Record<"coll" | "debtAtTouch" | "costAtTouch" | "debtAtIndex" | "costAtIndex", string> = {
+  coll: LOAN_SUM.collHeld,
+  debtAtTouch: LOAN_SUM.debtAtLastTouch,
+  costAtTouch: LOAN_SUM.fees,
+  debtAtIndex:
+    "Debt at the latest index — the loan's shares at the deployment's latest FeesAccrued newDebtPerShare, rounded up: fees accrued since that log are left out.",
+  costAtIndex:
+    "Cost so far — the debt at the deployment's latest FeesAccrued index less the WETH borrowed net of repayments, summed from the loan's LoanOpened and LoanAdjusted logs.",
+};
+
+/** A reserve loan's listing-row figure, as the wallet page draws it. */
+export function loanRowProv(what: keyof typeof LOAN_ROW, via: PolarisRowVia): Provenance {
+  return {
+    kind: "derived",
+    pclass: "indexed",
+    summary: LOAN_ROW[what],
+    contract: manager,
+    via: ROW_VIA.loan[via],
+  };
+}
+
+/** A Stability Pool deposit's listing-row figure, as the wallet page draws it. */
+export function spRowProv(
+  what: "recorded" | "bcGain" | "stableGain",
+  market: PolarisMarket,
+  via: PolarisRowVia,
+): Provenance {
+  return {
+    kind: "derived",
+    pclass: "indexed",
+    summary: SP_SUM[what](stableOf(market)),
+    contract: pool(market),
+    via: ROW_VIA.sp[via],
+  };
+}

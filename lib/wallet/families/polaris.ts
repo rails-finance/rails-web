@@ -92,7 +92,7 @@ function shapeRow(r: WalletSummaryRow): WalletPosition | null {
     return {
       ...base,
       market: "Reserve loan",
-      card: { kind: "polaris-loan", row: r.card as PolarisLoanRow },
+      card: { kind: "polaris-loan", row: r.card as PolarisLoanRow, via: "wallet" },
       ...(ended && { history: historyBase(r) }),
     };
   if (kind === "sp") {
@@ -100,7 +100,7 @@ function shapeRow(r: WalletSummaryRow): WalletPosition | null {
     return {
       ...base,
       market: STABLE[row.market],
-      card: { kind: "polaris-deposit", row },
+      card: { kind: "polaris-deposit", row, via: "wallet" },
       ...(ended && { history: historyBase(r) }),
     };
   }
@@ -174,7 +174,7 @@ export const polaris: FamilyModule = {
         if (c.kind === "polaris-cdp") {
           const s = cdpRows?.get(cdpKey(c.row));
           // The board still gives a stored CDP its ratio.
-          if (!s) return { ...p, card: { ...c, markets }, headRead: "failed" };
+          if (!s) return { ...p, card: { ...c, markets }, headRead: cdpRows ? "stored" : "failed" };
           if (s.status !== "open")
             return { ...p, card: { ...c, markets }, closedSince: { block: s.lastBlock }, headRead: "stored" };
           return {
@@ -187,7 +187,7 @@ export const polaris: FamilyModule = {
         }
         if (c.kind === "polaris-loan") {
           const s = loanRead?.rows.get(c.row.loan_id);
-          if (!s) return { ...p, headRead: "failed" };
+          if (!s) return { ...p, headRead: loanRead ? "stored" : "failed" };
           if (s.status !== "open") return { ...p, closedSince: { block: Number(s.last_block) }, headRead: "stored" };
           // Untouched since the store's row: its debt at the last touch, which
           // the card's tip states, stands.
@@ -197,7 +197,7 @@ export const polaris: FamilyModule = {
           const at = loanRead?.index;
           return {
             ...p,
-            card: { kind: "polaris-loan", row: s },
+            card: { kind: "polaris-loan", row: s, via: "listing" },
             headRead: "read",
             readAtBlock: Number(at?.block_number ?? s.last_block),
             readAt: Number(at?.block_timestamp ?? s.last_timestamp) || undefined,
@@ -205,11 +205,11 @@ export const polaris: FamilyModule = {
         }
         if (c.kind === "polaris-deposit") {
           const s = spRows?.get(spKey(c.row));
-          if (!s) return { ...p, headRead: "failed" };
+          if (!s) return { ...p, headRead: spRows ? "stored" : "failed" };
           if (s.status !== "open") return { ...p, closedSince: { block: Number(s.last_block) }, headRead: "stored" };
           return {
             ...p,
-            card: { kind: "polaris-deposit", row: s },
+            card: { kind: "polaris-deposit", row: s, via: "listing" },
             headRead: "read",
             readAtBlock: Number(s.last_block),
             readAt: Number(s.last_timestamp) || undefined,

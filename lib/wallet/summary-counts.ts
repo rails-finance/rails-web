@@ -82,8 +82,9 @@ export function rowIsPage(href: string, pathname: string, search: string): boole
   return (new URLSearchParams(search).get("market") ?? "core").toLowerCase() === market.toLowerCase();
 }
 
-/** The wallet view's counter's tip (W1): the counts cover the mainnet wallet
- *  families only (`WALLET_FAMILIES`), not Polaris on Sepolia (ui-jobs 691). */
+/** The wallet view's counter's tip (W1): the counts cover the mainnet rows
+ *  only (`countedRow`); Polaris on Sepolia is drawn and not counted (ui-jobs
+ *  691). */
 export const WALLET_COUNTS_SCOPE = "Counts mainnet positions; the Sepolia testnet is not counted.";
 
 const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;

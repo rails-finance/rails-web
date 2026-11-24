@@ -73,7 +73,7 @@ export const pwn: FamilyModule = {
       positions: open.map((p): WalletPosition => {
         const s = listed.get(keyOf(rowOf(p)));
         // Not listed for the wallet: the stored card stands.
-        if (!s) return { ...p, headRead: "failed" };
+        if (!s) return { ...p, headRead: "stored" };
         if (s.status !== "open")
           return { ...p, closedSince: { block: s.closedBlock ?? s.createdBlock ?? 0 }, headRead: "stored" };
         return { ...p, card: { kind: "pwn", row: s }, headRead: "read" };

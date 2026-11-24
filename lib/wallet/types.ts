@@ -115,9 +115,10 @@ export type WalletCard =
   | { kind: "polaris-cdp"; row: PolarisPositionSummary; markets: PolarisMarketsChainResponse | null }
   /** A Polaris reserve loan or Stability Pool deposit: the stored card holds
    *  the fields the listing card draws (mig 529), the head read the listing
-   *  route's whole row. */
-  | { kind: "polaris-loan"; row: PolarisLoanRow }
-  | { kind: "polaris-deposit"; row: PolarisDepositRow }
+   *  route's whole row (`via`). A loan's debt is at its last touch, or at the
+   *  deployment's latest index on a listing row. */
+  | { kind: "polaris-loan"; row: PolarisLoanRow; via: "wallet" | "listing" }
+  | { kind: "polaris-deposit"; row: PolarisDepositRow; via: "wallet" | "listing" }
   | { kind: "morpho-arbitrum"; row: ArbitrumReadRow }
   | { kind: "spark"; row: SparkPositionSummary }
   | { kind: "fluid"; row: FluidPositionSummary }
