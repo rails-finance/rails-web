@@ -220,6 +220,33 @@ export function sampleSpread(
   return out;
 }
 
+/** The gap chart's lines (anatomy A3.6): each other line's deviation from the
+ *  main line in percent, cell by cell, by `sampleSpread`. A line without
+ *  stored rounds shows its day's gap in every cell of that day, so a window
+ *  shorter than a day still draws it (ui-jobs 819). */
+export function gapSeries(
+  g: Grid,
+  main: Track,
+  others: readonly { track: Track; byDay: ReadonlyMap<number, number> }[],
+): (number | null)[][] {
+  return others.map((o) => sampleSpread(g, main, o.track, o.byDay).map((d) => (d == null ? null : d * 100)));
+}
+
+/** The moment the legends read: the cursor's where it lies in the window
+ *  shown, else the window's last moment (the checkpoint at most), on the
+ *  grid's cell where there is one (ui-jobs 819). */
+export function legendMoment(
+  cursor: number | null,
+  shown: { from: number; to: number },
+  t1: number,
+  g: Grid | null,
+): { ts: number; cursor: boolean } {
+  if (cursor != null && cursor >= shown.from && cursor <= shown.to) return { ts: cursor, cursor: true };
+  const end = Math.min(shown.to - 1, t1);
+  if (!g) return { ts: end, cursor: false };
+  return { ts: cellAt(g, Math.max(0, Math.min(g.count - 1, cellOf(g, end)))), cursor: false };
+}
+
 /** The detail chunks a grid reads: chunk `k` spans [k·S, (k+1)·S) for S = step·CHUNK_CELLS,
  *  only those overlapping [from, to] (the stored rounds' span). None on a grid of a day or more. */
 export function gridChunks(g: Grid, span: { from: number; to: number }): { k: number; from: number; to: number }[] {

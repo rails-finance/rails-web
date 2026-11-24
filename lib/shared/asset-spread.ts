@@ -9,7 +9,11 @@
 // other (from the blocks the store names), or where either is a constant:
 // two reads hours apart measure the market moving between them, the blocks'
 // span timed at the chain's rate in each era (./block-rate.ts; Base's Denim,
-// ui-jobs 615). Pure; the asset chart and the Prices list's flags read it.
+// ui-jobs 615). Where one line's day is its stored rounds' close, that close
+// is in force from its round's block to the day's end, so the other line's
+// read compares when it falls at or after that block, or within ten minutes
+// before it (ui-jobs 819). Pure; the asset chart and the Prices list's flags
+// read it.
 
 import { blockSpanSeconds } from "./block-rate";
 
@@ -95,6 +99,17 @@ export function lineSpreads(main: SpreadLine, others: readonly SpreadLine[], cha
     // A line given its rounds' day closes alone (the Prices list's flags) has
     // no points: its days compare at the same moment, with no moments between.
     const roundsFrom = main.rounds && o.rounds ? Math.max(main.rounds.joinDay, o.rounds.joinDay) : null;
+    // A day's two reads, the main line's at block `a` and the other's at `b`:
+    // a rounds close holds from its block on, so a read after it is the same moment.
+    const closes = (l: SpreadLine, day: number) => l.rounds != null && day >= l.rounds.joinDay;
+    const readTogether = (day: number, a: number, b: number) => {
+      const near = apart(a, b) <= READ_WINDOW_S;
+      const m = closes(main, day);
+      const c = closes(o, day);
+      if (m && !c) return b >= a || near;
+      if (c && !m) return a >= b || near;
+      return near;
+    };
     const note = (day: number, dev: number, ts?: number) => {
       if (!largest || Math.abs(dev) > Math.abs(largest.dev)) largest = ts == null ? { day, dev } : { day, dev, ts };
     };
@@ -109,7 +124,7 @@ export function lineSpreads(main: SpreadLine, others: readonly SpreadLine[], cha
       const sameMoment = roundsFrom != null && p[0] >= roundsFrom;
       const timed = !sameMoment && !main.fixed && !o.fixed;
       if (timed && (p[2] == null || q[2] == null)) continue;
-      if (timed && apart(p[2]!, q[2]!) > READ_WINDOW_S) {
+      if (timed && !readTogether(p[0], q[2]!, p[2]!)) {
         apartDays.add(p[0]);
         continue;
       }

@@ -1707,21 +1707,25 @@ export function liquityCollSurplusClaimContent(
 /** The asset chart's how-to-read on Lightweight Charts (anatomy A3.7). */
 export function assetLwChartContent(symbol: string): LearnMoreContent {
   return {
-    title: "How to read the price chart",
-    intro: `${symbol}'s price from each feed a lending protocol reads on this chain, over time in UTC. Protocols reading one feed, directly or through a wrapper that only rescales it, share a line.`,
+    title: "How to read the price charts",
+    intro: `${symbol}'s price from each feed a lending protocol reads on this chain, over time in UTC, in two charts that share one window and one cursor. Protocols reading one feed, directly or through a wrapper that only rescales it, share a line.`,
     detailsHeading: "The parts:",
     details: [
       {
-        bold: "The thick blue line",
-        text: "the main line: the one the most protocols read, or, opened from a protocol, the one that protocol reads.",
+        bold: "The price chart",
+        text: "the main line alone: opened from a protocol, the price that protocol uses; otherwise the one the most protocols read.",
       },
       {
-        bold: "The thin lines",
-        text: "the other feeds, on the same axis, each in the colour of its key over the chart (dashed where the colours run out).",
+        bold: "The gap chart",
+        text: "under it, each other feed as its gap from the main line in percent, 0 % being the main line, with dashed lines at ±1 %. Each line takes the colour and dash of its key in the legend over the chart (dashed where the colours run out).",
+      },
+      {
+        bold: "Comparing two lines",
+        text: "where both lines read stored rounds they are compared at the same moment. Before that, a day compares two lines only where both were read within ten minutes of each other, or one is a fixed price, or one line's day is its rounds' close and the other was read after that round. A line more than 1 % from the main line names its largest gap, which moves both charts there. A Maker line's gap is named with its cause: Maker prices from the median of an hour before.",
       },
       {
         bold: "Picking a line out",
-        text: "point at a row over the chart or under it, or at a line, to light that line in both panes; click or tap a row to hide its line or show it again, and the price axis rescales to the lines shown.",
+        text: "point at a row in the gap chart's legend, or at a line, to light that line; click or tap a row to hide its line or show it again, and the gap axis rescales to the lines shown.",
       },
       {
         bold: "Steps",
@@ -1729,15 +1733,11 @@ export function assetLwChartContent(symbol: string): LearnMoreContent {
       },
       {
         bold: "Zoom and pan",
-        text: "scroll or pinch to zoom, drag to pan, double-click to go back to the opening view; the buttons over the chart pick a span. Zoomed in on stored rounds, the chart reads every round in the window; zoomed out, each step is the last price of its span.",
+        text: "scroll or pinch to zoom, drag to pan, double-click to go back to the opening view; the buttons over the price chart pick a span. Either chart moves both. Zoomed in on stored rounds, the charts read every round in the window; zoomed out, each step is the last price of its span.",
       },
       {
-        bold: "The readout",
-        text: "over the chart: the time under the cursor, each line's price then, and on stored rounds the round, block and transaction behind the main line's price.",
-      },
-      {
-        bold: "The spread pane",
-        text: "under the prices, each other line's deviation from the main line, with dashed lines at ±1 %. Where both lines read stored rounds they are compared at the same moment; before that, a day compares two lines only where both were read within ten minutes of each other, or one is a fixed price. Under the chart, a line more than 1 % from the main line names its largest gap, which moves the chart there. A Maker line's gap is named with its cause: Maker prices from the median of an hour before.",
+        bold: "The legends",
+        text: "the time under the cursor (the window's last moment when the cursor is outside it), the main line's price then, and on stored rounds the round, block and transaction behind it; in the gap chart's legend, each other line's price and gap at that time.",
       },
       {
         bold: "Stored rounds",

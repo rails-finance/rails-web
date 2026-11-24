@@ -1,17 +1,17 @@
 "use client";
 
 // One chain's section of an asset page (rails-ops reference/asset-key-map.md):
-// the price chart 328 built (`CombinedFlows`, the price chart alone) with a
-// line per feed, the main one (the most read) in its hue and the others thin
-// beneath it, the spread strip under it (each line against the main one at
-// the cursor), then the lines listed: each oracle named, the protocols that
-// read it with their series, the span stored and its "as of" stamp (decision
-// 0054, ruling 2).
+// the price chart, drawing the main line alone (the most read; with `via`,
+// the line the protocol reads), the gap chart under it with each other line's
+// deviation from the main one (ui-jobs 818), a caption over each
+// (`chartCaptions`), then the lines listed: each oracle named, the protocols
+// that read it with their series, the span stored and its "as of" stamp
+// (decision 0054, ruling 2).
 // A line is the daily store's series (`/api/prices/daily`), a point per
 // completed UTC day, continued from its stored rounds' first day by the
 // rounds' day closes where the chain serves them (`/api/prices/rounds`,
 // `joinRounds`), drawn on Lightweight Charts (`AssetLwChart`). The join is
-// stated in the chart's source line and each line's stamp. With `via` (the
+// stated in the charts' source line and each line's stamp. With `via` (the
 // page read from a protocol's side, lib/shared/asset-via.ts) the section's
 // first line is the one that protocol reads, named so over the chart and in
 // the list.
@@ -29,20 +29,12 @@ import { formatDate } from "@/lib/date";
 import { assetLwChartContent } from "@/lib/shared/learn-more-content";
 import { endAtLastPoke, lineName, shortAddress, type PageChain, type PageLine } from "@/lib/shared/asset-roster";
 import { usesWords, type ViaView } from "@/lib/shared/asset-via";
+import { chartCaptions, joinText } from "@/lib/shared/asset-captions";
 
 const DAY_MS = 86_400_000;
 /** The store answers at most 3,000 days a read. */
 const MAX_DAYS = 2999;
 const dayDate = (day: number) => formatDate(new Date(day * DAY_MS));
-
-/** The join under the chart: from which day the lines are their stored rounds. */
-function joinText(lines: { rounds: PriceRounds }[], drawn: number, joinDay: number): string {
-  const who = lines.length === drawn ? "the lines are" : `${lines.length} of the ${drawn} lines are`;
-  const one = lines.every((l) => l.rounds.joinDay === joinDay);
-  return one
-    ? `From ${dayDate(joinDay)} ${who} their stored oracle rounds, each day at its close; before it, the daily store.`
-    : `${who[0].toUpperCase()}${who.slice(1)} their stored oracle rounds from the time each line's stamp names, each day at its close; before it, the daily store.`;
-}
 
 export function AssetPriceChart({
   section,
@@ -135,29 +127,26 @@ export function AssetPriceChart({
     [prices, byKey],
   );
   const joinDay = roundLines.length ? Math.min(...roundLines.map((l) => l.rounds.joinDay)) : null;
+  // The captions over the two charts, from the line the price chart draws.
+  const captions = useMemo(() => {
+    const main = spreads?.main;
+    return main ? chartCaptions(via, main, symbol, spreads.others.length) : null;
+  }, [spreads, via, symbol]);
 
   return (
     <section className="mt-8" data-asset-chain={section.chain} data-anatomy="A2">
       <h2 className="mb-3 text-lg font-semibold text-foreground">{section.name}</h2>
-      {via && (
-        <p className="-mt-2 mb-3 text-sm text-rb-500" data-asset-via={via.lineId ?? "none"} data-anatomy="A2.1">
-          {via.lineId ? (
-            <>
-              The main line is <span className="text-foreground">{usesWords(via.name)}</span>
-              {via.usualId
-                ? "; the line most protocols read is thin beneath it."
-                : ", and the one most protocols read."}
-            </>
-          ) : (
-            `${via.explorer.label} has no stored price for ${symbol} here; the main line is the one most protocols read.`
-          )}
+      {captions && (
+        <p
+          className="-mt-2 mb-3 text-sm text-rb-500"
+          data-asset-via={via ? (via.lineId ?? "none") : undefined}
+          data-asset-price-caption=""
+          data-anatomy="A2.1"
+        >
+          {captions.price}
         </p>
       )}
-      <div
-        className="rounded-lg border border-rb-200 p-3 dark:border-rb-700"
-        data-asset-chart="lightweight"
-        data-anatomy="A3"
-      >
+      <div data-asset-chart="lightweight" data-anatomy="A3">
         {prices.length > 0 ? (
           <AssetLwChart
             lines={lwLines}
@@ -166,9 +155,13 @@ export function AssetPriceChart({
             help={lwHelp}
             joinNote={joinDay != null ? joinText(roundLines, prices.length, joinDay) : null}
             usual={via?.usualId ?? null}
+            gapCaption={captions?.gap ?? null}
           />
         ) : (
-          <p className="py-6 text-center text-sm text-rb-500" data-asset-chart-state={failed ? "failed" : "loading"}>
+          <p
+            className="rounded-lg border border-rb-200 py-6 text-center text-sm text-rb-500 dark:border-rb-700"
+            data-asset-chart-state={failed ? "failed" : "loading"}
+          >
             {failed ? "The daily prices were not read." : "Reading the daily prices…"}
           </p>
         )}

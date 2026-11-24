@@ -9,12 +9,12 @@
 //      line's colour, and so is each spread row's key.
 //   L2 the style follows the key: WETH under Aave V3 (another main line)
 //      draws every line that is thin on both in the same colour and dash.
-//   L3 hide/show: a thin line's row pressed hides it in both panes
+//   L3 hide/show: a thin line's row pressed hides its line in the gap chart
 //      (`visible: false`, the row marked hidden, aria-pressed false), "Show all
 //      lines" draws it again; the main line's row has no button.
 //   L4 highlight: a row hovered lights its line (alpha 1, a pixel wider) and
-//      dims the others; the chart hovered over its lines lights one of them
-//      and its legend row, and names it over the spread pane.
+//      dims the other gap lines (the main line stays full); the gap chart hovered over its lines lights one of
+//      them and its legend row, and names it over the gap chart.
 //   L5 attribution: the NOTICE and its link in the footer of /, a protocol's
 //      Assets page and an asset page, and no TradingView logo in the asset chart.
 //   L6 every page here, at 1440 and at 390 with touch, light and dark: no
@@ -168,16 +168,15 @@ try {
       "L3 Show all lines draws every line again",
     );
 
-    // L3 a hidden line leaves the price axis: every thin line hidden, the axis
-    // spans the main line alone, narrower than with them all. At a span where
-    // the thin lines sit inside the main line's own range the axis cannot
-    // narrow (1D on 5 Nov 2026), so the first of 1D, 7D and 30D where it does
-    // is the evidence; none narrowing is the red.
+    // L3 a hidden line leaves the gap axis: every thin line hidden, the axis
+    // spans the ±1 % guides alone, narrower than with them all. At a span where
+    // every gap sits inside ±1 % the axis cannot narrow, so the first of 1D,
+    // 7D, 30D, 1Y and All where it does is the evidence; none narrowing is the red.
     const scale = async () =>
-      (await page.getAttribute("[data-asset-lw-chart]", "data-asset-lw-scale")).split(",").map(Number);
+      (await page.getAttribute("[data-asset-lw-chart]", "data-asset-lw-gap-scale")).split(",").map(Number);
     const tried = [];
     let narrowed = false;
-    for (const span of ["1D", "7D", "30D"]) {
+    for (const span of ["1D", "7D", "30D", "1Y", "All"]) {
       await page.click(`[data-asset-range="${span}"]`);
       await page.waitForTimeout(1200);
       const [a0, a1] = await scale();
@@ -192,7 +191,7 @@ try {
         break;
       }
     }
-    check(narrowed, "L3 hidden lines leave the price axis's range", tried.join("; "));
+    check(narrowed, "L3 hidden lines leave the gap axis's range", tried.join("; "));
     await page.click('[data-asset-range="All"]');
     await page.waitForTimeout(1200);
 
@@ -200,16 +199,20 @@ try {
     await page.hover(`[data-asset-lw-line="${target.id}"] button`);
     await page.waitForTimeout(300);
     d2 = await drawn(page);
-    const others = ids.filter((id) => id !== target.id);
+    // The main line has the price chart alone and stays full.
+    const others = ids.slice(1).filter((id) => id !== target.id);
     check(
-      d2[target.id].alpha === 1 && d2[target.id].width === 2 && others.every((id) => d2[id].alpha < 0.5),
-      "L4 a row hovered lights its line and dims the others",
+      d2[target.id].alpha === 1 &&
+        d2[target.id].width === 2 &&
+        others.every((id) => d2[id].alpha < 0.5) &&
+        d2[ids[0]].alpha === 1,
+      "L4 a row hovered lights its line and dims the other gap lines",
       JSON.stringify(Object.fromEntries(ids.map((id) => [id.slice(-8), [d2[id].alpha, d2[id].width]]))),
     );
     await page.mouse.move(0, 0);
     await page.waitForTimeout(200);
-    // L4 highlight from the chart: sweep the spread pane, then the price pane.
-    const box = await page.locator("[data-asset-lw-box]").first().boundingBox();
+    // L4 highlight from the gap chart: sweep it from the bottom up.
+    const box = await page.locator("[data-asset-lw-gap-box]").first().boundingBox();
     let hit = null;
     for (let y = box.y + box.height - 40; y > box.y + 10 && !hit; y -= 3) {
       await page.mouse.move(box.x + box.width * 0.5, y);
@@ -226,7 +229,7 @@ try {
         const label = await page
           .getAttribute("[data-asset-lw-spread-label]", "data-asset-lw-spread-label")
           .catch(() => null);
-        check(label === hit, "L4 the lit line is named over the spread pane", `${label}`);
+        check(label === hit, "L4 the lit line is named over the gap chart", `${label}`);
       }
     }
     await layoutCheck(page, "WETH under Liquity V2 1440 light", errors);
