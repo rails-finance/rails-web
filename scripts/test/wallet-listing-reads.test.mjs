@@ -79,12 +79,14 @@ const noPageRows = [
 let v2sp = "ok";
 let ebisuSp = [];
 let calls = [];
+let summaryUrls = [];
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 globalThis.fetch = async (input, init = {}) => {
   const url = new URL(typeof input === "string" ? input : input.url);
   calls.push(url.pathname);
-  if (url.pathname === `/api/wallet/${W}/positions`)
+  if (/^\/api\/wallet\/[^/]+\/positions$/.test(url.pathname)) summaryUrls.push(url);
+  if (/^\/api\/wallet\/[^/]+\/positions$/.test(url.pathname))
     return json({ address: W, rows: [], total: 0, open: 0, closed: 0, limit: 500, offset: 0 });
   if (url.pathname === `/api/wallet/${W2}/positions`)
     return json({
@@ -456,4 +458,17 @@ test("V1 stake head: the LUSD fees at $1 and the ETH fees at the read's PriceFee
   assert.equal(p.card.head.stakeRaw, `100${E18}`);
   const noPrice = await liquityV1StakeHead(async () => chain({ priceRaw: null }))([pos]);
   assert.equal(noPrice.positions[0].headRead, "failed");
+});
+
+test("the summary request opts in to every family and chain", async () => {
+  summaryUrls = [];
+  await readSummary(W, signal());
+  await readWalletCounts("0x00000000000000000000000000000000000a11ce");
+  assert.ok(summaryUrls.length >= 1);
+  for (const u of summaryUrls) {
+    assert.equal(u.searchParams.get("families"), "all");
+    assert.equal(u.searchParams.get("chains"), "ethereum,base,arbitrum,arc,sepolia");
+    assert.ok(u.searchParams.get("limit"));
+    assert.ok(u.searchParams.get("former"));
+  }
 });
