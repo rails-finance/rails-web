@@ -15,6 +15,7 @@ export function CompoundV3OptimismFrontDoor() {
       label={LABEL}
       line={FRONT_DOOR.line}
       route={OPC_ROUTE}
+      chainId={10}
       links={[{ href: `${OPC_ROUTE}/markets`, label: FRONT_DOOR.links.markets }]}
     />
   );

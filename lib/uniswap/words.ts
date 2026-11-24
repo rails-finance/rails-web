@@ -701,8 +701,11 @@ export function readoutExplainer(p: PoolPosition): ExplainGroupWords[] {
 // ── Door 1: the front door and a wallet's positions ────────────────────────
 
 export const FRONT_DOOR = {
+  // Optimism's door first (ui-jobs 578); the other chains' line waits on their own review.
   line: (v: UniswapVersion, protocol: UniProtocol = "uniswap", chainId = 1) =>
-    `A wallet's ${versionLabel(v, protocol)} positions on ${uniDeployment(protocol, chainId).chainName}, each with its range, fees and pool over the last 30 days.`,
+    chainId === 10
+      ? `Enter a wallet address above to see its ${versionLabel(v, protocol)} positions on Optimism. You'll see each position's price range and the fees it earned over the last 30 days, with its pool's figures beside them.`
+      : `A wallet's ${versionLabel(v, protocol)} positions on ${uniDeployment(protocol, chainId).chainName}, each with its range, fees and pool over the last 30 days.`,
   /** PancakeSwap's door adds its farm. */
   stakedLine: "Positions staked in PancakeSwap's farm are listed under the wallet that staked them.",
   heading: (v: UniswapVersion, protocol: UniProtocol = "uniswap") => `${versionLabel(v, protocol)} positions`,

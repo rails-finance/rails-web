@@ -15,6 +15,7 @@ export function AaveV3OptimismFrontDoor() {
       label={LABEL}
       line={FRONT_DOOR.line}
       route={OP_ROUTE}
+      chainId={10}
       links={[{ href: `${OP_ROUTE}/markets`, label: FRONT_DOOR.links.markets }]}
     />
   );

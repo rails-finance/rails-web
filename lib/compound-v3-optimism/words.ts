@@ -26,7 +26,7 @@ export const usd = (x: number) =>
 export const pctText = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%`;
 
 export const FRONT_DOOR = {
-  line: "A wallet's Compound V3 accounts on Optimism: what it lends, borrows and puts up as collateral in each Comet, in dollars at the Comet's price feeds, its borrowing capacity and its interest over the last 30 days.",
+  line: "Enter a wallet address above to see its Compound V3 accounts on Optimism. You'll see what it lends, borrows and holds as collateral in each of the three markets, how much of its borrowing limit it uses, and its interest over the last 30 days.",
   links: { markets: "Market overview" },
 };
 
