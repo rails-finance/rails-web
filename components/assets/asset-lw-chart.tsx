@@ -105,7 +105,7 @@ export interface HeadPrice {
   updated: string | null;
 }
 
-const PANEL = "rounded-xl bg-raised p-3 sm:p-4";
+const PANEL = "rounded-xl bg-raised p-3 sm:p-4 dark:bg-[var(--surface-sunken)]";
 
 /** The panel's header (A3.8): the figure large, then beside it the change
  *  and time, or the hovered moment (`hover`); the range buttons at the right. */
@@ -605,7 +605,7 @@ export function AssetLwChart({
                         span == null ? { from: bounds.t0, to: bounds.t1 } : { from: bounds.t1 - span, to: bounds.t1 },
                       );
                     }}
-                    className={`rounded px-2 py-0.5 tabular-nums ${active(span) ? "bg-[var(--surface-sunken)] font-semibold text-foreground" : "text-rb-500 hover:text-foreground"}`}
+                    className={`rounded px-2 py-0.5 tabular-nums ${active(span) ? "bg-[var(--surface-sunken)] dark:bg-white/10 font-semibold text-foreground" : "text-rb-500 hover:text-foreground"}`}
                     data-asset-range={word}
                   >
                     {word}

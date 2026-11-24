@@ -102,7 +102,7 @@ export function AssetPriceChart({
           joinNote={main?.rounds ? joinText(main.rounds.joinDay) : null}
         />
       ) : (
-        <div className="rounded-xl bg-raised p-3 sm:p-4">
+        <div className="rounded-xl bg-raised p-3 sm:p-4 dark:bg-[var(--surface-sunken)]">
           <ChartHead head={head} />
           <p className="py-6 text-center text-sm text-rb-500" data-asset-chart-state={failed ? "failed" : "loading"}>
             {!mainLine.drawn
