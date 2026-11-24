@@ -71,7 +71,12 @@ import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { useAssetScope } from "@/lib/shared/asset-scope";
 import { walletPositionAssetKeys } from "@/lib/wallet/aim-assets";
 import { COW_TERMS } from "@/lib/cow/terms";
-import { LiquidityBoundary, LiquidityReading, LiquiditySection } from "@/components/wallet/wallet-liquidity";
+import {
+  LiquidityBoundary,
+  LiquidityReading,
+  LiquiditySection,
+  WhenLiquidityEmpty,
+} from "@/components/wallet/wallet-liquidity";
 import type { WalletLiquidity } from "@/lib/wallet/types";
 
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
@@ -435,6 +440,16 @@ export function WalletView({
       </Suspense>
     </LiquidityBoundary>
   );
+  // The empty wallet's sentence (W3).
+  const noPositions = (
+    <p className="text-sm text-foreground/80" data-wallet-reads="">
+      Rails found no positions for this wallet on the{" "}
+      <Link href="/coverage" className={`underline-offset-2 ${INLINE_LINK}`} data-wallet-coverage="">
+        protocols and chains it covers
+      </Link>
+      .
+    </p>
+  );
   const filterBar = read.held.length > 0 && (
     <WalletFilterBar
       address={address}
@@ -564,14 +579,15 @@ export function WalletView({
                         ? "Rails holds no vault shares for this wallet."
                         : `Rails holds no ${chosen.name} position for this wallet.`}
                     </p>
+                  ) : liquidity && liquiditySection ? (
+                    // Drawn once the liquidity read settles with none (W9 lists any it finds).
+                    <LiquidityBoundary fallback={null}>
+                      <Suspense fallback={null}>
+                        <WhenLiquidityEmpty read={liquidity}>{noPositions}</WhenLiquidityEmpty>
+                      </Suspense>
+                    </LiquidityBoundary>
                   ) : (
-                    <p className="text-sm text-foreground/80" data-wallet-reads="">
-                      Rails found no positions for this wallet on the{" "}
-                      <Link href="/coverage" className={`underline-offset-2 ${INLINE_LINK}`} data-wallet-coverage="">
-                        protocols and chains it covers
-                      </Link>
-                      .
-                    </p>
+                    noPositions
                   )}
                   {back && (
                     <p className="text-sm">
