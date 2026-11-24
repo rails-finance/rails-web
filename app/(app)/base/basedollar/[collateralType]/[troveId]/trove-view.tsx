@@ -395,7 +395,8 @@ export default function BasedollarTroveDetail({
   const cooldownWindow = useRateCooldownWindow({
     events: basedollarEvents,
     folders: servedFolders,
-    active: view?.status === "open" && chain?.status !== "zombie" && shutdown == null,
+    active: view?.status === "open" && chain != null && chain.status !== "zombie" && shutdown == null,
+    positionPath: `/base/basedollar/${collateralType}/${troveId}`,
   });
 
   // Lifetime flows: the Trove's whole history replayed (lib/shared/liquity-flows.ts).

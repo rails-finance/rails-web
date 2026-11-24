@@ -395,7 +395,8 @@ export default function AsymmetryTroveDetail({
   const cooldownWindow = useRateCooldownWindow({
     events: asymmetryEvents,
     folders: servedFolders,
-    active: view?.status === "open" && chain?.status !== "zombie" && shutdown == null,
+    active: view?.status === "open" && chain != null && chain.status !== "zombie" && shutdown == null,
+    positionPath: `/ethereum/asymmetry/${collateralType}/${troveId}`,
   });
 
   // Lifetime flows: the Trove's whole history replayed (lib/shared/liquity-flows.ts).

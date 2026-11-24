@@ -168,8 +168,7 @@ for (const s of await samples()) {
   await row.locator('[role="button"]').first().click();
   await row.locator("[data-rate-cooldown-fee]").waitFor({ timeout: 10_000 });
   const fee = await row.locator("[data-rate-cooldown-fee]").innerText();
-  assert(/7 days of interest on the Trove's whole debt at the branch's average rate/.test(fee), "the fee rule");
-  assert(/premature adjustment fee/.test(fee), "the docs' other name");
+  assert(/7 days of average interest on the Trove's debt, added to the debt/.test(fee), "the fee rule");
   const same = await row.locator("[data-rate-cooldown-same]").innerText();
   assert(
     exp.batched

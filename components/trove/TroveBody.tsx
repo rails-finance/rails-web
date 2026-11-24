@@ -284,7 +284,8 @@ export function TroveBody({
   // closed or zombie Trove or a shut-down branch, where a rate change reverts.
   const cooldownWindow = useRateCooldownWindow({
     events: liquityEvents,
-    active: !closed && !trove.isZombie && shutdown == null,
+    active: !still && !closed && !trove.isZombie && shutdown == null,
+    positionPath: `/ethereum/liquity-v2/trove/${trove.collateralType}/${trove.id}`,
   });
 
   // One clock for the debt, interest and cost figures: a shut-down branch's

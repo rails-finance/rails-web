@@ -1,5 +1,5 @@
 // The 7-day rate-change cooldown of a Liquity V2 Trove (and each fork's), read
-// from the Trove's own timeline rows (rails-ops TO-DO-ui-jobs 831;
+// from the Trove's timeline rows (rails-ops TO-DO-ui-jobs 831;
 // reference/liquity-v2-fees-and-interest.md (a)).
 //
 // The rule, from the contracts. `Troves[id].lastInterestRateAdjTime` is set on
@@ -45,7 +45,7 @@ export interface CooldownFolder {
   counts: { key: string; count: number }[];
 }
 
-/** The operations that set the Trove's own clock, and what each started. */
+/** The operations that set the Trove's clock, and what each started. */
 const TROVE_CLOCK: Record<string, CooldownStart> = {
   openTrove: "open",
   openTroveAndJoinBatch: "open-batch",
@@ -68,7 +68,7 @@ export interface RateCooldown {
   /** The clock the fee test reads: the Trove's, or on a batched Trove the
    *  later of the Trove's (its join) and the batch's. */
   clock: RateCooldownClock;
-  /** The Trove's own clock, which on a batched Trove its join set. */
+  /** The Trove's clock, which on a batched Trove its join set. */
   troveClock: RateCooldownClock;
   /** The batch manager, on a batched Trove; null otherwise. */
   batchManager: string | null;

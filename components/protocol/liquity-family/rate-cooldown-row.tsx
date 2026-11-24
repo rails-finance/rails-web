@@ -14,7 +14,6 @@
 // column, no ⋮ and no number.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
 
 import { NoteRowShell } from "@/components/shared/note-row-shell";
 import { Prov, type Provenance, type ProvInput } from "@/components/shared/provenance";
@@ -78,9 +77,12 @@ export function useRateCooldownWindow({
   events,
   folders,
   active,
+  positionPath,
   cooldown = INTEREST_RATE_ADJ_COOLDOWN,
 }: {
   events: readonly BaseActivityEvent[];
+  /** The Trove page's path, which the event links hang off. */
+  positionPath: string;
   folders?: readonly ServedFolder[] | null;
   active: boolean;
   cooldown?: number;
@@ -92,7 +94,7 @@ export function useRateCooldownWindow({
     [rows, now, cooldown, folders],
   );
   if (!active || now == null || !state) return undefined;
-  return () => <RateCooldownRow state={state} now={now} />;
+  return () => <RateCooldownRow state={state} now={now} positionPath={positionPath} />;
 }
 
 /** "28 Nov 2026, 14:32 UTC". */
@@ -155,7 +157,7 @@ function deadlineProv(state: RateCooldown, chainId: ChainId): Provenance {
   };
 }
 
-/** The receipt behind the delegate's own cooldown on the batch's rate. */
+/** The receipt behind the delegate's cooldown on the batch's rate. */
 function delegateProv(clock: RateCooldownClock, chainId: ChainId): Provenance {
   return {
     kind: "chain-derived",
@@ -167,13 +169,19 @@ function delegateProv(clock: RateCooldownClock, chainId: ChainId): Provenance {
   };
 }
 
-export function RateCooldownRow({ state, now }: { state: RateCooldown; now: number }) {
+export function RateCooldownRow({
+  state,
+  now,
+  positionPath,
+}: {
+  state: RateCooldown;
+  now: number;
+  positionPath: string;
+}) {
   const chainId = useChainId();
-  const pathname = usePathname();
-  const base = (pathname ?? "").replace(/\/event\/.*$/, "");
   const eventLink = (clock: RateCooldownClock) => (
     <a
-      href={`${base}/event/${encodeURIComponent(clock.row.id)}`}
+      href={`${positionPath}/event/${encodeURIComponent(clock.row.id)}`}
       className="underline decoration-dotted underline-offset-2"
       data-rate-cooldown-event={clock.row.id}
     >
@@ -187,12 +195,7 @@ export function RateCooldownRow({ state, now }: { state: RateCooldown; now: numb
     ? `Leaving the batch at another rate before ${ends} costs an Upfront Borrowing Fee`
     : `A rate change before ${ends} costs an Upfront Borrowing Fee`;
   const prov = deadlineProv(state, chainId);
-  const fee = (
-    <>
-      The fee is 7 days of interest on the Trove&apos;s whole debt at the branch&apos;s average rate, added to the debt.
-      The docs also call it the premature adjustment fee.
-    </>
-  );
+  const fee = <>The fee is 7 days of average interest on the Trove&apos;s debt, added to the debt.</>;
   const fromBatch = batched && state.clock.start === "batch-rate";
 
   return (
@@ -208,7 +211,7 @@ export function RateCooldownRow({ state, now }: { state: RateCooldown; now: numb
         label={`Rate-change cooldown, ${words}, ${left} left`}
         marker={{ attr: "data-rate-cooldown", value: state.clock.row.id }}
         header={
-          // Long words wrap inside their own cell, so the chevron and the
+          // Long words wrap inside their cell, so the chevron and the
           // time left keep the row's right end.
           <span
             className="min-w-0 max-w-full text-sm text-rb-500 max-sm:text-center max-sm:text-xs sm:flex-1"
@@ -266,9 +269,7 @@ export function RateCooldownRow({ state, now }: { state: RateCooldown; now: numb
               : a batch rate change before then costs the batch an Upfront Borrowing Fee, shared across its Troves.
             </p>
           )}
-          <p className="text-xs text-rb-500">
-            A clock on this Trove, read from its events. It isn&apos;t included in this page&apos;s event counts.
-          </p>
+          <p className="text-xs text-rb-500">Not counted in this page&apos;s events.</p>
         </div>
       </NoteRowShell>
     </div>
