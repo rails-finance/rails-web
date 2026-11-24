@@ -1,8 +1,8 @@
 import "server-only";
 
-// The one way the wallet page's Liquidity section (W9) reaches rails-server: every owner route
-// and every position read goes through `liquidityHop`, at most four at once (createLimit), each
-// under its own wait. ui-jobs 814 moves the wallet page's api calls onto 813's limiter
+// The one way the wallet page's Liquidity section (W9) reaches rails-server: each of its eleven
+// owner routes goes through `liquidityHop`, at most four at once (createLimit), each under its
+// own wait. ui-jobs 814 moves the wallet page's api calls onto 813's limiter
 // (lib/wallet/api-hop.ts, `apiHop`): the fetch marked below is the one line that changes.
 //
 // SERVER-ONLY: reads RAILS_API_URL and the bearer token.

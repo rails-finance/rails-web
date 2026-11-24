@@ -138,6 +138,22 @@ export interface AeroPositionsRead {
     liquidity: string;
     staked: boolean;
     gauge: string | null;
+    // The head-only fields the wallet page's listing card draws (rails-ops decisions/0071), read at
+    // `head`. `pool`, `fee`, `now` and `stake` are read for the first 25 rows; the rest carry null.
+    pool: string | null;
+    /** The NFT's holder on record: the owner, or the gauge where the position is staked. */
+    owner: string;
+    tickLower: number;
+    tickUpper: number;
+    /** The pool's fee() now. */
+    fee: number | null;
+    now: AeroPoolRead | null;
+    /** A staked row's gauge reads: the depositor is the owner; penaltyBps and minStakeSeconds null. */
+    stake: AeroStaked | null;
   }[];
+  /** How many rows carry the head-only fields (25): a row at or past it has `now` null by design. */
+  headRows?: number;
+  /** The reward's price legs at the head (`then` null); null with no held rows. */
+  aero: { usdc: AeroPriceLeg; weth: AeroPriceLeg } | null;
   truncated: boolean;
 }

@@ -4,9 +4,10 @@
 // after the page (lib/wallet/liquidity/read-liquidity.ts), below the protocol sections (W3).
 // Each position is its explorer's card as a listing row inside one link (N2), as W3 draws them:
 // Uniswap's and PancakeSwap's, Aerodrome's and Velodrome's with the range at the head block in
-// the fourth headline, Balancer's as its card states it. The cards state no dollars, so the
-// section states no total. A route that did not answer, a truncated answer, and the positions
-// past the section's cap are each said under the cards.
+// the fourth headline, Balancer's with its share and tokens. Every card is drawn from its owner
+// route's answer at the head block. The cards state no dollars, so the section states no total.
+// A route or a position that could not be read, a truncated answer, and the positions past the
+// route's first 25 are each said under the cards.
 
 import Link from "next/link";
 import { use } from "react";
@@ -30,14 +31,13 @@ export function LiquidityReading() {
   );
 }
 
-/** A route that answered with positions the section does not draw: those that could not be
- *  read, and those past its cap, all on the explorer's wallet page. */
+/** A route whose answer holds more rows than it reads at the head: those past them are on the
+ *  explorer's wallet page. */
 function MoreLine({ s }: { s: LiquiditySourceRead }) {
   const over = s.held - s.drawn - s.failed;
   return (
     <p className={LINE} data-wallet-liquidity-more={s.key}>
-      {s.what}: {s.failed > 0 && `${s.failed} ${s.failed === 1 ? "position" : "positions"} could not be read. `}
-      {over > 0 ? `${over} more ${over === 1 ? "is" : "are"} on ` : "Every position is on "}
+      {s.what}: the newest {s.headRows} are drawn; {over} more {over === 1 ? "is" : "are"} on{" "}
       <Link href={s.href} prefetch={false} className={INLINE_LINK}>
         its wallet page
       </Link>
@@ -46,14 +46,20 @@ function MoreLine({ s }: { s: LiquiditySourceRead }) {
   );
 }
 
+/** "Velodrome on Optimism", or "2 Uniswap V3 and V4 positions on Ethereum" for rows in an answer. */
+const unreadWhat = (s: LiquiditySourceRead) =>
+  s.state === "ok" ? `${s.failed} ${s.name} ${s.failed === 1 ? "position" : "positions"} on ${s.chainName}` : s.what;
+
 export function LiquiditySection({ read }: { read: Promise<WalletLiquidity> }) {
   const l = use(read);
   // Focus (ui-jobs 557): a position stays where a token of its pool is in focus.
   const scoped = useScopedRows(l.positions, walletPositionAssetKeys, (p) => p.chain as number);
-  const unread = l.sources.filter((s) => s.state === "failed" || s.state === "refused");
+  const unread = l.sources.filter(
+    (s) => s.state === "failed" || s.state === "refused" || (s.state === "ok" && s.failed > 0),
+  );
   const ceiling = l.sources.some((s) => s.state === "ceiling");
   const truncated = l.sources.filter((s) => s.state === "ok" && s.truncated);
-  const more = l.sources.filter((s) => s.state === "ok" && s.held > s.drawn);
+  const more = l.sources.filter((s) => s.state === "ok" && s.held > s.drawn + s.failed);
   if (l.positions.length === 0 && unread.length === 0 && !ceiling && truncated.length === 0 && more.length === 0)
     return null;
   return (
@@ -87,7 +93,7 @@ export function LiquiditySection({ read }: { read: Promise<WalletLiquidity> }) {
       <div className="mt-3 flex flex-col gap-1">
         {unread.length > 0 && (
           <p className={LINE} data-wallet-liquidity-unanswered={unread.map((s) => s.key).join(",")}>
-            {andList(unread.map((s) => s.what))} could not be read.
+            {andList(unread.map(unreadWhat))} could not be read.
           </p>
         )}
         {ceiling && (

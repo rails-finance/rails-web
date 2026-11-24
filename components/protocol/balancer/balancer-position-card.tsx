@@ -94,6 +94,28 @@ function slots(r: BalPositionRead, surface: "detail" | "listing"): PositionCardS
           </span>
         ) : undefined,
     },
+  ];
+  const status = !open ? { word: CARD_WORDS.closed, tone: "muted" as const, tip: CARD_WORDS.none } : null;
+  // The position's name: the pool and the wallet (lib/shared/position-name.ts).
+  const name = positionName({
+    market: p.symbol,
+    noun: POSITION_NOUN[balChain(r.chainId).session],
+    id: r.wallet.toLowerCase(),
+  });
+  // A listing row: the pool's symbol as the tag, the wallet being the page's.
+  if (surface === "listing")
+    return {
+      surface: "listing",
+      status,
+      heads,
+      counters: null,
+      name,
+      tag: p.symbol ? <ListingTag market={p.symbol} /> : undefined,
+      menu: null,
+    };
+  // The 30-day rate and the first add are the position page's reads, which the owner route does
+  // not make: the detail card alone states them.
+  heads.push(
     {
       id: "rate",
       label: CARD_WORDS.rate,
@@ -124,25 +146,7 @@ function slots(r: BalPositionRead, surface: "detail" | "listing"): PositionCardS
         </span>
       ),
     },
-  ];
-  const status = !open ? { word: CARD_WORDS.closed, tone: "muted" as const, tip: CARD_WORDS.none } : null;
-  // The position's name: the pool and the wallet (lib/shared/position-name.ts).
-  const name = positionName({
-    market: p.symbol,
-    noun: POSITION_NOUN[balChain(r.chainId).session],
-    id: r.wallet.toLowerCase(),
-  });
-  // A listing row: the pool's symbol as the tag, the wallet being the page's.
-  if (surface === "listing")
-    return {
-      surface: "listing",
-      status,
-      heads,
-      counters: null,
-      name,
-      tag: p.symbol ? <ListingTag market={p.symbol} /> : undefined,
-      menu: null,
-    };
+  );
   return {
     surface: "detail",
     heading: CARD_WORDS.heading,

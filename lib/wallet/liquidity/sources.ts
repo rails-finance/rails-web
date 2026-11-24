@@ -1,7 +1,7 @@
 // The owner routes the wallet page's Liquidity section reads at visit (W9; rails-ops
 // decisions/0071): one per explorer and chain, each answering the wallet's positions that hold
-// liquidity (rails-server api/src/routes/uniswap.ts, aerodrome.ts, balancer.ts). Paths only;
-// lib/wallet/liquidity/read-liquidity.ts reads them.
+// liquidity with the head-only fields its listing card draws (rails-server api/src/routes/uniswap.ts,
+// aerodrome.ts, balancer.ts). Paths only; lib/wallet/liquidity/read-liquidity.ts reads them.
 //
 // Pure, with no imports: scripts/test/wallet-liquidity.test.mjs reads it.
 
@@ -45,8 +45,9 @@ export const LIQUIDITY_SOURCES: readonly LiquiditySource[] = [
   src("balancer", "balancer", 42161, "Arbitrum", "Balancer V3", "/arbitrum/balancer-v3"),
 ];
 
-/** How many of one route's positions the section draws as cards: each card is one position read. */
-export const LIQUIDITY_CARDS_PER_SOURCE = 6;
+/** How many of an answer's rows the Uniswap-family and Slipstream routes read at the head (the
+ *  server's HEAD_ROWS): the rows past it carry no head fields, and the section draws none of them. */
+export const LIQUIDITY_HEAD_ROWS = 25;
 
 const qs = (q: Record<string, string>) => new URLSearchParams(q).toString();
 
@@ -61,20 +62,6 @@ export function ownerPath(s: LiquiditySource, owner: string): string {
   const o = owner.toLowerCase();
   if (s.kind === "balancer") return `/api/at-block/balancer/positions?${qs({ chainId: String(s.chainId), owner: o })}`;
   return `/api/at-block/${s.protocol}/positions?${qs({ ...chainQ(s), owner: o })}`;
-}
-
-/** One position's read, the one its page makes: a Uniswap-family version and id, a Slipstream
- *  deployment and id, or a Balancer pool with the wallet. */
-export function positionPath(
-  s: LiquiditySource,
-  p: { version?: string; deployment?: string; id?: string; pool?: string },
-  owner: string,
-): string {
-  if (s.kind === "balancer")
-    return `/api/at-block/balancer/position?${qs({ chainId: String(s.chainId), pool: (p.pool ?? "").toLowerCase(), wallet: owner.toLowerCase() })}`;
-  if (s.kind === "slipstream")
-    return `/api/at-block/${s.protocol}/position?${qs({ ...chainQ(s), deployment: p.deployment ?? "", id: p.id ?? "" })}`;
-  return `/api/at-block/${s.protocol}/position?${qs({ ...chainQ(s), version: p.version ?? "", id: p.id ?? "" })}`;
 }
 
 const andList = (xs: string[]) =>

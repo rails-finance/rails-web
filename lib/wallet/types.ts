@@ -102,8 +102,8 @@ export type WalletCard =
   /** A Liquity V2 fork's Stability Pool deposit: its deposit listing's row,
    *  as stored (no head read). */
   | { kind: "fork-deposit"; fork: "ebisu" | "asymmetry" | "basedollar"; row: LiquityV2DepositRow<string> }
-  /** A liquidity position the wallet page reads at visit (W9, lib/wallet/liquidity/): the
-   *  explorer's position read at the head block, drawn by its card as a listing row. */
+  /** A liquidity position the wallet page reads at visit (W9, lib/wallet/liquidity/): its owner
+   *  route's row at the head block as the read its explorer's card takes, drawn as a listing row. */
   | { kind: "uniswap"; protocol: UniProtocol; read: UniPositionRead }
   | { kind: "slipstream"; read: AeroPositionRead }
   | { kind: "balancer"; read: BalPositionRead };
@@ -267,10 +267,13 @@ export interface LiquiditySourceRead {
   truncated: boolean;
   /** Positions holding liquidity the route named. */
   held: number;
-  /** Their cards drawn; `held - drawn - failed` are past the section's cap. */
+  /** Their cards drawn; `held - drawn - failed` are past the answer's `headRows`, which carry no
+   *  head fields by design. */
   drawn: number;
-  /** Position reads that did not answer. */
+  /** Rows before `headRows` without their head fields: a row read that failed. */
   failed: number;
+  /** The rows the answer reads at the head (its `headRows`, 25). */
+  headRows: number;
   /** The explorer's wallet page, which lists every position. */
   href: string;
   /** The explorer's name on that chain, for the lines under the section. */
