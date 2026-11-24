@@ -538,7 +538,7 @@ const usdcRoster = {
           s(`aave-v4:${USDC}`, "Aave V4", 20535),
           s(`cv3:0xc3d688b66703497daa19211eedff47f25384cdc3:${USDC}`, "Compound V3 cUSDCv3", 19230),
         ]),
-        rl("0xd09124f3d9d8d4f6e4e1c9b3a4c0c5e6f7a8b9c0", "Chainlink USDC / ETH", "chainlink", [
+        rl("0x986b5e1e1755e3c2440e960477f25201b0a8bbd4", "Chainlink USDC / ETH", "chainlink", [
           s(`cv3:0xa17581a9e3356d9a858b789d68b4d866e593ae94:${USDC}`, "Compound V3 cWETHv3", 19381),
         ]),
       ],
@@ -576,6 +576,7 @@ test("a protocol that reads two lines gets a row per market, both linked to its 
   const comp = rows.filter((r) => r.protocol.name.startsWith("Compound V3"));
   assert.equal(comp[0].protocol.href, comp[1].protocol.href);
   assert.deepEqual([comp[0].price.text, comp[1].price.text], ["$0.9999", "$1.0001"]);
+  assert.equal(comp[1].kind, "Priced in ETH, × WETH/USD", "the USDC / ETH line says how its dollars are made");
 });
 
 test("row labels are unique on the Morpho USDC page and name the market", () => {

@@ -63,6 +63,10 @@ export const ORACLE_LABELS: Record<string, OracleLabel> = {
   // "Maker fixed at 1.00 (a DSValue)" and SparkLend's "Fixed at 1.00" (kind fixed).
   "1:0x77b68899b99b686f415d074278a9a16b336085a0": { short: "Fixed at 1.00", kind: "fixed" },
   "1:0x42a03f81dd8a1cecd746dc262e4d1cd9fd39f777": { kind: "fixed" },
+  // "Chainlink USDC / ETH" (kind chainlink), read by Compound V3 cWETHv3: its
+  // USD figure is the answer times WETH/USD at the same block (rails-server's
+  // compound_v3_prices_at_block quote_usd_raw).
+  "1:0x986b5e1e1755e3c2440e960477f25201b0a8bbd4": { kind: "priced in ETH, × WETH/USD" },
 };
 
 /** The oracle's label on `chain`, undefined where Rails stores none. */
