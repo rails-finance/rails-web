@@ -60,7 +60,13 @@ export interface PolarisLoanCardProps {
   /** The wallet page: each listing figure carries its receipt, the row read
    *  through `via` with its debt at the loan's last touch or at the
    *  deployment's latest index. */
-  receipts?: { via: PolarisRowVia; debtAt: "touch" | "index" };
+  receipts?: {
+    via: PolarisRowVia;
+    debtAt: "touch" | "index";
+    /** The blocks the row states its collateral, and its debt and cost, at. */
+    collBlock?: number;
+    debtBlock?: number;
+  };
 }
 
 function LoanMenuRows({ row }: { row: PolarisLoanRow }) {
@@ -124,15 +130,23 @@ export function polarisLoanSlots({
     const coll = big(row.coll_raw);
     const debt = big(row.debt_at_index_raw);
     const cost = big(row.cost_raw);
-    const atIndex = receipts?.debtAt === "index";
+    // The wallet page's stored row states the debt at the loan's last touch;
+    // a listing row states it at the deployment's latest index.
+    const atTouch = receipts?.debtAt === "touch";
     const prov = (what: Parameters<typeof loanRowProv>[0], figure: ReactNode) =>
-      receipts ? <Prov info={loanRowProv(what, receipts.via)}>{figure}</Prov> : figure;
+      receipts ? (
+        <Prov info={loanRowProv(what, receipts.via, what === "coll" ? receipts.collBlock : receipts.debtBlock)}>
+          {figure}
+        </Prov>
+      ) : (
+        figure
+      );
     const heads: PositionCardHead[] = closed
       ? [
           {
             id: "cost",
             label: "Cost",
-            value: prov(atIndex ? "costAtIndex" : "costAtTouch", <RawFigure raw={cost} symbol={W.symbol} />),
+            value: prov(atTouch ? "costAtTouch" : "costAtIndex", <RawFigure raw={cost} symbol={W.symbol} />),
             assets: tokenIcon(W.symbol, W.address, cost),
           },
         ]
@@ -146,15 +160,17 @@ export function polarisLoanSlots({
           {
             id: "debt",
             label: "Debt",
-            labelTip: "As of the last touch. Fees accrued since are left out.",
+            labelTip: atTouch
+              ? "As of the last touch. Fees accrued since are left out."
+              : "At the deployment's latest fee index. Fees accrued since that log are left out.",
             labelTipOnListing: true,
-            value: prov(atIndex ? "debtAtIndex" : "debtAtTouch", <RawFigure raw={debt} symbol={W.symbol} approx />),
+            value: prov(atTouch ? "debtAtTouch" : "debtAtIndex", <RawFigure raw={debt} symbol={W.symbol} approx />),
             assets: tokenIcon(W.symbol, W.address, debt),
           },
           {
             id: "cost",
             label: "Cost so far",
-            value: prov(atIndex ? "costAtIndex" : "costAtTouch", <RawFigure raw={cost} symbol={W.symbol} approx />),
+            value: prov(atTouch ? "costAtTouch" : "costAtIndex", <RawFigure raw={cost} symbol={W.symbol} approx />),
             assets: tokenIcon(W.symbol, W.address, cost),
           },
         ];

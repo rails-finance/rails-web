@@ -118,8 +118,14 @@ export type WalletCard =
    *  the fields the listing card draws (mig 529), the head read the listing
    *  route's whole row (`via`). A loan's debt is at its last touch, or at the
    *  deployment's latest index on a listing row. */
-  | { kind: "polaris-loan"; row: PolarisLoanRow; via: "wallet" | "listing" }
-  | { kind: "polaris-deposit"; row: PolarisDepositRow; via: "wallet" | "listing" }
+  | {
+      kind: "polaris-loan";
+      row: PolarisLoanRow;
+      via: "wallet" | "listing";
+      /** The blocks its collateral, and its debt and cost, are at. */
+      blocks: { coll?: number; debt?: number };
+    }
+  | { kind: "polaris-deposit"; row: PolarisDepositRow; via: "wallet" | "listing"; block?: number }
   | { kind: "morpho-arbitrum"; row: ArbitrumReadRow }
   | { kind: "spark"; row: SparkPositionSummary }
   | { kind: "fluid"; row: FluidPositionSummary }

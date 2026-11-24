@@ -56,7 +56,7 @@ export interface PolarisDepositCardProps {
   explanation?: ReactNode;
   /** The wallet page: each listing figure carries its receipt, the row read
    *  through `via`. */
-  receipts?: { via: PolarisRowVia };
+  receipts?: { via: PolarisRowVia; block?: number };
 }
 
 /** The vault-held tag (C22·polaris). */
@@ -133,7 +133,7 @@ export function polarisDepositSlots({
   if (!detail) {
     const recorded = big(row.deposit_raw);
     const prov = (what: Parameters<typeof spRowProv>[0], figure: ReactNode) =>
-      receipts ? <Prov info={spRowProv(what, m, receipts.via)}>{figure}</Prov> : figure;
+      receipts ? <Prov info={spRowProv(what, m, receipts.via, receipts.block)}>{figure}</Prov> : figure;
     const heads: PositionCardHead[] = [
       {
         id: "deposit",
