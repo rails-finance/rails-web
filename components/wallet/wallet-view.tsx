@@ -104,7 +104,8 @@ function Figure({ f }: { f: { usd: number; prov: Provenance } | null }) {
 const across = (t: WalletTotal | null) => (t?.figure ? `across ${plural(t.of, "protocol")}` : undefined);
 
 /** The wallet's totals (W2): each figure the sum of the protocol sections'
- *  figures below it, with its receipt. */
+ *  figures below it, with its receipt; the sections it leaves out named
+ *  under the row (Miles, 24 Nov 2026, "wallet total b"). */
 function Totals({
   sections,
   filtered,
@@ -118,9 +119,12 @@ function Totals({
   const coll = walletTotal(sections, "collateral", unanswered);
   const debt = walletTotal(sections, "debt", unanswered);
   const net = walletNet(coll, debt);
-  // Each reason a total is absent, said once under the row.
+  // Each reason a total is absent, or what it leaves out, said once under the row.
   const gaps = [...new Set([coll?.gap, debt?.gap].filter((g): g is string => g != null))];
+  const leaves = [...new Set([coll?.leaves, debt?.leaves].filter((g): g is string => g != null))];
+  // The rate reads over the sections the totals sum.
   const owing = sections
+    .filter((s) => !s.testnet && s.collateral != null && s.debt != null)
     .flatMap((s) => s.open)
     .filter((p) => p.usdOwnOracle && !unreadAtHead(p) && (p.debtUsd ?? 0) > 0);
   const rated = owing.filter((p) => p.debtRate != null);
@@ -168,6 +172,12 @@ function Totals({
         <p className="mt-2 text-xs text-rb-500">
           {filtered ? "The positions shown" : "Each protocol’s total below"}, summed in dollars at the sources each
           receipt names.
+          {leaves.map((l) => (
+            <span key={l} data-wallet-total-leaves="">
+              {" "}
+              {l}
+            </span>
+          ))}
         </p>
       )}
     </section>
