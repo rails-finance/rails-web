@@ -146,10 +146,13 @@ function statusOf(s: string): MaplePositionStatus {
  *  Returns the rows plus the pool-state map (the access band reads it too). */
 export async function buildMaplePositionRows(
   raw: RawMapleWalletRow[],
+  given?: MaplePoolStateMap,
 ): Promise<{ rows: MaplePositionSummary[]; poolState: Record<string, MaplePoolState> }> {
   // One multicall for the two pools' rates + the liquid/deployed split;
-  // empty map when RPC is down (amounts-only degradation).
-  const state: MaplePoolStateMap = await resolveMaplePoolState();
+  // empty map when RPC is down (amounts-only degradation). `given`: a read
+  // already in hand (the wallet page's head read), or an empty map for rows
+  // built from the store with no chain read.
+  const state: MaplePoolStateMap = given ?? (await resolveMaplePoolState());
   const poolState: Record<string, MaplePoolState> = {};
   for (const [key, s] of state.entries()) poolState[key] = s;
 

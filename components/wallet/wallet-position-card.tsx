@@ -68,6 +68,15 @@ import {
 import { UniswapPositionCard } from "@/components/protocol/uniswap/uniswap-position-card";
 import { AerodromePositionCard } from "@/components/protocol/aerodrome/aerodrome-position-card";
 import { BalancerPositionCard } from "@/components/protocol/balancer/balancer-position-card";
+import {
+  DolomitePositionCard,
+  viewFromSummary as dolomiteView,
+} from "@/components/protocol/dolomite/dolomite-position-card";
+import { AlchemixPositionCard } from "@/components/protocol/alchemix/alchemix-position-card";
+import { AlchemixV2PositionCard } from "@/components/protocol/alchemix/v2-position-card";
+import { ALCHEMIX_BASE, ALCHEMIX_ETHEREUM } from "@/lib/alchemix/lines";
+import { MaplePositionCard, viewFromSummary as mapleView } from "@/components/protocol/maple/maple-position-card";
+import { FxPositionCard, viewFromSummary as fxView } from "@/components/protocol/fx/fx-position-card";
 import { ArbitrumReadCard, CometReadCard } from "@/components/shared/arbitrum-positions-listing";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
@@ -159,6 +168,22 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
       return <SkySavingsPositionCard p={card.row} asOf={card.asOf} surface="listing" />;
     case "llamalend":
       return <LlamalendPositionCard v={llamalendView(card.row)} surface="listing" />;
+    case "dolomite":
+      return <DolomitePositionCard v={dolomiteView(card.row)} surface="listing" />;
+    case "alchemix":
+      return (
+        <AlchemixPositionCard
+          p={card.row}
+          session={(card.lane === "base" ? ALCHEMIX_BASE : ALCHEMIX_ETHEREUM).session}
+          receipts
+        />
+      );
+    case "alchemix-v2":
+      return <AlchemixV2PositionCard p={card.row} session={ALCHEMIX_ETHEREUM.session} receipts />;
+    case "maple":
+      return <MaplePositionCard v={mapleView(card.row)} surface="listing" />;
+    case "fx":
+      return <FxPositionCard v={fxView(card.row)} surface="listing" noUsd />;
     case "morpho-arbitrum":
       return <ArbitrumReadCard row={card.row} family="morpho" />;
     case "spark":
@@ -278,17 +303,18 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
     atRisk: atRisk(p),
     // The Arbitrum cards carry their stored read's block in the card.
     stamp: p.notRead ? (
-      // An Aave V3 Base account the chain has not been read for (open point 8).
+      // An Aave V3 Base account the chain has not been read for (open point 8),
+      // or an f(x) position with no read stored.
       <span className="text-[11px] font-medium text-rb-500" data-wallet-not-read="">
         Not read
       </span>
     ) : p.closedSince ? (
       <span
         className="text-[11px] font-medium text-rb-500"
-        data-wallet-closed-since={p.closedSince.block}
+        data-wallet-holds-nothing-since={p.closedSince.block}
         title={`At block ${p.closedSince.block.toLocaleString("en-US")} the position holds nothing; the card shows the sweep's earlier read.`}
       >
-        Closed since the sweep
+        Holds nothing since the sweep
       </span>
     ) : (
       // A closed position's card states its ending; the read's age is an

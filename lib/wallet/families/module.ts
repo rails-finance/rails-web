@@ -47,6 +47,9 @@ export interface FamilyModule {
   /** "deposits" or "stakes" for a module taking a protocol's deposit or
    *  stake rows beside its Trove module (the rows' `kind`). */
   summaryKind?: "deposits" | "stakes";
+  /** The head read also reads the open positions the store has not read
+   *  (`notRead`), and fills them where it can (f(x)). */
+  readsNotRead?: true;
   shape(rows: WalletSummaryRow[]): Promise<WalletPosition[]>;
   /** Absent where the family's figures are the stored ones (Arbitrum). */
   /** `apiMs`: how long to wait for rails-server's route before the chain (walletApiWait). */

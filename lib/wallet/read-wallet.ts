@@ -37,6 +37,10 @@ import { moonwellBase, moonwellEthereum } from "@/lib/wallet/families/moonwell";
 import { eulerV2Base } from "@/lib/wallet/families/euler-base";
 import { skySavings } from "@/lib/wallet/families/sky-savings";
 import { llamalend } from "@/lib/wallet/families/llamalend";
+import { dolomite } from "@/lib/wallet/families/dolomite";
+import { alchemixBase, alchemixEthereum } from "@/lib/wallet/families/alchemix";
+import { maple } from "@/lib/wallet/families/maple";
+import { fx } from "@/lib/wallet/families/fx";
 import { morphoBase } from "@/lib/wallet/families/morpho-base";
 import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/families/ethereum-single";
 import { aaveV3Arbitrum, compoundV3Arbitrum, morphoArbitrum } from "@/lib/wallet/families/arbitrum";
@@ -96,6 +100,11 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   eulerV2Base,
   skySavings,
   llamalend,
+  dolomite,
+  alchemixEthereum,
+  alchemixBase,
+  maple,
+  fx,
 ];
 
 /** The families the page reads, by chain, in one sentence for the empty
@@ -329,7 +338,7 @@ async function readFamily(
   const rest = positions.filter((p) => p.status !== "open");
   let head: HeadResult = { positions: open, reads: 0 };
   let error: string | undefined;
-  const readable = open.filter((p) => !p.notRead);
+  const readable = f.readsNotRead ? open : open.filter((p) => !p.notRead);
   if (f.head && readable.length > 0) {
     try {
       const remaining = deadline - Date.now();

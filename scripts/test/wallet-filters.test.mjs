@@ -40,6 +40,29 @@ test("a lending account that never borrowed is a deposit", () => {
   assert.equal(kindOfRow(row("morpho", { card: morpho })), "deposits");
 });
 
+test("a Dolomite account borrowing in several markets is a loan", () => {
+  // mig 522 writes no debt unit where several markets hold the borrow side.
+  const open = { borrowMarketCount: 2, balances: [{ parRaw: "-5" }, { parRaw: "-7" }], peakMarkets: [] };
+  assert.equal(kindOfRow(row("dolomite", { card: open })), "loans");
+  const closed = { borrowMarketCount: 0, peakMarkets: [{ peakSupplyParRaw: "9", peakBorrowParRaw: "4" }] };
+  assert.equal(kindOfRow(row("dolomite", { card: closed })), "loans");
+  const lender = { borrowMarketCount: 0, peakMarkets: [{ peakSupplyParRaw: "9", peakBorrowParRaw: "0" }] };
+  assert.equal(kindOfRow(row("dolomite", { card: lender })), "deposits");
+});
+
+test("an Alchemix position owing is a loan, one with no debt a deposit, a V2 credit no debt", () => {
+  const v3 = (raw) => ({ figures: { debt: { raw, formatted: Number(raw), asOfBlock: 1 }, derivedLowerBound: null } });
+  assert.equal(kindOfRow(row("alchemix", { card: v3("813152429816868344200") })), "loans");
+  assert.equal(kindOfRow(row("alchemix", { card: v3("0") })), "deposits");
+  const credit = { version: "v2", frozenDebt: { raw: "-12", formatted: -12, sign: "credit", asOfBlock: 1 } };
+  assert.equal(kindOfRow(row("alchemix", { card: credit })), "deposits");
+});
+
+test("Maple is a deposit and f(x) a loan", () => {
+  assert.equal(kindOfRow(row("maple")), "deposits");
+  assert.equal(kindOfRow(row("fx")), "loans");
+});
+
 test("the link keeps a kind only where the protocol holds more than one", () => {
   const a = "0xabc";
   assert.equal(walletHref(a, "liquity-v2", ["loans"]), "/wallet/0xabc?protocol=liquity-v2");
