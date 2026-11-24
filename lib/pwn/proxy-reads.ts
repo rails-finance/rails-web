@@ -4,6 +4,7 @@
 // routes' header comments carry the argument for each shape. SERVER-ONLY.
 
 import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
+import { apiSlot } from "@/lib/wallet/api-hop";
 import { buildPwnPositionRows, type RawPwnPositionRow } from "@/lib/sources/api/pwn-positions";
 import { timelineCacheHeaders } from "@/lib/shared/decimals-unread";
 import { withRowCeiling } from "@/lib/shared/timeline-row-ceiling";
@@ -53,12 +54,15 @@ export async function readPwnPositions(
   if (sp.get("offset") != null) qs.set("offset", sp.get("offset")!);
 
   const url = `${hop.baseUrl}/api/pwn/positions?${qs.toString()}`;
-  const response = await fetch(url, { signal, headers: hop.headers });
-  if (!response.ok) {
+  // Inside a wallet read, one slot of the api host's cap (lib/wallet/api-hop.ts).
+  const { response, raw } = await apiSlot(async () => {
+    const res = await fetch(url, { signal, headers: hop.headers });
+    return { response: res, raw: res.ok ? ((await res.json()) as PositionsRawResponse) : null };
+  }, signal);
+  if (!raw) {
     console.error(`Backend API error: ${response.status} ${response.statusText}`);
     return proxyFail(response.status, { success: false, error: `Backend error: ${response.statusText}` });
   }
-  const raw = (await response.json()) as PositionsRawResponse;
   const data = await buildPwnPositionRows(raw.rows);
   return proxyOk(
     {

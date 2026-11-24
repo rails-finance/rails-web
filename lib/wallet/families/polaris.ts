@@ -35,6 +35,7 @@ import {
 } from "@/lib/sources/api/polaris-sp-loans";
 import { loadPolarisMarketsFromChain, type PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-position";
 import { createAuthHeaders } from "@/lib/api/fetch-with-auth";
+import { apiHop } from "@/lib/wallet/api-hop";
 import { SEPOLIA_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, opt, plural, storeStamp, type WalletSummaryRow } from "@/lib/wallet/summary-row";
@@ -157,6 +158,8 @@ export const polaris: FamilyModule = {
       reads += 1;
       return fn();
     };
+    // Each api-host read takes a slot of the wallet page's cap (lib/wallet/api-hop.ts):
+    // the CDP read inside its client, the loan and deposit reads here.
     const [cdps, board, loans, deposits] = await Promise.allSettled([
       read(has("polaris-cdp"), async () => {
         const r = await readPolarisPositionsFromBackend(
@@ -178,7 +181,7 @@ export const polaris: FamilyModule = {
         return b.chainStale ? null : b;
       }),
       read(has("polaris-loan"), async () => {
-        const r = await readPolarisSpLoans<PolarisLoanListResponse>("reserve-loans", list, hop);
+        const r = await apiHop(() => readPolarisSpLoans<PolarisLoanListResponse>("reserve-loans", list, hop), signal);
         const whole = r.pagination.total <= r.rows.length;
         const listed: Listed<PolarisLoanRow> & { index: PolarisLoanListResponse["index"] } = {
           rows: new Map(r.rows.map((x) => [x.loan_id, x])),
@@ -188,7 +191,10 @@ export const polaris: FamilyModule = {
         return listed;
       }),
       read(has("polaris-deposit"), async () => {
-        const r = await readPolarisSpLoans<PolarisDepositListResponse>("stability-pool", list, hop);
+        const r = await apiHop(
+          () => readPolarisSpLoans<PolarisDepositListResponse>("stability-pool", list, hop),
+          signal,
+        );
         const whole = r.pagination.total <= r.rows.length;
         const listed: Listed<PolarisDepositRow> = {
           rows: new Map(r.rows.map((x) => [spKey(x), x])),

@@ -13,13 +13,16 @@ import { register } from "node:module";
 
 const root = new URL("../../", import.meta.url).href;
 const stub = `export async function withServerHead() { return globalThis.__morphoHead(); }`;
+const chainStub = `export async function loadMorphoPositionFromChain() { return globalThis.__morphoChain(); }`;
 const hooks = `
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 const root = ${JSON.stringify(root)};
 const stub = ${JSON.stringify("data:text/javascript," + encodeURIComponent(stub))};
+const chainStub = ${JSON.stringify("data:text/javascript," + encodeURIComponent(chainStub))};
 export async function resolve(specifier, context, next) {
   if (specifier === "@/lib/sources/api/lender-position-head") return { url: stub, shortCircuit: true };
+  if (specifier === "@/lib/sources/chain/morpho-position") return { url: chainStub, shortCircuit: true };
   if (specifier.startsWith("@/")) {
     for (const ext of [".ts", ".tsx", "/index.ts"]) {
       const url = root + specifier.slice(2) + ext;
@@ -48,8 +51,15 @@ const MARKET = "b323495f7e4148be5643a4ea4a8221eef163e4bccfdedc2a6f4696baacbc86cc
 const W = "0x1111111111111111111111111111111111111111";
 const PARAMS = `(Address(${USDC}), Address(${WSTETH}), Address(${ORACLE}), Address(${IRM}), Uint(860000000000000000, 256))`;
 
+process.env.ALCHEMY_URL = "http://rpc.test";
+
 globalThis.fetch = async (input, init = {}) => {
   const url = new URL(typeof input === "string" ? input : input.url);
+  if (url.host === "rpc.test") {
+    const q = JSON.parse(init.body);
+    const one = (x) => ({ jsonrpc: "2.0", id: x.id, result: "0x16c8a40" });
+    return new Response(JSON.stringify(Array.isArray(q) ? q.map(one) : one(q)), { status: 200 });
+  }
   if (url.pathname === "/api/reference/erc20") {
     const { addresses } = JSON.parse(init.body);
     const known = {
@@ -286,7 +296,8 @@ test("the debt receipt names the visit's head read", () => {
   assert.match(stored.summary, /has not refreshed them since/);
 });
 
-test("the head reads hold at most four in flight", async () => {
+// The cap on api-host requests sits in route-gate.ts, under withServerHead (wallet-api-cap.test.mjs).
+test("every open row's route read goes out together", async () => {
   let inFlight = 0;
   let most = 0;
   globalThis.__morphoHead = async () => {
@@ -302,6 +313,28 @@ test("the head reads hold at most four in flight", async () => {
   });
   const shaped = await morphoEthereum.shape(rows);
   assert.equal(shaped.length, 11);
+  const out = await morphoEthereum.head(shaped, W, new AbortController().signal, 1000, { rows });
+  assert.equal(out.reads, 11);
+  assert.ok(out.positions.every((p) => p.headRead === "read"));
+  assert.equal(most, 11);
+});
+
+test("the rows the route does not answer read the chain at most four at once", async () => {
+  let inFlight = 0;
+  let most = 0;
+  globalThis.__morphoHead = async () => null;
+  globalThis.__morphoChain = async () => {
+    inFlight++;
+    most = Math.max(most, inFlight);
+    await new Promise((r) => setTimeout(r, 5));
+    inFlight--;
+    return live();
+  };
+  const rows = Array.from({ length: 11 }, (_, i) => {
+    const market = MARKET.slice(0, -2) + i.toString(16).padStart(2, "0");
+    return { ...summaryRow({ ...after532, market }), positionId: `${market}-${W}` };
+  });
+  const shaped = await morphoEthereum.shape(rows);
   const out = await morphoEthereum.head(shaped, W, new AbortController().signal, 1000, { rows });
   assert.equal(out.reads, 11);
   assert.ok(out.positions.every((p) => p.headRead === "read"));

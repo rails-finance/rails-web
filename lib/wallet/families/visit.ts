@@ -13,7 +13,7 @@ import type { ChainId } from "@/lib/shared/chains";
 import { protocolForSession } from "@/lib/shared/protocols";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { publicErrorMessage } from "@/lib/api/public-error";
-import { apiHop } from "@/lib/wallet/api-hop";
+import { apiHop, inChain } from "@/lib/wallet/api-hop";
 import { withBudget } from "@/lib/wallet/summary-row";
 import type { WalletFamilyRead, WalletPosition } from "@/lib/wallet/types";
 
@@ -81,7 +81,7 @@ export async function readVisitFamilies(
     reading.map(async (m) => {
       const t0 = Date.now();
       try {
-        const answer = await readOne(m, address, budgetMs, readerIp);
+        const answer = await inChain(() => readOne(m, address, budgetMs, readerIp));
         return { m, ms: Date.now() - t0, positions: m.shape(answer, address) };
       } catch (err) {
         throw { m, ms: Date.now() - t0, error: publicErrorMessage(err) };

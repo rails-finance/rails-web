@@ -13,6 +13,7 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const ROOT = pathToFileURL(REPO + "/").href;
 const hook = `
 export async function resolve(spec, ctx, next) {
+  if (spec.startsWith("@/")) return next(${JSON.stringify(ROOT)} + spec.slice(2) + ".ts", ctx);
   if (spec.startsWith("./") && !/\\.[a-z]+$/.test(spec)) return next(new URL(spec + ".ts", ctx.parentURL).href, ctx);
   return next(spec, ctx);
 }

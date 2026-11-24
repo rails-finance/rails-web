@@ -23,6 +23,7 @@
 // buildPolarisPositionRows, exactly where it did.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { apiSlot } from "@/lib/wallet/api-hop";
 import type { FetchPolarisPositionsParams, PolarisPositionsResult } from "@/lib/api/fetch-polaris-positions";
 import {
   buildPolarisMarketBooks,
@@ -135,12 +136,15 @@ export async function readPolarisPositionsFromBackend(
   if (p.limit != null) qs.set("limit", String(p.limit));
   if (p.offset != null) qs.set("offset", String(p.offset));
 
-  const response = await fetch(`${base}/api/polaris/positions?${qs.toString()}`, {
-    ...createAuthFetchOptions({ signal }, readerIp),
-    cache: "no-store",
-  });
-  if (!response.ok) return { ok: false, status: response.status, statusText: response.statusText };
-  const raw = (await response.json()) as PositionsRawResponse;
+  // Inside a wallet read, one slot of the api host's cap (lib/wallet/api-hop.ts).
+  const { response, raw } = await apiSlot(async () => {
+    const res = await fetch(`${base}/api/polaris/positions?${qs.toString()}`, {
+      ...createAuthFetchOptions({ signal }, readerIp),
+      cache: "no-store",
+    });
+    return { response: res, raw: res.ok ? ((await res.json()) as PositionsRawResponse) : null };
+  }, signal);
+  if (!raw) return { ok: false, status: response.status, statusText: response.statusText };
   return {
     ok: true,
     upstream: response,

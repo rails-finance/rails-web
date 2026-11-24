@@ -40,7 +40,7 @@ import { moonwellBase, moonwellEthereum } from "@/lib/wallet/families/moonwell";
 import { eulerV2Arbitrum, eulerV2Base } from "@/lib/wallet/families/euler";
 import { aaveV3Optimism, compoundV3Optimism } from "@/lib/wallet/families/optimism";
 import { morphoArc, morphoOptimism } from "@/lib/wallet/families/morpho-at-block";
-import { readVisitFamilies, visitFamiliesLine, type VisitModule } from "@/lib/wallet/families/visit";
+import { readVisitFamilies, visitFamiliesLine, type VisitModule, type VisitRead } from "@/lib/wallet/families/visit";
 import { skySavings } from "@/lib/wallet/families/sky-savings";
 import { llamalend } from "@/lib/wallet/families/llamalend";
 import { dolomite } from "@/lib/wallet/families/dolomite";
@@ -67,7 +67,7 @@ import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
-import { apiHop } from "@/lib/wallet/api-hop";
+import { apiHop, inChain, inWalletRead } from "@/lib/wallet/api-hop";
 import { kindOfRow, WALLET_PROTOCOLS } from "@/lib/wallet/wallet-filters";
 
 /** The whole read's budget, the summary route's time included. */
@@ -379,8 +379,13 @@ async function readFamily(
   if (f.head && readable.length > 0) {
     try {
       const remaining = deadline - Date.now();
-      head = await withBudget(Math.max(500, remaining), (signal) =>
-        f.head!(open, address, signal, walletApiWait(remaining), { rows, readerIp }),
+      // The 500 ms floor gives the chain reads time; an api request past the
+      // read's deadline is refused (api-hop.ts), and its row reads the chain.
+      // The family's requests after its first take the cap's priority lane.
+      head = await inChain(() =>
+        withBudget(Math.max(500, remaining), (signal) =>
+          f.head!(open, address, signal, walletApiWait(remaining), { rows, readerIp }),
+        ),
       );
     } catch (err) {
       error = publicErrorMessage(err);
@@ -419,13 +424,31 @@ function heldOf(rows: WalletSummaryRow[], visited: WalletPosition[] = []): Walle
   })).filter((p) => p.positions > 0);
 }
 
+/** The chosen protocol's part of the reads at visit: its positions, its
+ *  modules' entries and its failures. */
+function narrowVisit(v: VisitRead, protocol: string): VisitRead {
+  const ours = new Set(WALLET_VISIT_FAMILIES.filter((m) => m.family === protocol).map((m) => m.id));
+  const families = v.families.filter((f) => ours.has(f.id));
+  return {
+    positions: v.positions.filter((p) => p.family === protocol),
+    families,
+    failed: families.flatMap((f) => (f.unanswered ? [f.unanswered.what] : [])),
+  };
+}
+
 /** `protocol`: read that protocol's families alone (ui-jobs 738); the summary
- *  route still answers every row, which names the others for the pill. */
-export async function readWalletUncached(
+ *  route still answers every row and still reads every launched module at
+ *  visit, so the pill names the others. Every request it makes to the api host shares the page's cap (lib/wallet/api-hop.ts),
+ *  and none is made past the read's budget. */
+export function readWalletUncached(
   address: string,
   readerIp?: string,
   opts: { protocol?: string } = {},
 ): Promise<WalletRead> {
+  return inWalletRead(() => readWalletInScope(address, readerIp, opts), Date.now() + WALLET_BUDGET_MS);
+}
+
+async function readWalletInScope(address: string, readerIp: string | undefined, opts: { protocol?: string }) {
   const t0 = Date.now();
   const deadline = t0 + WALLET_BUDGET_MS;
   let summary: Summary;
@@ -448,9 +471,12 @@ export async function readWalletUncached(
   const serverMs = Date.now() - t0;
   const reading = opts.protocol ? WALLET_FAMILIES.filter((f) => f.summaryFamily === opts.protocol) : WALLET_FAMILIES;
   // The families read at visit start here, once the summary and the listing
-  // reads have settled, beside the stored families' head reads.
-  const visiting = WALLET_VISIT_FAMILIES.filter((m) => !opts.protocol || m.family === opts.protocol);
-  const visits = readVisitFamilies(visiting, address, Math.max(500, deadline - Date.now()), readerIp);
+  // reads have settled, beside the stored families' head reads. A narrowed
+  // read still reads every launched module, since no stored row names their
+  // holdings for the pills, and draws only the chosen protocol's.
+  // The floor does not reach the api host: a visit family whose request is
+  // past the read's deadline fails, and the read is partial and uncached.
+  const visits = readVisitFamilies(WALLET_VISIT_FAMILIES, address, Math.max(500, deadline - Date.now()), readerIp);
   const groups = reading
     .map((f) => ({
       f,
@@ -458,8 +484,9 @@ export async function readWalletUncached(
     }))
     .filter((g) => g.rows.length > 0);
   const settled = await Promise.allSettled(groups.map((g) => readFamily(g.f, g.rows, address, deadline, readerIp)));
-  const visited = await visits;
-  const held = heldOf(summary.rows, visited.positions);
+  const visitedAll = await visits;
+  const held = heldOf(summary.rows, visitedAll.positions);
+  const visited = opts.protocol ? narrowVisit(visitedAll, opts.protocol) : visitedAll;
   const families: WalletFamilyRead[] = [];
   const positions: WalletPosition[] = [];
   settled.forEach((s, i) => {

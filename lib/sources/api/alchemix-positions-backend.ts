@@ -19,6 +19,7 @@
 // returns the backend's own refusal rather than an empty list.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { apiSlot } from "@/lib/wallet/api-hop";
 import type { AlchemixPositionsResponse } from "@/types/api/alchemix";
 
 export type AlchemixPositionsRead =
@@ -39,10 +40,13 @@ export async function readAlchemixPositionsFromBackend(
   const base = process.env.RAILS_API_URL;
   if (!base) throw new Error("RAILS_API_URL environment variable is not set");
 
-  const response = await fetch(`${base}/api/alchemix/positions?${alchemixPositionsQuery(p).toString()}`, {
-    ...createAuthFetchOptions({ signal }, readerIp),
-    cache: "no-store",
-  });
-  if (!response.ok) return { ok: false, status: response.status, statusText: response.statusText };
-  return { ok: true, upstream: response, result: (await response.json()) as AlchemixPositionsResponse };
+  // Inside a wallet read, one slot of the api host's cap (lib/wallet/api-hop.ts).
+  return apiSlot(async (): Promise<AlchemixPositionsRead> => {
+    const response = await fetch(`${base}/api/alchemix/positions?${alchemixPositionsQuery(p).toString()}`, {
+      ...createAuthFetchOptions({ signal }, readerIp),
+      cache: "no-store",
+    });
+    if (!response.ok) return { ok: false, status: response.status, statusText: response.statusText };
+    return { ok: true, upstream: response, result: (await response.json()) as AlchemixPositionsResponse };
+  }, signal);
 }

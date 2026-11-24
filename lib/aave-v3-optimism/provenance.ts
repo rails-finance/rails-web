@@ -171,8 +171,9 @@ export function opReserveProv(key: OpReserveFigure, c: OpReceiptContext, x: OpRe
 
 export type OpCardFigure = "supplied-total" | "debt-total" | "health" | "room";
 
-/** A headline: a total over the reserves, or a figure of getUserAccountData. */
-export function opCardProv(key: OpCardFigure, c: OpReceiptContext): Provenance {
+/** A headline: a total over the reserves, or a figure of getUserAccountData.
+ *  `more`: a sentence a total's prose ends with. */
+export function opCardProv(key: OpCardFigure, c: OpReceiptContext, more = ""): Provenance {
   const { p, r } = c;
   const head = { block: r.head.block };
   if (key === "health")
@@ -205,7 +206,7 @@ export function opCardProv(key: OpCardFigure, c: OpReceiptContext): Provenance {
     pclass: "oracle",
     source: head,
     contract: oracleC(r),
-    summary: `${debt ? "Debt" : "Supplied"} in USD. Each ${debt ? "borrowed" : "supplied"} asset's amount at Aave's oracle price, added up, at ${at(r.head)}.${gap}`,
+    summary: `${debt ? "Debt" : "Supplied"} in USD. Each ${debt ? "borrowed" : "supplied"} asset's amount at Aave's oracle price, added up, at ${at(r.head)}.${gap}${more}`,
     via: `${via(`block ${n(r.head.block)}`)} · scaled × index × oracle getAssetPrice · summed`,
     formula: "Σ (amount × price)",
     inputs: rows.map(({ x, v, a }) => ({
@@ -215,5 +216,35 @@ export function opCardProv(key: OpCardFigure, c: OpReceiptContext): Provenance {
       pclass: "oracle" as const,
       note: `${fig(a)} ${x.symbol} × $${x.price == null ? "—" : fig(x.price)}`,
     })),
+  };
+}
+
+/** The wallet card's Supplied headline (decision 0071): its receipt, with the
+ *  figure the wallet total sums for the account, the supplied reserves switched
+ *  on as collateral, stated as "Collateral $X". With a reserve unpriced the
+ *  total sums nothing for the account and the receipt states no collateral. */
+export function opWalletSuppliedProv(c: OpReceiptContext): Provenance {
+  const { p } = c;
+  if (p.unpriced.length > 0) return opCardProv("supplied-total", c);
+  const collateral = `$${fig(p.collateralUsd)}`;
+  const off = p.supplied.filter((x) => !x.isCollateral).map((x) => x.symbol);
+  const base = opCardProv(
+    "supplied-total",
+    c,
+    ` Collateral ${collateral}, the reserves switched on, is the part the wallet total sums.`,
+  );
+  return {
+    ...base,
+    inputs: [
+      ...(base.inputs ?? []),
+      {
+        label: "Collateral",
+        value: collateral,
+        kind: "chain",
+        pclass: "oracle",
+        step: true,
+        note: off.length ? `the supplied reserves less ${off.join(", ")}, switched off` : "every supplied reserve",
+      },
+    ],
   };
 }

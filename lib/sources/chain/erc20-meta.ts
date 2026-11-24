@@ -26,6 +26,7 @@ import { chainClient } from "./rpc";
 import { scaleRaw } from "@/lib/shared/scale-raw";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { throwAtBuild } from "@/lib/sources/api/route-gate";
+import { apiSlot } from "@/lib/wallet/api-hop";
 import {
   ARBITRUM_CHAIN_ID,
   BASE_CHAIN_ID,
@@ -138,21 +139,30 @@ async function readStored(
   try {
     for (let i = 0; i < addrs.length; i += STORED_MAX) {
       const asked = addrs.slice(i, i + STORED_MAX);
-      const res = await fetch(
-        `${api}/api/reference/erc20`,
-        createAuthFetchOptions({
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chain: chainId, addresses: asked }),
-          signal: AbortSignal.timeout(STORED_TIMEOUT_MS),
-        }),
-      );
-      if (!res.ok) {
-        void res.body?.cancel().catch(() => undefined);
-        if (res.status >= 500 || res.status === 429) throwAtBuild("reference/erc20", `status ${res.status}`);
+      // Inside a wallet read, one slot of the api host's cap, released before
+      // the chain is read (lib/wallet/api-hop.ts); the wait runs from the slot.
+      type Stored = { tokens?: Record<string, StoredRow>; missing?: string[] };
+      const got = await apiSlot(async (): Promise<{ body: Stored } | { status: number }> => {
+        const res = await fetch(
+          `${api}/api/reference/erc20`,
+          createAuthFetchOptions({
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chain: chainId, addresses: asked }),
+            signal: AbortSignal.timeout(STORED_TIMEOUT_MS),
+          }),
+        );
+        if (!res.ok) {
+          void res.body?.cancel().catch(() => undefined);
+          return { status: res.status };
+        }
+        return { body: (await res.json()) as Stored };
+      });
+      if ("status" in got) {
+        if (got.status >= 500 || got.status === 429) throwAtBuild("reference/erc20", `status ${got.status}`);
         return null;
       }
-      const body = (await res.json()) as { tokens?: Record<string, StoredRow>; missing?: string[] };
+      const body = got.body;
       if (!body.tokens || !Array.isArray(body.missing)) return null;
       for (const addr of asked) {
         const row = body.tokens[addr];

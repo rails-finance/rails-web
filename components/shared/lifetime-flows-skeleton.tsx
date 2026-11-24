@@ -121,8 +121,8 @@ export function LifetimeFlowsSkeleton({
         }`}
       >
         <div className="flex h-8 items-center gap-3 pointer-coarse:h-11">
-          <div className={`${BLOCK} h-2 w-14`} />
-          {compact && viewToggle && <div className={`${BLOCK} h-8 w-36 pointer-coarse:h-11`} />}
+          <div className={`${BLOCK} h-2 w-11`} />
+          {compact && viewToggle && <div className={`${BLOCK} h-8 w-40 pointer-coarse:h-11`} />}
         </div>
         <div className={`${BLOCK} size-7 rounded-full`} />
       </div>

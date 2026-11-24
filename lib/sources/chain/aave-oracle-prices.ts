@@ -35,6 +35,7 @@ import { parseAbi } from "viem";
 import { chainClient } from "./rpc";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { throwAtBuild } from "@/lib/sources/api/route-gate";
+import { apiSlot } from "@/lib/wallet/api-hop";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
 /** The server's market key per AaveOracle, as its AAVE_V3_POSITION_MARKETS names them. */
@@ -52,6 +53,25 @@ const SERVER_MARKET: Record<string, string> = {
 const SERVER_TIMEOUT_MS = 3_000;
 /** The server route's limit on assets a request. */
 const SERVER_MAX_ASSETS = 40;
+
+/** The oracle-prices route's JSON body, or its status where it is not 2xx.
+ *  Inside a wallet read the request holds one slot of the api host's cap
+ *  (lib/wallet/api-hop.ts), released before any chain read; the wait runs from
+ *  the slot. */
+function askRoute<T>(api: string, qs: URLSearchParams): Promise<{ body: T } | { status: number }> {
+  return apiSlot(async () => {
+    const res = await fetch(`${api}/api/at-block/aave-v3/oracle-prices?${qs.toString()}`, {
+      ...createAuthFetchOptions(),
+      cache: "no-store",
+      signal: AbortSignal.timeout(SERVER_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      void res.body?.cancel().catch(() => undefined);
+      return { status: res.status };
+    }
+    return { body: (await res.json()) as T };
+  });
+}
 
 /** One oracle's prices from the server route, raw (8 decimals) by asset, and
  *  the block the route read them at; null when the route cannot answer. Asked
@@ -74,16 +94,12 @@ async function serverPrices(
       // set of more than SERVER_MAX_ASSETS stands on one block.
       const at = block ?? readAt;
       if (at != null) qs.set("block", String(at));
-      const res = await fetch(`${api}/api/at-block/aave-v3/oracle-prices?${qs.toString()}`, {
-        ...createAuthFetchOptions(),
-        cache: "no-store",
-        signal: AbortSignal.timeout(SERVER_TIMEOUT_MS),
-      });
-      if (!res.ok) {
-        if (res.status >= 500 || res.status === 429) throwAtBuild("aave-v3/oracle-prices", `status ${res.status}`);
+      const got = await askRoute<{ prices?: Record<string, string>; block?: number | string }>(api, qs);
+      if ("status" in got) {
+        if (got.status >= 500 || got.status === 429) throwAtBuild("aave-v3/oracle-prices", `status ${got.status}`);
         return null;
       }
-      const body = (await res.json()) as { prices?: Record<string, string>; block?: number | string };
+      const body = got.body;
       for (const [a, v] of Object.entries(body.prices ?? {})) out.set(a.toLowerCase(), BigInt(v));
       const b = Number(body.block);
       // The receipt names one block per oracle: an answer at another block
@@ -128,13 +144,9 @@ export async function aaveOraclePricesAtBlock(
       assets: assets.slice(0, SERVER_MAX_ASSETS).join(","),
       block: String(block),
     });
-    const res = await fetch(`${api}/api/at-block/aave-v3/oracle-prices?${qs.toString()}`, {
-      ...createAuthFetchOptions(),
-      cache: "no-store",
-      signal: AbortSignal.timeout(SERVER_TIMEOUT_MS),
-    });
-    if (!res.ok) return out;
-    const body = (await res.json()) as { prices?: Record<string, string> };
+    const got = await askRoute<{ prices?: Record<string, string> }>(api, qs);
+    if ("status" in got) return out;
+    const body = got.body;
     for (const [a, v] of Object.entries(body.prices ?? {})) {
       const usd = Number(BigInt(v)) / PRICE_SCALE;
       if (usd > 0) out.set(a.toLowerCase(), usd);
