@@ -45,6 +45,7 @@ import type { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle"
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { morphoHasDebt } from "@/lib/morpho/position-legs";
 import { morphoCardAtHead, storedMorphoCard } from "./morpho-card";
+import { API_CONCURRENCY, createLimiter } from "@/lib/wallet/api-hop";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, opt, plural, storeStamp } from "@/lib/wallet/summary-row";
 import { formerHoldOf, movedHistory } from "@/lib/wallet/moved-row";
@@ -144,7 +145,12 @@ export const morphoEthereum: FamilyModule = {
     const atHead = new Map<string, RawMorphoPositionRow>();
     // The chain's block, read once and only when a position needs the chain.
     let block: Promise<bigint> | null = null;
-    const r = await eachOpen(open, async (p) => {
+    // Every open row is read: at most API_CONCURRENCY at once, to the api
+    // route or, past it, the chain. Not apiHop: its slots are the api host's,
+    // and its retry would repeat a chain read.
+    const limit = createLimiter(API_CONCURRENCY);
+    const r = await eachOpen(open, (p) => limit(() => readOne(p), signal));
+    async function readOne(p: WalletPosition): Promise<WalletPosition> {
       const s = (p.card as { row: MorphoPositionSummary }).row;
       const served = await withServerHead(
         {
@@ -162,6 +168,9 @@ export const morphoEthereum: FamilyModule = {
         live = await loadMorphoPositionFromChain(s.marketId, address, undefined, await block);
       }
       if (live.chainStale) return { ...p, headRead: "failed" };
+      // A row stored owing nothing that the chain finds owing is behind the
+      // chain: its card states no debt, so it is not a head read.
+      if (!morphoHasDebt(s.borrowSharesRaw) && morphoHasDebt(live.borrowSharesRaw)) return { ...p, headRead: "failed" };
       const stored = storedById.get(p.positionId);
       const card = stored != null ? morphoCardAtHead(storedMorphoCard(stored), live) : null;
       if (card) atHead.set(p.positionId, card);
@@ -182,13 +191,16 @@ export const morphoEthereum: FamilyModule = {
         readAtBlock: live.blockNumber,
         readAt: live.timestamp,
       };
-    });
+    }
     // One build for every card the head read reached; a card it did not keeps
     // the stored row's figures, and its section states no total (unreadAtHead).
     const rebuilt = await buildMorphoPositionRows([...atHead.values()]);
     const cardById = new Map(rebuilt.map((s) => [s.positionId, s]));
+    // A failed read states no stamp: the row's is its last event (mig 532),
+    // a time no one read the chain, and the page's "Updated" takes the oldest.
     const byId = new Map(
-      r.positions.map((p) => {
+      r.positions.map((p): [string, WalletPosition] => {
+        if (p.headRead === "failed") return [p.positionId, { ...p, readAt: undefined, readAtBlock: undefined }];
         const s = p.headRead === "read" ? cardById.get(p.positionId) : undefined;
         return [p.positionId, s ? { ...p, card: { kind: "morpho" as const, row: s } } : p];
       }),

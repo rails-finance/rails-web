@@ -423,12 +423,12 @@ export const morphoCurrentDebtProv = (
   const totalsAt = !index
     ? "the live per-market totals"
     : index.atHead
-      ? `the market's totals as this visit's head read made them at block ${index.block.toLocaleString("en-US")}, with interest accrued to that block`
+      ? `the market's totals from this visit's head read at block ${index.block.toLocaleString("en-US")}, interest accrued to that block`
       : `the market's totals at block ${index.block.toLocaleString("en-US")}`;
   const slotNote = !index
     ? "market slot — live"
     : index.atHead
-      ? `market() at block ${index.block}, accrued to that block — this visit's head read`
+      ? `market slot at block ${index.block}, accrued to that block (this visit's head read)`
       : `market slot at block ${index.block}`;
   return {
     kind: "chain",

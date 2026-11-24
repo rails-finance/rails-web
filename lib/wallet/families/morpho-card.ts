@@ -1,7 +1,7 @@
 // The Morpho Blue wallet card's market totals, on Base and Ethereum
 // (rails-server mig 516 and 532). The stored card's totals and their state
 // stamp are not read: before those migrations apply the card still carries
-// them, and they are dated by the market-state refresh, not by the visit. An
+// them, and they are dated by the market-state refresh. An
 // open card owing a debt takes the totals of the visit's head read instead,
 // and a card the head read did not reach keeps what the stored row can still
 // say: the collateral and the borrowed-less-repaid principal. The row's

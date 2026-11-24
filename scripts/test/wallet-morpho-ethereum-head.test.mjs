@@ -173,7 +173,7 @@ for (const [name, card] of [
 ]) {
   test(`the card's debt is the stored shares at the head read's totals, ${name}`, async () => {
     const { shaped, read, reads } = await visit(card, live());
-    // Before the head read the card states no totals of its own.
+    // Before the head read the card states no totals.
     assert.equal(shaped.card.row.currentDebt, null);
     assert.equal(read.headRead, "read");
     assert.equal(reads, 1);
@@ -202,38 +202,53 @@ for (const [name, card] of [
     assert.equal(read.card.row.borrowed.amount, 3900);
     assert.equal(read.card.row.collateral.amount, 2);
     assert.equal(unreadAtHead(read), true);
+    // The row's stamp is its last event's after 532: a failed read states none.
+    assert.equal(read.readAt, undefined);
+    assert.equal(read.readAtBlock, undefined);
+  });
+
+  const collateralOnly = { ...card, borr_raw: "0", bsh_raw: "0" };
+
+  test(`an open row owing nothing is read at visit and takes the read's stamp, ${name}`, async () => {
+    const { shaped, read, reads } = await visit(
+      collateralOnly,
+      live({ borrowSharesRaw: "0", ltv: null, healthy: null }),
+    );
+    assert.equal(shaped.readAtBlock, 21000000);
+    assert.equal(reads, 1);
+    assert.equal(read.headRead, "read");
+    assert.equal(read.readAtBlock, HEAD_BLOCK);
+    assert.equal(read.readAt, HEAD_TS);
+    assert.equal(read.riskFigure, undefined);
+    assert.equal(read.liquidatable, undefined);
+    assert.equal(read.debtRate, undefined);
+    assert.equal(read.card.row.currentDebt, null);
+    assert.equal(read.card.row.collateral.amount, 2);
+  });
+
+  test(`an open row owing nothing whose read fails states no stamp and counts as unread, ${name}`, async () => {
+    const { read } = await visit(collateralOnly, live({ chainStale: true }));
+    assert.equal(read.headRead, "failed");
+    assert.equal(read.readAt, undefined);
+    assert.equal(read.readAtBlock, undefined);
+    assert.equal(unreadAtHead(read), true);
+  });
+
+  test(`a row stored owing nothing that the chain finds owing is a failed read, ${name}`, async () => {
+    const { read } = await visit(collateralOnly, live());
+    assert.equal(read.headRead, "failed");
+    assert.equal(read.card.row.currentDebt, null);
+    assert.equal(read.readAt, undefined);
+    assert.equal(unreadAtHead(read), true);
+  });
+
+  test(`a head read whose borrow shares moved leaves the card's stored figures, ${name}`, async () => {
+    const { read } = await visit(card, live({ borrowSharesRaw: "5000000000000000" }));
+    assert.equal(read.headRead, "read");
+    assert.equal(read.card.row.currentDebt, null);
+    assert.equal(read.card.row.borrowed.amount, 3900);
   });
 }
-
-test("an open row owing nothing is read at visit and takes the read's stamp, not its last event's", async () => {
-  const collateralOnly = { ...after532, borr_raw: "0", bsh_raw: "0" };
-  const { shaped, read, reads } = await visit(collateralOnly, live({ borrowSharesRaw: "0", ltv: null, healthy: null }));
-  assert.equal(shaped.readAtBlock, 21000000);
-  assert.equal(reads, 1);
-  assert.equal(read.headRead, "read");
-  assert.equal(read.readAtBlock, HEAD_BLOCK);
-  assert.equal(read.readAt, HEAD_TS);
-  assert.equal(read.riskFigure, undefined);
-  assert.equal(read.liquidatable, undefined);
-  assert.equal(read.debtRate, undefined);
-  assert.equal(read.card.row.currentDebt, null);
-  assert.equal(read.card.row.collateral.amount, 2);
-});
-
-test("an open row owing nothing whose read fails keeps its stored stamp and counts as unread", async () => {
-  const collateralOnly = { ...after532, borr_raw: "0", bsh_raw: "0" };
-  const { read } = await visit(collateralOnly, live({ chainStale: true }));
-  assert.equal(read.headRead, "failed");
-  assert.equal(read.readAtBlock, 21000000);
-  assert.equal(unreadAtHead(read), true);
-});
-
-test("a head read whose borrow shares moved leaves the card's stored figures", async () => {
-  const { read } = await visit(after532, live({ borrowSharesRaw: "5000000000000000" }));
-  assert.equal(read.headRead, "read");
-  assert.equal(read.card.row.currentDebt, null);
-  assert.equal(read.card.row.borrowed.amount, 3900);
-});
 
 test("a position owing a debt whose principal reads zero is still read", async () => {
   const { read } = await visit({ ...after532, borr_raw: "0" }, live());
@@ -260,7 +275,7 @@ test("storedMorphoCard leaves out the totals and the state stamp; morphoCardAtHe
 test("the debt receipt names the visit's head read", () => {
   const index = { block: HEAD_BLOCK, readAt: new Date(HEAD_TS * 1000).toISOString(), stale: false, atHead: true };
   const p = morphoCurrentDebtProv("USDC", "4", "110000000000000", "100000000000000000", undefined, index);
-  assert.match(p.summary, /this visit's head read made them at block 23,900,000/);
+  assert.match(p.summary, /totals from this visit's head read at block 23,900,000, interest accrued to that block/);
   assert.doesNotMatch(p.summary, /has not refreshed them/);
   assert.match(p.via, /read at the chain head on this visit/);
   assert.equal(p.source.block, HEAD_BLOCK);
@@ -269,4 +284,26 @@ test("the debt receipt names the visit's head read", () => {
   const stored = morphoCurrentDebtProv("USDC", "4", "1", "1", undefined, { ...index, atHead: undefined, stale: true });
   assert.match(stored.summary, /the market's totals at block 23,900,000/);
   assert.match(stored.summary, /has not refreshed them since/);
+});
+
+test("the head reads hold at most four in flight", async () => {
+  let inFlight = 0;
+  let most = 0;
+  globalThis.__morphoHead = async () => {
+    inFlight++;
+    most = Math.max(most, inFlight);
+    await new Promise((r) => setTimeout(r, 5));
+    inFlight--;
+    return { answer: live() };
+  };
+  const rows = Array.from({ length: 11 }, (_, i) => {
+    const market = MARKET.slice(0, -2) + i.toString(16).padStart(2, "0");
+    return { ...summaryRow({ ...after532, market }), positionId: `${market}-${W}` };
+  });
+  const shaped = await morphoEthereum.shape(rows);
+  assert.equal(shaped.length, 11);
+  const out = await morphoEthereum.head(shaped, W, new AbortController().signal, 1000, { rows });
+  assert.equal(out.reads, 11);
+  assert.ok(out.positions.every((p) => p.headRead === "read"));
+  assert.equal(most, 4);
 });
