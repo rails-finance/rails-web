@@ -470,10 +470,9 @@ export async function readWalletUncached(
     address,
     positions,
     families,
-    // A testnet's rows are not counted (WALLET_COUNTS_SCOPE).
-    total: opts.protocol
-      ? groups.reduce((s, g) => s + g.rows.filter(countedRow).length, 0)
-      : summary.total - summary.rows.filter((r) => !countedRow(r)).length,
+    // A testnet's rows are not counted (WALLET_COUNTS_SCOPE): readSummary's
+    // total already leaves them out.
+    total: opts.protocol ? groups.reduce((s, g) => s + g.rows.filter(countedRow).length, 0) : summary.total,
     readAt: Math.floor(Date.now() / 1000),
     serverMs,
     ms: Date.now() - t0,
