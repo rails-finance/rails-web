@@ -8,7 +8,8 @@
 // interest, the room to borrow and the drop that liquidates. Every figure is
 // read when the page opens; the read stamp names the blocks.
 
-import { HEALTH_FACTOR_TIP, morphoApy, MORPHO_TERMS } from "@/lib/morpho/terms";
+import { LLTV_TIP, morphoApy, MORPHO_TERMS } from "@/lib/morpho/terms";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardSlots, type PositionPanelRow } from "@/components/shared/position-card";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
@@ -91,14 +92,16 @@ function slots(r: MorphoAtBlockPositionRead, dep: MorphoAtBlockDeployment): Posi
     left.push({
       id: "supplied",
       label: `${L} supplied`,
-      tip: CARD_WORDS.interestTip,
+      tip: CARD_WORDS.suppliedTip,
       asset: { symbol: L, address: f.loan.address },
       value: (
         <span>
           {sideValue(c, "supplied", f.supplied, L, f.suppliedUsd)}
           {f.supplyInterest && (
             <span className="mt-0.5 block text-xs text-rb-500">
-              {CARD_WORDS.interest30.earned} {interestValue(c, "supply", f.supplyInterest)}
+              <HeadingTip text={CARD_WORDS.interest30.earned} tip={CARD_WORDS.interestTip.earned} />
+              {": "}
+              {interestValue(c, "supply", f.supplyInterest)}
             </span>
           )}
         </span>
@@ -108,14 +111,16 @@ function slots(r: MorphoAtBlockPositionRead, dep: MorphoAtBlockDeployment): Posi
     right.push({
       id: "debt",
       label: `${L} debt`,
-      tip: CARD_WORDS.interestTip,
+      tip: CARD_WORDS.debtTip,
       asset: { symbol: L, address: f.loan.address },
       value: (
         <span>
           {sideValue(c, "debt", f.debt, L, f.debtUsd)}
           {f.debtInterest && (
             <span className="mt-0.5 block text-xs text-rb-500">
-              {CARD_WORDS.interest30.owed} {interestValue(c, "debt", f.debtInterest)}
+              <HeadingTip text={CARD_WORDS.interest30.owed} tip={CARD_WORDS.interestTip.owed} />
+              {": "}
+              {interestValue(c, "debt", f.debtInterest)}
             </span>
           )}
         </span>
@@ -186,7 +191,7 @@ function slots(r: MorphoAtBlockPositionRead, dep: MorphoAtBlockDeployment): Posi
             {
               id: "health-factor",
               label: MORPHO_TERMS.healthFactor,
-              labelTip: HEALTH_FACTOR_TIP,
+              labelTip: CARD_WORDS.healthTip,
               value:
                 f.healthFactor != null ? (
                   <Prov info={morphoAtBlockProv("health", c)}>{f.healthFactor.toFixed(2)}</Prov>
@@ -195,10 +200,11 @@ function slots(r: MorphoAtBlockPositionRead, dep: MorphoAtBlockDeployment): Posi
                 <span className="whitespace-nowrap">
                   {f.ltv != null && (
                     <>
-                      {CARD_WORDS.ltv} <Prov info={morphoAtBlockProv("ltv", c)}>{pctText(f.ltv, 1)}</Prov> ·{" "}
+                      <HeadingTip text={CARD_WORDS.ltv} tip={CARD_WORDS.ltvTip} />{" "}
+                      <Prov info={morphoAtBlockProv("ltv", c)}>{pctText(f.ltv, 1)}</Prov> ·{" "}
                     </>
                   )}
-                  {MORPHO_TERMS.lltv} {pctText(f.lltv, 1)}
+                  <HeadingTip text={MORPHO_TERMS.lltv} tip={LLTV_TIP} /> {pctText(f.lltv, 1)}
                 </span>
               ),
             },

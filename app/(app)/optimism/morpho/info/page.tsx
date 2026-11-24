@@ -11,6 +11,7 @@ import Link from "next/link";
 import {
   ProtocolInfoPage,
   type InfoReads,
+  type InfoTerm,
   type InfoView,
   GUIDE_NO_LEARN_MORE,
 } from "@/components/shared/protocol-info-page";
@@ -24,6 +25,42 @@ export const metadata = infoMetadata("morpho-optimism");
 
 const UL = "list-disc space-y-1 pl-5";
 const ROUTE = MORPHO_OPTIMISM.route;
+const DOCS = "https://docs.morpho.org";
+
+// The terms the position card's tips use beyond the shared glossary, in the
+// docs' spelling (rails-ops reference/official-docs/morpho.md, Terms).
+const CARD_TERMS: readonly InfoTerm[] = [
+  {
+    term: "Health factor",
+    definition:
+      "The health factor is the collateral's value at the market's oracle times the LLTV, divided by the debt. Above 1 the position is healthy; below 1 anyone can liquidate it.",
+    sources: [{ label: "Health factor", href: `${DOCS}/developers/blue/concepts/ltv/#health-factor` }],
+  },
+  {
+    term: "LTV",
+    definition:
+      "The Loan-To-Value (LTV) is the debt as a share of the collateral's value at the market's oracle. Interest on the debt raises it even while prices hold.",
+    sources: [{ label: "Collateral, LTV & Health", href: `${DOCS}/developers/blue/concepts/ltv/` }],
+  },
+  {
+    term: "Utilization",
+    definition:
+      "Utilization is the share of a market's supplied assets that is borrowed. The rate model raises the borrow rate as utilization climbs, steeply past its 90% target.",
+    sources: [{ label: "The AdaptiveCurveIRM", href: `${DOCS}/learn/concepts/irm/#the-adaptivecurveirm` }],
+  },
+  {
+    term: "Liquidation Incentive Factor",
+    definition:
+      "The Liquidation Incentive Factor (LIF) sets a liquidator's bonus: it takes collateral worth the debt it repays times the factor. Each market's factor follows from its LLTV, min(1.15, 1 ÷ (0.3 × LLTV + 0.7)), and the whole bonus goes to the liquidator.",
+    sources: [
+      {
+        label: "Liquidation Incentive Factor",
+        href: `${DOCS}/learn/concepts/liquidation/#liquidation-incentive-factor-lif`,
+      },
+    ],
+  },
+];
+const [TERM_0, ...TERMS] = MORPHO_INFO_SHARED.glossary();
 
 const views: readonly [InfoView, ...InfoView[]] = [
   {
@@ -128,7 +165,7 @@ export default function InfoPage() {
         </>
       }
       notCovered="A position's history, a listing of every position, the largest suppliers and borrowers, liquidations and vaults aren't covered here."
-      glossary={MORPHO_INFO_SHARED.glossary()}
+      glossary={[TERM_0, ...TERMS, ...CARD_TERMS]}
       howItWorks={[
         MORPHO_INFO_SHARED.whatItIs,
         MORPHO_INFO_SHARED.isolatedMarkets,

@@ -5,6 +5,7 @@
 
 import type { MorphoAtBlockFigures, MorphoAtBlockPositionFigures } from "@/lib/morpho-at-block/position";
 import type { MorphoAtBlockDeployment } from "@/lib/morpho-at-block/types";
+import { lifBonusText, lifText, morphoLif } from "@/lib/morpho/terms";
 
 type Dep = Pick<MorphoAtBlockDeployment, "chain" | "aaveOracle">;
 
@@ -65,6 +66,11 @@ export const CARD_WORDS = {
   supplied: "Supplied",
   suppliedTip: "What the wallet has lent to the market, with its interest to the block read.",
   ltv: "LTV",
+  ltvTip: "The debt as a share of the collateral's value at the market's oracle.",
+  /** The health factor's tip with who liquidates (the other Morpho cards keep
+   *  lib/morpho/terms HEALTH_FACTOR_TIP). */
+  healthTip:
+    "The collateral's value at the market's oracle times the LLTV, over the debt. Above 1 the position is healthy; below 1 anyone can liquidate it.",
   borrowRate: "Borrow APY",
   borrowRateTip:
     "The market's borrow rate from its rate model, compounded over a year. It follows how much of the market is lent out.",
@@ -76,10 +82,14 @@ export const CARD_WORDS = {
   drop: "Liquidates on a drop of",
   dropTip: "How far the collateral's price, in the loan asset, can fall before the LTV reaches the LLTV.",
   interest30: { earned: "Earned, 30 days", owed: "Interest, 30 days" },
-  interestTip: "What the market's rate added over the last 30 days, from the market's totals at the two dates.",
+  interestTip: {
+    earned:
+      "The interest the position earned over the last 30 days, shown where nothing was supplied or withdrawn in that time.",
+    owed: "The interest the position paid over the last 30 days, shown where nothing was borrowed or repaid in that time.",
+  },
   withheld: {
-    opened: "opened inside the 30 days",
-    changed: "changed inside the 30 days",
+    opened: "opened inside the window",
+    changed: "changed inside the window",
     unread: "not read",
   } as Record<"opened" | "changed" | "unread", string>,
   unpriced: "no dollar price",
@@ -105,6 +115,10 @@ export function cardExplainer(f: MorphoAtBlockPositionFigures, { chain }: Dep): 
       title: "Its limit",
       bullets: [
         `Its debt is ${pctText(f.ltv, 1)} of its collateral's value at the market's oracle. The market liquidates at ${pctText(f.lltv, 1)}.`,
+        `If the health factor falls below 1, anyone can liquidate it: the liquidator repays some or all of the debt and takes collateral worth the repaid debt times the market's Liquidation Incentive Factor, ${lifText(morphoLif(f.lltv))}, a ${lifBonusText(morphoLif(f.lltv))}.`,
+        f.usd
+          ? `The health factor and liquidation use the market's oracle, which prices the collateral in ${f.loan.symbol}; the dollar figures are for reading only.`
+          : `The health factor and liquidation use the market's oracle, which prices the collateral in ${f.loan.symbol}.`,
       ],
     });
   return out;
