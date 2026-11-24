@@ -88,7 +88,7 @@ import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { CompoundFlowsNote, compoundFlowsContent } from "@/components/protocol/compound/compound-flows-note";
 import { CompoundFlowReplayContext } from "@/components/protocol/compound/compound-ledger";
 import { useCompoundFlows } from "@/hooks/useCompoundFlows";
-import type { CompoundLive } from "@/lib/compound/flows";
+import { compoundFlowsSides, type CompoundLive } from "@/lib/compound/flows";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import type { PositionCardExports } from "@/components/shared/position-card";
@@ -539,6 +539,7 @@ export default function CompoundPositionView({
             closed={view != null && view.status !== "open"}
             // The card's ⋮ carries the menu; an event page draws no Tools.
             tools={false}
+            card={!onEventPage && (loading || view != null)}
           />
 
           {loading ? (
@@ -571,6 +572,7 @@ export default function CompoundPositionView({
                         </div>
                       }
                       learnMore={compoundFlowsContent()}
+                      skeleton={{ sides: compoundFlowsSides(view) }}
                     />
                   }
                 />

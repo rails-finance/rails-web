@@ -16,7 +16,7 @@
 // towers can be removed without removing the scrubber (rails-ops
 // TO-DO-ui-jobs §206).
 
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import {
@@ -170,7 +170,9 @@ export function LifetimeFlowsPanel({
   // Collapsed by default (the charts hidden); the viewer's choice is kept
   // (flows-view-store). The cursor and any cut it made survive the toggle.
   const [compact, setCompact] = useState(true);
-  useEffect(() => setCompact(readFlowsView() === "compact"), []);
+  // Read before paint, so a reader who keeps the charts shown never sees the
+  // compact skeleton's frame (ui-jobs 591).
+  useLayoutEffect(() => setCompact(readFlowsView() === "compact"), []);
   const toggleView = () => {
     const next = !compact;
     setCompact(next);
@@ -215,7 +217,13 @@ export function LifetimeFlowsPanel({
           {...(collapseKey && settled ? { [COLLAPSED_ATTR]: collapsed ? "1" : "0" } : {})}
           suppressHydrationWarning
           className={`rounded-2xl bg-raised ${CARD_PAD_X} py-4`}
-          style={loading && remembered["detail-economics"] ? { minHeight: remembered["detail-economics"] } : undefined}
+          // The remembered height is another position's on this route shape:
+          // where the page states the sides, the skeleton's measured shape holds.
+          style={
+            loading && skeleton?.sides == null && remembered["detail-economics"]
+              ? { minHeight: remembered["detail-economics"] }
+              : undefined
+          }
         >
           {collapseKey && <script dangerouslySetInnerHTML={{ __html: collapseScript() }} suppressHydrationWarning />}
           {/* The chevron follows the heading. The button is the disclosure row,
