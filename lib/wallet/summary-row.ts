@@ -6,7 +6,7 @@
 import type { WalletKind } from "./wallet-filters";
 
 export interface WalletSummaryRow {
-  chain: "ethereum" | "base" | "arbitrum";
+  chain: "ethereum" | "base" | "arbitrum" | "arc" | "sepolia";
   family: string;
   /** Set on a row the wallet read shapes from a protocol listing
    *  (lib/wallet/listing-summary-rows.ts): a deposit beside the protocol's
@@ -30,11 +30,15 @@ export interface WalletSummaryRow {
   liquidationCount: number | null;
   readBlock: number | null;
   readAt: string | null;
-  href: string;
+  /** Null on a row with no page (a Morpho Vault V2 holding). */
+  href: string | null;
   /** The family listing route's row, as rails-server's family route answers it. */
   card: unknown;
   writtenAt: string;
 }
+
+/** Sepolia rows are drawn and never counted (WALLET_COUNTS_SCOPE). */
+export const countedRow = (r: Pick<WalletSummaryRow, "chain">): boolean => r.chain !== "sepolia";
 
 export interface WalletSummaryAnswer {
   address: string;

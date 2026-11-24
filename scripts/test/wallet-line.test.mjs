@@ -4,6 +4,7 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
+import { ARC_CHAIN_ID, CHAINS, SEPOLIA_CHAIN_ID } from "../../lib/shared/chains.ts";
 import { MENU_TESTNETS, WALLET_COUNTS_SCOPE, rowIsPage, walletProtocolMenu } from "../../lib/wallet/summary-counts.ts";
 
 const W = "0x3df83ec9d2b62bb9bb83eba1218a202564bb67da";
@@ -118,6 +119,25 @@ test("this page: the page's row marked; not a link where the row is the page", (
 test("a position on no roster entry is named by its family", () => {
   const m = menu([pos("unknown", "open", 1)], "/x");
   assert.deepEqual([m.rows[0].name, m.rows[0].href], ["unknown", "/ethereum/unknown/1"]);
+});
+
+test("a position with a null href is no page; its row links to the listing or the wallet view", () => {
+  assert.equal(rowIsPage(null, "/ethereum/aave-v3/1", ""), false);
+  const noPage = (family, id) => ({ ...pos(family, "open", id), href: null });
+  const alone = menu([noPage("liquity-v2", 1), pos("aave-v3", "open", 2)], "/ethereum/aave-v3/2");
+  assert.equal(alone.pageCounted, true);
+  assert.equal(alone.rows.find((r) => r.name === "Liquity V2").href, `/ethereum/liquity-v2?q=${W}`);
+  const unlisted = menu([noPage("morpho", 1)], "/x");
+  assert.equal(unlisted.trigger, "1 position");
+  assert.equal(unlisted.rows[0].href, DASHBOARD);
+  assert.equal(unlisted.rows[0].current, false);
+});
+
+test("an Arc or Sepolia position keeps its chain and its menu row", () => {
+  assert.equal(CHAINS[ARC_CHAIN_ID].slug, "arc");
+  assert.equal(CHAINS[SEPOLIA_CHAIN_ID].slug, "sepolia");
+  const m = menu([pos("aave-v3", "open", 1, "arc"), pos("aave-v3", "open", 2)], "/x");
+  assert.deepEqual(m.rows.map((r) => r.key).sort(), ["arc:aave-v3", "ethereum:aave-v3"]);
 });
 
 test("the footer and the wallet view's tip", () => {

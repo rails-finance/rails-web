@@ -48,6 +48,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { openListingSearch } from "./lib/listing-toolbar.mjs";
 
+// The listing's own search: the wallet panel in the header draws a search
+// input of its own, hidden until opened.
+const LISTING_TOOLBAR = '[data-skel-section="listing-toolbar"]';
+
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, "..", "..");
@@ -180,10 +184,9 @@ async function openListing(context, url, { route } = {}) {
  *  wallet URL opened cold is answered by SSR, which no page.route can reach).
  *  That is what lets the truncation case rewrite `pagination.total` on the
  *  wire. */
-async function searchWallet(page, placeholder, wallet) {
+async function searchWallet(page, wallet) {
   // The search rests as an icon until pressed (N1.1, ui-jobs 801).
-  await openListingSearch(page);
-  const box = page.getByPlaceholder(placeholder);
+  const box = await openListingSearch(page, page.locator(LISTING_TOOLBAR));
   await box.click();
   await box.fill(wallet);
   // 300ms debounce, then the fetch, then the re-render.
@@ -355,7 +358,7 @@ info(
   const page = await openListing(context, `${BASE}/sepolia/polaris`, {
     route: inflateTotal("**/api/polaris/positions**", 21),
   });
-  await searchWallet(page, "Address, ENS, or position number", POLARIS_WALLET);
+  await searchWallet(page, POLARIS_WALLET);
   const strip = await readStrip(page);
   check(
     "P8. a wallet stated as holding 21 positions states the count only — no legs, and says why",
@@ -552,8 +555,7 @@ const walletBand = async (wallet) => {
 // ── typed search, and a wallet holding nothing ─────────────────────────────
 {
   const page = await openListing(context, `${BASE}/ethereum/liquity-v2`);
-  await openListingSearch(page);
-  const box = page.getByPlaceholder("Address, ENS, or ID");
+  const box = await openListingSearch(page, page.locator(LISTING_TOOLBAR));
   await box.click();
   await box.fill(V2_WALLET);
   await page.waitForURL((u) => u.pathname.startsWith("/wallet/"), { timeout: 60000 }).catch(() => {});
@@ -625,8 +627,9 @@ const board = {
   ],
 };
 const pRows = [row("usdp", "1", "open", 10, 30000), row("goldp", "2", "open", 2, 5), row("usdp", "3", "closed", 0, 0)];
-const polaris = polarisHolderStrip(pRows, 3, board, 20);
-const polarisTruncated = polarisHolderStrip(pRows, 21, board, 20);
+// The wallet the search names is an argument (lib/polaris/holder-strip.ts).
+const polaris = polarisHolderStrip(pRows, 3, board, 20, 0, "0x1");
+const polarisTruncated = polarisHolderStrip(pRows, 21, board, 20, 0, "0x1");
 
 const trove = (id, ct, coll, debt) => ({
   id, collateralType: ct, status: "open", isZombie: false,
@@ -638,7 +641,7 @@ const trove = (id, ct, coll, debt) => ({
   owner: "0x1", lastOwner: null, ownerEns: null,
 });
 const prices = { weth: 2000, wsteth: 2400, reth: 2200 };
-const v2 = liquityV2HolderStrip([trove("0xaaaabbbbcccc", "WETH", 100, 100000), trove("0xddddeeeeffff", "rETH", 50, 50000)], 2, prices, 20);
+const v2 = liquityV2HolderStrip([trove("0xaaaabbbbcccc", "WETH", 100, 100000), trove("0xddddeeeeffff", "rETH", 50, 50000)], 2, prices, 20, 0, "0x1");
 
 const shape = (s) => ({
   countsLine: s.countsLine, counts: s.counts, truncated: s.truncated, note: s.note ?? null,
@@ -737,7 +740,7 @@ if (!probeLine) {
         "rETH amount × price=$110,000.00",
         "sum=$310,000.00",
       ].every((r) => leg(got.v2, "collateral").inputs.includes(r)) &&
-      /states no block/.test(leg(got.v2, "collateral").summary),
+      /names no block/.test(leg(got.v2, "collateral").summary),
     JSON.stringify(leg(got.v2, "collateral")).slice(0, 260),
   );
   check(
