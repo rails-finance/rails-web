@@ -91,6 +91,7 @@ try {
       source: document.querySelector("[data-asset-source]")?.getAttribute("data-asset-source") ?? "",
       heading: document.querySelector("[data-asset-oracles] h2")?.textContent.trim() ?? "",
       intro: document.querySelector("[data-asset-oracles-intro]")?.textContent.trim() ?? "",
+      headers: [...document.querySelectorAll("[data-asset-oracles] thead th")].map((th) => th.textContent.trim()),
       tableName: document.querySelector("[data-asset-oracles] table")?.getAttribute("aria-label") ?? "",
       rows: [...document.querySelectorAll("[data-asset-oracles] tr[data-asset-oracle]")].map((tr) => ({
         id: tr.dataset.assetOracle,
@@ -118,11 +119,16 @@ try {
     );
     check(words.heading === "", "L2 the table has no heading", words.heading);
     check(
-      /^The table below shows how other protocols on Ethereum price WETH: the oracle each one reads, its contract/.test(
+      /^The table below shows how other protocols on Ethereum price WETH: the oracle each one reads, its (latest price|price at one block and its gap from Liquity V2's price)\.$/.test(
         words.intro,
       ),
       "L2 the intro sentence above the table",
       words.intro,
+    );
+    check(
+      !words.headers.includes("Contract") && ["Used by", "Oracle", "Price now"].every((h) => words.headers.includes(h)),
+      "L2 the table has no Contract column",
+      words.headers.join(" | "),
     );
     check(words.tableName === "How other protocols price WETH", "L2 the table keeps its name", words.tableName);
     const same = words.rows.filter((r) => r.group === "same");
@@ -139,8 +145,8 @@ try {
       `${words.rows.length}`,
     );
     check(
-      words.rows.filter((r) => r.group === "listed").every((r) => r.text.includes("No stored price")),
-      "L2 a listed-only row reads No stored price",
+      words.rows.filter((r) => r.group === "listed").every((r) => r.text.includes("Not saved by Rails")),
+      "L2 a listed-only row reads Not saved by Rails",
     );
     check(
       !words.rows.some((r) => r.id === "1:0x5f4ec3df9cbd43714fe2740f5e3616155c5b8419"),

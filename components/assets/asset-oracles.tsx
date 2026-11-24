@@ -4,10 +4,10 @@
 // table (D1, D4, D5, D6; components/shared/data-table). First the protocols on
 // the page's own oracle line ("Same oracle as <page protocol>"), then the
 // other lines, then the protocols that list the token and store no line for it
-// ("No stored price"). One row per protocol, or per market for a protocol that
+// ("Not saved by Rails"). One row per protocol, or per market for a protocol that
 // reads more than one line; each row is one link to that protocol's page for
 // the token (a plain row where it has none), and does not expand. Each row has
-// the Oracle, the Contract (mono text, the full address in its tooltip), and
+// the Oracle and
 // Price now, and on a same-block read a Gap; prices and gaps carry their
 // receipts. Where the prices stand at different blocks (the stored stub) the
 // table shows the price only and draws no as-of line. Below sm each row is a
@@ -131,7 +131,6 @@ export function OracleTable({
             symbol,
             sameBlock: gaps,
             gapFrom,
-            hasListed: rows.some((r) => r.group === "listed"),
           })}
         </p>
         {gaps && (
@@ -142,7 +141,7 @@ export function OracleTable({
       </div>
       <DataTable
         label={`How other protocols price ${symbol}`}
-        tableClassName="min-w-[760px] text-sm"
+        tableClassName="min-w-[640px] text-sm"
         stacked
         rowHeight="two"
       >
@@ -150,7 +149,6 @@ export function OracleTable({
           <DataTableLeadHeader plain />
           <DataTableHeader label="Used by" />
           <DataTableHeader label="Oracle" />
-          <DataTableHeader label="Contract" />
           <DataTableHeader label="Price now" align="right" />
           {gaps && <DataTableHeader label="Gap" align="right" />}
         </DataTableHead>
@@ -182,7 +180,7 @@ export function OracleTable({
                   plain
                   chainless
                 />
-                <DataTableCell rowHeader valign="middle" className="sm:whitespace-nowrap">
+                <DataTableCell rowHeader valign="middle" className="sm:w-[22%] sm:min-w-[180px] sm:whitespace-nowrap">
                   <span className="flex items-center gap-2">
                     <DataTableLeadMark protocol={explorer} chain={chain as ChainId} chainless />
                     {href ? (
@@ -215,14 +213,11 @@ export function OracleTable({
                     )}
                   </span>
                 </DataTableCell>
-                <DataTableCell label="Contract" valign="middle" className="whitespace-nowrap text-sm">
-                  {r.address ? <Address address={r.address} /> : <span className="text-rb-500">–</span>}
-                </DataTableCell>
                 <DataTableCell
                   label="Price now"
                   align="right"
                   valign="middle"
-                  className="whitespace-nowrap tabular-nums"
+                  className="whitespace-nowrap tabular-nums sm:w-[130px]"
                   data-asset-price-now={r.price.value ?? ""}
                 >
                   {line ? (
@@ -236,7 +231,7 @@ export function OracleTable({
                     label="Gap"
                     align="right"
                     valign="middle"
-                    className="whitespace-nowrap tabular-nums text-rb-500"
+                    className="whitespace-nowrap tabular-nums text-rb-500 sm:w-[110px]"
                     data-asset-gap={r.gap.value ?? ""}
                   >
                     {listed ? (

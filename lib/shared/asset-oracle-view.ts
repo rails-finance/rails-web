@@ -295,20 +295,12 @@ export function priceCell(p: LinePriceNow | undefined): PriceCell {
 
 /** The sentence above the table (A2.4), built from data. `gapFrom` names what
  *  the gap is against ("Liquity V2's price", "the price charted above"); it is
- *  drawn on a same-block read only. A second sentence where protocols list the
- *  token with no stored price. */
-export function tableIntro(o: {
-  chain: string;
-  symbol: string;
-  sameBlock: boolean;
-  gapFrom: string;
-  hasListed: boolean;
-}): string {
-  const head = `The table below shows how other protocols on ${o.chain} price ${o.symbol}: the oracle each one reads, its contract`;
-  const body = o.sameBlock
+ *  drawn on a same-block read only. */
+export function tableIntro(o: { chain: string; symbol: string; sameBlock: boolean; gapFrom: string }): string {
+  const head = `The table below shows how other protocols on ${o.chain} price ${o.symbol}: the oracle each one reads`;
+  return o.sameBlock
     ? `${head}, its price at one block and its gap from ${o.gapFrom}.`
     : `${head} and its latest price.`;
-  return o.hasListed ? `${body} Protocols marked No stored price list ${o.symbol} with no oracle Rails stores.` : body;
 }
 
 /** The table's "other" rows: every line on the chain but the page's, in the
@@ -384,7 +376,7 @@ export function sameRows(
 }
 
 /** The table's "listed" rows: a protocol that lists the token and stores no
- *  line for it, with no price. A stated reason, where the data has one, sits under "No stored price". */
+ *  line for it, with no price. A stated reason, where the data has one, sits under "Not saved by Rails". */
 export function listedRows(entries: readonly AlsoListedEntry[], now: AssetPricesNow): OracleRow[] {
   return entries.map((e) => ({
     id: `listed:${e.explorer}`,
@@ -393,7 +385,7 @@ export function listedRows(entries: readonly AlsoListedEntry[], now: AssetPrices
     via: null,
     protocol: { name: e.name, explorer: e.explorer, href: e.href },
     retired: false,
-    name: "No stored price",
+    name: "Not saved by Rails",
     full: null,
     kind: e.reason,
     address: null,

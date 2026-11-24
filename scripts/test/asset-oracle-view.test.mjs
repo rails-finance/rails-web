@@ -468,14 +468,14 @@ test('Morpho\'s page has no line of its own: its readers read "The price charted
   assert.equal(same[0].via, null);
 });
 
-test("a listed-only row: no stored price, no contract, no price", () => {
+test("a listed-only row: not saved by Rails, no price", () => {
   const rows = tableFor(liquity, "liquity", liquityNow(), "Liquity V2");
   const listed = rows.filter((r) => r.group === "listed");
   assert.deepEqual(
     listed.map((r) => [r.protocol.name, r.name, r.address, r.price.text, r.gap.text]),
     [
-      ["Morpho Blue", "No stored price", null, "–", "–"],
-      ["Pendle", "No stored price", null, "–", "–"],
+      ["Morpho Blue", "Not saved by Rails", null, "–", "–"],
+      ["Pendle", "Not saved by Rails", null, "–", "–"],
     ],
   );
   assert.equal(listed[0].protocol.href, null, "pageOf names no page for Morpho Blue here");
@@ -584,7 +584,7 @@ test("row labels are unique on the Morpho USDC page and name the market", () => 
   assert.ok(labels.includes("Compound V3 cUSDCv3: The price charted above, $0.9999"));
   assert.ok(labels.includes("Compound V3 cWETHv3: Chainlink USDC / ETH, $1.0001"));
   const listed = view.listedRows([{ name: "Pendle", explorer: "pendle", href: null, reason: null }], sameBlock({}));
-  assert.equal(view.rowLabel(listed[0]), "Pendle: No stored price");
+  assert.equal(view.rowLabel(listed[0]), "Pendle: Not saved by Rails");
 });
 
 test("the page protocol's markets under the chart, with their first stored days", () => {
@@ -601,17 +601,17 @@ test("the chart header's price carries cents, as the table's", () => {
 });
 
 test("the intro above the table, in its three cases", () => {
-  const o = { chain: "Ethereum", symbol: "WETH", sameBlock: false, gapFrom: "Liquity V2's price", hasListed: false };
+  const o = { chain: "Ethereum", symbol: "WETH", sameBlock: false, gapFrom: "Liquity V2's price" };
   assert.equal(
     view.tableIntro(o),
-    "The table below shows how other protocols on Ethereum price WETH: the oracle each one reads, its contract and its latest price.",
+    "The table below shows how other protocols on Ethereum price WETH: the oracle each one reads and its latest price.",
   );
   assert.equal(
     view.tableIntro({ ...o, sameBlock: true }),
-    "The table below shows how other protocols on Ethereum price WETH: the oracle each one reads, its contract, its price at one block and its gap from Liquity V2's price.",
+    "The table below shows how other protocols on Ethereum price WETH: the oracle each one reads, its price at one block and its gap from Liquity V2's price.",
   );
   assert.equal(
-    view.tableIntro({ ...o, symbol: "USDC", sameBlock: true, gapFrom: "the price charted above", hasListed: true }),
-    "The table below shows how other protocols on Ethereum price USDC: the oracle each one reads, its contract, its price at one block and its gap from the price charted above. Protocols marked No stored price list USDC with no oracle Rails stores.",
+    view.tableIntro({ ...o, symbol: "USDC", sameBlock: true, gapFrom: "the price charted above" }),
+    "The table below shows how other protocols on Ethereum price USDC: the oracle each one reads, its price at one block and its gap from the price charted above.",
   );
 });
