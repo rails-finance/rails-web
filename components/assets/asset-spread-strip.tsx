@@ -13,7 +13,14 @@
 import type { ReactNode } from "react";
 import { formatDate } from "@/lib/date";
 import { delayedLine, lineReaders, type PageLine } from "@/lib/shared/asset-roster";
-import { fmtSignedSpread, fmtSpread, SPREAD_LIMIT, type LineSpread } from "@/lib/shared/asset-spread";
+import {
+  dashTitle,
+  fmtSignedSpread,
+  fmtSpread,
+  SPREAD_LIMIT,
+  type DashReason,
+  type LineSpread,
+} from "@/lib/shared/asset-spread";
 import { roundTime } from "@/components/assets/round-time";
 
 const DAY_MS = 86_400_000;
@@ -25,6 +32,7 @@ export function AssetSpreadStrip({
   cursorDay,
   cursorTs,
   valueAt,
+  reasonAt,
   stamp: stampText,
   onJump,
   keyOf,
@@ -39,6 +47,8 @@ export function AssetSpreadStrip({
   /** On the rounds chart: the cursor's moment, and each line's deviation then. */
   cursorTs?: number | null;
   valueAt?: (lineId: string) => number | null;
+  /** Why a line has no deviation at the cursor, for the dash's tooltip. */
+  reasonAt?: (lineId: string) => DashReason;
   /** The cursor's time in words, where the chart names it (a day on a daily grid). */
   stamp?: string | null;
   onJump: (day: number, ts?: number) => void;
@@ -137,11 +147,7 @@ export function AssetSpreadStrip({
                 className={`shrink-0 tabular-nums ${at != null && Math.abs(at) > SPREAD_LIMIT ? "text-[var(--caution)]" : "text-rb-500"}`}
                 data-asset-spread-at={at ?? ""}
                 title={
-                  at == null
-                    ? onRounds
-                      ? "No stored round for this line at this moment"
-                      : "Not read within ten minutes of the main line on this day"
-                    : undefined
+                  at == null ? dashTitle(reasonAt?.(o.line.id) ?? (onRounds ? "rounds" : "none"), mainName) : undefined
                 }
               >
                 {at == null ? "–" : fmtSignedSpread(at)}
