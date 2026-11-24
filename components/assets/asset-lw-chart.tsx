@@ -1,11 +1,12 @@
 "use client";
 
 // One chain's asset chart on TradingView's Lightweight Charts (rails-ops
-// reference/asset-key-map.md, "The chart engine"; anatomy A3, A3.4, A3.5,
-// A3.7; ui-jobs 818): the main line alone (with `via`, the price the protocol
-// uses), with its range buttons, readout and price axis. The readout reads the
-// cursor's moment while it lies in the window, else the window's last
-// (`legendMoment`). The line is drawn on the uniform grid of
+// reference/asset-key-map.md, "The chart engine"; anatomy A3, A3.4, A3.7,
+// A3.8; ui-jobs 818): the main line alone (with `via`, the price the protocol
+// uses) in the page's panel, under its header (`ChartHead`): the price now
+// with its receipt, the 30-day change and its time, or while the cursor lies
+// in the window the price at the cursor with its moment and round
+// (`legendMoment`), and the range buttons. The line is drawn on the uniform grid of
 // lib/shared/asset-chart-grid.ts, so the axis stays proportional to time;
 // zoomed in on stored rounds, the grid's cells read detail windows of
 // `/api/prices/rounds` (cached by step and chunk). The span before the line's
@@ -14,18 +15,20 @@
 // import). Licence: Apache-2.0, the NOTICE in the site's footers
 // (components/shared/lw-attribution.tsx).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { IChartApi, ISeriesApi, LineData, Time, UTCTimestamp, WhitespaceData } from "lightweight-charts";
 import { legName, roundName, roundTime } from "@/components/assets/round-time";
 import { LINE_HUE } from "@/components/shared/lifetime-flows-combined";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { fmtChange } from "@/components/assets/price-sparkline";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { lwTickLabel, useLwColors, useLwLib } from "@/components/shared/lw-chart-kit";
-import { LineKey } from "@/components/shared/lw-line-key";
 import { fetchPriceRounds, type RoundsAnswer } from "@/lib/api/fetch-price-rounds";
 import { formatDate } from "@/lib/date";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatPrice } from "@/lib/shared/flows-price";
-import { lineReaders, type PageLine } from "@/lib/shared/asset-roster";
+import type { PageLine } from "@/lib/shared/asset-roster";
+import type { PriceCell } from "@/lib/shared/asset-oracle-view";
 import {
   CHUNK_MAX,
   DAY_S,
@@ -91,17 +94,91 @@ const cellWords = (g: Grid, ts: number, roundsFrom: number | null) =>
 
 type Chunk = { from: number; to: number; answer: RoundsAnswer | null };
 
-/** A line whose every series is a market Maker has retired: its key drawn quieter. */
-const retiredLine = (l: LwLine) => l.line.series.length > 0 && l.line.series.every((s) => s.retired);
+/** The panel header's price now: the page line's read, its receipt, the
+ *  30-day change and the read's time ("updated 07:12 UTC"). */
+export interface HeadPrice {
+  price: PriceCell;
+  info: Provenance | null;
+  symbol: string;
+  change: number | null;
+  updated: string | null;
+}
+
+const PANEL = "rounded-xl bg-raised p-3 sm:p-4";
+
+/** The panel's header (A3.8): the figure large, then beside it the change
+ *  and time, or the hovered moment (`hover`); the range buttons at the right. */
+export function ChartHead({
+  head,
+  hover,
+  controls,
+}: {
+  head: HeadPrice;
+  /** The price at the cursor and its moment, while the cursor lies in the window. */
+  hover?: { value: number | null; stamp: ReactNode } | null;
+  controls?: ReactNode;
+}) {
+  const p = head.price;
+  return (
+    <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2" data-anatomy="A3.8">
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 tabular-nums" data-asset-lw-head="">
+        <span className="text-3xl font-semibold leading-none text-foreground sm:text-4xl" data-asset-head-price="">
+          {hover ? (
+            <span data-asset-lw-value={hover.value ?? ""}>
+              {hover.value == null ? "–" : formatPrice(hover.value, "USD")}
+            </span>
+          ) : p.value != null && head.info ? (
+            <Prov info={head.info} value={String(p.value)} symbol={head.symbol}>
+              {p.text}
+            </Prov>
+          ) : (
+            <span title={p.reason ?? undefined}>–</span>
+          )}
+        </span>
+        {hover ? (
+          <span className="text-sm text-rb-500">{hover.stamp}</span>
+        ) : (
+          <>
+            {p.stale && (
+              <span
+                className="rounded border border-[var(--caution)] px-1 text-[11px] leading-4 text-[var(--caution)]"
+                title="The oracle's last update is older than its heartbeat"
+                data-asset-stale=""
+              >
+                stale
+              </span>
+            )}
+            {head.change != null && (
+              <span
+                className={`text-sm ${head.change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                data-asset-price-change={head.change}
+              >
+                {fmtChange(head.change)} <span className="text-rb-500">30D</span>
+              </span>
+            )}
+            {head.updated && (
+              <span className="text-sm text-rb-500" data-asset-head-time="">
+                {head.updated}
+              </span>
+            )}
+          </>
+        )}
+      </div>
+      {controls}
+    </div>
+  );
+}
 
 export function AssetLwChart({
   line: main,
   chain,
   help,
   joinNote,
+  head,
 }: {
   line: LwLine;
   chain: number;
+  head: HeadPrice;
   help: LearnMoreContent;
   /** The join under the chart ("From 25 Oct 2026 the line is…"), its source line. */
   joinNote: string | null;
@@ -315,7 +392,12 @@ export function AssetLwChart({
     // The cell is the bar the crosshair snapped to (its time), the logical index without one.
     c.subscribeCrosshairMove((param) => {
       const grid = gridRef.current;
-      if (!grid || param.logical == null || !param.sourceEvent || !param.point) return;
+      // The pointer left the chart: the header goes back to the price now.
+      if (!param.point) {
+        setCursorTs(null);
+        return;
+      }
+      if (!grid || param.logical == null || !param.sourceEvent) return;
       const i = param.time != null ? cellOf(grid, param.time as number) : Math.round(param.logical ?? -1);
       if (i < 0 || i >= grid.count) return;
       setCursorTs(cellAt(grid, i));
@@ -433,7 +515,8 @@ export function AssetLwChart({
     return () => el.removeEventListener("dblclick", reset);
   }, [home, show]);
 
-  // The readout's moment: the cursor's while it lies in the window shown, else the window's last.
+  // The header's moment: the cursor's while it lies in the window shown (the
+  // header then reads it), else the window's last.
   const moment = legendMoment(cursorTs, shown, bounds.t1, grid);
   const at = moment.ts;
   const t = tracked?.track;
@@ -459,7 +542,7 @@ export function AssetLwChart({
   const stamp = grid ? cellWords(grid, at, firstRound) : roundTime(at);
   const [helpOpen, setHelpOpen] = useState(false);
   const tx = (h: string) => explorerUrl(chain as ChainId, "tx", h);
-  const card = "rounded-lg border border-rb-200 p-3 dark:border-rb-700";
+  const hovering = moment.cursor;
 
   return (
     <div
@@ -470,73 +553,70 @@ export function AssetLwChart({
       data-asset-lw-from={Math.round(shown.from)}
       data-asset-lw-to={Math.round(shown.to)}
     >
-      <div className={card} data-asset-lw-price="">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="flex gap-1" role="group" aria-label="Span shown" data-anatomy="A3.4">
-            {RANGES.map(([word, span]) => (
-              <button
-                key={word}
-                type="button"
-                aria-pressed={active(span)}
-                onClick={() => {
-                  setRangeChosen(true);
-                  show(span == null ? { from: bounds.t0, to: bounds.t1 } : { from: bounds.t1 - span, to: bounds.t1 });
-                }}
-                className={`rounded px-2 py-0.5 tabular-nums ${active(span) ? "bg-[var(--surface-sunken)] font-semibold text-foreground" : "text-rb-500 hover:text-foreground"}`}
-                data-asset-range={word}
-              >
-                {word}
-              </button>
-            ))}
-          </div>
-          <span className="flex items-center gap-2 text-rb-500">
-            Times in UTC
-            <span className="shrink-0" data-flow-help="A3.7">
-              <LearnMoreButton onClick={() => setHelpOpen(true)} ariaLabel="How to read the price chart" />
-              {helpOpen && <LearnMoreModal content={help} onClose={() => setHelpOpen(false)} anatomy="A3.7" />}
-            </span>
-          </span>
-        </div>
-        <div className="mb-2 text-xs" data-asset-lw-readout={at} data-anatomy="A3.5">
-          <div className="flex flex-wrap items-baseline gap-x-2 text-rb-500 tabular-nums">
-            <span className="text-foreground" data-asset-lw-stamp="">
-              {stamp}
-            </span>
-            {!moment.cursor && at >= bounds.t1 && <span>latest</span>}
-            {round && (
-              <span data-asset-lw-round={round[6] ?? ""}>
-                {leg?.kind === "cap"
-                  ? "cap row"
-                  : leg?.kind === "rate"
-                    ? "rate row"
-                    : round[6]
-                      ? roundName(round[6])
-                      : "round"}
-                {mainRounds && mainRounds.legs.length > 1 && leg?.kind === "feed" ? ` of ${legName(leg.name)}` : ""},
-                block {round[4].toLocaleString("en-US")},{" "}
-                <a href={tx(round[5])} target="_blank" rel="noopener" className="font-mono hover:underline">
-                  {round[5].slice(0, 10)}…
-                </a>
-              </span>
-            )}
-          </div>
-          <ul className="mt-1" data-asset-lw-legend="">
-            <li data-asset-lw-line={main.line.id} data-asset-lw-slot="main" data-asset-lw-dash="solid">
-              <div className="flex items-baseline justify-between gap-3 px-1">
-                <span className="flex min-w-0 items-baseline gap-1.5">
-                  <LineKey color={LINE_HUE.collateral} dash="solid" main quiet={retiredLine(main)} />
-                  <span className="min-w-0 font-semibold text-foreground">
-                    {main.line.oracle.name}
-                    <span className="font-normal text-rb-500"> · {lineReaders(main.line)}</span>
-                  </span>
-                </span>
-                <span className="shrink-0 text-foreground tabular-nums" data-asset-lw-value={mainValue ?? ""}>
-                  {mainValue == null ? "–" : formatPrice(mainValue, "USD")}
-                </span>
+      <div className={PANEL} data-asset-lw-price="">
+        <ChartHead
+          head={head}
+          hover={
+            hovering
+              ? {
+                  value: mainValue,
+                  stamp: (
+                    <span className="tabular-nums" data-asset-lw-readout={at}>
+                      <span className="text-foreground" data-asset-lw-stamp="">
+                        {stamp}
+                      </span>
+                      {round && (
+                        <span data-asset-lw-round={round[6] ?? ""}>
+                          {" · "}
+                          {leg?.kind === "cap"
+                            ? "cap row"
+                            : leg?.kind === "rate"
+                              ? "rate row"
+                              : round[6]
+                                ? roundName(round[6])
+                                : "round"}
+                          {mainRounds && mainRounds.legs.length > 1 && leg?.kind === "feed"
+                            ? ` of ${legName(leg.name)}`
+                            : ""}
+                          , block {round[4].toLocaleString("en-US")},{" "}
+                          <a href={tx(round[5])} target="_blank" rel="noopener" className="font-mono hover:underline">
+                            {round[5].slice(0, 10)}…
+                          </a>
+                        </span>
+                      )}
+                    </span>
+                  ),
+                }
+              : null
+          }
+          controls={
+            <div className="flex items-center gap-2 text-xs">
+              <div className="flex gap-1" role="group" aria-label="Span shown" data-anatomy="A3.4">
+                {RANGES.map(([word, span]) => (
+                  <button
+                    key={word}
+                    type="button"
+                    aria-pressed={active(span)}
+                    onClick={() => {
+                      setRangeChosen(true);
+                      show(
+                        span == null ? { from: bounds.t0, to: bounds.t1 } : { from: bounds.t1 - span, to: bounds.t1 },
+                      );
+                    }}
+                    className={`rounded px-2 py-0.5 tabular-nums ${active(span) ? "bg-[var(--surface-sunken)] font-semibold text-foreground" : "text-rb-500 hover:text-foreground"}`}
+                    data-asset-range={word}
+                  >
+                    {word}
+                  </button>
+                ))}
               </div>
-            </li>
-          </ul>
-        </div>
+              <span className="shrink-0" data-flow-help="A3.7">
+                <LearnMoreButton onClick={() => setHelpOpen(true)} ariaLabel="How to read the price chart" />
+                {helpOpen && <LearnMoreModal content={help} onClose={() => setHelpOpen(false)} anatomy="A3.7" />}
+              </span>
+            </div>
+          }
+        />
         <div ref={box} className="relative isolate w-full" style={{ height: PRICE_H }} data-asset-lw-box="">
           <div
             ref={shade}

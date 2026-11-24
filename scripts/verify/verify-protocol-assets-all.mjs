@@ -7,9 +7,9 @@
 // Per explorer:
 //   a. /<chain>/<slug>/assets answers 200 with at least one line;
 //   b. its sections menu reads "Assets" and then "About" last;
-//   c. the first line's page answers 200 under the protocol (A7), and its
-//      "Also used in" links each open an explorer's page for the same token,
-//      or a vault's page.
+//   c. the first line's page answers 200 under the protocol (A7), and the
+//      protocol links of "Also reads this oracle" and the oracle table (A2.3,
+//      A2.4) each open an explorer's page for the same token.
 // Then every distinct "In <protocol>" link answers with its market (reserve
 // pages checked against their market's read), and one explorer the roster
 // gives no Assets has no such page (a 404).
@@ -73,12 +73,13 @@ for (const e of explorers) {
   if (!lines.length) continue;
   const token = lines[0];
   const page = await get(`${e.href}/assets/${token}`);
-  const alsoHrefs = [
-    ...page.html.slice(page.html.indexOf('data-anatomy="A7.2"')).matchAll(/<a[^>]*data-asset-chip="([^"]+)"[^>]*>/g),
-  ].map((m) => [m[1], /href="([^"]+)"/.exec(m[0])?.[1] ?? ""]);
-  const wrong = alsoHrefs.filter(([id, h]) => id !== "sbold" && !(h.startsWith("/") && h.endsWith(`/assets/${token}`)));
+  const alsoHrefs = [...page.html.matchAll(/<a[^>]*data-asset-oracle-link="([^"]*)"[^>]*>/g)].map((m) => [
+    m[1],
+    /href="([^"]+)"/.exec(m[0])?.[1] ?? "",
+  ]);
+  const wrong = alsoHrefs.filter(([, h]) => !(h.startsWith("/") && h.endsWith(`/assets/${token}`)));
   check(
-    `${e.id} c. its page for ${token.slice(0, 10)}… answers under the protocol, "Also used in" opening explorers' pages`,
+    `${e.id} c. its page for ${token.slice(0, 10)}… answers under the protocol, its protocol links opening explorers' pages`,
     page.status === 200 && page.html.includes('data-anatomy="A7"') && wrong.length === 0,
     `${page.status}; ${alsoHrefs.length} others${wrong.length ? `; wrong ${JSON.stringify(wrong.slice(0, 2))}` : ""}`,
   );

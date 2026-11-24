@@ -1718,16 +1718,12 @@ export function assetLwChartContent(symbol: string): LearnMoreContent {
         text: "scroll or pinch to zoom, drag to pan, double-click to go back to the opening view; the buttons over the chart pick a span. Zoomed in on stored rounds, the chart reads every round in the window; zoomed out, each step is the last price of its span.",
       },
       {
-        bold: "The readout",
-        text: "the time under the cursor (the window's last moment when the cursor is outside it), the price then, and on stored rounds the round, block and transaction behind it.",
+        bold: "The header",
+        text: "the price now, its 30-day change and when it was read; with the cursor on the chart, the price at the cursor, its time, and on stored rounds the round, block and transaction behind it.",
       },
       {
         bold: "Stored rounds",
         text: "the shaded span is the daily store's read of the oracle, a price per UTC day; after it, the line is the oracle's rounds as stored.",
-      },
-      {
-        bold: "The list under the chart",
-        text: `the other protocols reading ${symbol} on this chain and the feed each reads, protocols reading one feed together. "The same feed as" marks the protocols that read the feed the chart draws.`,
       },
     ],
   };

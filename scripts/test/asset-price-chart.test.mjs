@@ -1,7 +1,7 @@
 // The asset page's price chart and the words around it (ui-jobs 818, 819):
 // lib/shared/asset-spread.ts (a daily read against a rounds close, for the
 // Prices list's flags), lib/shared/asset-chart-grid.ts (`legendMoment`) and
-// lib/shared/asset-captions.ts. Run: npm test
+// lib/shared/asset-captions.ts (the join). Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
 import { register } from "node:module";
@@ -21,7 +21,7 @@ register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
 const { lineSpreads } = await import("../../lib/shared/asset-spread.ts");
 const { DAY_S, cellAt, cellOf, gridFor, legendMoment } = await import("../../lib/shared/asset-chart-grid.ts");
-const { joinText, priceCaption, sourceName } = await import("../../lib/shared/asset-captions.ts");
+const { joinText } = await import("../../lib/shared/asset-captions.ts");
 
 // WETH on Ethereum, 26–30 May 2025 (days 20234–20238), as the stores hold it:
 // the main line's stored rounds (Chainlink ETH / USD), each day's close at the
@@ -92,55 +92,6 @@ test("the readout reads the cursor in the window, else the window's last moment 
   const g2 = gridFor(tail, bounds, 600);
   assert.equal(legendMoment(null, tail, bounds.t1, g2).ts, bounds.t1);
   assert.equal(legendMoment(null, shown, bounds.t1, null).ts, shown.to - 1);
-});
-
-const tok = { chain: 1, token: "0xc02a", symbol: "WETH" };
-const cl = {
-  id: "0x5f4e",
-  oracle: { address: "0x5f4e", name: "Chainlink ETH / USD", kind: "chainlink" },
-  series: [
-    {
-      key: "liquity-v2:WETH",
-      protocol: "Liquity V2",
-      token: tok,
-      via: { address: "0xcc5f", name: "Liquity V2 WETH PriceFeed", kind: "pass" },
-    },
-    {
-      key: "moonwell:0xb85c",
-      protocol: "Moonwell",
-      token: tok,
-      via: { address: "0xa0f8", name: "Moonwell's OEV wrapper", kind: "pass" },
-    },
-  ],
-};
-const view = (over = {}) => ({
-  explorer: { id: "liquity", label: "Liquity V2", chain: 1 },
-  name: "Liquity V2",
-  lineId: "0x5f4e",
-  usualId: "0x5424",
-  ...over,
-});
-
-test("the caption names the price the chart draws (818)", () => {
-  assert.equal(
-    priceCaption(view(), cl, "WETH"),
-    "The price Liquity V2 uses: Chainlink ETH / USD through Liquity V2 WETH PriceFeed",
-  );
-  const aave = view({ explorer: { id: "aave-v3", label: "Aave V3", chain: 1 }, name: "Aave V3 Core" });
-  const direct = { ...cl, series: [{ key: "aave-v3:core:0xc02a", protocol: "Aave V3 Core", token: tok }] };
-  assert.equal(priceCaption(aave, direct, "WETH"), "The price Aave V3 Core uses: Chainlink ETH / USD");
-  assert.equal(priceCaption(null, cl, "WETH"), "The price most protocols read: Chainlink ETH / USD");
-  const morpho = view({
-    explorer: { id: "morpho", label: "Morpho Blue", chain: 1 },
-    name: "Morpho Blue",
-    lineId: null,
-  });
-  assert.equal(
-    priceCaption(morpho, cl, "USDC"),
-    "Morpho Blue has no stored price for USDC here. The price most protocols read: Chainlink ETH / USD",
-  );
-  assert.equal(sourceName(cl, "moonwell"), "Chainlink ETH / USD through Moonwell's OEV wrapper");
-  assert.equal(sourceName(cl, null), "Chainlink ETH / USD");
 });
 
 test("the join names the day the line becomes its stored rounds", () => {

@@ -1,14 +1,16 @@
-// Live check of the asset chart's line, the list of other protocols under it
-// (rails-ops reference/asset-key-map.md, "The chart engine"; Miles, 24 Nov
+// Live check of the asset chart's line and the page around it (rails-ops
+// reference/asset-key-map.md, "The chart engine"; Miles's mockup of 24 Nov
 // 2026, ui-jobs 818), and of TradingView's attribution in the footers.
 //
 //   L1 the line: on WETH under Liquity V2 (decision 0069: an asset's page sits
 //      under a protocol and reads from its side) the chart draws one line, the
-//      price Liquity V2 uses, in blue at 2 px; its legend key's stroke is its
-//      colour; no second chart.
-//   L2 the list (A2.2): one entry per other line, Liquity V2 left out, each
-//      protocol link a page under /ethereum/<protocol>/assets/<WETH>, and
-//      "the same feed as Liquity V2" on Moonwell's entry alone.
+//      price Liquity V2 uses, in blue at 2 px, with no legend; the panel's
+//      header (A3.8) carries the price; no second chart.
+//   L2 the page's words (A1, A1.9, A2.3, A2.4, A2.6): the title "WETH price in
+//      Liquity V2", the source line ending on the WETH PriceFeed; "Also reads
+//      this oracle" naming Moonwell; one oracle row per other line, Liquity
+//      V2's line left out, each protocol link a page under
+//      /ethereum/<protocol>/assets/<WETH>; the as-of line.
 //   L3 attribution: the NOTICE and its link in the footer of /, a protocol's
 //      Assets page and an asset page, and no TradingView logo in the asset chart.
 //   L4 every page here, at 1440 and at 390 with touch, light and dark: no
@@ -48,28 +50,6 @@ async function drawn(page) {
   await page.waitForSelector("[data-asset-lw-chart][data-asset-lw-drawn]", { timeout: 180000 });
   return page.evaluate(() => JSON.parse(document.querySelector("[data-asset-lw-chart]").dataset.assetLwDrawn));
 }
-/** Each legend row of the chart: its id and key stroke. */
-const legend = (page) =>
-  page.evaluate(() =>
-    [...document.querySelector("[data-asset-lw-chart]").querySelectorAll("[data-asset-lw-line]")].map((li) => {
-      const line = li.querySelector("[data-line-key] line");
-      return { id: li.dataset.assetLwLine, stroke: line ? getComputedStyle(line).stroke : null };
-    }),
-  );
-const rgb = (c) => (c ?? "").replace(/rgba?\(([^,]+),\s*([^,]+),\s*([^,)]+).*/, "$1,$2,$3");
-/** A CSS colour (oklch from the tokens) as the rgba() a canvas paints it. */
-const asRgb = (page, list) =>
-  page.evaluate((cs) => {
-    const ctx = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-    return cs.map((c) => {
-      if (!c) return null;
-      ctx.clearRect(0, 0, 1, 1);
-      ctx.fillStyle = c;
-      ctx.fillRect(0, 0, 1, 1);
-      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-      return `rgba(${r}, ${g}, ${b}, 1)`;
-    });
-  }, list);
 
 async function layoutCheck(page, label, errors) {
   const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -91,42 +71,53 @@ try {
     page.on("pageerror", (e) => errors.push(String(e)));
     await page.goto(BASE + ETH_VIA, NAV);
     const d = await drawn(page);
-    const rows = await legend(page);
-    (
-      await asRgb(
-        page,
-        rows.map((r) => r.stroke),
-      )
-    ).forEach((c, i) => (rows[i].stroke = c));
     const ids = Object.keys(d);
-    check(ids.length === 1 && rows.length === 1 && rows[0].id === ids[0], "L1 the chart draws one line", ids.join(" "));
+    check(ids.length === 1, "L1 the chart draws one line", ids.join(" "));
     check(d[ids[0]].width === 2, "L1 the line is 2 px", `${d[ids[0]].width}`);
-    check(rgb(rows[0].stroke) === rgb(d[ids[0]].color), "L1 the legend key is the line's colour", `${rows[0].stroke}`);
+    const head = await page.evaluate(() => ({
+      legend: document.querySelectorAll("[data-asset-lw-chart] [data-asset-lw-legend], [data-asset-lw-line]").length,
+      price: document.querySelector("[data-asset-lw-chart] [data-asset-head-price]")?.textContent.trim() ?? "",
+    }));
+    check(head.legend === 0, "L1 no legend under the header", `${head.legend}`);
+    check(/^\$[\d,]+(\.\d+)?$|^–$/.test(head.price), "L1 the panel's header carries the price", head.price);
     check((await page.locator("[data-asset-lw-gap], [data-asset-lw-gap-box]").count()) === 0, "L1 no second chart");
 
-    // L2 the list of other protocols.
-    const list = await page.evaluate(() =>
-      [...document.querySelectorAll("[data-asset-readers] [data-asset-reader]")].map((li) => ({
-        id: li.dataset.assetReader,
-        same: li.dataset.assetSameFeed ?? null,
-        text: li.textContent,
-        links: [...li.querySelectorAll("a[data-asset-reader-link]")].map((a) => a.getAttribute("href")),
+    // L2 the page's words.
+    const words = await page.evaluate(() => ({
+      title: document.querySelector("[data-asset-title]")?.textContent.trim() ?? "",
+      source: document.querySelector("[data-asset-source]")?.getAttribute("data-asset-source") ?? "",
+      also: [...document.querySelectorAll("[data-asset-also-reads] [data-asset-also-reader]")].map((li) =>
+        li.textContent.trim(),
+      ),
+      rows: [...document.querySelectorAll("[data-asset-oracles] [data-asset-oracle]")].map((li) => ({
+        id: li.dataset.assetOracle,
+        links: [...li.querySelectorAll("a[data-asset-oracle-link]")].map((a) => a.getAttribute("href")),
       })),
+      asOf: document.querySelector("[data-asset-as-of]")?.textContent.trim() ?? "",
+    }));
+    check(words.title === "WETH price in Liquity V2", "L2 the title", words.title);
+    check(
+      words.source === "0xcc5f8102eb670c89a4a3c567c13851260303c24f",
+      "L2 the source line ends on Liquity V2's WETH PriceFeed",
+      words.source,
     );
-    check(list.length >= 4, "L2 the list has an entry per other line", `${list.length}`);
-    const links = list.flatMap((e) => e.links);
+    check(
+      words.also.length === 1 && words.also[0].startsWith("Moonwell"),
+      "L2 Moonwell alone also reads the oracle",
+      words.also.join(" | "),
+    );
+    check(words.rows.length >= 4, "L2 a row per other oracle", `${words.rows.length}`);
+    check(
+      !words.rows.some((r) => r.id === "1:0x5f4ec3df9cbd43714fe2740f5e3616155c5b8419"),
+      "L2 Liquity V2's line is not a row",
+    );
+    const links = words.rows.flatMap((r) => r.links);
     check(
       links.length > 0 && links.every((h) => new RegExp(`^/ethereum/[a-z0-9-]+/assets/${WETH}$`).test(h)),
       "L2 each protocol links its page for WETH",
       links.join(" "),
     );
-    check(!links.some((h) => h.includes("/liquity-v2/")), "L2 Liquity V2 is left out");
-    const same = list.filter((e) => e.same);
-    check(
-      same.length === 1 && same[0].same === "Liquity V2" && same[0].text.startsWith("Moonwell"),
-      "L2 Moonwell alone reads the same feed as Liquity V2",
-      same.map((e) => e.text).join(" | "),
-    );
+    check(words.asOf.length > 0, "L2 the as-of line", words.asOf);
     await layoutCheck(page, "WETH under Liquity V2 1440 light", errors);
     await ctx.close();
   }
