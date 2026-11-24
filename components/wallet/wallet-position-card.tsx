@@ -276,7 +276,7 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
       <span
         className="text-[11px] font-medium text-rb-500"
         data-wallet-closed-since={p.closedSince.block}
-        title={`At block ${p.closedSince.block.toLocaleString("en-US")} the position holds no collateral and no debt beyond dust; the card shows the sweep's earlier read.`}
+        title={`At block ${p.closedSince.block.toLocaleString("en-US")} the position holds nothing; the card shows the sweep's earlier read.`}
       >
         Closed since the sweep
       </span>

@@ -106,6 +106,19 @@ const closedAt = (p: WalletPosition) => p.history?.closedAt ?? 0;
 export const unreadAtHead = (p: WalletPosition) =>
   p.notRead === true || p.headRead === "failed" || p.headRead === "stored";
 
+/** A section's note where some of its open positions went unread at head:
+ *  all of them, some of them, or none (no note). */
+export function unreadNote(unread: number, open: number): string | undefined {
+  if (unread <= 0 || open <= 0) return undefined;
+  const who =
+    unread < open
+      ? `${unread} of the ${open} open positions`
+      : open === 1
+        ? "The open position"
+        : `None of the ${open} open positions`;
+  return `${who} could not be read at the chain head, so the section states no total.`;
+}
+
 /** A position's dollars in one field. A missing debt counts as none only on
  *  a deposit or a stake no head read contradicts: a head read states its debt, so one
  *  missing there is unpriced, not zero. */
@@ -458,7 +471,7 @@ export function walletSections(
       band = {
         ...band,
         legs: [],
-        note: `${unread === open.length ? (unread === 1 ? "The open position was" : `None of the ${open.length} open positions were`) : `${unread} of the ${open.length} open positions ${unread === 1 ? "was" : "were"}`} not read at the chain head, so the section states no total.`,
+        note: unreadNote(unread, open.length),
       };
     } else if (open.length > 0 && (collateral == null) !== (debt == null)) {
       // One figure stands: the band says the other states none, so a lone

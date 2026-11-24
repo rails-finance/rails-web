@@ -236,7 +236,7 @@ export const moonwellEthereum: FamilyModule = {
           ...p,
           card: { kind: "moonwell", row: s },
           ...usd,
-          usdSource: ETHEREUM_USD_SOURCE,
+          usdSource: usd.collateralUsd != null || usd.debtUsd != null ? ETHEREUM_USD_SOURCE : undefined,
           usdOwnOracle: usd.collateralUsd != null,
           // The debt is the store's at the wallet's last event: the card keeps
           // the store's stamp, and a section holding it states no total (rule 743).

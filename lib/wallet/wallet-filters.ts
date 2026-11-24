@@ -116,7 +116,9 @@ export function kindOfRow(row: WalletSummaryRow): WalletKind {
   // A Trove protocol's deposits carry their kind (listing-summary-rows.ts).
   if (kinds.includes("troves")) return "troves";
   // An Euler V2 pair states no amount: its vault is the account's controller
-  // where the account borrows from it.
+  // where the account borrows from it. A controller can stay enabled with no
+  // debt (about 1,800 stored pairs, mig 517), so the flag is the best signal
+  // the store gives and no proof of a loan.
   const controller = (row.card as { controller?: unknown } | null)?.controller === true;
   const owed =
     positive(row.debt?.amount) || positive(row.peakDebt) || positive(row.debtUsd) || owedIn(row.card) || controller;

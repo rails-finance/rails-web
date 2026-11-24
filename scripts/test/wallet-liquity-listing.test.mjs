@@ -315,7 +315,7 @@ test("a gain with no price states no claim: the head read fails (rule 743)", () 
     { bands: true },
   );
   assert.equal(s.collateral, undefined);
-  assert.match(s.band.note, /not read at the chain head/);
+  assert.match(s.band.note, /could not be read at the chain head/);
 });
 
 test("the section receipt carries each leg of a claim; the band's leg is the head deposit, no ≈", () => {

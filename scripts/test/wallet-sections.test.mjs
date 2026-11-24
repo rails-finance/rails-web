@@ -30,7 +30,7 @@ export async function resolve(specifier, context, next) {
 }`;
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
-const { walletSections, walletTotal, walletNet } = await import("../../lib/wallet/wallet-sections.ts");
+const { walletSections, walletTotal, walletNet, unreadNote } = await import("../../lib/wallet/wallet-sections.ts");
 
 let n = 0;
 const pos = (family, extra = {}) => ({
@@ -120,7 +120,10 @@ test("a section with an open position not read at head states no figure, and the
   const aave = s.find((x) => x.slug === "aave-v3");
   assert.equal(aave.collateral, undefined);
   assert.equal(aave.band.legs.length, 0);
-  assert.match(aave.band.note, /1 of the 2 open positions was not read at the chain head/);
+  assert.match(
+    aave.band.note,
+    /^1 of the 2 open positions could not be read at the chain head, so the section states no total\.$/,
+  );
   const coll = walletTotal(s, "collateral");
   assert.equal(coll.of, 2);
   assert.equal(coll.gap, "No wallet total: Aave V3 was not read at the chain head");
@@ -382,4 +385,13 @@ test("a live read alone shuts a branch with no record; its collateral dollars st
     s.band.legs.find((l) => l.label === "Recorded collateral"),
     undefined,
   );
+});
+
+test("the unread note reads for all, some and none of a section's open positions", () => {
+  const tail = " could not be read at the chain head, so the section states no total.";
+  assert.equal(unreadNote(5, 5), `None of the 5 open positions${tail}`);
+  assert.equal(unreadNote(1, 1), `The open position${tail}`);
+  assert.equal(unreadNote(2, 5), `2 of the 5 open positions${tail}`);
+  assert.equal(unreadNote(1, 2), `1 of the 2 open positions${tail}`);
+  assert.equal(unreadNote(0, 5), undefined);
 });

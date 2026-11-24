@@ -75,7 +75,14 @@ export const eulerV2Base: FamilyModule = {
     signal.throwIfAborted();
     const answer = await fetchEulerWallet(BASE_CHAIN_ID, address);
     signal.throwIfAborted();
-    if (answer.kind !== "ok") return { reads: 0, positions: open.map((p) => ({ ...p, headRead: "failed" })) };
+    // A read that did not answer fails the family's head with its reason
+    // (readFamily keeps the stored cards and records the error).
+    if (answer.kind !== "ok")
+      throw new Error(
+        answer.kind === "ceiling"
+          ? "/api/at-block/euler/positions is at its read ceiling"
+          : `/api/at-block/euler/positions answered ${answer.kind === "not-found" ? "not found" : "with no read"}`,
+      );
     const w = answer.data;
     // The read without its accounts, for the receipts.
     const wallet = { ...w, accounts: [] };

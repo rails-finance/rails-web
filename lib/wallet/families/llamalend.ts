@@ -3,10 +3,12 @@
 // listing row, built by the listing's builder. The stored card is the
 // position's last UserState (its debt at that block; its collateral null where
 // the chain logged the "unknown" sentinel), built as the listing builds a row
-// whose live read did not land. The head read is the listing's own: the
+// whose live read did not land. The head read is the listing's: the
 // builder reads every market's AMM price_oracle and, in one Multicall over the
 // open positions, each one's user_state and health(user, true), so the card's
-// collateral, debt, soft-liquidation state and health are at the head.
+// collateral, debt, soft-liquidation state and health are at the head. A
+// position whose live debt reads zero was repaid since the sweep: it keeps the
+// stored card, marked closed since the sweep.
 // Dollars only where the listing states them: crvUSD-borrowed markets.
 
 import {
@@ -70,13 +72,18 @@ export const llamalend: FamilyModule = {
     const now = Math.floor(Date.now() / 1000);
     // The reads that answered: the block and the AMMs' prices, and the
     // positions' Multicall.
-    const reads =
-      (cards.some((c) => c.priceBlock != null) ? 2 : 0) + (cards.some((c) => c.stateBasis === "chain") ? 1 : 0);
+    const live = (c: LlamalendPositionSummary) => c.stateBasis === "chain" || c.liveDebtZero === true;
+    const reads = (cards.some((c) => c.priceBlock != null) ? 2 : 0) + (cards.some(live) ? 1 : 0);
+    // The head block the read is pinned to, from the market state.
+    const head = cards.find((c) => c.priceBlock != null)?.priceBlock ?? null;
     return {
       reads,
       positions: open.map((p, i): WalletPosition => {
         const s = cards[i];
-        // The live read did not land, or found no debt: the stored figures stand.
+        // Repaid since the sweep: the figures stay the store's, so the section
+        // states no total (rule 743), and the card states no risk.
+        if (s.liveDebtZero && head != null) return { ...p, closedSince: { block: head }, headRead: "stored" };
+        // The live read did not land: the stored figures stand.
         if (s.stateBasis !== "chain") return { ...p, headRead: "failed" };
         const h = s.healthFull;
         return {
@@ -86,13 +93,14 @@ export const llamalend: FamilyModule = {
           debtUsd: opt(s.debtUsd),
           usdSource: s.debtUsd != null ? USD_SOURCE : undefined,
           usdOwnOracle: s.collateralUsd != null,
-          // health(user, true) ranks the positions; it is shown as the card's tile figure.
-          buffer: h ?? undefined,
+          // health(user, true) is a margin over the debt, h = value / debt − 1;
+          // the collateral can fall by h / (1 + h) before it reaches 0. A rank only.
+          buffer: h != null && h > -1 ? h / (1 + h) : undefined,
           riskFigure: h != null ? { value: `${pct(h)} health`, label: "liquidates below 0%" } : undefined,
           liquidatable: s.liquidatable ?? undefined,
           headRead: "read",
-          // The Multicall reads the latest block and states none: the stamp is the read's time.
-          readAt: now,
+          readAtBlock: s.priceBlock ?? head ?? undefined,
+          readAt: Math.floor(Date.now() / 1000),
         };
       }),
     };

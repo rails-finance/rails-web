@@ -8,8 +8,7 @@
 // row with what its shares redeem for at chi at the sealed block, and that
 // block; a holder it no longer lists is closed since the sweep. The listing
 // states no figure unless its check against the contract passed, so neither
-// does the head read. A deposit owes nothing; the listing
-// states no dollars (decision 0041).
+// does the head read. The listing states no dollars (decision 0041).
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";

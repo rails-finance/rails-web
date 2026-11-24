@@ -30,9 +30,11 @@ export function EulerWalletCard({ row }: { row: EulerWalletCardRow }) {
       </Prov>
     ) : null;
   const heads: PositionCardHead[] = [];
-  if (row.controller || r?.loan)
-    heads.push({ id: "borrowed", label: CARD_WORDS.borrowed, tier: "amount", value: figure(r?.loan ?? null) });
-  if (!row.controller || r?.deposit)
+  // A read pair draws what it holds; a stored one, its flags.
+  const loan = r ? r.loan != null : row.controller;
+  const deposit = r ? r.deposit != null : !row.controller;
+  if (loan) heads.push({ id: "borrowed", label: CARD_WORDS.borrowed, tier: "amount", value: figure(r?.loan ?? null) });
+  if (deposit)
     heads.push({
       id: "supplied",
       label: CARD_WORDS.supplied,
