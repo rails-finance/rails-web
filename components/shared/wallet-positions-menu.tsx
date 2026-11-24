@@ -26,7 +26,15 @@ import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { moveFocus } from "@/components/shared/tools-menu";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
-import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, chainMeta, type ChainId } from "@/lib/shared/chains";
+import {
+  ARBITRUM_CHAIN_ID,
+  ARC_CHAIN_ID,
+  BASE_CHAIN_ID,
+  MAINNET_CHAIN_ID,
+  SEPOLIA_CHAIN_ID,
+  chainMeta,
+  type ChainId,
+} from "@/lib/shared/chains";
 import { PROTOCOLS, listingHrefForWallet, protocolForPathname } from "@/lib/shared/protocols";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import {
@@ -45,6 +53,8 @@ const CHAIN_ID: Record<WalletCountsChain, ChainId> = {
   ethereum: MAINNET_CHAIN_ID,
   base: BASE_CHAIN_ID,
   arbitrum: ARBITRUM_CHAIN_ID,
+  arc: ARC_CHAIN_ID,
+  sepolia: SEPOLIA_CHAIN_ID,
 };
 
 // One read per address per page load; the route keeps its answer 60 s.
@@ -69,7 +79,7 @@ type Menu = NonNullable<ReturnType<typeof walletProtocolMenu<WalletCountsPositio
 /** A position's explorer on the roster: its name, its place, and its listing
  *  searched by the wallet (every wallet family's listing reads `q`). */
 function protocolOf(p: WalletCountsPosition, address: string): MenuProtocol | undefined {
-  const entry = protocolForPathname(p.href.split("?")[0]);
+  const entry = p.href ? protocolForPathname(p.href.split("?")[0]) : undefined;
   if (!entry) return undefined;
   return { name: entry.label, order: PROTOCOLS.indexOf(entry), listing: listingHrefForWallet(entry.session, address) };
 }
@@ -80,7 +90,7 @@ const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-30
 
 /** The protocol's and the chain's icons, each named for screen readers and on hover. */
 function ProtocolIcons({ p }: { p: WalletCountsPosition }) {
-  const entry = protocolForPathname(p.href.split("?")[0]);
+  const entry = p.href ? protocolForPathname(p.href.split("?")[0]) : undefined;
   const protocol = entry?.label ?? p.family;
   const chain = chainMeta(CHAIN_ID[p.chain]).name;
   return (

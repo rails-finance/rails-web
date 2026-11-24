@@ -94,12 +94,13 @@ export function walletFamiliesLine(): string {
     byChain.set(f.summaryChain, names);
   }
   const list = (n: string[]) => (n.length < 2 ? n.join("") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`);
-  const where: Record<WalletSummaryRow["chain"], string> = {
+  // No wallet module reads Arc or Sepolia, so neither has a phrase.
+  const where: Partial<Record<WalletSummaryRow["chain"], string>> = {
     ethereum: "on Ethereum",
     base: "on Base",
     arbitrum: "on Arbitrum where Rails has read the wallet",
   };
-  return [...byChain].map(([chain, names]) => `${list(names)} ${where[chain]}`).join("; ");
+  return [...byChain].map(([chain, names]) => `${list(names)} ${where[chain] ?? `on ${chain}`}`).join("; ");
 }
 
 /** A listing read that did not answer, or answered part of the wallet: its
@@ -484,6 +485,8 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
       }
     }
     for (const r of summary.rows) {
+      // Testnets are not counted (WALLET_COUNTS_SCOPE).
+      if (r.chain === "sepolia") continue;
       if (!taken.has(r))
         positions.push({
           chain: r.chain,

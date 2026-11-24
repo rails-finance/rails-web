@@ -224,15 +224,25 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
       data-head-read={p.headRead}
     >
       <PositionCardEdgeContext.Provider value={edge}>
-        <Link
-          href={p.href}
-          prefetch={false}
-          className="group/listing-row block"
-          data-anatomy="N2"
-          aria-label={`${p.familyName} on ${chain}${p.market ? `, ${p.market}` : ""}`}
-        >
-          <FamilyCard card={p.card} state={stateOf(p)} />
-        </Link>
+        {p.href ? (
+          <Link
+            href={p.href}
+            prefetch={false}
+            className="group/listing-row block"
+            data-anatomy="N2"
+            aria-label={`${p.familyName} on ${chain}${p.market ? `, ${p.market}` : ""}`}
+          >
+            <FamilyCard card={p.card} state={stateOf(p)} />
+          </Link>
+        ) : (
+          <div
+            className="group/listing-row block"
+            data-anatomy="N2"
+            aria-label={`${p.familyName} on ${chain}${p.market ? `, ${p.market}` : ""}`}
+          >
+            <FamilyCard card={p.card} state={stateOf(p)} />
+          </div>
+        )}
       </PositionCardEdgeContext.Provider>
     </div>
   );

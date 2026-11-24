@@ -38,7 +38,41 @@ register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 process.env.RAILS_API_URL = "http://box.test";
 
 const W = "0x2291f52bddc937b5b840d15e551e1da8c80c2b3c";
+const W2 = "0x9999999999999999999999999999999999999999";
 const E18 = "000000000000000000";
+// A summary row with no page (href null), as a Morpho Vault V2 holding is stored,
+// and the same row under a family a wallet module takes.
+const noPageRow = (family) => ({
+  chain: "ethereum",
+  family,
+  positionId: `${family}:1`,
+  owner: W2,
+  market: null,
+  status: "open",
+  collateral: null,
+  debt: null,
+  collateralUsd: null,
+  debtUsd: null,
+  usdSource: null,
+  peakCollateral: null,
+  peakDebt: null,
+  openedAt: null,
+  closedAt: null,
+  lastActivityAt: null,
+  txCount: null,
+  liquidationCount: null,
+  readBlock: null,
+  readAt: null,
+  href: null,
+  card: {},
+  writtenAt: "2026-11-24T00:00:00Z",
+});
+const noPageRows = [
+  noPageRow("morpho-vault-v2"),
+  noPageRow("aave-v3"),
+  { ...noPageRow("aave-v3"), chain: "arc", positionId: "arc:1" },
+  { ...noPageRow("aave-v3"), chain: "sepolia", positionId: "sepolia:1" },
+];
 
 // The backend, by route. `v2sp` sets how the V2 deposit listing answers;
 // `ebisuSp` the rows Ebisu's deposit listing answers (the other forks' none).
@@ -52,6 +86,16 @@ globalThis.fetch = async (input, init = {}) => {
   calls.push(url.pathname);
   if (url.pathname === `/api/wallet/${W}/positions`)
     return json({ address: W, rows: [], total: 0, open: 0, closed: 0, limit: 500, offset: 0 });
+  if (url.pathname === `/api/wallet/${W2}/positions`)
+    return json({
+      address: W2,
+      rows: noPageRows,
+      total: noPageRows.length,
+      open: noPageRows.length,
+      closed: 0,
+      limit: 500,
+      offset: 0,
+    });
   if (url.pathname === "/api/liquity-v1/positions")
     return json({
       rows: [
@@ -218,6 +262,16 @@ test("counts: partial while a listing failed, and not kept; whole and kept after
   calls = [];
   await readWalletCounts(W);
   assert.equal(calls.length, 0, "a whole answer is kept");
+});
+
+test("counts: a row with a null href counts and passes through without throwing", async () => {
+  v2sp = "ok";
+  const c = await readWalletCounts(W2);
+  assert.equal(c.error, undefined);
+  // The listings add their own rows. The Sepolia row is a testnet and is not
+  // counted; the Arc row is.
+  const noPage = c.positions.filter((p) => p.href === null);
+  assert.deepEqual(noPage.map((p) => p.chain).sort(), ["arc", "ethereum", "ethereum"]);
 });
 
 // The deposit modules' head reads, the pool reader stubbed.
