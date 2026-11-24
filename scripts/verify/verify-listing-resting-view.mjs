@@ -487,10 +487,20 @@ if (wants("Liquity V2")) {
       searchTotal.total === holderTotal,
       `page ${searchTotal.total} (${searchTotal.from}) vs API ${holderTotal}`,
     );
+    // A wallet search on the Liquity V2 listing opens the wallet page with its
+    // Protocol pill set (ui-jobs 738); that pill is the reset it offers.
+    const walletView = await bare.evaluate(() => ({
+      path: window.location.pathname,
+      protocol: new URLSearchParams(window.location.search).get("protocol"),
+      pill: document.querySelector('[data-filter-pill="Protocol"]')?.getAttribute("data-pill-state") ?? null,
+    }));
     check(
-      label("5c. relaxing on a search selects nothing — All draws no Status pill and no reset"),
-      drawsNoStatus(searchChips),
-      describeChips(searchChips),
+      label("5c. a wallet search opens /wallet with its Protocol pill set to Liquity V2 and no Status pill set"),
+      walletView.path.startsWith("/wallet/") &&
+        walletView.protocol === "liquity-v2" &&
+        walletView.pill === "set" &&
+        searchChips.statusChip == null,
+      `${JSON.stringify(walletView)}; ${describeChips(searchChips)}`,
     );
     check(
       label("5d. every rendered pill is a real lifecycle word"),
@@ -1161,7 +1171,7 @@ const ROSTER = [
     name: "Fluid",
     route: "/ethereum/fluid",
     api: "/api/fluid/positions",
-    rows: 'a[href^="/ethereum/fluid/"]:not([href$="/vaults"]):not([href$="/info"])',
+    rows: 'a[href^="/ethereum/fluid/"]:not([href$="/vaults"]):not([href$="/info"]):not([href*="/assets"])',
     perPage: 20,
     open: "status=open",
     all: "status=open,closed",
@@ -1193,7 +1203,7 @@ const ROSTER = [
     name: "f(x)",
     route: "/ethereum/fx",
     api: "/api/fx/positions",
-    rows: 'a[href^="/ethereum/fx/"]:not([href$="/pools"]):not([href$="/info"])',
+    rows: 'a[href^="/ethereum/fx/"]:not([href$="/pools"]):not([href$="/info"]):not([href*="/assets"])',
     perPage: 20,
     open: "status=open",
     all: "status=open,closed,liquidated",
@@ -1228,7 +1238,7 @@ const ROSTER = [
     // A row links by vault number or by owner depending on what the card leads
     // with, so the row set is "everything under the route that is not one of
     // the two page links".
-    rows: 'a[href^="/ethereum/makerdao/"]:not([href$="/system"]):not([href$="/info"])',
+    rows: 'a[href^="/ethereum/makerdao/"]:not([href$="/system"]):not([href$="/info"]):not([href*="/assets"])',
     perPage: 20,
     open: "status=open",
     all: "status=open,closed,liquidated",
@@ -1288,7 +1298,7 @@ const ROSTER = [
     route: "/ethereum/morpho",
     api: "/api/morpho/positions",
     // The rail (on every page since 498) links "Vaults" under the same prefix, so it is excluded as well.
-    rows: 'a[href^="/ethereum/morpho/"]:not([href^="/ethereum/morpho/markets"]):not([href^="/ethereum/morpho/vaults"]):not([href$="/info"])',
+    rows: 'a[href^="/ethereum/morpho/"]:not([href^="/ethereum/morpho/markets"]):not([href^="/ethereum/morpho/vaults"]):not([href$="/info"]):not([href*="/assets"])',
     perPage: 20,
     open: "status=open",
     all: "status=open,closed,liquidated",
