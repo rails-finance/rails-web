@@ -43,6 +43,7 @@ import {
 import {
   aaveVaultCensusBalanceProv,
   aaveVaultCensusFractionProv,
+  aaveVaultStoredBalanceProv,
   aaveVaultHolderFractionProv,
   aaveVaultHolderSharesProv,
   aaveVaultPositionDivergenceProv,
@@ -119,7 +120,9 @@ function vaultCardSlots({ row, lane }: VaultPositionCardProps): PositionCardSlot
   const coords: AaveVaultCoords = {
     blockNumber: row.live?.blockNumber,
     readBy: serverReadAt(row.live?.head, row.live?.blockNumber),
-    censusBlock: row.census.block,
+    // The stored lane's row knows no census block: its block is the last
+    // transfer, which its balance receipt names.
+    censusBlock: lane === "stored" ? undefined : row.census.block,
     chainId,
     vault: row.vault,
     vaultName: row.symbol ?? undefined,
@@ -191,7 +194,9 @@ function vaultCardSlots({ row, lane }: VaultPositionCardProps): PositionCardSlot
           info={
             row.live
               ? aaveVaultHolderSharesProv(coords)
-              : aaveVaultCensusBalanceProv(coords, lane === "census" ? "wallet" : (lane ?? "unread"))
+              : lane === "stored"
+                ? aaveVaultStoredBalanceProv(coords, row.census.lastBlock)
+                : aaveVaultCensusBalanceProv(coords, lane === "census" ? "wallet" : "unread")
           }
         >
           <AssetAmount
@@ -239,7 +244,9 @@ function vaultCardSlots({ row, lane }: VaultPositionCardProps): PositionCardSlot
     labelTip:
       lane === "census"
         ? "This holding's shares over the vault's totalSupply(), both at the census block."
-        : "This holding's shares over the vault's totalSupply(), both read at the page's block.",
+        : lane === "stored"
+          ? "This holding's shares over the vault's totalSupply(). The census was not read for it on this visit, so no share is stated."
+          : "This holding's shares over the vault's totalSupply(), both read at the page's block.",
     value: (
       <Figure>
         {dust ? (
@@ -248,6 +255,12 @@ function vaultCardSlots({ row, lane }: VaultPositionCardProps): PositionCardSlot
           <Prov info={lane === "census" ? aaveVaultCensusFractionProv(coords) : aaveVaultHolderFractionProv(coords)}>
             {pctText(fraction)}
           </Prov>
+        ) : lane ? (
+          // The wallet page reads no chain: a share the census did not state
+          // is not read, and no later read fills it.
+          <span data-prov-exempt="">
+            <Unread what="not read" />
+          </span>
         ) : (
           <NotLoaded className="text-base font-normal text-rb-500" />
         )}

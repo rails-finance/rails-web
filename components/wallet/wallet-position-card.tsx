@@ -348,7 +348,7 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
       <span
         className="text-[11px] font-medium text-rb-500"
         data-wallet-holds-nothing-since={p.closedSince.block}
-        title={`At block ${p.closedSince.block.toLocaleString("en-US")} the position holds nothing; the card shows the ${read}'s earlier read.`}
+        title={`At block ${p.closedSince.block.toLocaleString("en-US")} the position holds nothing; the card shows ${read === "census" ? "its stored row, from the last transfer" : "the sweep's earlier read"}.`}
       >
         Holds nothing since the {read}
       </span>

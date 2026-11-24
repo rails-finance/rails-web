@@ -559,17 +559,14 @@ const atCensus = (c: AaveVaultCoords): string =>
    draw it. */
 
 /** Why a card states the census's balance: the listing's live read did not
- *  answer, the wallet page read the holder's census answer, or the wallet
- *  page holds the stored row alone (the balance since the last transfer). */
-type CensusBalanceWhy = "unread" | "wallet" | "stored";
+ *  answer, or the wallet page read the holder's census answer. */
+type CensusBalanceWhy = "unread" | "wallet";
 
 const CENSUS_BALANCE_WHY: Record<CensusBalanceWhy, string> = {
   unread:
     "It is stated because the live read for this card did not answer, and an unread figure is stated as unread. What the address holds now is not answered on this page.",
   wallet:
     "The wallet page reads the holder's census answer and no chain at visit, so the figure is the census's at its block.",
-  stored:
-    "The wallet page states it from its stored row for the holding, at the holder's last transfer of this vault; the census answer was not read for it on this visit.",
 };
 
 /** The census's own `balanceOf` — what this card falls back to when the live
@@ -583,6 +580,19 @@ const aaveVaultCensusBalanceProv_ = (c: AaveVaultCoords, why: CensusBalanceWhy =
   summary: `Shares held at the census block — this address's balance of the vault's share token${atCensus(c)}, read by the census and kept. ${CENSUS_BALANCE_WHY[why]}`,
   contract: vaultContract(c),
   via: `${censusLane(c)} · balanceOf(holder) @ the census block`,
+});
+
+/** The balance the wallet page's stored row states for a holding the census
+ *  answer was not read for: the balance since the holder's last transfer of
+ *  the vault, which the census wrote and the row keeps. */
+const aaveVaultStoredBalanceProv_ = (c: AaveVaultCoords, lastTransfer: number): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: lastTransfer },
+  verify: recompute("balanceOf(the holder)", { ...c, blockNumber: lastTransfer }),
+  summary: `Shares held since the last transfer — this address's balance of the vault's share token from block ${lastTransfer.toLocaleString("en-US")}, its last transfer of this vault, as the census found it and the wallet page's stored row keeps it. The census answer was not read for this holding on this visit, so no later block is stated.`,
+  contract: vaultContract(c),
+  via: `${censusLane(c)} · balanceOf(holder) @ the last transfer · the wallet's stored row`,
 });
 
 /** The holder's share of the vault at the census block, as the census
@@ -755,6 +765,7 @@ export const aaveAttestedNameProv = withServerRead(aaveAttestedNameProv_);
 export const aaveVaultCatalogueMemberProv = withServerRead(aaveVaultCatalogueMemberProv_);
 export const aaveVaultCensusBalanceProv = withServerRead(aaveVaultCensusBalanceProv_);
 export const aaveVaultCensusFractionProv = withServerRead(aaveVaultCensusFractionProv_);
+export const aaveVaultStoredBalanceProv = withServerRead(aaveVaultStoredBalanceProv_);
 export const aaveVaultPositionSeenProv = withServerRead(aaveVaultPositionSeenProv_);
 export const aaveVaultPositionShapeProv = withServerRead(aaveVaultPositionShapeProv_);
 export const aaveVaultPositionDivergenceProv = withServerRead(aaveVaultPositionDivergenceProv_);

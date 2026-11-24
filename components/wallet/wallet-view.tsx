@@ -178,10 +178,14 @@ function Totals({
  *  vault shares, ui-jobs 783), with its chain. */
 type Undrawn = NonNullable<WalletFamilyRead["undrawn"]> & { chain: ChainId };
 
+/** The positions not drawn that the Status pill counts. */
+const undrawnCount = (u: Undrawn, status?: WalletStatus) =>
+  status === "open" ? u.open : status === "closed" ? u.closed : u.open + u.closed;
+
 /** One protocol's section (W3): its name, the listing's band (N7) where it
  *  holds two positions or more, then its cards, open by risk, then closed
  *  newest first; under them, how many more the read did not draw. */
-function Section({ s, undrawn }: { s: WalletSection; undrawn: Undrawn[] }) {
+function Section({ s, undrawn, status }: { s: WalletSection; undrawn: Undrawn[]; status?: WalletStatus }) {
   const atRiskCount = s.open.filter(atRisk).length;
   const id = `wallet-section-${s.slug}`;
   return (
@@ -196,7 +200,7 @@ function Section({ s, undrawn }: { s: WalletSection; undrawn: Undrawn[] }) {
         <h2 id={id} className={H2}>
           {s.name}{" "}
           <span className="font-medium text-rb-500" data-prov-exempt="">
-            {(s.positions.length + undrawn.reduce((n, u) => n + u.open + u.closed, 0)).toLocaleString("en-US")}
+            {(s.positions.length + undrawn.reduce((n, u) => n + undrawnCount(u, status), 0)).toLocaleString("en-US")}
           </span>
         </h2>
         {s.open.length > 1 && (
@@ -212,18 +216,16 @@ function Section({ s, undrawn }: { s: WalletSection; undrawn: Undrawn[] }) {
           <WalletPositionCard key={`${p.chain}:${p.family}:${p.positionId}`} position={p} />
         ))}
       </div>
-      {undrawn.map((u) => (
-        <p key={u.chain} className="mt-3 text-xs text-rb-500" data-wallet-undrawn={u.open + u.closed}>
-          {plural(
-            u.open + u.closed,
-            `more holding on ${chainMeta(u.chain).name}`,
-            `more holdings on ${chainMeta(u.chain).name}`,
-          )}{" "}
-          {u.open + u.closed === 1 ? "is" : "are"} not drawn
-          {u.open > 0 ? `, ${u.open.toLocaleString("en-US")} of them open` : ""}; the page draws the open ones with the
-          largest census value first.
-        </p>
-      ))}
+      {undrawn.map((u) => {
+        const n = u.open + u.closed;
+        return (
+          <p key={u.chain} className="mt-3 text-xs text-rb-500" data-wallet-undrawn={n}>
+            {n.toLocaleString("en-US")} more {n === 1 ? "holding" : "holdings"} on {chainMeta(u.chain).name}{" "}
+            {n === 1 ? "is" : "are"} not drawn ({u.open.toLocaleString("en-US")} open); the open ones with the largest
+            census value come first.
+          </p>
+        );
+      })}
     </section>
   );
 }
@@ -369,7 +371,8 @@ export function WalletView({
   const counted = scoped.rows.filter((p) => !onTestnet(p));
   // The positions the read counted and did not draw.
   const undrawn: Undrawn[] = read.families.flatMap((r) => (r.undrawn ? [{ ...r.undrawn, chain: r.chain }] : []));
-  const notDrawn = (k: "open" | "closed") => (scoped.on ? 0 : undrawn.reduce((n, u) => n + u[k], 0));
+  // Counted whenever rows are cut, as the line under the section says.
+  const notDrawn = (k: "open" | "closed") => undrawn.reduce((n, u) => n + u[k], 0);
   const wallet = {
     open: counted.filter((p) => p.status === "open").length + notDrawn("open"),
     moved: counted.filter((p) => p.status === "moved").length,
@@ -557,7 +560,7 @@ export function WalletView({
                   <Totals sections={sections} filtered={filtered} unanswered={blocking} />
                 )}
                 {sections.map((s) => (
-                  <Section key={s.slug} s={s} undrawn={filtered ? [] : undrawn.filter((u) => u.family === s.slug)} />
+                  <Section key={s.slug} s={s} undrawn={undrawn.filter((u) => u.family === s.slug)} status={status} />
                 ))}
                 {/* What the filter bar leaves shown, with its noun: the bar
                     draws no count (ui-jobs 801; Miles, 22 Nov 2026). */}

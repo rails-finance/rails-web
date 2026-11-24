@@ -172,7 +172,8 @@ const vaultProtocolOf = (p) => {
   return {
     name: vaultProtocolOfHref(p.href) ?? label,
     order,
-    listing: root === "yearn" ? null : `/${p.chain}/${root}/vaults/positions?q=${W}`,
+    // Yearn V3 has no holder listing: the wallet view narrowed to the vault shares.
+    listing: root === "yearn" ? `${DASHBOARD}?protocol=vaults` : `/${p.chain}/${root}/vaults/positions?q=${W}`,
   };
 };
 
@@ -199,16 +200,16 @@ test("vault rows take one menu row per vault protocol and chain, each named", ()
     "ethereum:vaults:morpho",
     "ethereum:vaults:yearn",
   ]);
-  assert.equal(rows["ethereum:vaults:morpho"].name, "MetaMorpho");
+  assert.equal(rows["ethereum:vaults:morpho"].name, "MetaMorpho vaults");
   assert.equal(rows["ethereum:vaults:morpho"].counts, "1 open · 1 closed");
   assert.equal(rows["ethereum:vaults:morpho"].href, `/ethereum/morpho/vaults/positions?q=${W}`);
   assert.equal(rows["ethereum:morpho"].name, "Morpho Blue");
   assert.equal(rows["ethereum:vaults:aave"].name, "Aave vaults");
   assert.equal(rows["ethereum:vaults:aave"].href, `/ethereum/aave/vaults/0xv3/${W}`);
-  // Yearn V3 has no holder listing: past one holding, the wallet view.
+  // Yearn V3 has no holder listing: past one holding, the wallet view's vault shares.
   assert.equal(rows["ethereum:vaults:yearn"].name, "Yearn V3");
-  assert.equal(rows["ethereum:vaults:yearn"].href, DASHBOARD);
-  assert.equal(rows["base:vaults:morpho"].name, "MetaMorpho");
+  assert.equal(rows["ethereum:vaults:yearn"].href, `${DASHBOARD}?protocol=vaults`);
+  assert.equal(rows["base:vaults:morpho"].name, "MetaMorpho vaults");
 });
 
 test("menuKey splits vault rows by their href's root and leaves other families whole", () => {

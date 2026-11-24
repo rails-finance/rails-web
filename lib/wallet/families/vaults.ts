@@ -7,7 +7,7 @@
 //
 // The head read is the listing's census read for the holder
 // (rails-server /api/vaults/positions?chain=&holder=, every status, largest
-// value first): each holding's census figures at the census block the row
+// value first, paged until the open holdings are matched): each holding's census figures at the census block the row
 // states (balance, share of the vault, the census's value at the Aave V3
 // oracle and its priced block), the vault's asset from the census header, and
 // the blocks' times from the at-block store. No chain read: the card is
@@ -60,7 +60,7 @@ interface StoredVaultCard {
 
 /** The vault protocol's name for a census family. */
 export function vaultProtocolName(family: string): string {
-  if (family === "morpho") return "MetaMorpho";
+  if (family === "morpho") return "MetaMorpho vaults";
   if (family === "yearn-v3") return "Yearn V3";
   return "Aave vaults";
 }
@@ -92,11 +92,14 @@ export function storedVaultRow(r: WalletSummaryRow, chainId: number): VaultPosit
   return { ...row, value: { ...row.value, assetSymbol: c.assetSymbol } };
 }
 
-/** The holder's holdings as the census answers them, every status, up to
- *  MAX_PAGES pages, largest value first. */
+/** The holder's holdings as the census answers them, every status, largest
+ *  value first: page by page until every vault in `want` is listed, the
+ *  answer ends, or MAX_PAGES pages are read. Each page repeats the chain's
+ *  census header, so no page is read past the holdings wanted. */
 async function readHolderCensus(
   chainId: number,
   holder: string,
+  want: ReadonlySet<string>,
   signal: AbortSignal,
   readerIp?: string,
 ): Promise<{ rows: BackendPositionRow[]; census: VaultCensusRow[]; reads: number }> {
@@ -123,12 +126,20 @@ async function readHolderCensus(
       census?: VaultCensusRow[];
     };
   };
-  const first = await page(0);
-  const total = first.pagination?.total ?? first.data?.length ?? 0;
-  const more = Math.min(MAX_PAGES, Math.ceil(total / PAGE)) - 1;
-  const rest = await Promise.all(Array.from({ length: Math.max(0, more) }, (_, i) => page((i + 1) * PAGE)));
-  const rows = [first, ...rest].flatMap((p) => p.data ?? []);
-  return { rows, census: first.census ?? [], reads: 1 + rest.length };
+  const rows: BackendPositionRow[] = [];
+  const left = new Set(want);
+  let census: VaultCensusRow[] = [];
+  let reads = 0;
+  for (let offset = 0; reads < MAX_PAGES && left.size > 0; offset += PAGE) {
+    const answer = await page(offset);
+    reads += 1;
+    if (reads === 1) census = answer.census ?? [];
+    const data = answer.data ?? [];
+    rows.push(...data);
+    for (const r of data) left.delete(r.vault.toLowerCase());
+    if (data.length < PAGE || rows.length >= (answer.pagination?.total ?? 0)) break;
+  }
+  return { rows, census, reads };
 }
 
 const rowOf = (p: WalletPosition) => (p.card as { row: VaultPositionRow }).row;
@@ -163,7 +174,13 @@ function vaultsModule(chainId: typeof MAINNET_CHAIN_ID | typeof BASE_CHAIN_ID): 
     },
     async head(open, address, signal, _apiMs, { readerIp }): Promise<HeadResult> {
       if (open.length === 0) return { positions: open, reads: 0 };
-      const answer = await readHolderCensus(chainId, address, signal, readerIp);
+      const answer = await readHolderCensus(
+        chainId,
+        address,
+        new Set(open.map((p) => rowOf(p).vault)),
+        signal,
+        readerIp,
+      );
       const census = new Map(answer.census.map((c) => [c.vault.toLowerCase(), c]));
       const listed = new Map(
         answer.rows.map((b) => {
@@ -171,13 +188,17 @@ function vaultsModule(chainId: typeof MAINNET_CHAIN_ID | typeof BASE_CHAIN_ID): 
           return [r.vault, r] as const;
         }),
       );
-      // The blocks the cards name, from the at-block store; a block it does
-      // not answer leaves its date out.
+      // The blocks the open holdings' census cards name, from the at-block
+      // store; a block it does not answer leaves its date out.
+      const matched = open.flatMap((p) => {
+        const r = listed.get(rowOf(p).vault);
+        return r?.census.live ? [r] : [];
+      });
       const blocks = [
-        ...new Set([...listed.values()].flatMap((r) => [r.census.firstBlock, r.census.lastBlock, r.census.block])),
+        ...new Set(matched.flatMap((r) => [r.census.firstBlock, r.census.lastBlock, r.census.block])),
       ].filter((b) => Number.isFinite(b) && b > 0);
       const times = blocks.length
-        ? await readBlockTimes(chainId, blocks).catch(() => new Map<number, number>())
+        ? await readBlockTimes(chainId, blocks, { signal, readerIp }).catch(() => new Map<number, number>())
         : new Map<number, number>();
       signal.throwIfAborted();
       return {
@@ -210,7 +231,8 @@ function vaultsModule(chainId: typeof MAINNET_CHAIN_ID | typeof BASE_CHAIN_ID): 
               ...p,
               card: { kind: "vault", row, lane: "census" },
               collateralUsd: usd ?? undefined,
-              usdSource: usd != null ? `the Aave V3 oracle at census block ${priced}` : undefined,
+              usdSource:
+                usd != null ? `the Aave V3 oracle at census block ${priced.toLocaleString("en-US")}` : undefined,
               headRead: "stored",
               readAtBlock: row.census.block,
               readAt: times.get(row.census.block),

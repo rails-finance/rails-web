@@ -36,9 +36,11 @@ import {
 } from "@/lib/shared/chains";
 import { PROTOCOLS, listingHrefForWallet, protocolForPathname } from "@/lib/shared/protocols";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import { walletProtocolHref } from "@/lib/wallet/wallet-filters";
 import {
   MENU_TESTNETS,
   rowIsPage,
+  VAULT_SHARES_FAMILY,
   vaultProtocolOfHref,
   walletProtocolMenu,
   type MenuProtocol,
@@ -77,9 +79,10 @@ type Menu = NonNullable<ReturnType<typeof walletProtocolMenu<WalletCountsPositio
 
 /** A position's explorer on the roster: its name, its place, and its listing
  *  searched by the wallet (every wallet family's listing reads `q`). A
- *  vault-share row names its vault protocol ("MetaMorpho" under Morpho's
- *  door) and opens the holder listing of the explorer's Vaults tab, where
- *  it has one (Yearn V3 has none: the wallet view). */
+ *  vault-share row names its vault protocol ("MetaMorpho vaults" under
+ *  Morpho's door) and opens the holder listing of the explorer's Vaults tab,
+ *  where it has one; Yearn V3 has none, so its row opens the wallet view
+ *  narrowed to the vault shares. */
 function protocolOf(p: WalletCountsPosition, address: string): MenuProtocol | undefined {
   const entry = protocolForPathname(p.href.split("?")[0]);
   if (!entry) return undefined;
@@ -87,7 +90,9 @@ function protocolOf(p: WalletCountsPosition, address: string): MenuProtocol | un
   return {
     name: vault ?? entry.label,
     order: PROTOCOLS.indexOf(entry),
-    listing: listingHrefForWallet(entry.session, address, vault ? "vaults" : undefined),
+    listing: vault
+      ? (listingHrefForWallet(entry.session, address, "vaults") ?? walletProtocolHref(address, VAULT_SHARES_FAMILY))
+      : listingHrefForWallet(entry.session, address),
   };
 }
 

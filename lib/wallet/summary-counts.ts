@@ -107,7 +107,7 @@ export const VAULT_SHARES_FAMILY = "vaults";
 
 /** The vault protocols a vault-share row can belong to, by the root of its
  *  holder page (`/<chain>/<root>/vaults/<vault>/<holder>`, lib/vaults/routes.ts). */
-const VAULT_ROOTS: Record<string, string> = { morpho: "MetaMorpho", aave: "Aave vaults", yearn: "Yearn V3" };
+const VAULT_ROOTS: Record<string, string> = { morpho: "MetaMorpho vaults", aave: "Aave vaults", yearn: "Yearn V3" };
 
 /** A vault-share row's protocol root from its href (morpho, aave, yearn);
  *  undefined for a path outside the vault routes. */
@@ -116,7 +116,7 @@ export function vaultRoot(href: string): string | undefined {
   return m && m[1] in VAULT_ROOTS ? m[1] : undefined;
 }
 
-/** The menu's name for a vault-share row's protocol ("MetaMorpho"), or
+/** The menu's name for a vault-share row's protocol ("MetaMorpho vaults"), or
  *  undefined where its href names none. */
 export const vaultProtocolOfHref = (href: string): string | undefined => {
   const root = vaultRoot(href);
@@ -124,7 +124,7 @@ export const vaultProtocolOfHref = (href: string): string | undefined => {
 };
 
 /** A position's row in the menu: its chain and family, a vault-share row's
- *  split by its vault protocol, so MetaMorpho, Aave's vaults and Yearn V3
+ *  split by its vault protocol, so MetaMorpho vaults, Aave vaults and Yearn V3
  *  each take a row. */
 export const menuKey = (p: Pick<WalletCountsPosition, "chain" | "family" | "href">): string =>
   p.family === VAULT_SHARES_FAMILY
