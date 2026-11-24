@@ -494,18 +494,31 @@ if (wants("Liquity V2")) {
       protocol: new URLSearchParams(window.location.search).get("protocol"),
       pill: document.querySelector('[data-filter-pill="Protocol"]')?.getAttribute("data-pill-state") ?? null,
     }));
+    // The Protocol pill is drawn only for a wallet holding more than one
+    // protocol (wallet-filter-bar.tsx, `held.length > 1`). Where none is drawn,
+    // the wallet's counts must name one protocol.
+    let protocolsHeld = null;
+    if (walletView.pill == null) {
+      const counts = await api(`/api/chain/wallet/${holder}/summary`).catch(() => null);
+      protocolsHeld = counts ? new Set(counts.positions.map((p) => `${p.chain}:${p.family}`)).size : null;
+    }
     check(
-      label("5c. a wallet search opens /wallet with its Protocol pill set to Liquity V2 and no Status pill set"),
+      label(
+        "5c. a wallet search opens /wallet with its Protocol pill set to Liquity V2 (none on a one-protocol wallet) and no Status pill set",
+      ),
       walletView.path.startsWith("/wallet/") &&
         walletView.protocol === "liquity-v2" &&
-        walletView.pill === "set" &&
+        (walletView.pill === "set" || (walletView.pill == null && protocolsHeld === 1)) &&
         searchChips.statusChip == null,
-      `${JSON.stringify(walletView)}; ${describeChips(searchChips)}`,
+      `${JSON.stringify(walletView)}${protocolsHeld != null ? `; protocols held ${protocolsHeld}` : ""}; ${describeChips(searchChips)}`,
     );
+    // An open card on the wallet page draws no lifecycle word (94b544d15), so a
+    // row with none reads as open.
+    const walletPills = searchPills.map((p) => p ?? "OPEN");
     check(
-      label("5d. every rendered pill is a real lifecycle word"),
-      searchPills.length > 0 && searchPills.every((p) => p != null && ALL_PILLS.has(p)),
-      [...new Set(searchPills)].join(", ") || "none",
+      label("5d. every rendered pill is a real lifecycle word, a row with none read as open"),
+      walletPills.length > 0 && walletPills.every((p) => ALL_PILLS.has(p)),
+      [...new Set(searchPills.map((p) => p ?? "(none: open)"))].join(", ") || "none",
     );
   } else {
     check(label("5. holder fixture"), false, "no closed trove with a lastOwner in the API answer");
