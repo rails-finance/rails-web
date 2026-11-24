@@ -198,6 +198,8 @@ export const CARD_WORDS = {
   uncollectedTipStaked: (staker: string, pr: UniProtocol = "pancakeswap") =>
     `Fees the position has earned and its staker, ${short(staker)}, has not ${TERMS[pr].collected} yet.`,
   cake: "Pending CAKE",
+  /** Under a listing card's fees, where the range takes the fourth headline. */
+  cakeSub: (amount: string, symbol: string) => `${amount} ${symbol} pending`,
   cakeTip: "CAKE rewards PancakeSwap's farm has paid this staked position that the staker has not harvested yet.",
   /** PancakeSwap: whether the position is staked in the farm, beside its number. */
   staked: "Staked",
@@ -210,7 +212,16 @@ export const CARD_WORDS = {
   fullRange: "Full range",
   rangeText: (low: number, high: number) => `Range ${num(low)} to ${num(high)}`,
   priceText: (price: number, unit: string) => `Price ${num(price)} ${unit}`,
+  /** The listing card's range headline (the wallet page): the state at the head block, the range's prices under it. */
+  inRange: "In range",
+  rangeHeadTip:
+    "Whether the pool's price at the head block is inside the position's range. Out of range, the position holds one token and earns no fees.",
+  rangeSpan: (low: number, high: number, unit: string) => `${num(low)} to ${num(high)} ${unit}`,
 };
+
+/** The range headline's word: Full range, In range or Out of range at the head block. */
+export const rangeWord = (p: Pick<PoolPosition, "inRange" | "range">): string =>
+  p.range.full ? CARD_WORDS.fullRange : p.inRange ? CARD_WORDS.inRange : CARD_WORDS.outOfRange;
 
 /** The card's status word: Closed with no liquidity, Out of range outside it, none while in range. */
 export function cardStatus(

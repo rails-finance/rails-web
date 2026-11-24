@@ -41,6 +41,10 @@ import type { ArbitrumReadRow } from "@/components/shared/arbitrum-positions-lis
 import type { CometCard } from "@/lib/compound-arbitrum/comet-cards";
 import type { WalletKind } from "@/lib/wallet/wallet-filters";
 import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
+import type { UniPositionRead } from "@/lib/uniswap/types";
+import type { UniProtocol } from "@/lib/uniswap/deployments";
+import type { AeroPositionRead } from "@/lib/aerodrome/types";
+import type { BalPositionRead } from "@/lib/balancer/types";
 
 /** "redeemed" is in the type for the families that end a position by
  *  redemption; no store states it as an ending yet (a fully redeemed Liquity
@@ -97,7 +101,12 @@ export type WalletCard =
   | { kind: "basedollar"; row: BasedollarTroveSummary }
   /** A Liquity V2 fork's Stability Pool deposit: its deposit listing's row,
    *  as stored (no head read). */
-  | { kind: "fork-deposit"; fork: "ebisu" | "asymmetry" | "basedollar"; row: LiquityV2DepositRow<string> };
+  | { kind: "fork-deposit"; fork: "ebisu" | "asymmetry" | "basedollar"; row: LiquityV2DepositRow<string> }
+  /** A liquidity position the wallet page reads at visit (W9, lib/wallet/liquidity/): the
+   *  explorer's position read at the head block, drawn by its card as a listing row. */
+  | { kind: "uniswap"; protocol: UniProtocol; read: UniPositionRead }
+  | { kind: "slipstream"; read: AeroPositionRead }
+  | { kind: "balancer"; read: BalPositionRead };
 
 /** A closed position's row in the History table: what the store states, each
  *  field absent where it states nothing. */
@@ -243,4 +252,36 @@ export interface WalletRead {
   /** The listing reads that did not answer, by what they read: the answer
    *  is part of the wallet, states no wallet total and is not kept. */
   partial?: string[];
+}
+
+/** One owner route's part of the Liquidity section (W9): how it answered, how many positions
+ *  holding liquidity it named, and how many of those the section draws. */
+export interface LiquiditySourceRead {
+  /** `uniswap:8453`, `balancer:1` (lib/wallet/liquidity/sources.ts). */
+  key: string;
+  /** "Uniswap V3 and V4 on Ethereum". */
+  what: string;
+  /** "ok", or why it did not answer: the read ceiling's 503, a Balancer index refusal, a failure. */
+  state: "ok" | "ceiling" | "refused" | "failed";
+  /** The route answered part of the wallet's positions (`truncated`). */
+  truncated: boolean;
+  /** Positions holding liquidity the route named. */
+  held: number;
+  /** Their cards drawn; `held - drawn - failed` are past the section's cap. */
+  drawn: number;
+  /** Position reads that did not answer. */
+  failed: number;
+  /** The explorer's wallet page, which lists every position. */
+  href: string;
+  /** The explorer's name on that chain, for the lines under the section. */
+  name: string;
+  chainName: string;
+  ms: number;
+}
+
+/** The Liquidity section's read: every owner route, then each position's card read. */
+export interface WalletLiquidity {
+  positions: WalletPosition[];
+  sources: LiquiditySourceRead[];
+  ms: number;
 }

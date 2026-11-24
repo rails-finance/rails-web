@@ -30,6 +30,7 @@ import { holderListingMetadata } from "@/lib/shared/page-metadata";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { resolveEnsAddress, resolveEnsNames } from "@/lib/ens/resolve-ens";
 import { readCowWalletEntry } from "@/lib/sources/api/cow";
+import { readWalletLiquidity } from "@/lib/wallet/liquidity/read-liquidity";
 
 export const dynamic = "force-dynamic";
 // The read's budget (8 s) sits under it.
@@ -97,8 +98,17 @@ export default async function WalletPage({ params, searchParams }: Props) {
   // view under its own Suspense, never by the page; not read where one
   // protocol is chosen.
   const cow = protocol ? null : readCowWalletEntry(address, ip);
+  const wallet = readWallet(address, ip, { protocol });
+  // The Liquidity section (W9) streams in like the CoW row: its owner routes start once the
+  // main read has settled, so the two never open their connections to the api together.
+  const liquidity = protocol
+    ? null
+    : wallet.then(
+        () => readWalletLiquidity(address, ip),
+        () => readWalletLiquidity(address, ip),
+      );
   const [read, names] = await Promise.all([
-    readWallet(address, ip, { protocol }),
+    wallet,
     resolveEnsNames([address]).catch(() => ({}) as Record<string, string | null>),
   ]);
   return (
@@ -107,6 +117,7 @@ export default async function WalletPage({ params, searchParams }: Props) {
       ensName={names[address] ?? null}
       read={read}
       cow={cow}
+      liquidity={liquidity}
       reads={walletFamiliesLine()}
       back={back}
       kinds={parseKinds(sp.get("kind") ?? undefined)}

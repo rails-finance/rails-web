@@ -119,6 +119,10 @@ export function unreadNote(unread: number, open: number): string | undefined {
   return `${who} could not be read at the chain head, so the section states no total.`;
 }
 
+/** The Liquidity section's note (W9): its cards state the pools' tokens, no dollars, so it
+ *  states no total; in the wording of the wallet total's gap. */
+export const LIQUIDITY_NO_TOTAL = "No total: liquidity positions state no dollars.";
+
 /** A position's dollars in one field. A missing debt counts as none only on
  *  a deposit or a stake no head read contradicts: a head read states its debt, so one
  *  missing there is unpriced, not zero. */

@@ -67,6 +67,9 @@ import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { useAssetScope } from "@/lib/shared/asset-scope";
 import { walletPositionAssetKeys } from "@/lib/wallet/aim-assets";
 import { COW_TERMS } from "@/lib/cow/terms";
+import { LiquidityReading, LiquiditySection } from "@/components/wallet/wallet-liquidity";
+import { walletLiquidityLine } from "@/lib/wallet/liquidity/sources";
+import type { WalletLiquidity } from "@/lib/wallet/types";
 
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
 const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
@@ -307,6 +310,7 @@ export function WalletView({
   ensName,
   read,
   cow,
+  liquidity,
   reads,
   back,
   kinds: initialKinds = [],
@@ -318,6 +322,9 @@ export function WalletView({
   /** The wallet's CoW trades, unawaited (`readCowWalletEntry`); W7. Null
    *  where one protocol is chosen, which is read alone. */
   cow: Promise<CowWalletEntry | null> | null;
+  /** The wallet's liquidity positions, read at visit after the page's main read and
+   *  unawaited (`readWalletLiquidity`); W9. Null where one protocol is chosen. */
+  liquidity: Promise<WalletLiquidity> | null;
   /** `?kind=`: the Kind pill's selection on arrival (ui-jobs 738). */
   kinds?: WalletKind[];
   /** `?status=`: the Status pill's selection on arrival. */
@@ -373,6 +380,13 @@ export function WalletView({
   const trades = cow && !byKind && status == null && (
     <Suspense fallback={null}>
       <Trades address={address} cow={cow} />
+    </Suspense>
+  );
+  // The liquidity positions (W9), below the protocol sections: drawn, like the trades, with
+  // neither Kind nor Status chosen.
+  const liquiditySection = liquidity && !byKind && status == null && (
+    <Suspense fallback={<LiquidityReading />}>
+      <LiquiditySection read={liquidity} />
     </Suspense>
   );
   const filterBar = read.held.length > 0 && (
@@ -469,6 +483,7 @@ export function WalletView({
             <section className="flex max-w-xl flex-col gap-3" data-wallet-error="">
               <IndexNotice className="text-sm text-foreground/80" />
             </section>
+            {liquiditySection}
             {trades}
           </>
         ) : filtered && all.length === 0 && read.positions.length > 0 ? (
@@ -503,7 +518,8 @@ export function WalletView({
                     </p>
                   ) : (
                     <p className="text-sm text-foreground/80" data-wallet-reads="">
-                      Rails holds no position for this wallet. This page reads {reads}.
+                      Rails holds no stored position for this wallet. This page reads {reads}. At each visit it reads
+                      the liquidity positions on {walletLiquidityLine()}.
                     </p>
                   )}
                   {back && (
@@ -520,6 +536,7 @@ export function WalletView({
                   <WalletLookup positionHref={(w) => `/wallet/${w}`} placeholder="Wallet address or ENS name" />
                   <StartHereLine />
                 </section>
+                {liquiditySection}
                 {trades}
               </>,
             )}
@@ -538,6 +555,7 @@ export function WalletView({
                 <p className="text-sm text-rb-500" data-wallet-shown={all.length} data-prov-exempt="">
                   {plural(all.length, status ? `${status} position` : "position")}
                 </p>
+                {liquiditySection}
                 {trades}
               </>,
             )}

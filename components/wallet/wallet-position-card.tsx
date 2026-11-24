@@ -65,6 +65,9 @@ import {
   LlamalendPositionCard,
   viewFromSummary as llamalendView,
 } from "@/components/protocol/llamalend/llamalend-position-card";
+import { UniswapPositionCard } from "@/components/protocol/uniswap/uniswap-position-card";
+import { AerodromePositionCard } from "@/components/protocol/aerodrome/aerodrome-position-card";
+import { BalancerPositionCard } from "@/components/protocol/balancer/balancer-position-card";
 import { ArbitrumReadCard, CometReadCard } from "@/components/shared/arbitrum-positions-listing";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
@@ -223,6 +226,13 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
       );
     case "fork-deposit":
       return forkDepositWalletCard(SP_DEPLOYMENTS[card.fork])(card.row, state);
+    // The Liquidity section's cards (W9): each explorer's card as a listing row.
+    case "uniswap":
+      return <UniswapPositionCard r={card.read} protocol={card.protocol} surface="listing" />;
+    case "slipstream":
+      return <AerodromePositionCard r={card.read} surface="listing" />;
+    case "balancer":
+      return <BalancerPositionCard r={card.read} surface="listing" />;
   }
 }
 

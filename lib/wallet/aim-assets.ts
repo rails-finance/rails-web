@@ -21,6 +21,8 @@
 //   liquity-v1-stake       LQTY, and LUSD and ETH (its fees)
 //   ebisu / asymmetry / basedollar   collateral symbol, and the fork's debt symbol
 //   the three Arbitrum kinds         nothing: AIM's universe has no Arbitrum token
+//   uniswap, slipstream    the pool's two tokens (the native coin as AIM's native key)
+//   balancer               each of the pool's tokens
 //
 // A symbol resolves to the AIM chooser's tokens of that symbol on the
 // position's chain (SCOPE_SYMBOLS).
@@ -28,6 +30,7 @@
 import { assetKey } from "@/lib/shared/asset-family";
 import { SCOPE_SYMBOLS } from "@/lib/shared/asset-scope";
 import type { WalletPosition } from "@/lib/wallet/types";
+import { poolTokenKeys } from "@/components/protocol/uniswap/pool-focus-keys";
 
 // The forks' debt symbols (lib/<fork>/asset-catalog.ts DEBT_SYMBOL), written
 // out so this module does not pull the catalogs into the wallet's bundle.
@@ -100,6 +103,12 @@ export function walletPositionAssetKeys(p: WalletPosition): string[] {
       break;
     case "llamalend":
       symbols.push(c.row.collateralSymbol, c.row.borrowedSymbol);
+      break;
+    case "uniswap":
+    case "slipstream":
+      return poolTokenKeys(chain, [c.read.token0, c.read.token1]);
+    case "balancer":
+      for (const t of c.read.tokens) addresses.push(t.address);
       break;
     default:
       break;
