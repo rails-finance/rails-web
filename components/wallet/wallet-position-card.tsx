@@ -88,6 +88,9 @@ import {
 } from "@/components/protocol/polaris/polaris-position-card";
 import { PolarisLoanCard } from "@/components/protocol/polaris/polaris-loan-card";
 import { PolarisDepositCard } from "@/components/protocol/polaris/polaris-deposit-card";
+import { AaveV4PositionListingCard } from "@/components/aave-v4/AaveV4PositionListingCard";
+import { AaveV4ArcWalletCard } from "@/components/protocol/aave-v4-arc/aave-v4-arc-wallet-card";
+import { AaveV4DeploymentProvider, BASE_AAVE_V4 } from "@/lib/aave-v4/deployment";
 import { ArbitrumReadCard, CometReadCard } from "@/components/shared/arbitrum-positions-listing";
 import { VaultPositionCard } from "@/components/vaults/vault-position-card";
 import { ReadStamp } from "@/components/wallet/read-stamp";
@@ -127,6 +130,17 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
       );
     case "aave-v3-arbitrum":
       return <ArbitrumReadCard row={card.row} family="aave-v3" />;
+    case "aave-v4":
+      // The Base card files under Base's session, as its listing's layout
+      // provides; Ethereum's is the context's default.
+      if (card.lane === "arc") return <AaveV4ArcWalletCard read={card.read} />;
+      return card.lane === "base" ? (
+        <AaveV4DeploymentProvider value={BASE_AAVE_V4}>
+          <AaveV4PositionListingCard row={card.row} storedAtBlock={card.storedAtBlock} />
+        </AaveV4DeploymentProvider>
+      ) : (
+        <AaveV4PositionListingCard row={card.row} storedAtBlock={card.storedAtBlock} />
+      );
     case "compound-v3":
       return card.lane === "base" ? (
         <CompoundPositionCard

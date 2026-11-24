@@ -481,7 +481,7 @@ export function WalletView({
           // decision 0050's step 3 is built from.
           read.families.map((r) => {
             const mine = open.filter(
-              (p) => `${p.family}:${p.chain}` === `${r.id.replace(/-(base|arbitrum)$/, "")}:${r.chain}`,
+              (p) => `${p.family}:${p.chain}` === `${r.id.replace(/-(base|arbitrum|arc)$/, "")}:${r.chain}`,
             );
             return {
               id: r.id,

@@ -31,6 +31,7 @@ import { readLiquityV1Sp, type LiquityV1DepositListResponse } from "@/lib/source
 import { readLiquityV2Sp, type LiquityV2DepositListResponse } from "@/lib/sources/api/liquity-v2-sp";
 import { readLiquityV1Staking, type LiquityV1StakeListResponse } from "@/lib/sources/api/liquity-v1-staking";
 import { aaveV3Base, aaveV3Ethereum, seamless, spark } from "@/lib/wallet/families/aave";
+import { ARC_ON_WALLET, aaveV4Arc, aaveV4Base, aaveV4Ethereum } from "@/lib/wallet/families/aave-v4";
 import { compoundV3Base, compoundV3Ethereum } from "@/lib/wallet/families/compound";
 import { compoundV2 } from "@/lib/wallet/families/compound-v2";
 import { moonwellBase, moonwellEthereum } from "@/lib/wallet/families/moonwell";
@@ -77,6 +78,9 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   aaveV3Ethereum,
   aaveV3Base,
   aaveV3Arbitrum,
+  aaveV4Ethereum,
+  aaveV4Base,
+  aaveV4Arc,
   compoundV3Ethereum,
   compoundV3Base,
   compoundV3Arbitrum,
@@ -118,10 +122,11 @@ export const WALLET_FAMILIES: FamilyModule[] = [
 
 /** The families the page reads, by chain, in one sentence for the empty
  *  state: "Aave V3, … and Asymmetry on Ethereum; … on Base; …". The Arbitrum
- *  rows are written when Rails reads the wallet there, which the sentence says. */
+ *  and Arc rows are written when Rails reads the wallet there, which the sentence says. */
 export function walletFamiliesLine(): string {
   const byChain = new Map<WalletSummaryRow["chain"], string[]>();
   for (const f of WALLET_FAMILIES) {
+    if (f.summaryChain === "arc" && !ARC_ON_WALLET) continue;
     const names = byChain.get(f.summaryChain) ?? [];
     for (const n of f.lineNames ?? [f.name]) if (!names.includes(n)) names.push(n);
     byChain.set(f.summaryChain, names);
@@ -131,7 +136,7 @@ export function walletFamiliesLine(): string {
     ethereum: "on Ethereum",
     base: "on Base",
     arbitrum: "on Arbitrum where Rails has read the wallet",
-    arc: "on Arc",
+    arc: "on Arc where Rails has read the wallet",
     sepolia: "on Sepolia (testnet)",
   };
   return [...byChain].map(([chain, names]) => `${list(names)} ${where[chain]}`).join("; ");
@@ -307,15 +312,18 @@ export async function readSummary(address: string, signal: AbortSignal, readerIp
   }
   const extra = await listing;
   const open = extra.rows.filter((r) => r.status === "open").length;
-  // Testnet rows stay in `rows` and leave the totals.
+  // Testnet rows stay in `rows` and leave the totals. Arc's rows, while its
+  // explorer is unlaunched, leave the rows and the totals.
   const testnet = rows.filter((r) => !countedRow(r));
-  const testnetOpen = testnet.filter((r) => r.status === "open").length;
+  const hidden = ARC_ON_WALLET ? [] : rows.filter((r) => r.chain === "arc");
+  const left = [...testnet, ...hidden];
+  const leftOpen = left.filter((r) => r.status === "open").length;
   return {
     ...first!,
-    rows: [...rows, ...extra.rows],
-    total: first!.total - testnet.length + extra.rows.length,
-    open: first!.open - testnetOpen + open,
-    closed: first!.closed - (testnet.length - testnetOpen) + extra.rows.length - open,
+    rows: [...rows.filter((r) => !hidden.includes(r)), ...extra.rows],
+    total: first!.total - left.length + extra.rows.length,
+    open: first!.open - leftOpen + open,
+    closed: first!.closed - (left.length - leftOpen) + extra.rows.length - open,
     listingFailed: extra.failed,
   };
 }
