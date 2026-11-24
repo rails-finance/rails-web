@@ -50,6 +50,7 @@ import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-ca
 import { LiquityTroveMetaContext, type LiquityTroveMeta } from "@/components/protocol/liquity/event-prose-render";
 import { UserGlyph } from "@/components/shared/rate-pill";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { useRateCooldownWindow } from "@/components/protocol/liquity-family/rate-cooldown-row";
 import { LIQUITY_TIMELINE_RUNS } from "@/lib/liquity/timeline-runs";
 import { PreviousEventContext } from "@/components/protocol/liquity/delegate-run-sheet";
 import type { SpineKey } from "@/components/shared/mobile-spine";
@@ -279,6 +280,13 @@ export function TroveBody({
     [chronoIndex, chrono],
   );
 
+  // The 7-day rate-change cooldown while it runs (ui-jobs 831): none on a
+  // closed or zombie Trove or a shut-down branch, where a rate change reverts.
+  const cooldownWindow = useRateCooldownWindow({
+    events: liquityEvents,
+    active: !closed && !trove.isZombie && shutdown == null,
+  });
+
   // One clock for the debt, interest and cost figures: a shut-down branch's
   // accrual stops at the shutdown (ui-jobs 626).
   const accrualNow = liquityAccrualNow(now, shutdown?.at);
@@ -349,6 +357,7 @@ export function TroveBody({
                 // card's detail panel open on its first mount.
                 persistKeyPrefix="liquity-v2"
                 closed={closed}
+                liveWindow={cooldownWindow}
                 tl={tlWithGlyph}
                 boundary={boundary}
                 loadOlder={loadOlder}

@@ -62,6 +62,7 @@ import {
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import { fetchLiquityForkPosition, type LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { useRateCooldownWindow } from "@/components/protocol/liquity-family/rate-cooldown-row";
 import { IndexNotice } from "@/components/shared/index-notice";
 import { LIQUITY_FORK_FOLDER_REGISTER, liquityForkTimelineRuns } from "@/lib/shared/liquity-fork-timeline-runs";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
@@ -389,6 +390,13 @@ export default function BasedollarTroveDetail({
   const liveRisk = chain != null && view?.status === "open";
   // The branch's shutdown (ui-jobs 612): the catalog's record at once, the live read confirming it.
   const shutdown = useBranchShutdown("basedollar", collateralType, view?.status === "open");
+  // The 7-day rate-change cooldown while it runs (ui-jobs 831): none on a
+  // closed or zombie Trove or a shut-down branch, where a rate change reverts.
+  const cooldownWindow = useRateCooldownWindow({
+    events: basedollarEvents,
+    folders: servedFolders,
+    active: view?.status === "open" && chain?.status !== "zombie" && shutdown == null,
+  });
 
   // Lifetime flows: the Trove's whole history replayed (lib/shared/liquity-flows.ts).
   // A windowed or folder-served page reads the flat history once for it.
@@ -638,6 +646,7 @@ export default function BasedollarTroveDetail({
                 displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
                 csvExportCeiling={INDEX_ROW_CEILING}
                 closed={view ? view.status !== "open" : undefined}
+                liveWindow={cooldownWindow}
                 // Matches `BasedollarEventCard`'s own
                 // `persistKey={`basedollar:${event.id}`}` — lets pinned mode (the
                 // per-event share route) force a landed card's detail panel open
