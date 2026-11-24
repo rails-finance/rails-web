@@ -126,7 +126,8 @@ const dateLabel = async (page) => {
  *  before hydration is lost. */
 async function copyLink(page) {
   // At 390 px the ⋮ opens a MobileSheet portalled to body, outside the card.
-  const menu = page.getByRole("menu").first();
+  // The card's ⋮ names its menu "<Noun> menu" (tools-menu.tsx).
+  const menu = page.getByRole("menu", { name: /^\w+ menu$/ }).first();
   for (let i = 0; i < 6 && !(await menu.isVisible().catch(() => false)); i++) {
     await page
       .locator("[data-card-menu] > button")

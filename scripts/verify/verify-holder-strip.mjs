@@ -184,10 +184,8 @@ async function openListing(context, url, { route } = {}) {
  *  wallet URL opened cold is answered by SSR, which no page.route can reach).
  *  That is what lets the truncation case rewrite `pagination.total` on the
  *  wire. */
-async function searchWallet(page, placeholder, wallet) {
+async function searchWallet(page, wallet) {
   // The search rests as an icon until pressed (N1.1, ui-jobs 801).
-  // The toolbar's own field; `placeholder` names it for the reader.
-  void placeholder;
   const box = await openListingSearch(page, page.locator(LISTING_TOOLBAR));
   await box.click();
   await box.fill(wallet);
@@ -360,7 +358,7 @@ info(
   const page = await openListing(context, `${BASE}/sepolia/polaris`, {
     route: inflateTotal("**/api/polaris/positions**", 21),
   });
-  await searchWallet(page, "Address, ENS, or position number", POLARIS_WALLET);
+  await searchWallet(page, POLARIS_WALLET);
   const strip = await readStrip(page);
   check(
     "P8. a wallet stated as holding 21 positions states the count only — no legs, and says why",
