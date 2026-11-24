@@ -1,6 +1,6 @@
-// The asset page's gap chart and the words around its two charts (ui-jobs 818,
-// 819): lib/shared/asset-spread.ts (a daily read against a rounds close),
-// lib/shared/asset-chart-grid.ts (`gapSeries`, `legendMoment`) and
+// The asset page's price chart and the words around it (ui-jobs 818, 819):
+// lib/shared/asset-spread.ts (a daily read against a rounds close, for the
+// Prices list's flags), lib/shared/asset-chart-grid.ts (`legendMoment`) and
 // lib/shared/asset-captions.ts. Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -19,11 +19,9 @@ export async function resolve(specifier, context, next) {
 }`;
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
-const { lineSpreads, dashReason } = await import("../../lib/shared/asset-spread.ts");
-const { DAY_S, cellAt, cellOf, gapSeries, gridFor, legendMoment, lineTrack } = await import(
-  "../../lib/shared/asset-chart-grid.ts"
-);
-const { chartCaptions, joinText, sourceName } = await import("../../lib/shared/asset-captions.ts");
+const { lineSpreads } = await import("../../lib/shared/asset-spread.ts");
+const { DAY_S, cellAt, cellOf, gridFor, legendMoment } = await import("../../lib/shared/asset-chart-grid.ts");
+const { joinText, priceCaption, sourceName } = await import("../../lib/shared/asset-captions.ts");
 
 // WETH on Ethereum, 26–30 May 2025 (days 20234–20238), as the stores hold it:
 // the main line's stored rounds (Chainlink ETH / USD), each day's close at the
@@ -49,13 +47,6 @@ const ROUNDS = CLOSES.flatMap(([day, close, block]) => [
   [day * DAY_S + 8 * 3600, close * 0.99, block - 3600],
   [day * DAY_S + 20 * 3600, close, block],
 ]);
-const T1 = 20239 * DAY_S - 1;
-const mainRounds = {
-  points: ROUNDS,
-  joinDay: 19250,
-  from: { ts: ROUNDS[0][0] },
-  asOf: { ts: T1 },
-};
 const main = { key: "main", points: CLOSES, rounds: { points: ROUNDS, joinDay: 19250 } };
 
 test("a daily read at or after the main line's rounds close compares with that close (819b)", () => {
@@ -72,7 +63,6 @@ test("a daily read at or after the main line's rounds close compares with that c
   assert.equal(maker.passes, true);
   assert.equal(maker.largest.day, 20238);
   assert.ok(!aave.byDay.has(20238), "a read 52 blocks before the close keeps the ten-minute window");
-  assert.equal(dashReason(aave, 20238, false), "window");
   // Two daily stores keep the window both ways: 115 blocks apart is 23 minutes.
   const [daily] = lineSpreads({ key: "m", points: CLOSES }, [{ key: "maker", points: MAKER }], 1);
   assert.ok(!daily.byDay.has(20238), "without rounds the reads are 23 minutes apart");
@@ -85,25 +75,7 @@ test("a daily read at or after the main line's rounds close compares with that c
   assert.ok(flip.byDay.has(20238));
 });
 
-test("the gap chart draws each daily line's gap in a window shorter than a week (819b)", () => {
-  const bounds = { t0: 20234 * DAY_S, t1: T1 };
-  const g = gridFor({ from: 20234 * DAY_S, to: 20239 * DAY_S }, bounds, 600);
-  assert.ok(g.step < DAY_S, `an intraday grid (${g.step} s a cell)`);
-  const mainTrack = lineTrack(CLOSES, mainRounds, g.step, T1);
-  const makerTrack = lineTrack(MAKER, null, g.step, T1);
-  const [spread] = lineSpreads(main, [{ key: "maker", points: MAKER }], 1);
-  const [gaps] = gapSeries(g, mainTrack, [{ track: makerTrack, byDay: spread.byDay }]);
-  assert.equal(gaps.length, g.count);
-  const noon30 = cellOf(g, 20238 * DAY_S + 12 * 3600);
-  assert.ok(Math.abs(gaps[noon30] - (2586.43 / 2524.59 - 1) * 100) < 1e-9, "30 May reads +2.45 % all day");
-  const drawn = gaps.filter((v) => v != null).length;
-  assert.ok(drawn >= g.count * 0.9, `${drawn} of ${g.count} cells drawn`);
-  // A line with no comparable day draws nothing.
-  const [none] = gapSeries(g, mainTrack, [{ track: makerTrack, byDay: new Map() }]);
-  assert.ok(none.every((v) => v == null));
-});
-
-test("the legends read the cursor in the window, else the window's last moment (819a)", () => {
+test("the readout reads the cursor in the window, else the window's last moment (819a)", () => {
   const bounds = { t0: 19000 * DAY_S, t1: 20780 * DAY_S + 3600 };
   const shown = { from: 20234 * DAY_S, to: 20239 * DAY_S };
   const g = gridFor(shown, bounds, 600);
@@ -149,48 +121,31 @@ const view = (over = {}) => ({
   ...over,
 });
 
-test("the captions name the price each chart draws (818)", () => {
-  assert.deepEqual(chartCaptions(view(), cl, "WETH", 5), {
-    price: "The price Liquity V2 uses: Chainlink ETH / USD through Liquity V2 WETH PriceFeed",
-    gap: "Other protocols' prices for WETH, against Liquity V2's",
-  });
-  assert.equal(chartCaptions(view(), cl, "WETH", 0).gap, null, "no other line, no gap chart");
+test("the caption names the price the chart draws (818)", () => {
+  assert.equal(
+    priceCaption(view(), cl, "WETH"),
+    "The price Liquity V2 uses: Chainlink ETH / USD through Liquity V2 WETH PriceFeed",
+  );
   const aave = view({ explorer: { id: "aave-v3", label: "Aave V3", chain: 1 }, name: "Aave V3 Core" });
   const direct = { ...cl, series: [{ key: "aave-v3:core:0xc02a", protocol: "Aave V3 Core", token: tok }] };
-  assert.equal(chartCaptions(aave, direct, "WETH", 3).price, "The price Aave V3 Core uses: Chainlink ETH / USD");
-  assert.deepEqual(chartCaptions(null, cl, "WETH", 5), {
-    price: "The price most protocols read: Chainlink ETH / USD",
-    gap: "Other protocols' prices for WETH, against the most-read price",
-  });
+  assert.equal(priceCaption(aave, direct, "WETH"), "The price Aave V3 Core uses: Chainlink ETH / USD");
+  assert.equal(priceCaption(null, cl, "WETH"), "The price most protocols read: Chainlink ETH / USD");
   const morpho = view({
     explorer: { id: "morpho", label: "Morpho Blue", chain: 1 },
     name: "Morpho Blue",
     lineId: null,
   });
   assert.equal(
-    chartCaptions(morpho, cl, "USDC", 2).price,
+    priceCaption(morpho, cl, "USDC"),
     "Morpho Blue has no stored price for USDC here. The price most protocols read: Chainlink ETH / USD",
   );
   assert.equal(sourceName(cl, "moonwell"), "Chainlink ETH / USD through Moonwell's OEV wrapper");
   assert.equal(sourceName(cl, null), "Chainlink ETH / USD");
 });
 
-test("the join names one line in the singular (818)", () => {
-  const r = (joinDay) => ({ rounds: { joinDay } });
+test("the join names the day the line becomes its stored rounds", () => {
   assert.equal(
-    joinText([r(19250)], 6, 19250),
-    "From 15 Sep 2022 1 of the 6 lines is its stored oracle rounds, each day at its close; before it, the daily store.",
-  );
-  assert.equal(
-    joinText([r(19250), r(19250)], 6, 19250),
-    "From 15 Sep 2022 2 of the 6 lines are their stored oracle rounds, each day at its close; before it, the daily store.",
-  );
-  assert.equal(
-    joinText([r(19250)], 1, 19250),
+    joinText(19250),
     "From 15 Sep 2022 the line is its stored oracle rounds, each day at its close; before it, the daily store.",
-  );
-  assert.equal(
-    joinText([r(19250), r(19300)], 2, 19250),
-    "The lines are their stored oracle rounds from the time each line's stamp names, each day at its close; before it, the daily store.",
   );
 });

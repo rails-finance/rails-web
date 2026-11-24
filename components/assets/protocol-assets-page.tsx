@@ -225,6 +225,13 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
   const { page, view } = via ? viaPage(opened, via) : { page: opened, view: null };
   const head = await fetchAssetHeadServer(chain, t, via ? e.id : null, readerIp).catch(() => null);
   const section = page.chains.find((c) => c.chain === chain);
+  // Each other explorer's page for the token, for the list under the chart.
+  const readerHrefs = Object.fromEntries(
+    line.also.flatMap((ch) => {
+      const at = ch.token || ch.chain !== chain ? null : hrefOf(ch.explorer);
+      return at ? [[ch.explorer, protocolAssetsHref(at, t)]] : [];
+    }),
+  );
   return (
     <Frame protocol={e}>
       <AssetPageHead
@@ -244,6 +251,7 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
           section={section}
           symbol={page.symbol}
           via={view && section.chain === view.explorer.chain ? view : null}
+          readerHrefs={readerHrefs}
         />
       )}
     </Frame>

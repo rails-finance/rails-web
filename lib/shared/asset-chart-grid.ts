@@ -197,42 +197,7 @@ export function sampleRuns(g: Grid, runs: readonly (readonly (readonly [number, 
   return out;
 }
 
-/** Each cell's deviation of `other` from `main` (a fraction): on both lines'
- *  rounds at the cell's moment, before them the day's spread (`byDay`,
- *  compared only where the store's reads were within ten minutes). */
-export function sampleSpread(
-  g: Grid,
-  main: Track,
-  other: Track,
-  byDay: ReadonlyMap<number, number>,
-): (number | null)[] {
-  const both = main.roundsFrom != null && other.roundsFrom != null ? Math.max(main.roundsFrom, other.roundsFrom) : null;
-  const out: (number | null)[] = new Array(g.count);
-  for (let i = 0; i < g.count; i++) {
-    const at = cellAt(g, i);
-    if (both != null && at >= both) {
-      const end = Math.min(main.end, other.end);
-      const m = cellTime(g, i) > end ? null : inForce(main.points, Math.min(at, end));
-      const o = m == null ? null : inForce(other.points, Math.min(at, end));
-      out[i] = m != null && o != null && m > 0 ? o / m - 1 : null;
-    } else out[i] = byDay.get(Math.floor(at / DAY_S)) ?? null;
-  }
-  return out;
-}
-
-/** The gap chart's lines (anatomy A3.6): each other line's deviation from the
- *  main line in percent, cell by cell, by `sampleSpread`. A line without
- *  stored rounds shows its day's gap in every cell of that day, so a window
- *  shorter than a day still draws it (ui-jobs 819). */
-export function gapSeries(
-  g: Grid,
-  main: Track,
-  others: readonly { track: Track; byDay: ReadonlyMap<number, number> }[],
-): (number | null)[][] {
-  return others.map((o) => sampleSpread(g, main, o.track, o.byDay).map((d) => (d == null ? null : d * 100)));
-}
-
-/** The moment the legends read: the cursor's where it lies in the window
+/** The moment the readout reads: the cursor's where it lies in the window
  *  shown, else the window's last moment (the checkpoint at most), on the
  *  grid's cell where there is one (ui-jobs 819). */
 export function legendMoment(

@@ -17,7 +17,7 @@
 // the most protocols read (a protocol's markets and ilks counted once), the
 // longest series breaking a tie; the others are measured against it.
 
-import { CHAINS, type ChainId } from "@/lib/shared/chains";
+import { CHAINS, type ChainId } from "./chains";
 
 /** Native ETH's key on every chain (BTC's is 0xbbbb…bbbb, Chainlink's Denominations address). */
 export const NATIVE = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";

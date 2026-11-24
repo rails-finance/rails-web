@@ -1702,46 +1702,32 @@ export function liquityCollSurplusClaimContent(
   };
 }
 
-/** The "?" on an asset page's chart (rails-ops reference/asset-key-map.md):
- *  a line per oracle, the picked one in colour. */
 /** The asset chart's how-to-read on Lightweight Charts (anatomy A3.7). */
 export function assetLwChartContent(symbol: string): LearnMoreContent {
   return {
-    title: "How to read the price charts",
-    intro: `${symbol}'s price from each feed a lending protocol reads on this chain, over time in UTC, in two charts that share one window and one cursor. Protocols reading one feed, directly or through a wrapper that only rescales it, share a line.`,
+    title: "How to read the price chart",
+    intro: `${symbol}'s price over time in UTC, from one feed: opened from a protocol, the price that protocol uses; where it stores none, the one the most protocols read.`,
     detailsHeading: "The parts:",
     details: [
       {
-        bold: "The price chart",
-        text: "the main line alone: opened from a protocol, the price that protocol uses; otherwise the one the most protocols read.",
-      },
-      {
-        bold: "The gap chart",
-        text: "under it, each other feed as its gap from the main line in percent, 0 % being the main line, with dashed lines at ±1 %. Each line takes the colour and dash of its key in the legend over the chart (dashed where the colours run out).",
-      },
-      {
-        bold: "Comparing two lines",
-        text: "where both lines read stored rounds they are compared at the same moment. Before that, a day compares two lines only where both were read within ten minutes of each other, or one is a fixed price, or one line's day is its rounds' close and the other was read after that round. A line more than 1 % from the main line names its largest gap, which moves both charts there. A Maker line's gap is named with its cause: Maker prices from the median of an hour before.",
-      },
-      {
-        bold: "Picking a line out",
-        text: "point at a row in the gap chart's legend, or at a line, to light that line; click or tap a row to hide its line or show it again, and the gap axis rescales to the lines shown.",
-      },
-      {
         bold: "Steps",
-        text: "a price holds until the next round, or before the stored rounds until the next day's read, so each line moves in steps.",
+        text: "a price holds until the next round, or before the stored rounds until the next day's read, so the line moves in steps.",
       },
       {
         bold: "Zoom and pan",
-        text: "scroll or pinch to zoom, drag to pan, double-click to go back to the opening view; the buttons over the price chart pick a span. Either chart moves both. Zoomed in on stored rounds, the charts read every round in the window; zoomed out, each step is the last price of its span.",
+        text: "scroll or pinch to zoom, drag to pan, double-click to go back to the opening view; the buttons over the chart pick a span. Zoomed in on stored rounds, the chart reads every round in the window; zoomed out, each step is the last price of its span.",
       },
       {
-        bold: "The legends",
-        text: "the time under the cursor (the window's last moment when the cursor is outside it), the main line's price then, and on stored rounds the round, block and transaction behind it; in the gap chart's legend, each other line's price and gap at that time.",
+        bold: "The readout",
+        text: "the time under the cursor (the window's last moment when the cursor is outside it), the price then, and on stored rounds the round, block and transaction behind it.",
       },
       {
         bold: "Stored rounds",
-        text: "the shaded span is the daily store's read of the oracle, a price per UTC day; after it, the lines are the oracle's rounds as stored.",
+        text: "the shaded span is the daily store's read of the oracle, a price per UTC day; after it, the line is the oracle's rounds as stored.",
+      },
+      {
+        bold: "The list under the chart",
+        text: `the other protocols reading ${symbol} on this chain and the feed each reads, protocols reading one feed together. "The same feed as" marks the protocols that read the feed the chart draws.`,
       },
     ],
   };

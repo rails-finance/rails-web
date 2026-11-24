@@ -2,24 +2,23 @@
 
 // One chain's section of an asset page (rails-ops reference/asset-key-map.md):
 // the price chart, drawing the main line alone (the most read; with `via`,
-// the line the protocol reads), the gap chart under it with each other line's
-// deviation from the main one (ui-jobs 818), a caption over each
-// (`chartCaptions`), then the lines listed: each oracle named, the protocols
-// that read it with their series, the span stored and its "as of" stamp
-// (decision 0054, ruling 2).
+// the line the protocol reads) under its caption (`priceCaption`), the other
+// protocols reading the token under it (`readerEntries`; Miles, 24 Nov 2026),
+// then the lines listed: each oracle named, the protocols that read it with
+// their series, the span stored and its "as of" stamp (decision 0054, ruling 2).
 // A line is the daily store's series (`/api/prices/daily`), a point per
 // completed UTC day, continued from its stored rounds' first day by the
 // rounds' day closes where the chain serves them (`/api/prices/rounds`,
 // `joinRounds`), drawn on Lightweight Charts (`AssetLwChart`). The join is
-// stated in the charts' source line and each line's stamp. With `via` (the
+// stated in the chart's source line and each line's stamp. With `via` (the
 // page read from a protocol's side, lib/shared/asset-via.ts) the section's
 // first line is the one that protocol reads, named so over the chart and in
 // the list.
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { AssetLwChart } from "@/components/assets/asset-lw-chart";
 import { roundTime } from "@/components/assets/round-time";
-import { lineSpreads } from "@/lib/shared/asset-spread";
 import { fetchPriceRounds, type RoundsAnswer } from "@/lib/api/fetch-price-rounds";
 import { fetchDailyAnswer, type DailyAnswer } from "@/lib/api/fetch-daily-prices";
 import { dailyStorePriceSeries, joinRounds, roundsOf, type PriceRounds } from "@/lib/shared/price-series";
@@ -29,7 +28,9 @@ import { formatDate } from "@/lib/date";
 import { assetLwChartContent } from "@/lib/shared/learn-more-content";
 import { endAtLastPoke, lineName, shortAddress, type PageChain, type PageLine } from "@/lib/shared/asset-roster";
 import { usesWords, type ViaView } from "@/lib/shared/asset-via";
-import { chartCaptions, joinText } from "@/lib/shared/asset-captions";
+import { joinText, priceCaption } from "@/lib/shared/asset-captions";
+import { readerEntries, readerTail, readerText, type ReaderEntry } from "@/lib/shared/asset-readers";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const DAY_MS = 86_400_000;
 /** The store answers at most 3,000 days a read. */
@@ -40,10 +41,13 @@ export function AssetPriceChart({
   section,
   symbol,
   via = null,
+  readerHrefs = {},
 }: {
   section: PageChain;
   symbol: string;
   via?: ViaView | null;
+  /** Each other explorer's page for the token, by explorer id. */
+  readerHrefs?: Record<string, string>;
 }) {
   const drawn = section.lines.filter((l) => l.drawn != null);
   const keys = drawn.map((l) => l.drawn!.key);
@@ -97,65 +101,37 @@ export function AssetPriceChart({
       });
   }, [answer, rounds, byKey, drawn, symbol, section.chain]);
   const lwHelp = useMemo(() => assetLwChartContent(symbol), [symbol]);
-  const lwLines = useMemo(() => prices.map((p) => ({ line: byKey.get(p.key)!, series: p })), [prices, byKey]);
+  // The chart draws the main line (the first drawn) alone.
+  const main = prices[0] ?? null;
+  const mainLine = main ? byKey.get(main.key)! : null;
+  const lwLine = useMemo(() => (main && mainLine ? { line: mainLine, series: main } : null), [main, mainLine]);
   const lastOf = (key: string) => prices.find((p) => p.key === key)?.points.at(-1) ?? null;
-  // The spread: every drawn line against the main one (the first drawn).
-  const spreads = useMemo(() => {
-    const main = prices[0];
-    const mainLine = main ? byKey.get(main.key) : undefined;
-    if (!main || !mainLine) return null;
-    const withRounds = (r: PriceRounds | undefined) => (r ? { rounds: { points: r.points, joinDay: r.joinDay } } : {});
-    const others = prices.slice(1).map((p) => ({
-      key: p.key,
-      points: p.points,
-      fixed: byKey.get(p.key)!.oracle.kind === "fixed",
-      ...withRounds(p.rounds),
-    }));
-    const out = lineSpreads(
-      { key: main.key, points: main.points, fixed: mainLine.oracle.kind === "fixed", ...withRounds(main.rounds) },
-      others,
-      section.chain,
-    );
-    return { main: mainLine, others: out.map((sp) => ({ line: byKey.get(sp.key)!, spread: sp })) };
-  }, [prices, byKey, section.chain]);
-  // The lines that read stored rounds, for the join in the source line.
-  const roundLines = useMemo(
-    () =>
-      prices
-        .filter((p) => p.rounds)
-        .map((p) => ({ id: byKey.get(p.key)!.id, name: p.name ?? p.key, rounds: p.rounds! })),
-    [prices, byKey],
+  const caption = mainLine ? priceCaption(via, mainLine, symbol) : null;
+  const readers = useMemo(
+    () => readerEntries(section, via, (id) => readerHrefs[id] ?? null),
+    [section, via, readerHrefs],
   );
-  const joinDay = roundLines.length ? Math.min(...roundLines.map((l) => l.rounds.joinDay)) : null;
-  // The captions over the two charts, from the line the price chart draws.
-  const captions = useMemo(() => {
-    const main = spreads?.main;
-    return main ? chartCaptions(via, main, symbol, spreads.others.length) : null;
-  }, [spreads, via, symbol]);
 
   return (
     <section className="mt-8" data-asset-chain={section.chain} data-anatomy="A2">
       <h2 className="mb-3 text-lg font-semibold text-foreground">{section.name}</h2>
-      {captions && (
+      {caption && (
         <p
           className="-mt-2 mb-3 text-sm text-rb-500"
           data-asset-via={via ? (via.lineId ?? "none") : undefined}
           data-asset-price-caption=""
           data-anatomy="A2.1"
         >
-          {captions.price}
+          {caption}
         </p>
       )}
       <div data-asset-chart="lightweight" data-anatomy="A3">
-        {prices.length > 0 ? (
+        {lwLine ? (
           <AssetLwChart
-            lines={lwLines}
+            line={lwLine}
             chain={section.chain}
-            spreads={spreads}
             help={lwHelp}
-            joinNote={joinDay != null ? joinText(roundLines, prices.length, joinDay) : null}
-            usual={via?.usualId ?? null}
-            gapCaption={captions?.gap ?? null}
+            joinNote={main?.rounds ? joinText(main.rounds.joinDay) : null}
           />
         ) : (
           <p
@@ -166,6 +142,7 @@ export function AssetPriceChart({
           </p>
         )}
       </div>
+      {readers.length > 0 && <Readers entries={readers} symbol={symbol} />}
       <ul className="mt-4 space-y-3" data-asset-lines="" data-anatomy="A4">
         {section.lines.map((l) => (
           <LineRow
@@ -175,7 +152,7 @@ export function AssetPriceChart({
             symbol={symbol}
             last={l.drawn ? lastOf(l.drawn.key) : null}
             rounds={l.drawn ? prices.find((p) => p.key === l.drawn!.key)?.rounds : undefined}
-            main={spreads?.main.id === l.id}
+            main={mainLine?.id === l.id}
             uses={via?.lineId === l.id ? usesWords(via.name) : null}
             usual={via?.usualId === l.id}
           />
@@ -187,6 +164,34 @@ export function AssetPriceChart({
           {formatDate(new Date(`${section.readAt.date}T00:00:00Z`))}); an earlier day carries the oracle of its day.
         </p>
       )}
+    </section>
+  );
+}
+
+/** The other protocols reading the token here (anatomy A2.2), one entry per line. */
+function Readers({ entries, symbol }: { entries: ReaderEntry[]; symbol: string }) {
+  return (
+    <section className="mt-5" data-asset-readers="" data-anatomy="A2.2">
+      <h3 className="mb-2 text-sm font-semibold text-foreground">Other protocols reading {symbol}</h3>
+      <ul className="space-y-1 text-sm text-foreground">
+        {entries.map((e) => (
+          <li key={e.id} data-asset-reader={e.id} data-asset-same-feed={e.sameAs ?? undefined} title={readerText(e)}>
+            {e.protocols.map((p, i) => (
+              <Fragment key={p.name}>
+                {i === 0 ? "" : i === e.protocols.length - 1 ? " and " : ", "}
+                {p.href ? (
+                  <Link href={p.href} className={INLINE_LINK} data-asset-reader-link={p.explorer ?? ""}>
+                    {p.name}
+                  </Link>
+                ) : (
+                  p.name
+                )}
+              </Fragment>
+            ))}{" "}
+            {readerTail(e)}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
