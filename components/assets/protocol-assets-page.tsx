@@ -22,7 +22,7 @@ import { RailHeader } from "@/components/shared/rail-header";
 import { ProtocolAssets } from "@/components/assets/assets-by-protocol";
 import { AssetTitle, SourceRow, UnpricedPanel, type RelationGroup } from "@/components/assets/asset-page-head";
 import { AssetPriceChart } from "@/components/assets/asset-price-chart";
-import { AlsoListed, AlsoReads, AsOfLine, OracleTable } from "@/components/assets/asset-oracles";
+import { AsOfLine, OracleTable } from "@/components/assets/asset-oracles";
 import { AssetReceipts } from "@/components/assets/asset-receipts";
 import { BoldLivePrice } from "@/components/assets/bold-live-price";
 import { fetchAssetExplorerServer, fetchAssetHeadServer } from "@/lib/api/fetch-asset-explorer-server";
@@ -38,7 +38,10 @@ import { assetPage, mainLine, type AssetPage } from "@/lib/shared/asset-roster";
 import {
   alsoListed,
   alsoReads,
+  listedRows,
   oracleRows,
+  sameRows,
+  tableRows,
   priceCell,
   priceProv,
   headTime,
@@ -252,7 +255,12 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
   const read = now.prices[pageLine.id];
   const symbol = page.symbol;
   const reads = alsoReads(pageLine, e.id, pageOf);
-  const rows = oracleRows(section.lines, pageLine, now, pageOf, nowMs);
+  const other = oracleRows(section.lines, pageLine, now, pageOf);
+  const rows = tableRows(
+    sameRows(pageLine, reads, own ? e.label : null, now),
+    other,
+    listedRows(alsoListed(line.line.chips, chain, e.id, { reads, rows: other }, pageOf), now),
+  );
   return (
     <Frame protocol={e}>
       <AssetTitle chain={chain} token={t} symbol={symbol} backHref={backHref} />
@@ -263,7 +271,7 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
             line={pageLine}
             symbol={symbol}
             head={{
-              price: headPrice(priceCell(read, true, nowMs)),
+              price: headPrice(priceCell(read)),
               info: read?.ok ? priceProv(pageLine, read, symbol) : null,
               symbol,
               change: head?.row?.change ?? null,
@@ -277,7 +285,6 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
             relations={relationsFor(page)}
             markets={line.markets}
           />
-          <AlsoReads entries={reads} chain={chain} />
           <OracleTable
             rows={rows}
             lines={section.lines}
@@ -287,7 +294,6 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
             refName={own ? `${e.label}'s price` : "the price most protocols read"}
             now={now}
           />
-          <AlsoListed entries={alsoListed(line.line.chips, chain, e.id, { reads, rows }, pageOf)} />
           <AsOfLine now={now} />
         </section>
       </AssetReceipts>

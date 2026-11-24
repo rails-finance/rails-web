@@ -165,12 +165,13 @@ test("the source names the oracle and the contract it is read through", () => {
   assert.equal(view.delayWords(5400), "90 minutes");
 });
 
-test("Also reads this oracle: the other protocols on the line, route and first day", () => {
+test("same-oracle readers: the other protocols on the line, route and first day", () => {
   const list = view.alsoReads(liquity.line, "liquity", pageOf);
   assert.equal(list.length, 1);
   assert.equal(list[0].protocol.name, "Moonwell");
   assert.equal(list[0].protocol.href, `/ethereum/moonwell/assets/${WETH}`);
-  assert.deepEqual(view.alsoReadsWords(list[0]), { before: "via its OEV wrapper", after: ", since 31 May 2026" });
+  assert.equal(list[0].route.words, "its OEV wrapper");
+  assert.equal(list[0].since, 20604, "its first stored day, 31 May 2026");
   assert.equal(list[0].route.address, "0xa0f82711a8b228455a2dfe0656763a60833b5e25");
   // Morpho's page: every reader of the most-read line, a protocol's markets together.
   const most = view.alsoReads(morpho.line, "morpho", pageOf);
@@ -181,7 +182,7 @@ test("Also reads this oracle: the other protocols on the line, route and first d
       ["Aave V4", 20535],
     ],
   );
-  assert.deepEqual(view.alsoReadsWords(most[0]), { before: "since 27 Jan 2023", after: "" });
+  assert.equal(most[0].route, null);
   // Maker's page: no other protocol reads the OSM.
   assert.deepEqual(view.alsoReads(maker.line, "makerdao", pageOf), []);
 });
@@ -195,7 +196,7 @@ test("the table: a row per other line, grouped, short names from stored data, no
     [ids["0x2750"]]: 1697.05,
     [ids["0xa150"]]: null,
   });
-  const rows = view.oracleRows(liquity.section.lines, liquity.line, now, pageOf, NOW);
+  const rows = view.oracleRows(liquity.section.lines, liquity.line, now, pageOf);
   assert.equal(rows.length, 5);
   assert.ok(!rows.some((r) => r.id === liquity.line.id), "the page's line is not a row");
   const aave = rows.find((r) => r.address.startsWith("0x5424"));
@@ -232,16 +233,16 @@ test("the table: a row per other line, grouped, short names from stored data, no
   assert.deepEqual([osm.price.text, osm.gap.text], ["$1,702.40", "+0.32%"]);
   assert.deepEqual([comet.price.text, comet.gap.text], ["$1,696.85", "−0.01%"]);
   assert.equal(spark.gap.text, "0.00%");
-  assert.equal(aave.price.stamp, null, "one block: no per-price stamp");
   // A failed read: "–" with its reason, in the price and the gap.
   const dolo = rows.find((r) => r.address.startsWith("0xa150"));
   assert.deepEqual([dolo.price.text, dolo.price.reason], ["–", "The feed reverted"]);
   assert.deepEqual([dolo.gap.text, dolo.gap.reason], ["–", "The feed reverted"]);
   // The page's price unread: every gap is "–" with that reason.
   const noRef = { ...now, prices: { ...now.prices, [liquity.line.id]: { ...now.prices[ids["0xa150"]] } } };
-  const r2 = view.oracleRows(liquity.section.lines, liquity.line, noRef, pageOf, NOW);
+  const r2 = view.oracleRows(liquity.section.lines, liquity.line, noRef, pageOf);
   assert.ok(r2.every((r) => r.gap.text === "–" && r.gap.reason === "The feed reverted"));
   assert.equal(view.asOfText(now), "As of 24 Nov 2026, 07:12 UTC · block 26,483,745");
+  assert.ok(rows.every((r) => r.group === "other"));
 });
 
 test("a protocol on more than one line is named by market", () => {
@@ -270,7 +271,7 @@ test("a protocol on more than one line is named by market", () => {
     s("maker:USDC-A", "Maker USDC-A", 18338, { retired: true }),
   ]);
   const now = unreadPricesNow(1, [core, etherfi, gone], "The prices were not read");
-  const rows = view.oracleRows([core, etherfi, gone], core, now, () => null, NOW);
+  const rows = view.oracleRows([core, etherfi, gone], core, now, () => null);
   assert.deepEqual(
     rows[0].usedBy.map((p) => p.name),
     ["Aave V3 EtherFi"],
@@ -280,7 +281,7 @@ test("a protocol on more than one line is named by market", () => {
   assert.deepEqual([rows[0].price.text, rows[0].price.reason, rows[0].gap], ["–", "The prices were not read", null]);
 });
 
-test("prices at different blocks: each its stamp, no gap, the as-of line says so", () => {
+test("prices at different blocks: the price only, no gap, no stamp, no as-of line", () => {
   const roundsAnswer = {
     lane: "on",
     asOf: { block: 23860201, ts: TS },
@@ -315,20 +316,27 @@ test("prices at different blocks: each its stamp, no gap, the as-of line says so
     [false, "Rails stores no price for this oracle in the last 10 days"],
   );
   assert.equal(now.block, 23860201, "the latest of the lines' blocks");
-  const rows = view.oracleRows(liquity.section.lines, liquity.line, now, pageOf, NOW);
+  const rows = view.oracleRows(liquity.section.lines, liquity.line, now, pageOf);
   assert.ok(
     rows.every((r) => r.gap === null),
     "no gap column",
   );
   const osm = rows.find((r) => r.address === OSM);
-  assert.equal(osm.price.stamp, "close of 23 Nov 2026 · block 23,855,000");
-  assert.equal(view.priceStamp(lq, NOW), "07:12 UTC · block 23,860,201");
+  assert.equal(osm.price.text, "$1,702.40");
+  assert.ok(
+    rows.every((r) => !("stamp" in r.price)),
+    "no per-row stamp",
+  );
   assert.equal(view.priceTime(lq, NOW + 86_400_000), "24 Nov 2026, 07:12 UTC");
   assert.equal(view.headTime(lq, NOW), "updated 07:12 UTC");
   assert.equal(view.headTime(mk, NOW), "close of 23 Nov 2026");
   assert.equal(view.headTime(now.prices[ids["0x5424"]], NOW), null);
-  assert.equal(view.asOfText(now), "Each price is its oracle's latest stored value, at the time and block under it");
-  assert.match(view.asOfNote(now), /A gap needs both prices at one block/);
+  assert.equal(view.asOfText(now), null, "no footer in stub mode");
+  assert.ok(
+    view
+      .sameRows(liquity.line, view.alsoReads(liquity.line, "liquity", pageOf), "Liquity V2", now)
+      .every((r) => r.gap === null),
+  );
   // A checkpoint with no time: the round's block and time, so a block always carries its time.
   const untimed = storedPricesNow(1, [liquity.line], { ...roundsAnswer, asOf: { block: 23860201, ts: null } }, null);
   assert.deepEqual(
@@ -379,7 +387,7 @@ const listedChips = [
 const listedNamed = () => {
   const pageLine = liquity.line;
   const reads = view.alsoReads(pageLine, "liquity", pageOf);
-  const rows = view.oracleRows(liquity.section.lines, pageLine, sameBlock({}), pageOf, NOW);
+  const rows = view.oracleRows(liquity.section.lines, pageLine, sameBlock({}), pageOf);
   return { reads, rows };
 };
 
@@ -399,24 +407,98 @@ test("also listed: a name links to its page for the token, plain where it has no
   assert.equal(out[1].href, null);
 });
 
-test("also listed: the words, joined as the page joins names", () => {
-  const out = view.alsoListed(listedChips, 1, "liquity", listedNamed(), pageOf);
-  assert.equal(view.alsoListedText(out), "Also listed by Morpho Blue and Pendle");
-  assert.equal(view.alsoListedText(out.slice(0, 1)), "Also listed by Morpho Blue");
-  assert.equal(view.andNames(["A", "B", "C"]), "A, B and C");
-});
-
 test("also listed: a reason clause only where the data states one", () => {
   const none = view.alsoListed(listedChips, 1, "liquity", listedNamed(), pageOf);
   assert.ok(none.every((e) => e.reason === null));
   const given = view.alsoListed(listedChips.slice(3, 4), 1, "liquity", listedNamed(), pageOf, (id) =>
     id === "morpho" ? "which prices WETH per market" : null,
   );
-  assert.equal(view.alsoListedText(given), "Also listed by Morpho Blue, which prices WETH per market");
+  assert.equal(given[0].reason, "which prices WETH per market");
 });
 
 test("also listed: nobody to list is no entry and no words", () => {
   const out = view.alsoListed(listedChips.slice(0, 3), 1, "liquity", listedNamed(), pageOf);
   assert.deepEqual(out, []);
-  assert.equal(view.alsoListedText(out), "");
+});
+
+// ── One table: the three groups ───────────────────────────────────────────
+
+const tableFor = (v, id, now, pageName, chips = listedChips) => {
+  const reads = view.alsoReads(v.line, id, pageOf);
+  const other = view.oracleRows(v.section.lines, v.line, now, pageOf);
+  const listed = view.alsoListed(chips, 1, id, { reads, rows: other }, pageOf);
+  return view.tableRows(view.sameRows(v.line, reads, pageName, now), other, view.listedRows(listed, now));
+};
+const liquityNow = () =>
+  sameBlock({
+    [ids["0x5424"]]: 1697.1,
+    [ids["0x5f4e"]]: 1697.0,
+    [ids["0x81fe"]]: 1702.4,
+    [ids["0xc005"]]: 1696.85,
+    [ids["0x2750"]]: 1697.05,
+    [ids["0xa150"]]: null,
+  });
+
+test("the table: same-oracle readers, then the other lines, then the listed-only protocols", () => {
+  const rows = tableFor(liquity, "liquity", liquityNow(), "Liquity V2");
+  const groups = rows.map((r) => r.group);
+  assert.deepEqual(groups, ["same", "other", "other", "other", "other", "other", "listed", "listed"]);
+  assert.deepEqual([...new Set(groups)], ["same", "other", "listed"], "each group is one run, in this order");
+  assert.equal(new Set(rows.map((r) => r.id)).size, rows.length, "a row id is unique");
+});
+
+test("a same-oracle row: the page protocol's name, its route, the page line's price, its since-date inside", () => {
+  const now = liquityNow();
+  const [row] = tableFor(liquity, "liquity", now, "Liquity V2");
+  assert.deepEqual(
+    row.usedBy.map((p) => p.name),
+    ["Moonwell"],
+  );
+  assert.equal(row.usedBy[0].href, `/ethereum/moonwell/assets/${WETH}`);
+  assert.equal(row.name, "Same oracle as Liquity V2");
+  assert.deepEqual(row.via, { words: "its OEV wrapper", address: "0xa0f82711a8b228455a2dfe0656763a60833b5e25" });
+  assert.equal(row.address, liquity.line.oracle.address);
+  assert.equal(row.price.text, "$1,697.00");
+  assert.equal(row.gap.text, "0.00%");
+  assert.equal(row.lineId, liquity.line.id);
+  assert.deepEqual(view.marketWords(row.markets[0]), { before: "Moonwell, since 31 May 2026", after: "" });
+});
+
+test('Morpho\'s page has no line of its own: its readers read "The price charted above"', () => {
+  const rows = tableFor(morpho, "morpho", sameBlock({}), null, []);
+  const same = rows.filter((r) => r.group === "same");
+  assert.deepEqual(
+    same.map((r) => [r.usedBy[0].name, r.name]),
+    [
+      ["Aave V3", "The price charted above"],
+      ["Aave V4", "The price charted above"],
+    ],
+  );
+  assert.equal(same[0].via, null);
+  assert.deepEqual(view.marketWords(same[0].markets[0]), { before: "Aave V3, since 27 Jan 2023", after: "" });
+});
+
+test("a listed-only row: no stored price, no contract, no price, no markets", () => {
+  const rows = tableFor(liquity, "liquity", liquityNow(), "Liquity V2");
+  const listed = rows.filter((r) => r.group === "listed");
+  assert.deepEqual(
+    listed.map((r) => [r.usedBy[0].name, r.name, r.address, r.price.text, r.gap.text, r.markets.length]),
+    [
+      ["Morpho Blue", "No stored price", null, "–", "–", 0],
+      ["Pendle", "No stored price", null, "–", "–", 0],
+    ],
+  );
+  assert.equal(listed[0].usedBy[0].href, null, "pageOf names no page for Morpho Blue here");
+});
+
+test("stub mode: the same-oracle and listed rows show the price only", () => {
+  const stub = { ...liquityNow(), sameBlock: false, block: null, timestamp: null };
+  const rows = tableFor(liquity, "liquity", stub, "Liquity V2");
+  assert.ok(
+    rows.every((r) => r.gap === null),
+    "no Gap column",
+  );
+  assert.equal(rows[0].price.text, "$1,697.00");
+  assert.ok(rows.every((r) => !("stamp" in r.price)));
+  assert.equal(view.asOfText(stub), null);
 });

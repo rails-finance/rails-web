@@ -1,12 +1,14 @@
 // The words of a protocol's asset page (Miles, 24 Nov 2026; ui-jobs 818;
-// anatomy A1.9, A2): the source naming the oracle the page charts, "Also reads this oracle" (the other protocols on that line),
-// the table of the other oracles with each one's price now and gap, and the
-// as-of line. The page's line is the one its protocol reads (`via`), else the
-// line most protocols read. Prices come from the price-now answer
-// (lib/shared/asset-prices-now.ts): on a same-block read a gap is the line's
-// price against the page line's at that block; where the lines stand at
-// different blocks (the stored stub) the table draws each price with its
-// stamp and no gap. A failed or missing read is "–" with its reason. Pure.
+// anatomy A1.9, A2): the source naming the oracle the page charts, and one
+// table, "How other protocols price <SYMBOL>": the protocols on the page's own
+// line, the other oracle lines, and the protocols that list the token with no
+// stored line, each row with its price now and, on a same-block read, its gap.
+// The as-of line closes a same-block read. The page's line is the one its
+// protocol reads (`via`), else the line most protocols read. Prices come from
+// the price-now answer (lib/shared/asset-prices-now.ts): on a same-block read
+// a gap is the line's price against the page line's at that block; where the
+// lines stand at different blocks (the stored stub) the table shows the price
+// only. A failed or missing read is "–" with its reason. Pure.
 
 import { formatDate } from "../date";
 import { delayedLine, protocolFamily, shortAddress, type PageLine, type PageSeries } from "./asset-roster";
@@ -125,13 +127,6 @@ export function alsoReads(
   });
 }
 
-/** "via its OEV wrapper", ", since 31 May 2026" around the route's address. */
-export function alsoReadsWords(e: AlsoReadsEntry): { before: string; after: string } {
-  const since = e.since != null ? `since ${formatDate(new Date(e.since * DAY_MS))}` : "";
-  if (!e.route) return { before: since, after: "" };
-  return { before: `via ${e.route.words}`, after: since ? `, ${since}` : "" };
-}
-
 /** A protocol listing the token on the chain that reads no stored oracle line for it. */
 export interface AlsoListedEntry {
   name: string;
@@ -143,8 +138,8 @@ export interface AlsoListedEntry {
 }
 
 /** The explorers listing the token on the chain (the card line's chips) that
- *  the page names nowhere else: not the page's protocol, not "Also reads this
- *  oracle", not the table's Used by. A vault family no explorer deploys (a chip
+ *  the table names nowhere else: not the page's protocol, not the same-oracle
+ *  rows, not the other rows' Used by. A vault family no explorer deploys (a chip
  *  with a token) is no protocol and is left out. `reasonOf` is the data's
  *  statement of why an explorer reads no line, null where it has none. */
 export function alsoListed(
@@ -168,18 +163,6 @@ export function alsoListed(
     out.push({ name: c.label, explorer: c.explorer, href: pageOf(c.explorer), reason: reasonOf(c.explorer) });
   }
   return out;
-}
-
-/** "A", "A and B", "A, B and C". */
-export const andNames = (xs: readonly string[]): string =>
-  xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
-
-/** The line's words as plain text: "Also listed by Morpho Blue", and a reason after its name. */
-export function alsoListedText(entries: readonly AlsoListedEntry[]): string {
-  if (entries.length === 0) return "";
-  const last = entries.length - 1;
-  const words = entries.map((e) => (e.reason ? `${e.name}, ${e.reason}` : e.name));
-  return `Also listed by ${words.map((w, i) => (i === 0 ? w : `${i === last ? " and " : ", "}${w}`)).join("")}`;
 }
 
 // ── Prices ───────────────────────────────────────────────────────────────────
@@ -217,30 +200,18 @@ export function headTime(p: LinePriceNow | undefined, nowMs: number): string | n
   return `updated ${priceTime(p, nowMs)}`;
 }
 
-/** A price's stamp, where the prices stand at different blocks: "07:12 UTC · block 23,860,201". */
-export function priceStamp(p: LinePriceNow, nowMs: number): string | null {
-  const t = priceTime(p, nowMs);
-  if (!p.ok || t == null || p.block == null) return null;
-  return `${t} · block ${p.block.toLocaleString("en-US")}`;
-}
-
 /** The as-of line under the table: "As of 24 Nov 2026, 07:12 UTC · block
- *  26,483,745" on a same-block read; where each price has its block,
- *  the sentence that says so. */
-export function asOfText(now: AssetPricesNow): string {
-  if (now.sameBlock && now.block != null && now.timestamp != null) {
-    const d = new Date(now.timestamp * 1000);
-    return `As of ${formatDate(d)}, ${hhmm(d)} · block ${now.block.toLocaleString("en-US")}`;
-  }
-  return "Each price is its oracle's latest stored value, at the time and block under it";
+ *  26,483,745" on a same-block read; null where each price stands at its own
+ *  block (the stub), which draws no line. */
+export function asOfText(now: AssetPricesNow): string | null {
+  if (!now.sameBlock || now.block == null || now.timestamp == null) return null;
+  const d = new Date(now.timestamp * 1000);
+  return `As of ${formatDate(d)}, ${hhmm(d)} · block ${now.block.toLocaleString("en-US")}`;
 }
 
 /** What the (i) beside the as-of line says. */
-export function asOfNote(now: AssetPricesNow): string {
-  if (now.sameBlock)
-    return "Every price on this page, the headline's included, is read from its oracle at this one block, so each gap compares two prices of the same moment. The chart is the stored history of the headline's oracle.";
-  return "Rails reads these from its stored oracle rounds, or for an oracle without them its daily store, so each price stands at its block. A gap needs both prices at one block, so the table shows none.";
-}
+export const AS_OF_NOTE =
+  "Every price on this page, the headline's included, is read from its oracle at this one block, so each gap compares two prices of the same moment. The chart is the stored history of the headline's oracle.";
 
 // ── The table ────────────────────────────────────────────────────────────────
 
@@ -250,8 +221,6 @@ export interface PriceCell {
   value: number | null;
   reason: string | null;
   stale: boolean;
-  /** The price's time and block, where the prices stand at different blocks. */
-  stamp: string | null;
 }
 
 /** A market-level line in a row's expansion. */
@@ -264,8 +233,17 @@ export interface MarketLine {
   since: number | null;
 }
 
+/** Which of the table's three groups a row belongs to. */
+export type RowGroup = "same" | "other" | "listed";
+
 export interface OracleRow {
+  /** The line's id on an "other" row; "same:<protocol>" or "listed:<explorer>" on the others. */
   id: string;
+  group: RowGroup;
+  /** The line the price is read from: the page's line on a "same" row, null on a "listed" one. */
+  lineId: string | null;
+  /** The route a "same" row's protocol reads the line through, drawn under its oracle. */
+  via: { words: string; address: string } | null;
   usedBy: PageProtocol[];
   /** Every market on the line is one its protocol has retired. */
   retired: boolean;
@@ -275,7 +253,8 @@ export interface OracleRow {
   full: string | null;
   /** The label's kind, capitalised for the cell; null where none is stored. */
   kind: string | null;
-  address: string;
+  /** Null on a "listed" row, which reads no line. */
+  address: string | null;
   price: PriceCell;
   /** Null where the table draws no gap (the prices stand at different blocks). */
   gap: { text: string; value: number | null; reason: string | null } | null;
@@ -284,19 +263,13 @@ export interface OracleRow {
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export function priceCell(p: LinePriceNow | undefined, sameBlock: boolean, nowMs: number): PriceCell {
+export function priceCell(p: LinePriceNow | undefined): PriceCell {
   if (!p || !p.ok || p.price == null)
-    return { text: "–", value: null, reason: p?.reason ?? "The price was not read", stale: false, stamp: null };
-  return {
-    text: fmtPriceNow(p.price),
-    value: p.price,
-    reason: null,
-    stale: p.stale === true,
-    stamp: sameBlock ? null : priceStamp(p, nowMs),
-  };
+    return { text: "–", value: null, reason: p?.reason ?? "The price was not read", stale: false };
+  return { text: fmtPriceNow(p.price), value: p.price, reason: null, stale: p.stale === true };
 }
 
-/** The table's rows: every line on the chain but the page's, in the chart's
+/** The table's "other" rows: every line on the chain but the page's, in the chart's
  *  order. A protocol is named by family ("Aave V3"), or by market where its
  *  markets read more than one of the chain's lines ("Aave V3 EtherFi"). */
 export function oracleRows(
@@ -304,7 +277,6 @@ export function oracleRows(
   pageLine: PageLine,
   now: AssetPricesNow,
   pageOf: (explorer: string) => string | null,
-  nowMs: number,
 ): OracleRow[] {
   const linesOf = new Map<string, number>();
   for (const l of lines)
@@ -325,11 +297,14 @@ export function oracleRows(
         usedBy.push({ name, explorer, href: explorer ? pageOf(explorer) : null });
       }
       const p = now.prices[l.id];
-      const price = priceCell(p, now.sameBlock, nowMs);
+      const price = priceCell(p);
       const symbols = new Set(l.series.map((s) => s.token.symbol));
       const short = l.oracle.label?.short;
       return {
         id: l.id,
+        group: "other" as const,
+        lineId: l.id,
+        via: null,
         usedBy,
         retired,
         name: short ?? l.oracle.name,
@@ -348,6 +323,62 @@ export function oracleRows(
       };
     });
 }
+
+/** The table's "same" rows: each protocol on the page line's own oracle, priced
+ *  as the page's line is. `pageName` is the page's protocol ("Aave V3"), null
+ *  where it has no line of its own (Morpho's page), and the row then names the
+ *  line the chart draws. */
+export function sameRows(
+  pageLine: Pick<PageLine, "id" | "oracle">,
+  reads: readonly AlsoReadsEntry[],
+  pageName: string | null,
+  now: AssetPricesNow,
+): OracleRow[] {
+  const price = priceCell(now.prices[pageLine.id]);
+  const gap = now.sameBlock ? gapCell(price, now.prices[pageLine.id]) : null;
+  return reads.map((e) => ({
+    id: `same:${e.protocol.name}`,
+    group: "same" as const,
+    lineId: pageLine.id,
+    via: e.route,
+    usedBy: [e.protocol],
+    retired: false,
+    name: pageName ? `Same oracle as ${pageName}` : "The price charted above",
+    full: null,
+    kind: null,
+    address: pageLine.oracle.address,
+    price,
+    gap,
+    markets: [{ protocol: e.protocol.name, prices: null, via: null, retired: false, since: e.since }],
+  }));
+}
+
+/** The table's "listed" rows: a protocol that lists the token and stores no
+ *  line for it, with no price. A stated reason, where the data has one, sits under "No stored price". */
+export function listedRows(entries: readonly AlsoListedEntry[], now: AssetPricesNow): OracleRow[] {
+  return entries.map((e) => ({
+    id: `listed:${e.explorer}`,
+    group: "listed" as const,
+    lineId: null,
+    via: null,
+    usedBy: [{ name: e.name, explorer: e.explorer, href: e.href }],
+    retired: false,
+    name: "No stored price",
+    full: null,
+    kind: e.reason,
+    address: null,
+    price: { text: "–", value: null, reason: null, stale: false },
+    gap: now.sameBlock ? { text: "–", value: null, reason: null } : null,
+    markets: [],
+  }));
+}
+
+/** The table in its order: the page line's readers, the other lines, the listed-only protocols. */
+export const tableRows = (same: OracleRow[], other: OracleRow[], listed: OracleRow[]): OracleRow[] => [
+  ...same,
+  ...other,
+  ...listed,
+];
 
 /** The line's price against the page line's, in percent. */
 function gapCell(price: PriceCell, ref: LinePriceNow | undefined): NonNullable<OracleRow["gap"]> {

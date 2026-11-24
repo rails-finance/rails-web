@@ -89,16 +89,14 @@ try {
       back: document.querySelector("[data-asset-back]")?.getAttribute("data-asset-back") ?? "",
       sourceAfterChart: !!document.querySelector("[data-asset-chart] ~ [data-asset-source-row] [data-asset-source]"),
       source: document.querySelector("[data-asset-source]")?.getAttribute("data-asset-source") ?? "",
-      also: [...document.querySelectorAll("[data-asset-also-reads] [data-asset-also-reader]")].map((li) =>
-        li.textContent.trim(),
-      ),
+      heading: document.querySelector("[data-asset-oracles] h2")?.textContent.trim() ?? "",
       rows: [...document.querySelectorAll("[data-asset-oracles] [data-asset-oracle]")].map((li) => ({
         id: li.dataset.assetOracle,
+        group: li.dataset.assetOracleGroup,
+        text: li.textContent.trim(),
         links: [...li.querySelectorAll("a[data-asset-oracle-link]")].map((a) => a.getAttribute("href")),
       })),
       asOf: document.querySelector("[data-asset-as-of]")?.textContent.trim() ?? "",
-      listed: document.querySelector("[data-asset-also-listed]")?.textContent.trim() ?? "",
-      listedAfterTable: !!document.querySelector("[data-asset-oracles] ~ [data-asset-also-listed]"),
     }));
     check(words.title === "WETH", "L2 the title", words.title);
     check(words.back === "/ethereum/liquity-v2/assets", "L2 Back falls back to Liquity V2's Assets list", words.back);
@@ -108,12 +106,24 @@ try {
       "L2 the source line ends on Liquity V2's WETH PriceFeed",
       words.source,
     );
+    check(words.heading === "How other protocols price WETH", "L2 the table's heading", words.heading);
+    const same = words.rows.filter((r) => r.group === "same");
     check(
-      words.also.length === 1 && words.also[0].startsWith("Moonwell"),
-      "L2 Moonwell alone also reads the oracle",
-      words.also.join(" | "),
+      same.length === 1 && same[0].text.startsWith("Moonwell") && same[0].text.includes("Same oracle as Liquity V2"),
+      "L2 Moonwell alone is on Liquity V2's oracle, in the table",
+      same.map((r) => r.text).join(" | "),
     );
-    check(words.rows.length >= 4, "L2 a row per other oracle", `${words.rows.length}`);
+    const order = words.rows.map((r) => r.group).join(" ");
+    check(/^(same )*(other )+(listed ?)*$/.test(`${order} `), "L2 the groups run same, other, listed", order);
+    check(
+      words.rows.filter((r) => r.group === "other").length >= 4,
+      "L2 a row per other oracle",
+      `${words.rows.length}`,
+    );
+    check(
+      words.rows.filter((r) => r.group === "listed").every((r) => r.text.includes("No stored price")),
+      "L2 a listed-only row reads No stored price",
+    );
     check(
       !words.rows.some((r) => r.id === "1:0x5f4ec3df9cbd43714fe2740f5e3616155c5b8419"),
       "L2 Liquity V2's line is not a row",
@@ -125,11 +135,10 @@ try {
       links.join(" "),
     );
     check(
-      words.listed === "" || (words.listedAfterTable && words.listed.startsWith("Also listed by ")),
-      "L2 Also listed by, where drawn, sits under the table",
-      words.listed,
+      words.asOf === "" || /^As of /.test(words.asOf),
+      "L2 the as-of line, where drawn, states one block (the stub draws none)",
+      words.asOf,
     );
-    check(words.asOf.length > 0, "L2 the as-of line", words.asOf);
     await layoutCheck(page, "WETH under Liquity V2 1440 light", errors);
     await ctx.close();
   }

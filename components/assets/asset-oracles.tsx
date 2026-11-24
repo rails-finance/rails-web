@@ -1,14 +1,13 @@
-// Under a protocol's asset chart (Miles's mockup of 24 Nov 2026; ui-jobs 818;
-// anatomy A2.3 to A2.7): "Also reads this oracle", the other protocols on the
-// page's line (`alsoReads`); "Other oracles for <symbol>", one row per other
-// line with its readers, oracle, contract, price now and gap against the
-// page's price (`oracleRows`), each row opening its markets; and the as-of
-// line (`asOfText`); under the table, "Also listed by" (`alsoListed`), the
-// protocols that list the token and read no stored line for it. Prices and
-// gaps carry their receipts. Where the prices stand at different blocks (the
-// stored stub) a price carries its stamp, the Gap column is held back with a
-// line saying why, and the as-of line says each price has its block. Below sm
-// each row is a card.
+// Under a protocol's asset chart (Miles's mockup and ruling of 24 Nov 2026,
+// "one table"; ui-jobs 818; anatomy A2.4 to A2.6): "How other protocols price
+// <symbol>", one table in three groups with no sub-headings. First the
+// protocols on the page's own oracle line ("Same oracle as <page protocol>"),
+// then one row per other line, then the protocols that list the token and
+// store no line for it ("No stored price"). Each row has Used by, Oracle,
+// Contract and Price now, and on a same-block read a Gap; a row opens its
+// markets, a listed-only row does not. Prices and gaps carry their receipts.
+// Where the prices stand at different blocks (the stored stub) the table shows
+// the price only and draws no as-of line. Below sm each row is a card.
 
 import Link from "next/link";
 import { ChevronRight, Info } from "lucide-react";
@@ -16,14 +15,11 @@ import { Prov } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { shortAddress, type PageLine } from "@/lib/shared/asset-roster";
 import {
-  alsoReadsWords,
-  type AlsoListedEntry,
-  asOfNote,
+  AS_OF_NOTE,
   asOfText,
   gapProv,
   marketWords,
   priceProv,
-  type AlsoReadsEntry,
   type OracleRow,
   type PageProtocol,
   type PriceCell,
@@ -70,36 +66,6 @@ function Dash({ reason }: { reason: string | null }) {
   );
 }
 
-/** "Also reads this oracle" (A2.3): each protocol, its route and its first stored day. */
-export function AlsoReads({ entries, chain }: { entries: AlsoReadsEntry[]; chain: number }) {
-  if (entries.length === 0) return null;
-  return (
-    <section className="mt-8" data-asset-also-reads="" data-anatomy="A2.3">
-      <h2 className={`mb-2 ${SECTION_HEAD}`}>Also reads this oracle</h2>
-      <ul className="space-y-1 text-sm sm:text-base">
-        {entries.map((e) => {
-          const w = alsoReadsWords(e);
-          return (
-            <li key={e.protocol.name} className="flex flex-wrap items-baseline gap-x-4" data-asset-also-reader="">
-              <ProtocolName p={e.protocol} className="font-semibold text-foreground" />
-              <span className="text-rb-500">
-                {w.before}
-                {e.route && (
-                  <>
-                    {" "}
-                    <Address chain={chain} address={e.route.address} />
-                  </>
-                )}
-                {w.after}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
 function PriceFigure({
   cell,
   line,
@@ -114,31 +80,24 @@ function PriceFigure({
   const p = now.prices[line.id];
   if (cell.value == null || !p) return <Dash reason={cell.reason} />;
   return (
-    <span className="inline-flex flex-col items-end">
-      <span className="inline-flex items-center gap-1.5">
-        {cell.stale && (
-          <span
-            className="rounded border border-[var(--caution)] px-1 text-[11px] leading-4 text-[var(--caution)]"
-            title="The oracle's last update is older than its heartbeat"
-            data-asset-stale=""
-          >
-            stale
-          </span>
-        )}
-        <Prov info={priceProv(line, p, symbol)} value={String(cell.value)} symbol={symbol}>
-          <span className="text-foreground">{cell.text}</span>
-        </Prov>
-      </span>
-      {cell.stamp && (
-        <span className="text-[11px] text-rb-500" data-asset-price-stamp={p.block ?? ""}>
-          {cell.stamp}
+    <span className="inline-flex items-center gap-1.5">
+      {cell.stale && (
+        <span
+          className="rounded border border-[var(--caution)] px-1 text-[11px] leading-4 text-[var(--caution)]"
+          title="The oracle's last update is older than its heartbeat"
+          data-asset-stale=""
+        >
+          stale
         </span>
       )}
+      <Prov info={priceProv(line, p, symbol)} value={String(cell.value)} symbol={symbol}>
+        <span className="text-foreground">{cell.text}</span>
+      </Prov>
     </span>
   );
 }
 
-/** "Other oracles for WETH" (A2.4): a row per other line (A2.5). */
+/** "How other protocols price WETH" (A2.4): a row per protocol group entry (A2.5). */
 export function OracleTable({
   rows,
   lines,
@@ -162,20 +121,16 @@ export function OracleTable({
   const gaps = now.sameBlock;
   const cols = gaps
     ? "sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_7rem_7.5rem_4.5rem]"
-    : "sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_7rem_11rem]";
+    : "sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_7rem_7.5rem]";
   const lineOf = (id: string) => lines.find((l) => l.id === id)!;
   const refPrice = now.prices[pageLine]?.price ?? null;
   return (
     <section className="mt-8" data-asset-oracles="" data-asset-gaps={gaps ? "on" : "off"} data-anatomy="A2.4">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className={SECTION_HEAD}>Other oracles for {symbol}</h2>
-        {gaps ? (
+        <h2 className={SECTION_HEAD}>How other protocols price {symbol}</h2>
+        {gaps && (
           <p className="text-sm text-rb-500" data-asset-gap-caption="">
             Gap is against {refName}
-          </p>
-        ) : (
-          <p className="text-sm text-rb-500" data-asset-gap-held="">
-            Gaps show once every price is read at one block.
           </p>
         )}
       </div>
@@ -191,80 +146,100 @@ export function OracleTable({
       </div>
       <ul className="divide-y divide-rb-200 dark:divide-rb-700">
         {rows.map((r) => {
-          const line = lineOf(r.id);
-          return (
-            <li key={r.id} data-asset-oracle={r.id} data-anatomy="A2.5">
-              <details className="group">
-                <summary
-                  className={`grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3 sm:items-center [&::-webkit-details-marker]:hidden ${cols}`}
+          const line = r.lineId ? lineOf(r.lineId) : null;
+          const listed = r.group === "listed";
+          const summaryClass = `grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3 sm:items-center ${cols}`;
+          const cells = (
+            <>
+              <span className="col-span-2 font-semibold text-foreground sm:col-span-1" data-asset-used-by="">
+                {!listed && (
+                  <ChevronRight
+                    className="mr-1 inline h-3.5 w-3.5 align-[-2px] text-rb-500 transition-transform group-open:rotate-90"
+                    aria-hidden="true"
+                  />
+                )}
+                {r.usedBy.map((p, i) => (
+                  <span key={p.name}>
+                    {i > 0 && ", "}
+                    <ProtocolName p={p} />
+                  </span>
+                ))}
+                {r.retired && <span className="font-normal text-rb-500"> (retired)</span>}
+              </span>
+              <span className="col-span-2 min-w-0 sm:col-span-1" title={r.full ?? undefined}>
+                <span className={`block ${listed ? "text-rb-500" : "text-foreground"}`} data-asset-oracle-name="">
+                  {r.name}
+                </span>
+                {r.via ? (
+                  <span className="block text-sm text-rb-500" data-asset-oracle-kind="">
+                    via {r.via.words} <Address chain={chain} address={r.via.address} />
+                  </span>
+                ) : (
+                  r.kind && (
+                    <span className="block text-sm text-rb-500" data-asset-oracle-kind="">
+                      {r.kind}
+                    </span>
+                  )
+                )}
+              </span>
+              <span className="text-sm">
+                {r.address ? <Address chain={chain} address={r.address} /> : <span className="text-rb-500">–</span>}
+              </span>
+              <span className="text-right tabular-nums" data-asset-price-now={r.price.value ?? ""}>
+                {line ? (
+                  <PriceFigure cell={r.price} line={line} symbol={symbol} now={now} />
+                ) : (
+                  <span className="text-rb-500">–</span>
+                )}
+              </span>
+              {r.gap && (
+                <span
+                  className="col-span-2 text-right tabular-nums text-rb-500 sm:col-span-1"
+                  data-asset-gap={r.gap.value ?? ""}
                 >
-                  <span className="col-span-2 font-semibold text-foreground sm:col-span-1" data-asset-used-by="">
-                    <ChevronRight
-                      className="mr-1 inline h-3.5 w-3.5 align-[-2px] text-rb-500 transition-transform group-open:rotate-90"
-                      aria-hidden="true"
-                    />
-                    {r.usedBy.map((p, i) => (
-                      <span key={p.name}>
-                        {i > 0 && ", "}
-                        <ProtocolName p={p} />
-                      </span>
-                    ))}
-                    {r.retired && <span className="font-normal text-rb-500"> (retired)</span>}
-                  </span>
-                  <span className="col-span-2 min-w-0 sm:col-span-1" title={r.full ?? undefined}>
-                    <span className="block text-foreground" data-asset-oracle-name="">
-                      {r.name}
-                    </span>
-                    {r.kind && (
-                      <span className="block text-sm text-rb-500" data-asset-oracle-kind="">
-                        {r.kind}
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-sm">
-                    <Address chain={chain} address={r.address} />
-                  </span>
-                  <span className="text-right tabular-nums" data-asset-price-now={r.price.value ?? ""}>
-                    <PriceFigure cell={r.price} line={line} symbol={symbol} now={now} />
-                  </span>
-                  {r.gap && (
-                    <span
-                      className="col-span-2 text-right tabular-nums text-rb-500 sm:col-span-1"
-                      data-asset-gap={r.gap.value ?? ""}
-                    >
-                      <span className="mr-2 text-xs sm:hidden">Gap</span>
-                      {r.gap.value != null && r.price.value != null && refPrice != null ? (
-                        <Prov
-                          info={gapProv(r, r.price.value, refPrice, refName, now.block)}
-                          value={String(r.gap.value)}
-                        >
-                          <span className="text-foreground">{r.gap.text}</span>
-                        </Prov>
-                      ) : (
-                        <Dash reason={r.gap.reason} />
-                      )}
-                    </span>
+                  <span className="mr-2 text-xs sm:hidden">Gap</span>
+                  {listed ? (
+                    "–"
+                  ) : r.gap.value != null && r.price.value != null && refPrice != null ? (
+                    <Prov info={gapProv(r, r.price.value, refPrice, refName, now.block)} value={String(r.gap.value)}>
+                      <span className="text-foreground">{r.gap.text}</span>
+                    </Prov>
+                  ) : (
+                    <Dash reason={r.gap.reason} />
                   )}
-                </summary>
-                <ul className="mb-3 space-y-0.5 text-sm text-rb-500" data-asset-oracle-markets="">
-                  {r.full && <li className="text-foreground">{r.full}</li>}
-                  {r.markets.map((m) => {
-                    const w = marketWords(m);
-                    return (
-                      <li key={`${m.protocol}${m.via?.address ?? ""}`}>
-                        {w.before}
-                        {m.via && (
-                          <>
-                            {" "}
-                            <Address chain={chain} address={m.via.address} />
-                          </>
-                        )}
-                        {w.after}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </details>
+                </span>
+              )}
+            </>
+          );
+          return (
+            <li key={r.id} data-asset-oracle={r.id} data-asset-oracle-group={r.group} data-anatomy="A2.5">
+              {listed ? (
+                <div className={summaryClass}>{cells}</div>
+              ) : (
+                <details className="group">
+                  <summary className={`cursor-pointer list-none [&::-webkit-details-marker]:hidden ${summaryClass}`}>
+                    {cells}
+                  </summary>
+                  <ul className="mb-3 space-y-0.5 text-sm text-rb-500" data-asset-oracle-markets="">
+                    {r.full && <li className="text-foreground">{r.full}</li>}
+                    {r.markets.map((m) => {
+                      const w = marketWords(m);
+                      return (
+                        <li key={`${m.protocol}${m.via?.address ?? ""}`}>
+                          {w.before}
+                          {m.via && (
+                            <>
+                              {" "}
+                              <Address chain={chain} address={m.via.address} />
+                            </>
+                          )}
+                          {w.after}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </details>
+              )}
             </li>
           );
         })}
@@ -273,41 +248,18 @@ export function OracleTable({
   );
 }
 
-/** "Also listed by Morpho Blue" (A2.7): under the table, the protocols that list the
- *  token on the chain and read no stored line for it, each linking its page for the token. */
-export function AlsoListed({ entries }: { entries: AlsoListedEntry[] }) {
-  if (entries.length === 0) return null;
-  return (
-    <p className="mt-3 text-sm text-rb-500" data-asset-also-listed="" data-anatomy="A2.7">
-      Also listed by{" "}
-      {entries.map((e, i) => (
-        <span key={e.explorer} data-asset-also-listed-by={e.explorer}>
-          {i > 0 && (i === entries.length - 1 ? " and " : ", ")}
-          {e.href ? (
-            <Link href={e.href} className={INLINE_LINK}>
-              {e.name}
-            </Link>
-          ) : (
-            e.name
-          )}
-          {e.reason && `, ${e.reason}`}
-        </span>
-      ))}
-    </p>
-  );
-}
-
-/** The as-of line (A2.6), with its explanation behind the (i). */
+/** The as-of line (A2.6), with its explanation behind the (i). Drawn on a same-block read only. */
 export function AsOfLine({ now }: { now: AssetPricesNow }) {
-  const note = asOfNote(now);
+  const text = asOfText(now);
+  if (text == null) return null;
   return (
     <p
       className="mt-8 flex items-center gap-2 border-t border-rb-200 pt-4 text-sm text-rb-500 dark:border-rb-700"
-      data-asset-as-of={now.sameBlock ? (now.block ?? "") : "each"}
+      data-asset-as-of={now.block ?? ""}
       data-anatomy="A2.6"
     >
-      {asOfText(now)}
-      <RevealTip tip={note} label={`About the prices: ${note}`} focusable wrap>
+      {text}
+      <RevealTip tip={AS_OF_NOTE} label={`About the prices: ${AS_OF_NOTE}`} focusable wrap>
         <Info className="h-4 w-4" aria-hidden="true" />
       </RevealTip>
     </p>
