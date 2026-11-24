@@ -496,11 +496,17 @@ if (wants("Liquity V2")) {
     }));
     // The Protocol pill is drawn only for a wallet holding more than one
     // protocol (wallet-filter-bar.tsx, `held.length > 1`). Where none is drawn,
-    // the wallet's counts must name one protocol.
+    // the wallet's counts must name one protocol, keyed by family with no chain
+    // as heldOf keys `held` (read-wallet.ts). The summary leaves out the
+    // families read at visit, which `held` adds; this fixture holds none.
     let protocolsHeld = null;
+    let summaryError = null;
     if (walletView.pill == null) {
-      const counts = await api(`/api/chain/wallet/${holder}/summary`).catch(() => null);
-      protocolsHeld = counts ? new Set(counts.positions.map((p) => `${p.chain}:${p.family}`)).size : null;
+      const counts = await api(`/api/chain/wallet/${holder}/summary`).catch((e) => {
+        summaryError = e?.message ?? String(e);
+        return null;
+      });
+      protocolsHeld = counts ? new Set(counts.positions.map((p) => p.family)).size : null;
     }
     check(
       label(
@@ -510,7 +516,7 @@ if (wants("Liquity V2")) {
         walletView.protocol === "liquity-v2" &&
         (walletView.pill === "set" || (walletView.pill == null && protocolsHeld === 1)) &&
         searchChips.statusChip == null,
-      `${JSON.stringify(walletView)}${protocolsHeld != null ? `; protocols held ${protocolsHeld}` : ""}; ${describeChips(searchChips)}`,
+      `${JSON.stringify(walletView)}${protocolsHeld != null ? `; protocols held ${protocolsHeld}` : ""}${summaryError ? `; summary unread: ${summaryError}` : ""}; ${describeChips(searchChips)}`,
     );
     // An open card on the wallet page draws no lifecycle word (94b544d15), so a
     // row with none reads as open.
