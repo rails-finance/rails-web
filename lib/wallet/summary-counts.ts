@@ -139,7 +139,9 @@ export function walletProtocolMenu<P extends WalletCountsPosition>(
   const groups = new Map<string, { protocol: MenuProtocol | undefined; positions: P[] }>();
   for (const p of positions) {
     const key = `${p.chain}:${p.family}`;
-    const g = groups.get(key) ?? { protocol: protocolOf(p), positions: [] };
+    const g = groups.get(key) ?? { protocol: undefined, positions: [] };
+    // The group takes its name from any row that resolves.
+    g.protocol ??= protocolOf(p);
     g.positions.push(p);
     groups.set(key, g);
   }

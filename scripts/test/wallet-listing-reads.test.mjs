@@ -274,6 +274,50 @@ test("counts: a row with a null href counts and passes through without throwing"
   assert.deepEqual(noPage.map((p) => p.chain).sort(), ["arc", "ethereum", "ethereum"]);
 });
 
+test("summary: Sepolia rows leave the rows and the totals together", async () => {
+  v2sp = "ok";
+  const s = await readSummary(W2, signal());
+  assert.equal(
+    s.rows.some((r) => r.chain === "sepolia"),
+    false,
+  );
+  assert.equal(s.total, s.rows.length);
+  assert.equal(s.open, s.rows.filter((r) => r.status === "open").length);
+  assert.equal(s.closed, 0);
+});
+
+test("menu: a null-href row resolves its protocol by chain and family, through the real roster", async () => {
+  const { protocolEntryOf, menuProtocolOf } = await import("../../lib/wallet/position-protocol.ts");
+  const { walletProtocolMenu } = await import("../../lib/wallet/summary-counts.ts");
+  const withPage = {
+    chain: "ethereum",
+    family: "aave-v3",
+    positionId: "1",
+    status: "open",
+    href: "/ethereum/aave-v3/1",
+  };
+  const noPage = { ...withPage, positionId: "2", href: null };
+  const entry = protocolEntryOf(withPage);
+  assert.ok(entry);
+  assert.equal(protocolEntryOf(noPage), entry);
+  const m = walletProtocolMenu(
+    [noPage, withPage],
+    () => false,
+    (p) => menuProtocolOf(p, W),
+    `/wallet/${W}`,
+  );
+  assert.equal(m.rows.length, 1);
+  assert.equal(m.rows[0].name, entry.label);
+  const alone = walletProtocolMenu(
+    [noPage, { ...noPage, family: "liquity-v2", positionId: "3" }],
+    () => false,
+    (p) => menuProtocolOf(p, W),
+    `/wallet/${W}`,
+  );
+  assert.ok(alone.rows.every((r) => r.name !== r.first.family));
+  assert.equal(protocolEntryOf({ ...noPage, family: "no-such-family" }), undefined);
+});
+
 // The deposit modules' head reads, the pool reader stubbed.
 const { liquityV1DepositHead, liquityV2DepositHead } = await import("../../lib/wallet/families/liquity-listing.ts");
 

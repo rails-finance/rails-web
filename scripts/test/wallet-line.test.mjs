@@ -121,7 +121,7 @@ test("a position on no roster entry is named by its family", () => {
   assert.deepEqual([m.rows[0].name, m.rows[0].href], ["unknown", "/ethereum/unknown/1"]);
 });
 
-test("a position with a null href is no page, and its row links to the listing or the wallet view", () => {
+test("a position with a null href is no page; its row links to the listing or the wallet view", () => {
   assert.equal(rowIsPage(null, "/ethereum/aave-v3/1", ""), false);
   const noPage = (family, id) => ({ ...pos(family, "open", id), href: null });
   const alone = menu([noPage("liquity-v2", 1), pos("aave-v3", "open", 2)], "/ethereum/aave-v3/2");

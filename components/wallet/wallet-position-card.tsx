@@ -236,7 +236,8 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
           </Link>
         ) : (
           <div
-            className="group/listing-row block"
+            role="group"
+            className="block"
             data-anatomy="N2"
             aria-label={`${p.familyName} on ${chain}${p.market ? `, ${p.market}` : ""}`}
           >

@@ -254,12 +254,16 @@ export async function readSummary(address: string, signal: AbortSignal, readerIp
   }
   const extra = await listing;
   const open = extra.rows.filter((r) => r.status === "open").length;
+  // Testnet rows are not counted (WALLET_COUNTS_SCOPE): they leave the rows
+  // and the totals together.
+  const testnet = rows.filter((r) => r.chain === "sepolia");
+  const testnetOpen = testnet.filter((r) => r.status === "open").length;
   return {
     ...first!,
-    rows: [...rows, ...extra.rows],
-    total: first!.total + extra.rows.length,
-    open: first!.open + open,
-    closed: first!.closed + extra.rows.length - open,
+    rows: [...rows.filter((r) => r.chain !== "sepolia"), ...extra.rows],
+    total: first!.total - testnet.length + extra.rows.length,
+    open: first!.open - testnetOpen + open,
+    closed: first!.closed - (testnet.length - testnetOpen) + extra.rows.length - open,
     listingFailed: extra.failed,
   };
 }
@@ -485,8 +489,6 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
       }
     }
     for (const r of summary.rows) {
-      // Testnets are not counted (WALLET_COUNTS_SCOPE).
-      if (r.chain === "sepolia") continue;
       if (!taken.has(r))
         positions.push({
           chain: r.chain,
