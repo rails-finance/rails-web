@@ -137,7 +137,12 @@ export interface RouteNowLine {
   /** An integer string at `decimals`; null where the line was not read. */
   price: string | null;
   decimals?: number;
-  stale: boolean;
+  /** Present only where the freshness is known; a missing `stale` is unknown, never fresh. */
+  stale?: boolean;
+  /** The server's word on freshness; "unknown" where it cannot tell. */
+  freshness?: "fresh" | "stale" | "unknown";
+  /** An OSM line's hold, in seconds. */
+  hop?: number;
   ok: boolean;
   /** The literal "not read" where the oracle did not answer. */
   reason?: string;
@@ -176,7 +181,9 @@ export function routePricesNow(answer: RouteNowAnswer): AssetPricesNow {
     prices[l.lineId] = {
       ok,
       price: ok ? price : null,
-      ...(ok && l.stale ? { stale: true } : {}),
+      // Only a known stale marks the line; a missing `stale` or freshness
+      // "unknown" claims nothing.
+      ...(ok && (l.stale === true || l.freshness === "stale") ? { stale: true } : {}),
       ...(ok ? {} : { reason: !l.reason || l.reason === ROUTE_NOT_READ ? NOT_ANSWERED : l.reason }),
       block: answer.block,
       timestamp: answer.timestamp,

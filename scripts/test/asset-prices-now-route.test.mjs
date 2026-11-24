@@ -86,3 +86,20 @@ test("the client's choice by status: 200 route, 502 unread, anything else the st
   assert.equal(pricesNowSource(502), "unread");
   for (const s of [404, 400, 401, 500, 503, null]) assert.equal(pricesNowSource(s), "stub");
 });
+
+test("a missing stale is unknown, never fresh; freshness and hop are accepted", () => {
+  const { stale: _s, ...noStale } = line({ lineId: "1:0xcc" });
+  const a = routePricesNow(
+    answer([
+      noStale,
+      line({ lineId: "1:0xdd", stale: undefined, freshness: "unknown" }),
+      line({ lineId: "1:0xee", stale: undefined, freshness: "stale" }),
+      line({ lineId: "1:0xff", freshness: "fresh", hop: 3600 }),
+    ]),
+  );
+  assert.equal(a.prices["1:0xcc"].ok, true);
+  assert.equal(a.prices["1:0xcc"].stale, undefined, "no claim either way");
+  assert.equal(a.prices["1:0xdd"].stale, undefined);
+  assert.equal(a.prices["1:0xee"].stale, true);
+  assert.equal(a.prices["1:0xff"].stale, undefined);
+});

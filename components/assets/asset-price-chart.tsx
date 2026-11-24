@@ -106,7 +106,7 @@ export function AssetPriceChart({
           <ChartHead head={head} />
           <p className="py-6 text-center text-sm text-rb-500" data-asset-chart-state={failed ? "failed" : "loading"}>
             {!mainLine.drawn
-              ? "Rails stores no series for this oracle."
+              ? "Rails stores no prices for this oracle."
               : failed
                 ? "The daily prices were not read."
                 : "Reading the daily prices…"}

@@ -75,6 +75,8 @@ try {
     const ids = Object.keys(d);
     check(ids.length === 1, "L1 the chart draws one line", ids.join(" "));
     check(d[ids[0]].width === 2, "L1 the line is 2 px", `${d[ids[0]].width}`);
+    // The two L1 checks below look for hooks nothing emits now: they guard
+    // against the removed legend and the second chart coming back.
     const head = await page.evaluate(() => ({
       legend: document.querySelectorAll("[data-asset-lw-chart] [data-asset-lw-legend], [data-asset-lw-line]").length,
       price: document.querySelector("[data-asset-lw-chart] [data-asset-head-price]")?.textContent.trim() ?? "",

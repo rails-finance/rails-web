@@ -2,7 +2,7 @@
 // anatomy A1.9, A2): the source naming the oracle the page charts, and one
 // table, "How other protocols price <SYMBOL>": a row per protocol (a protocol
 // that reads more than one line, a row per market), the protocols on the page's
-// own line first, then the other oracle lines, then the protocols that list the
+// line first, then the other oracle lines, then the protocols that list the
 // token with no stored line, each row with its price now and, on a same-block
 // read, its gap.
 // The as-of line closes a same-block read. The page's line is the one its
@@ -50,7 +50,7 @@ export interface SourceLine {
 /** The oracle the page charts, read from `explorer`'s side: "Chainlink ETH /
  *  USD, read through Liquity V2's WETH PriceFeed" (the one contract the
  *  explorer reads it through), "Chronicle median, held 1 hour by Maker's OSM"
- *  (a delayed line with its stored delay), else the oracle's name; each ends
+ *  (a delayed line with its hop), else the oracle's name; each ends
  *  on its contract. Where the protocol stores no line (`noLine`), the most
  *  read: "Morpho Blue has no stored price for USDC here; the price most
  *  protocols read is Chainlink USDC / USD". */
@@ -73,11 +73,11 @@ export function sourceLine(
       address: s.via!.address,
     };
   }
-  const delay = line.oracle.label?.delay;
-  if (delayedLine(line as PageLine) && delay) {
+  const hop = line.oracle.hop;
+  if (delayedLine(line as PageLine) && hop) {
     const family = line.series[0] ? protocolFamily(line.series[0].protocol) : null;
     return {
-      words: `${line.oracle.label?.short ?? line.oracle.name}, held ${delayWords(delay)} by ${family ? `${family}'s ` : "the "}OSM`,
+      words: `${line.oracle.label?.short ?? line.oracle.name}, held ${delayWords(hop)} by ${family ? `${family}'s ` : "the "}OSM`,
       address: line.oracle.address,
     };
   }
@@ -143,7 +143,17 @@ export function alsoReads(
   });
 }
 
-/** The page protocol's own markets on the charted line, under the chart:
+/** `pageOf` for the table's rows: the page's own protocol has no page to open
+ *  from its own page, so a row it owns (Compound V3's cWETHv3 on Compound V3's
+ *  USDC page) stays in the table with no link. */
+export function rowPageOf(
+  own: string | null,
+  pageOf: (explorer: string) => string | null,
+): (explorer: string) => string | null {
+  return (explorer) => (explorer === own ? null : pageOf(explorer));
+}
+
+/** The page protocol's markets on the charted line, under the chart:
  *  "Core since 27 Jan 2023 · Prime since 29 Jul 2024", or "Stored since 15 Jul
  *  2024" for a protocol with one market. Null where the page has no line of
  *  its own or no market has a stored day. */
@@ -245,7 +255,7 @@ export function asOfText(now: AssetPricesNow): string | null {
 
 /** What the (i) beside the as-of line says. */
 export const AS_OF_NOTE =
-  "Every price on this page, the headline's included, is read from its oracle at this one block, so each gap compares two prices of the same moment. The chart is the stored history of the headline's oracle.";
+  "Every price on this page, the headline's included, is read from its oracle at this one block. The chart is the stored history of the headline's oracle.";
 
 // ── The table ────────────────────────────────────────────────────────────────
 
@@ -347,7 +357,7 @@ export function oracleRows(
     });
 }
 
-/** The table's "same" rows: each protocol on the page line's own oracle, priced
+/** The table's "same" rows: each protocol on the page line's oracle, priced
  *  as the page's line is. `pageName` is the page's protocol ("Aave V3"), null
  *  where it has no line of its own (Morpho's page), and the row then names the
  *  line the chart draws. */

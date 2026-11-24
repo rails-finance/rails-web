@@ -5,7 +5,7 @@
 // the h1, the token's mark and symbol; the protocol bar above names the
 // protocol and chain. The source row (`SourceRow`), under the chart panel: the
 // oracle the page charts and the contract it is read through (A1.9,
-// `sourceLine`), under it the page protocol's own markets with their first
+// `sourceLine`), under it the page protocol's markets with their first
 // stored days, muted (`historyLine`), then muted what the token wraps or what wraps it and its
 // contract with a copy button (A1.6), and at its right the protocol's pages
 // for the token (A1.10), under it on a narrow screen. A page without a stored
@@ -142,7 +142,7 @@ export function SourceRow({
                 >
                   {shortAddress(address)}
                 </a>
-                <CopyFact value={address} label="Copy contract address" name="contract" />
+                <CopyFact value={address} label="Copy address" name="contract" />
               </span>
             )}
           </span>

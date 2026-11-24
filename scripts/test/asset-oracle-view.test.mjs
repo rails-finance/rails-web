@@ -77,7 +77,11 @@ const roster = {
             s("maker:ETH-B", "Maker ETH-B", 18554),
             s("maker:ETH-C", "Maker ETH-C", 18705),
           ],
-          { reads: "0x46ef0071b1e2ff6b42d36e5a177ea43ae5917f4e" },
+          {
+            reads: "0x46ef0071b1e2ff6b42d36e5a177ea43ae5917f4e",
+            label: { short: "Chronicle median", kind: "1 h delayed" },
+            hop: 3600,
+          },
         ),
         rl("0xc0053f3fbccd593758258334dfce24c2a9a673ad", "Chainlink ETH / USD", "chainlink", [
           s(`cv3:0xc3d688b66703497daa19211eedff47f25384cdc3:${WETH}`, "Compound V3 cUSDCv3", 19230),
@@ -90,10 +94,15 @@ const roster = {
           "Aggregated price feed ETH/USD from Chronicle, Chainlink, and RedStone oracles",
           "adapter",
           [s(`spark:${WETH}`, "SparkLend", 19445)],
+          { label: { short: "Chronicle + Chainlink + RedStone", kind: "aggregated" } },
         ),
-        rl("0xa150ef2d5827db283321d15d62d5d07fb41d636e", "Dolomite oracle aggregator", "protocol", [
-          s("dolomite:0", "Dolomite", 20265),
-        ]),
+        rl(
+          "0xa150ef2d5827db283321d15d62d5d07fb41d636e",
+          "Dolomite oracle aggregator",
+          "protocol",
+          [s("dolomite:0", "Dolomite", 20265)],
+          { label: { short: "Dolomite aggregator", kind: "aggregated" } },
+        ),
       ],
     },
   ],
@@ -143,7 +152,7 @@ test("the source names the oracle and the contract it is read through", () => {
     words: "Chainlink ETH / USD, read through Liquity V2's WETH PriceFeed",
     address: "0xcc5f8102eb670c89a4a3c567c13851260303c24f",
   });
-  // Maker: the OSM's stored short name and delay.
+  // Maker: the OSM's served short name and hop.
   assert.equal(maker.line.oracle.address, OSM);
   assert.deepEqual(view.sourceLine(maker.line, "makerdao"), {
     words: "Chronicle median, held 1 hour by Maker's OSM",
@@ -538,9 +547,13 @@ const usdcRoster = {
           s(`aave-v4:${USDC}`, "Aave V4", 20535),
           s(`cv3:0xc3d688b66703497daa19211eedff47f25384cdc3:${USDC}`, "Compound V3 cUSDCv3", 19230),
         ]),
-        rl("0x986b5e1e1755e3c2440e960477f25201b0a8bbd4", "Chainlink USDC / ETH", "chainlink", [
-          s(`cv3:0xa17581a9e3356d9a858b789d68b4d866e593ae94:${USDC}`, "Compound V3 cWETHv3", 19381),
-        ]),
+        rl(
+          "0x986b5e1e1755e3c2440e960477f25201b0a8bbd4",
+          "Chainlink USDC / ETH",
+          "chainlink",
+          [s(`cv3:0xa17581a9e3356d9a858b789d68b4d866e593ae94:${USDC}`, "Compound V3 cWETHv3", 19381)],
+          { label: { kind: "priced in ETH, × WETH/USD" } },
+        ),
       ],
     },
   ],
@@ -615,4 +628,21 @@ test("the intro above the table, in its three cases", () => {
     view.tableIntro({ ...o, symbol: "USDC", sameBlock: true, gapFrom: "the price charted above" }),
     "The table below shows how other protocols on Ethereum price USDC: the oracle each one reads, its price at one block and its gap from the price charted above.",
   );
+});
+
+test("a Maker line with no hop drops the duration clause; other hops are worded", () => {
+  const bare = { ...maker.line, oracle: { ...maker.line.oracle, hop: undefined } };
+  assert.equal(view.sourceLine(bare, "makerdao").words, "Maker OSM over the Chronicle ETH/USD median");
+  const two = { ...maker.line, oracle: { ...maker.line.oracle, hop: 7200 } };
+  assert.equal(view.sourceLine(two, "makerdao").words, "Chronicle median, held 2 hours by Maker's OSM");
+});
+
+test("a row the page's own protocol owns stays in the table with no link", () => {
+  const now = sameBlock({ [usdcMorpho.line.id]: 0.9999, [usdcMorpho.section.lines[1].id]: 1.0001 });
+  const pageOf = (id) => `/ethereum/${id}/assets/${USDC}`;
+  const rows = view.oracleRows(usdcMorpho.section.lines, usdcMorpho.line, now, view.rowPageOf("compound", pageOf));
+  const comp = rows.find((r) => r.protocol.name === "Compound V3 cWETHv3");
+  assert.ok(comp, "the row is kept");
+  assert.equal(comp.protocol.href, null);
+  assert.equal(view.rowPageOf("compound", pageOf)("aave-v3"), pageOf("aave-v3"));
 });

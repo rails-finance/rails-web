@@ -39,6 +39,7 @@ import {
   alsoReads,
   listedRows,
   oracleRows,
+  rowPageOf,
   sameRows,
   tableRows,
   priceCell,
@@ -255,7 +256,7 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
   const read = now.prices[pageLine.id];
   const symbol = page.symbol;
   const reads = alsoReads(pageLine, e.id, pageOf, multiLineFamilies(section.lines));
-  const other = oracleRows(section.lines, pageLine, now, pageOf);
+  const other = oracleRows(section.lines, pageLine, now, rowPageOf(e.id, pageOf));
   const rows = tableRows(
     sameRows(pageLine, reads, own ? e.label : null, now),
     other,

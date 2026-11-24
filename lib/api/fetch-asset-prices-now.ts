@@ -25,22 +25,22 @@ import {
 } from "@/lib/shared/asset-prices-now";
 import type { PageLine } from "@/lib/shared/asset-roster";
 
+/** One deadline for the whole read: the route call and the fallback share it. */
 const TIMEOUT_MS = 10_000;
+/** The route call's cache time: the server's round is 60 s. */
+const ROUTE_REVALIDATE_S = 60;
 const DAY_S = 86_400;
 /** The rounds read: the first and last of the last 40 days, as the Prices list reads them. */
 const ROUND_DAYS = 40;
 const MAX_ORACLES = 12;
 const MAX_SERIES = 40;
 
-async function get<T>(path: string, readerIp?: string | null): Promise<T | null> {
+async function get<T>(path: string, signal: AbortSignal, readerIp?: string | null): Promise<T | null> {
   const base = process.env.RAILS_API_URL;
   if (!base) throw new Error("RAILS_API_URL environment variable is not set");
   const res = await fetch(
     `${base}${path}`,
-    createAuthFetchOptions(
-      { next: { revalidate: ROUNDS_REVALIDATE_S }, signal: AbortSignal.timeout(TIMEOUT_MS) },
-      readerIp ?? undefined,
-    ),
+    createAuthFetchOptions({ next: { revalidate: ROUNDS_REVALIDATE_S }, signal }, readerIp ?? undefined),
   ).catch(() => null);
   return res?.ok ? ((await res.json()) as T) : null;
 }
@@ -49,6 +49,7 @@ async function get<T>(path: string, readerIp?: string | null): Promise<T | null>
 async function getRoute(
   chain: number,
   token: string,
+  signal: AbortSignal,
   readerIp?: string | null,
 ): Promise<{ status: number | null; body: RouteNowAnswer | null }> {
   const base = process.env.RAILS_API_URL;
@@ -56,10 +57,7 @@ async function getRoute(
   const q = new URLSearchParams({ chain: String(chain), token: token.toLowerCase() });
   const res = await fetch(
     `${base}/api/prices/assets/now?${q.toString()}`,
-    createAuthFetchOptions(
-      { next: { revalidate: ROUNDS_REVALIDATE_S }, signal: AbortSignal.timeout(TIMEOUT_MS) },
-      readerIp ?? undefined,
-    ),
+    createAuthFetchOptions({ next: { revalidate: ROUTE_REVALIDATE_S }, signal }, readerIp ?? undefined),
   ).catch(() => null);
   if (!res) return { status: null, body: null };
   const body = res.status === 200 ? ((await res.json().catch(() => null)) as RouteNowAnswer | null) : null;
@@ -75,7 +73,8 @@ export async function fetchAssetPricesNow(
   readerIp?: string | null,
 ): Promise<AssetPricesNow> {
   try {
-    const route = await getRoute(chain, token, readerIp);
+    const signal = AbortSignal.timeout(TIMEOUT_MS);
+    const route = await getRoute(chain, token, signal, readerIp);
     const source = pricesNowSource(route.status);
     if (source === "route" && route.body) return routePricesNow(route.body);
     if (source === "unread") return unreadPricesNow(chain, lines, "The prices were not read");
@@ -94,8 +93,8 @@ export async function fetchAssetPricesNow(
       from: String(Math.floor(now / DAY_S) - RECENT_DAYS),
     });
     const [rounds, daily] = await Promise.all([
-      oracles.length ? get<StoredRounds>(`/api/prices/rounds?${rq.toString()}`, readerIp) : null,
-      keys.length ? get<StoredDaily>(`/api/prices/daily?${dq.toString()}`, readerIp) : null,
+      oracles.length ? get<StoredRounds>(`/api/prices/rounds?${rq.toString()}`, signal, readerIp) : null,
+      keys.length ? get<StoredDaily>(`/api/prices/daily?${dq.toString()}`, signal, readerIp) : null,
     ]);
     return storedPricesNow(chain, lines, rounds, daily);
   } catch {

@@ -2,7 +2,7 @@
 // "one table"; ui-jobs 818; anatomy A2.4 to A2.6): "How other protocols price
 // <symbol>", one table in three groups with no sub-headings, on the house
 // table (D1, D4, D5, D6; components/shared/data-table). First the protocols on
-// the page's own oracle line ("Same oracle as <page protocol>"), then the
+// the page's oracle line ("Same oracle as <page protocol>"), then the
 // other lines, then the protocols that list the token and store no line for it
 // ("Not saved by Rails"). One row per protocol, or per market for a protocol that
 // reads more than one line; each row is one link to that protocol's page for
@@ -133,11 +133,6 @@ export function OracleTable({
             gapFrom,
           })}
         </p>
-        {gaps && (
-          <p className="text-sm text-rb-500" data-asset-gap-caption="">
-            Gap is against {refName}
-          </p>
-        )}
       </div>
       <DataTable
         label={`How other protocols price ${symbol}`}
@@ -184,7 +179,12 @@ export function OracleTable({
                   <span className="flex items-center gap-2">
                     <DataTableLeadMark protocol={explorer} chain={chain as ChainId} chainless />
                     {href ? (
-                      <DataTableRowLink href={href} aria-label={rowLabel(r)} className="font-semibold">
+                      <DataTableRowLink
+                        href={href}
+                        aria-label={rowLabel(r)}
+                        className="font-semibold"
+                        data-asset-oracle-link={explorer}
+                      >
                         {nameText}
                       </DataTableRowLink>
                     ) : (

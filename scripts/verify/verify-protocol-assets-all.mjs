@@ -78,9 +78,17 @@ for (const e of explorers) {
     /href="([^"]+)"/.exec(m[0])?.[1] ?? "",
   ]);
   const wrong = alsoHrefs.filter(([, h]) => !(h.startsWith("/") && h.endsWith(`/assets/${token}`)));
+  // A page whose table has rows for other protocols (a row href is set) must
+  // link them; the protocol's own page-row has no link, so no row reads own.
+  const linkable = [...page.html.matchAll(/data-asset-oracle-href="(\/[^"]*)"/g)].length;
+  const own = alsoHrefs.filter(([id]) => id === e.id);
   check(
     `${e.id} c. its page for ${token.slice(0, 10)}… answers under the protocol, its protocol links opening explorers' pages`,
-    page.status === 200 && page.html.includes('data-anatomy="A7"') && wrong.length === 0,
+    page.status === 200 &&
+      page.html.includes('data-anatomy="A7"') &&
+      wrong.length === 0 &&
+      own.length === 0 &&
+      !(linkable > 0 && alsoHrefs.length === 0),
     `${page.status}; ${alsoHrefs.length} others${wrong.length ? `; wrong ${JSON.stringify(wrong.slice(0, 2))}` : ""}`,
   );
 }
