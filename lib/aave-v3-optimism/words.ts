@@ -73,21 +73,17 @@ export const CARD_WORDS = {
   foot: "Dollar values use Aave's oracle at the same block.",
 };
 
-/** Where the collateral and the debt are one asset, or all counted by the
- *  account's E-Mode category, a price move shifts both sides together and
- *  interest is what moves the health factor: one sentence, else none. */
+/** Where the collateral and the debt are one asset, a price move shifts both
+ *  sides together and interest is what moves the health factor: one sentence,
+ *  else none. */
 function priceTogether(p: OpPositionFigures): string[] {
   const collateral = p.supplied.filter((x) => x.isCollateral);
   if (!collateral.length || !p.borrowed.length) return [];
   const both = [...collateral, ...p.borrowed];
-  const oneAsset = new Set(both.map((x) => x.asset.toLowerCase())).size === 1;
-  const inCategory = p.emode != null && both.every((x) => x.ltSource === "emode");
-  if (!oneAsset && !inCategory) return [];
+  if (new Set(both.map((x) => x.asset.toLowerCase())).size !== 1) return [];
   const earned = collateral.reduce((a, x) => a + (x.suppliedUsd ?? 0) * x.supplyApr, 0);
   const owed = p.borrowed.reduce((a, x) => a + (x.debtUsd ?? 0) * x.borrowApr, 0);
-  const which = oneAsset
-    ? `Its collateral and debt are both ${collateral[0].symbol}`
-    : `Its collateral and debt are all in the ${p.emode!.label} E-Mode category`;
+  const which = `Its collateral and debt are both ${collateral[0].symbol}`;
   return [
     owed > earned
       ? `${which}, so a price move changes both sides together, and the interest owed growing faster than the interest earned is what lowers the health factor.`
