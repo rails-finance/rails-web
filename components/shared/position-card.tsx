@@ -536,7 +536,8 @@ const OPEN_PILL = "bg-positive/20 text-positive";
 
 /** The lifecycle pill on both surfaces: OPEN for a live position, else the
  *  status word in capitals. On the wallet view an open position draws none,
- *  AT RISK excepted (`PositionCardEdge`). */
+ *  AT RISK excepted (`PositionCardEdge`), and an open position the wallet
+ *  stamps "Not read" (`edge.unread`) draws none, AT RISK included. */
 function StatusPill({ status }: { status: PositionCardStatus | null }) {
   const edge = useContext(PositionCardEdgeContext);
   // An unread open position carries one mark, the wallet's "Not read" stamp.
