@@ -32,7 +32,7 @@ import { formatDate } from "@/lib/date";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatPrice } from "@/lib/shared/flows-price";
 import { lineReaders, type PageLine } from "@/lib/shared/asset-roster";
-import { fmtSignedSpread, type LineSpread } from "@/lib/shared/asset-spread";
+import { dashReason, fmtSignedSpread, type DashReason, type LineSpread } from "@/lib/shared/asset-spread";
 import {
   CHUNK_MAX,
   DAY_S,
@@ -44,6 +44,7 @@ import {
   inForce,
   lineTrack,
   needsRegrid,
+  rangeActive,
   sampleSpread,
   sampleTrack,
   withDetail,
@@ -644,6 +645,17 @@ export function AssetLwChart({
     },
     [tracks, lines, at, spreads],
   );
+  // Why a line has no deviation at the cursor.
+  const reasonAt = useCallback(
+    (lineId: string): DashReason => {
+      const i = lines.findIndex((l) => l.line.id === lineId);
+      const m = tracks?.[0]?.track;
+      const o = tracks?.[i]?.track;
+      const both = m?.roundsFrom != null && o?.roundsFrom != null ? Math.max(m.roundsFrom, o.roundsFrom) : null;
+      return dashReason(spreads?.others[i - 1]?.spread, Math.floor(at / DAY_S), both != null && at >= both);
+    },
+    [tracks, lines, at, spreads],
+  );
   const onJump = useCallback(
     (day: number, ts?: number) => {
       const t = ts ?? day * DAY_S + DAY_S - 1;
@@ -652,11 +664,7 @@ export function AssetLwChart({
     },
     [show],
   );
-  const active = (span: number | null) => {
-    const w = shown.to - shown.from;
-    const want = span ?? bounds.t1 - bounds.t0;
-    return Math.abs(w - want) <= want * 0.03 && Math.abs(shown.to - bounds.t1) <= want * 0.03;
-  };
+  const active = (span: number | null) => rangeActive(shown, bounds, span);
   /** A line's key: the main hue, or its slot's token and dash. */
   const keyOf = (id: string, isMain: boolean) => {
     const st = styleOf(id);
@@ -843,6 +851,7 @@ export function AssetLwChart({
           cursorTs={at}
           stamp={grid ? cellWords(grid, at, firstRound) : null}
           valueAt={spreadAt}
+          reasonAt={reasonAt}
           onJump={onJump}
           keyOf={(id) => keyOf(id, false)}
           rowHover={rowHover}
