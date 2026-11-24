@@ -39,11 +39,12 @@ import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { ChainTruthListLoadingSkeleton } from "@/components/shared/chain-truth-list-loading-skeleton";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 
-/** A control's outline: a round button, or the resting Status pill. */
-const CONTROL = "skel-wait shrink-0 rounded-full border border-edge-raised";
+/** A control's shape, filled like the skeleton bars: a round button, or the
+ *  resting Status pill. */
+const CONTROL = "skel-wait shrink-0 rounded-full bg-edge-raised";
 const ROUND = `${CONTROL} size-11 sm:size-10`;
 
-/** The toolbar (list-toolbar.tsx) as outlines where its controls stand: the
+/** The toolbar (list-toolbar.tsx) as filled shapes where its controls stand: the
  *  Filters button and the resting Status pill at the left, the search, sort
  *  and ⋮ at the right. Its height is the row's, set in CSS: 40px from sm, and
  *  below sm two 44px lines, the right-hand group wrapping under the pills. */
