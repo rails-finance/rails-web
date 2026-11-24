@@ -96,7 +96,7 @@ const PALETTE = {
   grid: ["var(--rb-chart-grid)", 0.7],
   cross: ["var(--rb-500)", 0.8],
   caution: ["var(--caution)", 0.8],
-  zero: ["var(--rb-500)", 0.6],
+  zero: ["var(--rb-500)"],
 } as const;
 
 /** The price axis's labels, with the decimals their spacing needs ("$0.99995" beside "$1.00000"). */
