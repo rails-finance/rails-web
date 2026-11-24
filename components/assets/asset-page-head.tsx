@@ -5,7 +5,8 @@
 // the h1, the token's mark and symbol; the protocol bar above names the
 // protocol and chain. The source row (`SourceRow`), under the chart panel: the
 // oracle the page charts and the contract it is read through (A1.9,
-// `sourceLine`), then muted what the token wraps or what wraps it and its
+// `sourceLine`), under it the page protocol's own markets with their first
+// stored days, muted (`historyLine`), then muted what the token wraps or what wraps it and its
 // contract with a copy button (A1.6), and at its right the protocol's pages
 // for the token (A1.10), under it on a narrow screen. A page without a stored
 // price draws its figure and the no-price line (A1.3), or BOLD's live read
@@ -73,6 +74,7 @@ export function SourceRow({
   source,
   relations,
   markets,
+  history,
 }: {
   chain: number;
   token: string;
@@ -81,67 +83,76 @@ export function SourceRow({
   relations: RelationGroup[];
   /** The protocol's pages for the token ("Branch", "Troves"). */
   markets: ChipUse[];
+  /** The page protocol's markets on the charted line with their first stored days, one muted line; null where there is none. */
+  history?: string | null;
 }) {
   const address = token.toLowerCase();
   return (
     <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2" data-asset-source-row="">
-      <p className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
-        {source && (
-          <span className="text-foreground" data-asset-source={source.address} data-anatomy="A1.9">
-            {source.words}{" "}
-            <a
-              href={explorerUrl(chain as ChainId, "address", source.address)}
-              target="_blank"
-              rel="noopener"
-              className={ADDRESS_LINK}
-              title={source.address}
-            >
-              {shortAddress(source.address)}
-            </a>
-          </span>
-        )}
-        <span
-          className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 text-rb-500"
-          data-asset-links=""
-          data-anatomy="A1.6"
-        >
-          {relations.map((g, gi) => (
-            <span key={g.word}>
-              {gi > 0 && <span aria-hidden="true">· </span>}
-              {g.word}{" "}
-              {g.links.map((l, i) => (
-                <span key={l.href}>
-                  {i > 0 && ", "}
-                  <Link href={l.href} className="font-medium text-foreground underline-offset-2 hover:underline">
-                    {l.symbol}
-                  </Link>
-                  {l.chain !== chain && (
-                    <span role="img" aria-label={`on ${chainName(l.chain)}`} title={`On ${chainName(l.chain)}`}>
-                      <ChainGlyph chainId={l.chain as ChainId} className="ml-0.5 inline h-3 w-3 align-[-1px]" />
-                    </span>
-                  )}
-                </span>
-              ))}
-            </span>
-          ))}
-          {address !== NATIVE && (
-            <span className="inline-flex items-center gap-1.5" data-asset-contract={address}>
-              {relations.length > 0 && <span aria-hidden="true">·</span>}
-              contract
+      <div className="min-w-0">
+        <p className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+          {source && (
+            <span className="text-foreground" data-asset-source={source.address} data-anatomy="A1.9">
+              {source.words}{" "}
               <a
-                href={explorerUrl(chain as ChainId, "token", address)}
+                href={explorerUrl(chain as ChainId, "address", source.address)}
                 target="_blank"
                 rel="noopener"
                 className={ADDRESS_LINK}
-                title={address}
+                title={source.address}
               >
-                {shortAddress(address)}
+                {shortAddress(source.address)}
               </a>
-              <CopyFact value={address} label="Copy contract address" name="contract" />
             </span>
           )}
-        </span>
-      </p>
+          <span
+            className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 text-rb-500"
+            data-asset-links=""
+            data-anatomy="A1.6"
+          >
+            {relations.map((g, gi) => (
+              <span key={g.word}>
+                {gi > 0 && <span aria-hidden="true">· </span>}
+                {g.word}{" "}
+                {g.links.map((l, i) => (
+                  <span key={l.href}>
+                    {i > 0 && ", "}
+                    <Link href={l.href} className="font-medium text-foreground underline-offset-2 hover:underline">
+                      {l.symbol}
+                    </Link>
+                    {l.chain !== chain && (
+                      <span role="img" aria-label={`on ${chainName(l.chain)}`} title={`On ${chainName(l.chain)}`}>
+                        <ChainGlyph chainId={l.chain as ChainId} className="ml-0.5 inline h-3 w-3 align-[-1px]" />
+                      </span>
+                    )}
+                  </span>
+                ))}
+              </span>
+            ))}
+            {address !== NATIVE && (
+              <span className="inline-flex items-center gap-1.5" data-asset-contract={address}>
+                {relations.length > 0 && <span aria-hidden="true">·</span>}
+                contract
+                <a
+                  href={explorerUrl(chain as ChainId, "token", address)}
+                  target="_blank"
+                  rel="noopener"
+                  className={ADDRESS_LINK}
+                  title={address}
+                >
+                  {shortAddress(address)}
+                </a>
+                <CopyFact value={address} label="Copy contract address" name="contract" />
+              </span>
+            )}
+          </span>
+        </p>
+        {history && (
+          <p className="mt-1 text-sm text-rb-500" data-asset-history="">
+            {history}
+          </p>
+        )}
+      </div>
       {markets.length > 0 && (
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm" data-asset-markets="" data-anatomy="A1.10">
           {markets.map((m) => (

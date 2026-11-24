@@ -1,8 +1,10 @@
 // The words of a protocol's asset page (Miles, 24 Nov 2026; ui-jobs 818;
 // anatomy A1.9, A2): the source naming the oracle the page charts, and one
-// table, "How other protocols price <SYMBOL>": the protocols on the page's own
-// line, the other oracle lines, and the protocols that list the token with no
-// stored line, each row with its price now and, on a same-block read, its gap.
+// table, "How other protocols price <SYMBOL>": a row per protocol (a protocol
+// that reads more than one line, a row per market), the protocols on the page's
+// own line first, then the other oracle lines, then the protocols that list the
+// token with no stored line, each row with its price now and, on a same-block
+// read, its gap.
 // The as-of line closes a same-block read. The page's line is the one its
 // protocol reads (`via`), else the line most protocols read. Prices come from
 // the price-now answer (lib/shared/asset-prices-now.ts): on a same-block read
@@ -100,31 +102,64 @@ export interface AlsoReadsEntry {
   since: number | null;
 }
 
-/** The protocols on the page's line other than the page's, a retired
- *  market not counted: one entry per protocol, its markets together. */
+/** The families whose markets read more than one of the chain's lines: a row
+ *  names them by market ("Compound V3 cWETHv3"), not by family. A retired
+ *  market is not counted. */
+export function multiLineFamilies(lines: readonly Pick<PageLine, "series">[]): Set<string> {
+  const linesOf = new Map<string, number>();
+  for (const l of lines)
+    for (const f of new Set(l.series.filter((s) => !s.retired).map((s) => protocolFamily(s.protocol))))
+      linesOf.set(f, (linesOf.get(f) ?? 0) + 1);
+  return new Set([...linesOf].filter(([, n]) => n > 1).map(([f]) => f));
+}
+
+/** The protocols on the page's line other than the page's, a retired market
+ *  not counted: one entry per protocol, named by market for a family in
+ *  `multi` (`multiLineFamilies`). */
 export function alsoReads(
   line: Pick<PageLine, "series">,
   own: string | null,
   pageOf: (explorer: string) => string | null,
+  multi: ReadonlySet<string> = new Set(),
 ): AlsoReadsEntry[] {
-  const byFamily = new Map<string, PageSeries[]>();
+  const byName = new Map<string, PageSeries[]>();
   for (const s of line.series) {
     const explorer = seriesExplorer(s.token.chain, s.key);
     if (s.retired || (own != null && explorer === own)) continue;
-    const f = protocolFamily(s.protocol);
-    byFamily.set(f, [...(byFamily.get(f) ?? []), s]);
+    const family = protocolFamily(s.protocol);
+    const name = multi.has(family) ? s.protocol : family;
+    byName.set(name, [...(byName.get(name) ?? []), s]);
   }
-  return [...byFamily].map(([family, list]) => {
+  return [...byName].map(([name, list]) => {
     const explorer = seriesExplorer(list[0].token.chain, list[0].key);
     const vias = [...new Set(list.map((s) => s.via?.address ?? ""))];
     const via = vias.length === 1 && vias[0] ? list[0].via! : null;
     const days = list.map((s) => s.firstDay).filter((d): d is number => d != null);
     return {
-      protocol: { name: family, explorer, href: explorer ? pageOf(explorer) : null },
-      route: via ? { words: routeName(via.name, family), address: via.address } : null,
+      protocol: { name, explorer, href: explorer ? pageOf(explorer) : null },
+      route: via ? { words: routeName(via.name, protocolFamily(list[0].protocol)), address: via.address } : null,
       since: days.length ? Math.min(...days) : null,
     };
   });
+}
+
+/** The page protocol's own markets on the charted line, under the chart:
+ *  "Core since 27 Jan 2023 · Prime since 29 Jul 2024", or "Stored since 15 Jul
+ *  2024" for a protocol with one market. Null where the page has no line of
+ *  its own or no market has a stored day. */
+export function historyLine(line: Pick<PageLine, "series">, explorer: string | null): string | null {
+  if (!explorer) return null;
+  const own = line.series.filter((s) => s.firstDay != null && seriesExplorer(s.token.chain, s.key) === explorer);
+  if (own.length === 0) return null;
+  const first = new Map<string, number>();
+  for (const s of own) first.set(s.protocol, Math.min(first.get(s.protocol) ?? Infinity, s.firstDay!));
+  const family = protocolFamily(own[0].protocol);
+  return [...first]
+    .map(([name, day]) => {
+      const market = name.startsWith(`${family} `) ? name.slice(family.length + 1) : "Stored";
+      return `${market} since ${formatDate(new Date(day * DAY_MS))}`;
+    })
+    .join(" · ");
 }
 
 /** A protocol listing the token on the chain that reads no stored oracle line for it. */
@@ -138,8 +173,7 @@ export interface AlsoListedEntry {
 }
 
 /** The explorers listing the token on the chain (the card line's chips) that
- *  the table names nowhere else: not the page's protocol, not the same-oracle
- *  rows, not the other rows' Used by. A vault family no explorer deploys (a chip
+ *  the table names nowhere else: not the page's protocol, not another row's protocol. A vault family no explorer deploys (a chip
  *  with a token) is no protocol and is left out. `reasonOf` is the data's
  *  statement of why an explorer reads no line, null where it has none. */
 export function alsoListed(
@@ -152,7 +186,7 @@ export function alsoListed(
 ): AlsoListedEntry[] {
   const used = new Set<string>(own ? [own] : []);
   const names = new Set<string>();
-  for (const p of [...named.reads.map((e) => e.protocol), ...named.rows.flatMap((r) => r.usedBy)]) {
+  for (const p of [...named.reads.map((e) => e.protocol), ...named.rows.map((r) => r.protocol)]) {
     if (p.explorer) used.add(p.explorer);
     names.add(p.name);
   }
@@ -223,16 +257,6 @@ export interface PriceCell {
   stale: boolean;
 }
 
-/** A market-level line in a row's expansion. */
-export interface MarketLine {
-  protocol: string;
-  /** The token it prices where the line prices more than one ("prices ETH"). */
-  prices: string | null;
-  via: { name: string; address: string } | null;
-  retired: boolean;
-  since: number | null;
-}
-
 /** Which of the table's three groups a row belongs to. */
 export type RowGroup = "same" | "other" | "listed";
 
@@ -244,7 +268,8 @@ export interface OracleRow {
   lineId: string | null;
   /** The route a "same" row's protocol reads the line through, drawn under its oracle. */
   via: { words: string; address: string } | null;
-  usedBy: PageProtocol[];
+  /** The row's one protocol: its name is the family, or the market where the family reads more than one line. */
+  protocol: PageProtocol;
   /** Every market on the line is one its protocol has retired. */
   retired: boolean;
   /** The label's short name, else the oracle's full name. */
@@ -258,7 +283,6 @@ export interface OracleRow {
   price: PriceCell;
   /** Null where the table draws no gap (the prices stand at different blocks). */
   gap: { text: string; value: number | null; reason: string | null } | null;
-  markets: MarketLine[];
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -269,43 +293,57 @@ export function priceCell(p: LinePriceNow | undefined): PriceCell {
   return { text: fmtPriceNow(p.price), value: p.price, reason: null, stale: p.stale === true };
 }
 
-/** The table's "other" rows: every line on the chain but the page's, in the chart's
- *  order. A protocol is named by family ("Aave V3"), or by market where its
- *  markets read more than one of the chain's lines ("Aave V3 EtherFi"). */
+/** The sentence above the table (A2.4), built from data. `gapFrom` names what
+ *  the gap is against ("Liquity V2's price", "the price charted above"); it is
+ *  drawn on a same-block read only. A second sentence where protocols list the
+ *  token with no stored price. */
+export function tableIntro(o: {
+  chain: string;
+  symbol: string;
+  sameBlock: boolean;
+  gapFrom: string;
+  hasListed: boolean;
+}): string {
+  const head = `The table below shows how other protocols on ${o.chain} price ${o.symbol}: the oracle each one reads, its contract`;
+  const body = o.sameBlock
+    ? `${head}, its price at one block and its gap from ${o.gapFrom}.`
+    : `${head} and its latest price.`;
+  return o.hasListed ? `${body} Protocols marked No stored price list ${o.symbol} with no oracle Rails stores.` : body;
+}
+
+/** The table's "other" rows: every line on the chain but the page's, in the
+ *  chart's order, a row per protocol on it, so a line's rows stand together.
+ *  A protocol is named by family ("Aave V3"), or by market where its markets
+ *  read more than one of the chain's lines ("Aave V3 EtherFi"). */
 export function oracleRows(
   lines: readonly PageLine[],
   pageLine: PageLine,
   now: AssetPricesNow,
   pageOf: (explorer: string) => string | null,
 ): OracleRow[] {
-  const linesOf = new Map<string, number>();
-  for (const l of lines)
-    for (const f of new Set(l.series.filter((s) => !s.retired).map((s) => protocolFamily(s.protocol))))
-      linesOf.set(f, (linesOf.get(f) ?? 0) + 1);
+  const multi = multiLineFamilies(lines);
   const ref = now.prices[pageLine.id];
   return lines
     .filter((l) => l.id !== pageLine.id)
-    .map((l) => {
+    .flatMap((l) => {
       const live = l.series.filter((s) => !s.retired);
       const retired = live.length === 0 && l.series.length > 0;
-      const usedBy: PageProtocol[] = [];
+      const protocols: PageProtocol[] = [];
       for (const s of retired ? l.series : live) {
         const family = protocolFamily(s.protocol);
-        const name = (linesOf.get(family) ?? 0) > 1 ? s.protocol : family;
-        if (usedBy.some((p) => p.name === name)) continue;
+        const name = multi.has(family) ? s.protocol : family;
+        if (protocols.some((p) => p.name === name)) continue;
         const explorer = seriesExplorer(s.token.chain, s.key);
-        usedBy.push({ name, explorer, href: explorer ? pageOf(explorer) : null });
+        protocols.push({ name, explorer, href: explorer ? pageOf(explorer) : null });
       }
-      const p = now.prices[l.id];
-      const price = priceCell(p);
-      const symbols = new Set(l.series.map((s) => s.token.symbol));
+      const price = priceCell(now.prices[l.id]);
       const short = l.oracle.label?.short;
-      return {
-        id: l.id,
+      return protocols.map((protocol) => ({
+        id: `${l.id}:${protocol.name}`,
         group: "other" as const,
         lineId: l.id,
         via: null,
-        usedBy,
+        protocol,
         retired,
         name: short ?? l.oracle.name,
         full: short && short !== l.oracle.name ? l.oracle.name : null,
@@ -313,14 +351,7 @@ export function oracleRows(
         address: l.oracle.address,
         price,
         gap: now.sameBlock ? gapCell(price, ref) : null,
-        markets: l.series.map((s) => ({
-          protocol: s.protocol,
-          prices: symbols.size > 1 ? s.token.symbol : null,
-          via: s.via ? { name: s.via.name, address: s.via.address } : null,
-          retired: s.retired === true,
-          since: s.firstDay,
-        })),
-      };
+      }));
     });
 }
 
@@ -341,7 +372,7 @@ export function sameRows(
     group: "same" as const,
     lineId: pageLine.id,
     via: e.route,
-    usedBy: [e.protocol],
+    protocol: e.protocol,
     retired: false,
     name: pageName ? `Same oracle as ${pageName}` : "The price charted above",
     full: null,
@@ -349,7 +380,6 @@ export function sameRows(
     address: pageLine.oracle.address,
     price,
     gap,
-    markets: [{ protocol: e.protocol.name, prices: null, via: null, retired: false, since: e.since }],
   }));
 }
 
@@ -361,7 +391,7 @@ export function listedRows(entries: readonly AlsoListedEntry[], now: AssetPrices
     group: "listed" as const,
     lineId: null,
     via: null,
-    usedBy: [{ name: e.name, explorer: e.explorer, href: e.href }],
+    protocol: { name: e.name, explorer: e.explorer, href: e.href },
     retired: false,
     name: "No stored price",
     full: null,
@@ -369,7 +399,6 @@ export function listedRows(entries: readonly AlsoListedEntry[], now: AssetPrices
     address: null,
     price: { text: "–", value: null, reason: null, stale: false },
     gap: now.sameBlock ? { text: "–", value: null, reason: null } : null,
-    markets: [],
   }));
 }
 
@@ -389,13 +418,11 @@ function gapCell(price: PriceCell, ref: LinePriceNow | undefined): NonNullable<O
   return { text: fmtGap(pct), value: pct, reason: null };
 }
 
-/** A market line in words: "Compound V3 cWETHv3, via a constant 1 ETH feed", ", since 9 Jan 2023" after the address. */
-export function marketWords(m: MarketLine): { before: string; after: string } {
-  const head = `${m.protocol}${m.prices ? ` prices ${m.prices}` : ""}`;
-  const tail = `${m.retired ? ", a market it has retired" : ""}${
-    m.since != null ? `, since ${formatDate(new Date(m.since * DAY_MS))}` : ", nothing stored"
-  }`;
-  return m.via ? { before: `${head}, via ${m.via.name}`, after: tail } : { before: head + tail, after: "" };
+/** A row link's accessible name, one per row: "Compound V3 cWETHv3: Chainlink
+ *  USDC / USD, $0.9999", so rows that open one page still read apart. */
+export function rowLabel(r: Pick<OracleRow, "protocol" | "name" | "price" | "group">): string {
+  const price = r.group === "listed" ? null : r.price.value != null ? r.price.text : "no price read";
+  return `${r.protocol.name}: ${r.name}${price ? `, ${price}` : ""}`;
 }
 
 // ── Receipts ─────────────────────────────────────────────────────────────────

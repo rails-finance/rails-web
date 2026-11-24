@@ -1,57 +1,53 @@
 // Under a protocol's asset chart (Miles's mockup and ruling of 24 Nov 2026,
 // "one table"; ui-jobs 818; anatomy A2.4 to A2.6): "How other protocols price
-// <symbol>", one table in three groups with no sub-headings. First the
-// protocols on the page's own oracle line ("Same oracle as <page protocol>"),
-// then one row per other line, then the protocols that list the token and
-// store no line for it ("No stored price"). Each row has Used by, Oracle,
-// Contract and Price now, and on a same-block read a Gap; a row opens its
-// markets, a listed-only row does not. Prices and gaps carry their receipts.
-// Where the prices stand at different blocks (the stored stub) the table shows
-// the price only and draws no as-of line. Below sm each row is a card.
+// <symbol>", one table in three groups with no sub-headings, on the house
+// table (D1, D4, D5, D6; components/shared/data-table). First the protocols on
+// the page's own oracle line ("Same oracle as <page protocol>"), then the
+// other lines, then the protocols that list the token and store no line for it
+// ("No stored price"). One row per protocol, or per market for a protocol that
+// reads more than one line; each row is one link to that protocol's page for
+// the token (a plain row where it has none), and does not expand. Each row has
+// the Oracle, the Contract (mono text, the full address in its tooltip), and
+// Price now, and on a same-block read a Gap; prices and gaps carry their
+// receipts. Where the prices stand at different blocks (the stored stub) the
+// table shows the price only and draws no as-of line. Below sm each row is a
+// card (D6).
 
-import Link from "next/link";
-import { ChevronRight, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import { Prov } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableLeadCell,
+  DataTableLeadHeader,
+  DataTableLeadMark,
+  DataTableRow,
+  DataTableRowLink,
+} from "@/components/shared/data-table/data-table";
 import { shortAddress, type PageLine } from "@/lib/shared/asset-roster";
 import {
   AS_OF_NOTE,
   asOfText,
   gapProv,
-  marketWords,
   priceProv,
+  rowLabel,
+  tableIntro,
   type OracleRow,
-  type PageProtocol,
   type PriceCell,
 } from "@/lib/shared/asset-oracle-view";
 import type { AssetPricesNow } from "@/lib/shared/asset-prices-now";
-import { explorerUrl, type ChainId } from "@/lib/shared/chains";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import type { ChainId } from "@/lib/shared/chains";
 
-const ADDRESS_LINK = "font-mono text-blue-600 hover:underline dark:text-[var(--text-link)]";
-const SECTION_HEAD = "text-xs font-semibold uppercase tracking-[0.12em] text-rb-500";
-
-function Address({ chain, address }: { chain: number; address: string }) {
+/** An address as mono text, the full one in its tooltip. A link here would sit in a row's link. */
+function Address({ address }: { address: string }) {
   return (
-    <a
-      href={explorerUrl(chain as ChainId, "address", address)}
-      target="_blank"
-      rel="noopener"
-      className={ADDRESS_LINK}
-      title={address}
-    >
+    <span className="font-mono" title={address}>
       {shortAddress(address)}
-    </a>
-  );
-}
-
-function ProtocolName({ p, className = "" }: { p: PageProtocol; className?: string }) {
-  return p.href ? (
-    <Link href={p.href} className={`${INLINE_LINK} ${className}`} data-asset-oracle-link={p.explorer ?? ""}>
-      {p.name}
-    </Link>
-  ) : (
-    <span className={className}>{p.name}</span>
+    </span>
   );
 }
 
@@ -97,7 +93,7 @@ function PriceFigure({
   );
 }
 
-/** "How other protocols price WETH" (A2.4): a row per protocol group entry (A2.5). */
+/** "How other protocols price WETH" (A2.4): a row per protocol (A2.5), on the house table. */
 export function OracleTable({
   rows,
   lines,
@@ -105,6 +101,8 @@ export function OracleTable({
   chain,
   symbol,
   refName,
+  gapFrom,
+  chainName,
   now,
 }: {
   rows: OracleRow[];
@@ -115,135 +113,148 @@ export function OracleTable({
   symbol: string;
   /** Whose price the gap is against: "Liquity V2's price", "the price most protocols read". */
   refName: string;
+  /** What the intro says the gap is from: "Liquity V2's price", "the price charted above". */
+  gapFrom: string;
+  chainName: string;
   now: AssetPricesNow;
 }) {
   if (rows.length === 0) return null;
   const gaps = now.sameBlock;
-  const cols = gaps
-    ? "sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_7rem_7.5rem_4.5rem]"
-    : "sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_7rem_7.5rem]";
   const lineOf = (id: string) => lines.find((l) => l.id === id)!;
   const refPrice = now.prices[pageLine]?.price ?? null;
   return (
     <section className="mt-8" data-asset-oracles="" data-asset-gaps={gaps ? "on" : "off"} data-anatomy="A2.4">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className={SECTION_HEAD}>How other protocols price {symbol}</h2>
+        <p className="max-w-3xl text-sm leading-relaxed text-rb-500" data-asset-oracles-intro="">
+          {tableIntro({
+            chain: chainName,
+            symbol,
+            sameBlock: gaps,
+            gapFrom,
+            hasListed: rows.some((r) => r.group === "listed"),
+          })}
+        </p>
         {gaps && (
           <p className="text-sm text-rb-500" data-asset-gap-caption="">
             Gap is against {refName}
           </p>
         )}
       </div>
-      <div
-        className={`hidden gap-x-4 border-b border-rb-200 pb-2 text-xs text-rb-500 sm:grid dark:border-rb-700 ${cols}`}
-        aria-hidden="true"
+      <DataTable
+        label={`How other protocols price ${symbol}`}
+        tableClassName="min-w-[760px] text-sm"
+        stacked
+        rowHeight="two"
       >
-        <span>Used by</span>
-        <span>Oracle</span>
-        <span>Contract</span>
-        <span className="text-right">Price now</span>
-        {gaps && <span className="text-right">Gap</span>}
-      </div>
-      <ul className="divide-y divide-rb-200 dark:divide-rb-700">
-        {rows.map((r) => {
-          const line = r.lineId ? lineOf(r.lineId) : null;
-          const listed = r.group === "listed";
-          const summaryClass = `grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3 sm:items-center ${cols}`;
-          const cells = (
-            <>
-              <span className="col-span-2 font-semibold text-foreground sm:col-span-1" data-asset-used-by="">
-                {!listed && (
-                  <ChevronRight
-                    className="mr-1 inline h-3.5 w-3.5 align-[-2px] text-rb-500 transition-transform group-open:rotate-90"
-                    aria-hidden="true"
-                  />
-                )}
-                {r.usedBy.map((p, i) => (
-                  <span key={p.name}>
-                    {i > 0 && ", "}
-                    <ProtocolName p={p} />
-                  </span>
-                ))}
+        <DataTableHead>
+          <DataTableLeadHeader plain />
+          <DataTableHeader label="Used by" />
+          <DataTableHeader label="Oracle" />
+          <DataTableHeader label="Contract" />
+          <DataTableHeader label="Price now" align="right" />
+          {gaps && <DataTableHeader label="Gap" align="right" />}
+        </DataTableHead>
+        <DataTableBody>
+          {rows.map((r) => {
+            const line = r.lineId ? lineOf(r.lineId) : null;
+            const listed = r.group === "listed";
+            const href = r.protocol.href ?? undefined;
+            const explorer = r.protocol.explorer ?? "";
+            const nameText = (
+              <span data-asset-used-by="">
+                {r.protocol.name}
                 {r.retired && <span className="font-normal text-rb-500"> (retired)</span>}
               </span>
-              <span className="col-span-2 min-w-0 sm:col-span-1" title={r.full ?? undefined}>
-                <span className={`block ${listed ? "text-rb-500" : "text-foreground"}`} data-asset-oracle-name="">
-                  {r.name}
-                </span>
-                {r.via ? (
-                  <span className="block text-sm text-rb-500" data-asset-oracle-kind="">
-                    via {r.via.words} <Address chain={chain} address={r.via.address} />
+            );
+            return (
+              <DataTableRow
+                key={r.id}
+                href={href}
+                data-asset-oracle={r.id}
+                data-asset-oracle-group={r.group}
+                data-asset-oracle-href={href ?? ""}
+                data-anatomy="A2.5"
+              >
+                <DataTableLeadCell
+                  protocol={explorer}
+                  protocolName={r.protocol.name}
+                  chain={chain as ChainId}
+                  plain
+                  chainless
+                />
+                <DataTableCell rowHeader valign="middle" className="sm:whitespace-nowrap">
+                  <span className="flex items-center gap-2">
+                    <DataTableLeadMark protocol={explorer} chain={chain as ChainId} chainless />
+                    {href ? (
+                      <DataTableRowLink href={href} aria-label={rowLabel(r)} className="font-semibold">
+                        {nameText}
+                      </DataTableRowLink>
+                    ) : (
+                      <span className="font-semibold text-foreground">{nameText}</span>
+                    )}
                   </span>
-                ) : (
-                  r.kind && (
-                    <span className="block text-sm text-rb-500" data-asset-oracle-kind="">
-                      {r.kind}
+                </DataTableCell>
+                <DataTableCell label="Oracle" wide valign="middle" className="sm:w-full sm:max-w-0 sm:min-w-[220px]">
+                  <span className="block min-w-0" title={r.full ?? undefined}>
+                    <span
+                      className={`block truncate ${listed ? "text-rb-500" : "text-foreground"}`}
+                      data-asset-oracle-name=""
+                    >
+                      {r.name}
                     </span>
-                  )
-                )}
-              </span>
-              <span className="text-sm">
-                {r.address ? <Address chain={chain} address={r.address} /> : <span className="text-rb-500">–</span>}
-              </span>
-              <span className="text-right tabular-nums" data-asset-price-now={r.price.value ?? ""}>
-                {line ? (
-                  <PriceFigure cell={r.price} line={line} symbol={symbol} now={now} />
-                ) : (
-                  <span className="text-rb-500">–</span>
-                )}
-              </span>
-              {r.gap && (
-                <span
-                  className="col-span-2 text-right tabular-nums text-rb-500 sm:col-span-1"
-                  data-asset-gap={r.gap.value ?? ""}
+                    {r.via ? (
+                      <span className="block truncate text-sm text-rb-500" data-asset-oracle-kind="">
+                        via {r.via.words} <Address address={r.via.address} />
+                      </span>
+                    ) : (
+                      r.kind && (
+                        <span className="block truncate text-sm text-rb-500" data-asset-oracle-kind="">
+                          {r.kind}
+                        </span>
+                      )
+                    )}
+                  </span>
+                </DataTableCell>
+                <DataTableCell label="Contract" valign="middle" className="whitespace-nowrap text-sm">
+                  {r.address ? <Address address={r.address} /> : <span className="text-rb-500">–</span>}
+                </DataTableCell>
+                <DataTableCell
+                  label="Price now"
+                  align="right"
+                  valign="middle"
+                  className="whitespace-nowrap tabular-nums"
+                  data-asset-price-now={r.price.value ?? ""}
                 >
-                  <span className="mr-2 text-xs sm:hidden">Gap</span>
-                  {listed ? (
-                    "–"
-                  ) : r.gap.value != null && r.price.value != null && refPrice != null ? (
-                    <Prov info={gapProv(r, r.price.value, refPrice, refName, now.block)} value={String(r.gap.value)}>
-                      <span className="text-foreground">{r.gap.text}</span>
-                    </Prov>
+                  {line ? (
+                    <PriceFigure cell={r.price} line={line} symbol={symbol} now={now} />
                   ) : (
-                    <Dash reason={r.gap.reason} />
+                    <span className="text-rb-500">–</span>
                   )}
-                </span>
-              )}
-            </>
-          );
-          return (
-            <li key={r.id} data-asset-oracle={r.id} data-asset-oracle-group={r.group} data-anatomy="A2.5">
-              {listed ? (
-                <div className={summaryClass}>{cells}</div>
-              ) : (
-                <details className="group">
-                  <summary className={`cursor-pointer list-none [&::-webkit-details-marker]:hidden ${summaryClass}`}>
-                    {cells}
-                  </summary>
-                  <ul className="mb-3 space-y-0.5 text-sm text-rb-500" data-asset-oracle-markets="">
-                    {r.full && <li className="text-foreground">{r.full}</li>}
-                    {r.markets.map((m) => {
-                      const w = marketWords(m);
-                      return (
-                        <li key={`${m.protocol}${m.via?.address ?? ""}`}>
-                          {w.before}
-                          {m.via && (
-                            <>
-                              {" "}
-                              <Address chain={chain} address={m.via.address} />
-                            </>
-                          )}
-                          {w.after}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </details>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+                </DataTableCell>
+                {r.gap && (
+                  <DataTableCell
+                    label="Gap"
+                    align="right"
+                    valign="middle"
+                    className="whitespace-nowrap tabular-nums text-rb-500"
+                    data-asset-gap={r.gap.value ?? ""}
+                  >
+                    {listed ? (
+                      "–"
+                    ) : r.gap.value != null && r.price.value != null && refPrice != null ? (
+                      <Prov info={gapProv(r, r.price.value, refPrice, refName, now.block)} value={String(r.gap.value)}>
+                        <span className="text-foreground">{r.gap.text}</span>
+                      </Prov>
+                    ) : (
+                      <Dash reason={r.gap.reason} />
+                    )}
+                  </DataTableCell>
+                )}
+              </DataTableRow>
+            );
+          })}
+        </DataTableBody>
+      </DataTable>
     </section>
   );
 }

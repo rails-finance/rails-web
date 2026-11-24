@@ -27,7 +27,6 @@ import { AssetReceipts } from "@/components/assets/asset-receipts";
 import { BoldLivePrice } from "@/components/assets/bold-live-price";
 import { fetchAssetExplorerServer, fetchAssetHeadServer } from "@/lib/api/fetch-asset-explorer-server";
 import { fetchAssetPricesNow } from "@/lib/api/fetch-asset-prices-now";
-import { fmtRowPrice } from "@/components/assets/asset-price-row";
 import { fetchAssetRosterServer } from "@/lib/api/fetch-asset-roster-server";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { unpricedPage } from "@/lib/api/asset-explorer-chips";
@@ -45,7 +44,8 @@ import {
   priceCell,
   priceProv,
   headTime,
-  type PriceCell,
+  historyLine,
+  multiLineFamilies,
   sourceLine,
 } from "@/lib/shared/asset-oracle-view";
 import { viaPage } from "@/lib/shared/asset-via";
@@ -254,7 +254,7 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
   const nowMs = Date.now();
   const read = now.prices[pageLine.id];
   const symbol = page.symbol;
-  const reads = alsoReads(pageLine, e.id, pageOf);
+  const reads = alsoReads(pageLine, e.id, pageOf, multiLineFamilies(section.lines));
   const other = oracleRows(section.lines, pageLine, now, pageOf);
   const rows = tableRows(
     sameRows(pageLine, reads, own ? e.label : null, now),
@@ -271,7 +271,7 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
             line={pageLine}
             symbol={symbol}
             head={{
-              price: headPrice(priceCell(read)),
+              price: priceCell(read),
               info: read?.ok ? priceProv(pageLine, read, symbol) : null,
               symbol,
               change: head?.row?.change ?? null,
@@ -284,6 +284,7 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
             source={sourceLine(pageLine, own ? e.id : null, own ? undefined : { protocol: e.label, symbol })}
             relations={relationsFor(page)}
             markets={line.markets}
+            history={historyLine(pageLine, own ? e.id : null)}
           />
           <OracleTable
             rows={rows}
@@ -292,6 +293,8 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
             chain={chain}
             symbol={symbol}
             refName={own ? `${e.label}'s price` : "the price most protocols read"}
+            gapFrom={own ? `${e.label}'s price` : "the price charted above"}
+            chainName={CHAINS[chain].name}
             now={now}
           />
           <AsOfLine now={now} />
@@ -300,9 +303,6 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
     </Frame>
   );
 }
-
-/** The headline's figure in the Prices row's words: "$1,697", "$1.00". */
-const headPrice = (c: PriceCell): PriceCell => (c.value == null ? c : { ...c, text: `$${fmtRowPrice(c.value)}` });
 
 /** The page under the protocol's heading (H3 with the sections menu, Assets current). */
 function Frame({ protocol: e, children }: { protocol: ProtocolEntry; children: React.ReactNode }) {

@@ -90,12 +90,22 @@ try {
       sourceAfterChart: !!document.querySelector("[data-asset-chart] ~ [data-asset-source-row] [data-asset-source]"),
       source: document.querySelector("[data-asset-source]")?.getAttribute("data-asset-source") ?? "",
       heading: document.querySelector("[data-asset-oracles] h2")?.textContent.trim() ?? "",
-      rows: [...document.querySelectorAll("[data-asset-oracles] [data-asset-oracle]")].map((li) => ({
-        id: li.dataset.assetOracle,
-        group: li.dataset.assetOracleGroup,
-        text: li.textContent.trim(),
-        links: [...li.querySelectorAll("a[data-asset-oracle-link]")].map((a) => a.getAttribute("href")),
+      intro: document.querySelector("[data-asset-oracles-intro]")?.textContent.trim() ?? "",
+      tableName: document.querySelector("[data-asset-oracles] table")?.getAttribute("aria-label") ?? "",
+      rows: [...document.querySelectorAll("[data-asset-oracles] tr[data-asset-oracle]")].map((tr) => ({
+        id: tr.dataset.assetOracle,
+        group: tr.dataset.assetOracleGroup,
+        text: tr.textContent.trim(),
+        href: tr.dataset.assetOracleHref,
+        rowLinks: tr.querySelectorAll("a[data-row-link]").length,
+        label: tr.querySelector("a[data-row-link]")?.getAttribute("aria-label") ?? "",
+        nestedLinks: tr.querySelectorAll("a:not([data-row-cover]):not([data-row-link])").length,
+        expands: tr.querySelectorAll("details, summary").length,
       })),
+      history: document.querySelector("[data-asset-source-row] [data-asset-history]")?.textContent.trim() ?? "",
+      priceCents: /^\$[\d,]+\.\d{2}$/.test(
+        document.querySelector("[data-asset-lw-chart] [data-asset-head-price]")?.textContent.trim() ?? "",
+      ),
       asOf: document.querySelector("[data-asset-as-of]")?.textContent.trim() ?? "",
     }));
     check(words.title === "WETH", "L2 the title", words.title);
@@ -106,7 +116,15 @@ try {
       "L2 the source line ends on Liquity V2's WETH PriceFeed",
       words.source,
     );
-    check(words.heading === "How other protocols price WETH", "L2 the table's heading", words.heading);
+    check(words.heading === "", "L2 the table has no heading", words.heading);
+    check(
+      /^The table below shows how other protocols on Ethereum price WETH: the oracle each one reads, its contract/.test(
+        words.intro,
+      ),
+      "L2 the intro sentence above the table",
+      words.intro,
+    );
+    check(words.tableName === "How other protocols price WETH", "L2 the table keeps its name", words.tableName);
     const same = words.rows.filter((r) => r.group === "same");
     check(
       same.length === 1 && same[0].text.startsWith("Moonwell") && same[0].text.includes("Same oracle as Liquity V2"),
@@ -128,12 +146,35 @@ try {
       !words.rows.some((r) => r.id === "1:0x5f4ec3df9cbd43714fe2740f5e3616155c5b8419"),
       "L2 Liquity V2's line is not a row",
     );
-    const links = words.rows.flatMap((r) => r.links);
+    const links = words.rows.map((r) => r.href).filter(Boolean);
     check(
       links.length > 0 && links.every((h) => new RegExp(`^/ethereum/[a-z0-9-]+/assets/${WETH}$`).test(h)),
-      "L2 each protocol links its page for WETH",
+      "L2 each row links its protocol's page for WETH",
       links.join(" "),
     );
+    check(
+      words.rows.every((r) => r.rowLinks === (r.href ? 1 : 0)),
+      "L2 a row is one link to its page, a plain row where the protocol has none",
+    );
+    check(
+      new Set(words.rows.filter((r) => r.label).map((r) => r.label)).size === words.rows.filter((r) => r.label).length,
+      "L2 each row link has its own accessible name",
+    );
+    check(
+      words.rows.every((r) => r.expands === 0 && r.nestedLinks === 0),
+      "L2 a row does not expand and holds no link of its own",
+    );
+    check(
+      new Set(words.rows.map((r) => r.id)).size === words.rows.length &&
+        words.rows.every((r) => !/\bV[0-9], [A-Z]/.test(r.text.slice(0, 40))),
+      "L2 one row per protocol",
+    );
+    check(
+      /^Stored since \d{1,2} \w{3} \d{4}$/.test(words.history),
+      "L2 the page protocol's history, one line",
+      words.history,
+    );
+    check(words.priceCents, "L2 the chart header's price carries cents");
     check(
       words.asOf === "" || /^As of /.test(words.asOf),
       "L2 the as-of line, where drawn, states one block (the stub draws none)",

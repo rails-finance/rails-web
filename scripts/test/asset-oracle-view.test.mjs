@@ -197,16 +197,21 @@ test("the table: a row per other line, grouped, short names from stored data, no
     [ids["0xa150"]]: null,
   });
   const rows = view.oracleRows(liquity.section.lines, liquity.line, now, pageOf);
-  assert.equal(rows.length, 5);
-  assert.ok(!rows.some((r) => r.id === liquity.line.id), "the page's line is not a row");
-  const aave = rows.find((r) => r.address.startsWith("0x5424"));
+  assert.ok(!rows.some((r) => r.lineId === liquity.line.id), "the page's line is not a row");
+  // One row per protocol: Aave V3 and Aave V4 share an oracle and a contract, in two rows.
   assert.deepEqual(
-    aave.usedBy.map((p) => [p.name, p.href]),
+    rows.map((r) => r.protocol.name),
+    ["Aave V3", "Aave V4", "Maker", "Compound V3", "SparkLend", "Dolomite"],
+  );
+  const [aave, aave4] = rows;
+  assert.deepEqual(
+    [aave, aave4].map((r) => [r.protocol.name, r.protocol.href, r.address]),
     [
-      ["Aave V3", `/ethereum/aave-v3/assets/${WETH}`],
-      ["Aave V4", `/ethereum/aave-v4/assets/${WETH}`],
+      ["Aave V3", `/ethereum/aave-v3/assets/${WETH}`, "0x5424384b256154046e9667ddfaaa5e550145215e"],
+      ["Aave V4", `/ethereum/aave-v4/assets/${WETH}`, "0x5424384b256154046e9667ddfaaa5e550145215e"],
     ],
   );
+  assert.deepEqual([aave.price.text, aave.gap.text], [aave4.price.text, aave4.gap.text]);
   // No short name stored: the full name, and no subtitle (no "Aave's feed").
   assert.equal(aave.name, "Chainlink ETH / USD");
   assert.equal(aave.full, null);
@@ -216,18 +221,10 @@ test("the table: a row per other line, grouped, short names from stored data, no
     [osm.name, osm.kind, osm.full],
     ["Chronicle median", "1 h delayed", "Maker OSM over the Chronicle ETH/USD median"],
   );
-  assert.deepEqual(
-    osm.usedBy.map((p) => p.name),
-    ["Maker"],
-  );
-  assert.equal(osm.markets.length, 3);
+  assert.equal(osm.protocol.name, "Maker", "three ilks, one protocol, one row");
   const spark = rows.find((r) => r.address.startsWith("0x2750"));
   assert.deepEqual([spark.name, spark.kind], ["Chronicle + Chainlink + RedStone", "Aggregated"]);
   const comet = rows.find((r) => r.address.startsWith("0xc005"));
-  assert.deepEqual(view.marketWords(comet.markets[1]), {
-    before: "Compound V3 cWETHv3, via a constant 1 ETH feed",
-    after: ", since 24 Jan 2023",
-  });
   // Gaps against Liquity V2's 1,697.00, signed and rounded to two decimals.
   assert.deepEqual([aave.price.text, aave.gap.text], ["$1,697.10", "+0.01%"]);
   assert.deepEqual([osm.price.text, osm.gap.text], ["$1,702.40", "+0.32%"]);
@@ -241,6 +238,7 @@ test("the table: a row per other line, grouped, short names from stored data, no
   const noRef = { ...now, prices: { ...now.prices, [liquity.line.id]: { ...now.prices[ids["0xa150"]] } } };
   const r2 = view.oracleRows(liquity.section.lines, liquity.line, noRef, pageOf);
   assert.ok(r2.every((r) => r.gap.text === "–" && r.gap.reason === "The feed reverted"));
+  assert.equal(rows.find((r) => r.protocol.name === "Aave V4").protocol.href, `/ethereum/aave-v4/assets/${WETH}`);
   assert.equal(view.asOfText(now), "As of 24 Nov 2026, 07:12 UTC · block 26,483,745");
   assert.ok(rows.every((r) => r.group === "other"));
 });
@@ -272,12 +270,9 @@ test("a protocol on more than one line is named by market", () => {
   ]);
   const now = unreadPricesNow(1, [core, etherfi, gone], "The prices were not read");
   const rows = view.oracleRows([core, etherfi, gone], core, now, () => null);
-  assert.deepEqual(
-    rows[0].usedBy.map((p) => p.name),
-    ["Aave V3 EtherFi"],
-  );
+  assert.equal(rows[0].protocol.name, "Aave V3 EtherFi");
   assert.equal(rows[0].name, "Price cap over Chainlink USDC / USD", "no label: the full name");
-  assert.deepEqual([rows[1].retired, rows[1].usedBy.map((p) => p.name)], [true, ["Maker"]]);
+  assert.deepEqual([rows[1].retired, rows[1].protocol.name], [true, "Maker"]);
   assert.deepEqual([rows[0].price.text, rows[0].price.reason, rows[0].gap], ["–", "The prices were not read", null]);
 });
 
@@ -442,53 +437,48 @@ const liquityNow = () =>
 test("the table: same-oracle readers, then the other lines, then the listed-only protocols", () => {
   const rows = tableFor(liquity, "liquity", liquityNow(), "Liquity V2");
   const groups = rows.map((r) => r.group);
-  assert.deepEqual(groups, ["same", "other", "other", "other", "other", "other", "listed", "listed"]);
+  assert.deepEqual(groups, ["same", "other", "other", "other", "other", "other", "other", "listed", "listed"]);
   assert.deepEqual([...new Set(groups)], ["same", "other", "listed"], "each group is one run, in this order");
   assert.equal(new Set(rows.map((r) => r.id)).size, rows.length, "a row id is unique");
 });
 
-test("a same-oracle row: the page protocol's name, its route, the page line's price, its since-date inside", () => {
+test("a same-oracle row: the page protocol's name, its route, the page line's price", () => {
   const now = liquityNow();
   const [row] = tableFor(liquity, "liquity", now, "Liquity V2");
-  assert.deepEqual(
-    row.usedBy.map((p) => p.name),
-    ["Moonwell"],
-  );
-  assert.equal(row.usedBy[0].href, `/ethereum/moonwell/assets/${WETH}`);
+  assert.equal(row.protocol.name, "Moonwell");
+  assert.equal(row.protocol.href, `/ethereum/moonwell/assets/${WETH}`);
   assert.equal(row.name, "Same oracle as Liquity V2");
   assert.deepEqual(row.via, { words: "its OEV wrapper", address: "0xa0f82711a8b228455a2dfe0656763a60833b5e25" });
   assert.equal(row.address, liquity.line.oracle.address);
   assert.equal(row.price.text, "$1,697.00");
   assert.equal(row.gap.text, "0.00%");
   assert.equal(row.lineId, liquity.line.id);
-  assert.deepEqual(view.marketWords(row.markets[0]), { before: "Moonwell, since 31 May 2026", after: "" });
 });
 
 test('Morpho\'s page has no line of its own: its readers read "The price charted above"', () => {
   const rows = tableFor(morpho, "morpho", sameBlock({}), null, []);
   const same = rows.filter((r) => r.group === "same");
   assert.deepEqual(
-    same.map((r) => [r.usedBy[0].name, r.name]),
+    same.map((r) => [r.protocol.name, r.name]),
     [
       ["Aave V3", "The price charted above"],
       ["Aave V4", "The price charted above"],
     ],
   );
   assert.equal(same[0].via, null);
-  assert.deepEqual(view.marketWords(same[0].markets[0]), { before: "Aave V3, since 27 Jan 2023", after: "" });
 });
 
-test("a listed-only row: no stored price, no contract, no price, no markets", () => {
+test("a listed-only row: no stored price, no contract, no price", () => {
   const rows = tableFor(liquity, "liquity", liquityNow(), "Liquity V2");
   const listed = rows.filter((r) => r.group === "listed");
   assert.deepEqual(
-    listed.map((r) => [r.usedBy[0].name, r.name, r.address, r.price.text, r.gap.text, r.markets.length]),
+    listed.map((r) => [r.protocol.name, r.name, r.address, r.price.text, r.gap.text]),
     [
-      ["Morpho Blue", "No stored price", null, "–", "–", 0],
-      ["Pendle", "No stored price", null, "–", "–", 0],
+      ["Morpho Blue", "No stored price", null, "–", "–"],
+      ["Pendle", "No stored price", null, "–", "–"],
     ],
   );
-  assert.equal(listed[0].usedBy[0].href, null, "pageOf names no page for Morpho Blue here");
+  assert.equal(listed[0].protocol.href, null, "pageOf names no page for Morpho Blue here");
 });
 
 test("stub mode: the same-oracle and listed rows show the price only", () => {
@@ -501,4 +491,127 @@ test("stub mode: the same-oracle and listed rows show the price only", () => {
   assert.equal(rows[0].price.text, "$1,697.00");
   assert.ok(rows.every((r) => !("stamp" in r.price)));
   assert.equal(view.asOfText(stub), null);
+});
+
+// ── One row per protocol, linked, with its own label ───────────────────────
+
+test("the Aave split: V3 and V4 are two rows with the same oracle and contract, each linked to its page", () => {
+  const rows = tableFor(morpho, "morpho", sameBlock({}), null, []);
+  const same = rows.filter((r) => r.group === "same");
+  assert.deepEqual(
+    same.map((r) => [r.protocol.name, r.protocol.href, r.address]),
+    [
+      ["Aave V3", `/ethereum/aave-v3/assets/${WETH}`, "0x5424384b256154046e9667ddfaaa5e550145215e"],
+      ["Aave V4", `/ethereum/aave-v4/assets/${WETH}`, "0x5424384b256154046e9667ddfaaa5e550145215e"],
+    ],
+  );
+});
+
+test("a row has an href only where its protocol has an assets page", () => {
+  const rows = tableFor(liquity, "liquity", liquityNow(), "Liquity V2");
+  const hrefs = Object.fromEntries(rows.map((r) => [r.protocol.name, r.protocol.href]));
+  assert.equal(hrefs.Moonwell, `/ethereum/moonwell/assets/${WETH}`);
+  assert.equal(hrefs.Maker, `/ethereum/makerdao/assets/${WETH}`);
+  assert.equal(hrefs.Dolomite, null);
+  assert.equal(hrefs.Pendle, null);
+  assert.equal(hrefs["Morpho Blue"], null);
+});
+
+// USDC on Ethereum as Morpho Blue reads it: Compound V3's cUSDCv3 on the charted line, cWETHv3 on another.
+const USDC = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+const CHAINLINK_USDC = "0x8fffffd4afb6115b954bd326cbe7b4ba576818f6";
+const usdcRoster = {
+  readAt: {},
+  native: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  related: [],
+  assets: [
+    {
+      chain: 1,
+      token: USDC,
+      symbol: "USDC",
+      underlying: null,
+      wrapped: [],
+      lines: [
+        rl(CHAINLINK_USDC, "Chainlink USDC / USD", "chainlink", [
+          s(`aave-v3:core:${USDC}`, "Aave V3 Core", 19384),
+          s(`aave-v3:prime:${USDC}`, "Aave V3 Prime", 19933),
+          s(`aave-v4:${USDC}`, "Aave V4", 20535),
+          s(`cv3:0xc3d688b66703497daa19211eedff47f25384cdc3:${USDC}`, "Compound V3 cUSDCv3", 19230),
+        ]),
+        rl("0xd09124f3d9d8d4f6e4e1c9b3a4c0c5e6f7a8b9c0", "Chainlink USDC / ETH", "chainlink", [
+          s(`cv3:0xa17581a9e3356d9a858b789d68b4d866e593ae94:${USDC}`, "Compound V3 cWETHv3", 19381),
+        ]),
+      ],
+    },
+  ],
+};
+const usdcPage = assetPage(usdcRoster, 1);
+const usdcFrom = (id, label) => {
+  const { page: p, view: v } = viaPage(usdcPage, { id, label, chain: 1 });
+  const section = p.chains[0];
+  return { section, view: v, line: section.lines.find((l) => l.id === v.lineId) ?? section.lines[0] };
+};
+const usdcMorpho = usdcFrom("morpho", "Morpho Blue");
+const usdcPageOf = (id) => ({ "aave-v3": 1, "aave-v4": 1, compound: 1 })[id] ? `/ethereum/${id}/assets/${USDC}` : null;
+const usdcRows = () => {
+  const now = sameBlock({ [usdcMorpho.line.id]: 0.9999, [usdcMorpho.section.lines[1].id]: 1.0001 });
+  const multi = view.multiLineFamilies(usdcMorpho.section.lines);
+  const reads = view.alsoReads(usdcMorpho.line, "morpho", usdcPageOf, multi);
+  const other = view.oracleRows(usdcMorpho.section.lines, usdcMorpho.line, now, usdcPageOf);
+  return view.tableRows(view.sameRows(usdcMorpho.line, reads, null, now), other, []);
+};
+
+test("a protocol that reads two lines gets a row per market, both linked to its page", () => {
+  assert.deepEqual([...view.multiLineFamilies(usdcMorpho.section.lines)], ["Compound V3"]);
+  const rows = usdcRows();
+  assert.deepEqual(
+    rows.map((r) => [r.group, r.protocol.name, r.name]),
+    [
+      ["same", "Compound V3 cUSDCv3", "The price charted above"],
+      ["same", "Aave V3", "The price charted above"],
+      ["same", "Aave V4", "The price charted above"],
+      ["other", "Compound V3 cWETHv3", "Chainlink USDC / ETH"],
+    ],
+  );
+  const comp = rows.filter((r) => r.protocol.name.startsWith("Compound V3"));
+  assert.equal(comp[0].protocol.href, comp[1].protocol.href);
+  assert.deepEqual([comp[0].price.text, comp[1].price.text], ["$0.9999", "$1.0001"]);
+});
+
+test("row labels are unique on the Morpho USDC page and name the market", () => {
+  const labels = usdcRows().map(view.rowLabel);
+  assert.equal(new Set(labels).size, labels.length);
+  assert.ok(labels.includes("Compound V3 cUSDCv3: The price charted above, $0.9999"));
+  assert.ok(labels.includes("Compound V3 cWETHv3: Chainlink USDC / ETH, $1.0001"));
+  const listed = view.listedRows([{ name: "Pendle", explorer: "pendle", href: null, reason: null }], sameBlock({}));
+  assert.equal(view.rowLabel(listed[0]), "Pendle: No stored price");
+});
+
+test("the page protocol's markets under the chart, with their first stored days", () => {
+  const aave = from("aave-v3", "Aave V3");
+  assert.equal(view.historyLine(aave.line, "aave-v3"), "Core since 27 Jan 2023 · Prime since 29 Jul 2024");
+  assert.equal(view.historyLine(liquity.line, "liquity"), "Stored since 19 May 2025");
+  assert.equal(view.historyLine(morpho.line, null), null, "a page with no line of its own has none");
+  assert.equal(view.historyLine(maker.line, "aave-v3"), null);
+});
+
+test("the chart header's price carries cents, as the table's", () => {
+  const p = { ok: true, price: 1705.28, block: 1, timestamp: TS, read: "latestRoundData()" };
+  assert.equal(view.priceCell(p).text, "$1,705.28");
+});
+
+test("the intro above the table, in its three cases", () => {
+  const o = { chain: "Ethereum", symbol: "WETH", sameBlock: false, gapFrom: "Liquity V2's price", hasListed: false };
+  assert.equal(
+    view.tableIntro(o),
+    "The table below shows how other protocols on Ethereum price WETH: the oracle each one reads, its contract and its latest price.",
+  );
+  assert.equal(
+    view.tableIntro({ ...o, sameBlock: true }),
+    "The table below shows how other protocols on Ethereum price WETH: the oracle each one reads, its contract, its price at one block and its gap from Liquity V2's price.",
+  );
+  assert.equal(
+    view.tableIntro({ ...o, symbol: "USDC", sameBlock: true, gapFrom: "the price charted above", hasListed: true }),
+    "The table below shows how other protocols on Ethereum price USDC: the oracle each one reads, its contract, its price at one block and its gap from the price charted above. Protocols marked No stored price list USDC with no oracle Rails stores.",
+  );
 });

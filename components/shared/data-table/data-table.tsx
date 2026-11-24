@@ -520,12 +520,21 @@ export function DataTableLeadCell({
 /** The lead zone's mark and chain glyph for a stacked card's first line (D6),
  *  where the zone narrows to its edge; drawn only there, and silent (the lead
  *  cell names both). */
-export function DataTableLeadMark({ protocol, chain }: { protocol: string; chain: ChainId }) {
+export function DataTableLeadMark({
+  protocol,
+  chain,
+  chainless,
+}: {
+  protocol: string;
+  chain: ChainId;
+  /** With a plain lead cell on a page that is one chain: the mark alone, as the cell draws it. */
+  chainless?: boolean;
+}) {
   return (
     <span className="dt-lead-mark shrink-0 items-center gap-1 text-rb-500" aria-hidden>
       {/* An empty id is a vault no explorer deploys (sBOLD, ui-jobs 765): no mark. */}
       {protocol && <ProtocolIcon id={protocol} className="h-4 w-4 shrink-0 [&:is(img)]:grayscale" />}
-      <ChainGlyph id={chain} className="h-4 w-4 shrink-0" />
+      {!chainless && <ChainGlyph id={chain} className="h-4 w-4 shrink-0" />}
     </span>
   );
 }
