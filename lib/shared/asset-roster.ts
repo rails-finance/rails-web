@@ -27,6 +27,47 @@ export interface RosterOracle {
   name: string;
   kind: string;
   reads?: string;
+  /** Rails' short words for the oracle (`ORACLE_LABELS`), where it stores them. */
+  label?: OracleLabel;
+}
+
+/** How an asset page names an oracle in a table cell: a short name for the
+ *  oracle's full name, and the kind of read under it in the words the
+ *  same-block price read answers with ("1 h delayed", "fixed", "aggregated",
+ *  "capped"); `delay`, in seconds, where the oracle releases each price
+ *  late by design (a Maker OSM's hop). Each is optional: a page falls back to
+ *  the full name and draws no kind. No deployer is recorded, so no label
+ *  names one. */
+export interface OracleLabel {
+  short?: string;
+  kind?: string;
+  delay?: number;
+}
+
+/** The labels Rails stores, by chain and oracle address, each taken from the
+ *  oracle's roster name and kind (ui-jobs 818). */
+export const ORACLE_LABELS: Record<string, OracleLabel> = {
+  // Ethereum, WETH: "Maker OSM over the Chronicle ETH/USD median" (kind osm).
+  "1:0x81fe72b5a8d1a857d176c3e7d5bd2679a9b85763": {
+    short: "Chronicle median",
+    kind: "1 h delayed",
+    delay: 3600,
+  },
+  // "Aggregated price feed ETH/USD from Chronicle, Chainlink, and RedStone oracles" (kind adapter).
+  "1:0x2750e4cb635af1fccfb10c0ea54b5b5bfc2759b6": { short: "Chronicle + Chainlink + RedStone", kind: "aggregated" },
+  // "Dolomite oracle aggregator" (kind protocol); WETH and USDC read the one address.
+  "1:0xa150ef2d5827db283321d15d62d5d07fb41d636e": { short: "Dolomite aggregator", kind: "aggregated" },
+  // Ethereum, USDC: "Price cap over Chainlink USDC / USD" (kind adapter, "Capped USDC / USD"), two addresses.
+  "1:0x3f73f03aa83b2a48ed27e964ed0fdb590332095b": { short: "Chainlink USDC / USD", kind: "capped" },
+  "1:0xb6557f02f0a5da7b9d3c2d979cc19e00e756f6da": { short: "Chainlink USDC / USD", kind: "capped" },
+  // "Maker fixed at 1.00 (a DSValue)" and SparkLend's "Fixed at 1.00" (kind fixed).
+  "1:0x77b68899b99b686f415d074278a9a16b336085a0": { short: "Fixed at 1.00", kind: "fixed" },
+  "1:0x42a03f81dd8a1cecd746dc262e4d1cd9fd39f777": { kind: "fixed" },
+};
+
+/** The oracle's label on `chain`, undefined where Rails stores none. */
+export function oracleLabel(chain: number, address: string): OracleLabel | undefined {
+  return ORACLE_LABELS[`${chain}:${address.toLowerCase()}`];
 }
 export interface RosterSeries {
   key: string;
@@ -180,7 +221,9 @@ export function assetPage(answer: AssetRosterAnswer, chain: number): AssetPage |
       const id = `${a.chain}:${l.oracle.address}`;
       let line = lines.find((x) => x.id === id);
       if (!line) {
-        line = { id, oracle: l.oracle, protocols: [], readers: 0, span: 0, drawn: null, series: [] };
+        const label = oracleLabel(a.chain, l.oracle.address);
+        const oracle = label ? { ...l.oracle, label } : l.oracle;
+        line = { id, oracle, protocols: [], readers: 0, span: 0, drawn: null, series: [] };
         lines.push(line);
       }
       for (const s of l.series) line.series.push({ ...s, token: { chain: a.chain, token: a.token, symbol: a.symbol } });
