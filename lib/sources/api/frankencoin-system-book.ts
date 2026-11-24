@@ -17,6 +17,7 @@
 // lane the /api/frankencoin/positions proxy serves, one hop shorter).
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { fetchWithRetry } from "@/lib/api/resilient-fetch";
 import { buildFrankencoinPositionRows, type RawFrankencoinPositionRow } from "./frankencoin-positions";
 
 const PAGE = 100;
@@ -79,8 +80,13 @@ export async function loadFrankencoinBook(): Promise<FrankencoinBook> {
     const rows = [];
     for (let page = 0; page < MAX_PAGES; page++) {
       const url = `${base}/api/frankencoin/positions?limit=${PAGE}&offset=${page * PAGE}&sortOrder=asc`;
-      const res = await fetch(url, createAuthFetchOptions({ next: { revalidate: REVALIDATE_SECONDS } }));
-      if (!res.ok) return stub();
+      // A page that throws or answers 429/5xx is asked again (lib/api/resilient-fetch.ts),
+      // so one failed page does not withhold the whole book (ui-jobs 826).
+      const res = await fetchWithRetry(url, createAuthFetchOptions({ next: { revalidate: REVALIDATE_SECONDS } }));
+      if (!res.ok) {
+        void res.body?.cancel().catch(() => undefined);
+        return stub();
+      }
       const raw = (await res.json()) as { rows: RawFrankencoinPositionRow[]; total: number };
       rows.push(...buildFrankencoinPositionRows(raw.rows));
       if (rows.length >= raw.total || raw.rows.length === 0) break;
