@@ -43,7 +43,7 @@ import {
   ebisuDeposits,
 } from "@/lib/wallet/families/liquity-forks";
 import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
-import { withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
+import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
@@ -95,12 +95,13 @@ export function walletFamiliesLine(): string {
     byChain.set(f.summaryChain, names);
   }
   const list = (n: string[]) => (n.length < 2 ? n.join("") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`);
-  const where: Record<WalletSummaryRow["chain"], string> = {
+  // No wallet module reads Arc or Sepolia, so neither has a phrase.
+  const where: Partial<Record<WalletSummaryRow["chain"], string>> = {
     ethereum: "on Ethereum",
     base: "on Base",
     arbitrum: "on Arbitrum where Rails has read the wallet",
   };
-  return [...byChain].map(([chain, names]) => `${list(names)} ${where[chain]}`).join("; ");
+  return [...byChain].map(([chain, names]) => `${list(names)} ${where[chain] ?? `on ${chain}`}`).join("; ");
 }
 
 /** A listing read that did not answer, or answered part of the wallet: its
@@ -265,12 +266,15 @@ export async function readSummary(address: string, signal: AbortSignal, readerIp
   }
   const extra = await listing;
   const open = extra.rows.filter((r) => r.status === "open").length;
+  // Testnet rows stay in `rows` and leave the totals.
+  const testnet = rows.filter((r) => !countedRow(r));
+  const testnetOpen = testnet.filter((r) => r.status === "open").length;
   return {
     ...first!,
     rows: [...rows, ...extra.rows],
-    total: first!.total + extra.rows.length,
-    open: first!.open + open,
-    closed: first!.closed + extra.rows.length - open,
+    total: first!.total - testnet.length + extra.rows.length,
+    open: first!.open - testnetOpen + open,
+    closed: first!.closed - (testnet.length - testnetOpen) + extra.rows.length - open,
     listingFailed: extra.failed,
   };
 }
@@ -496,7 +500,7 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
       }
     }
     for (const r of summary.rows) {
-      if (!taken.has(r))
+      if (!taken.has(r) && countedRow(r))
         positions.push({
           chain: r.chain,
           family: r.family,

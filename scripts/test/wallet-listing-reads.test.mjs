@@ -38,7 +38,41 @@ register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 process.env.RAILS_API_URL = "http://box.test";
 
 const W = "0x2291f52bddc937b5b840d15e551e1da8c80c2b3c";
+const W2 = "0x9999999999999999999999999999999999999999";
 const E18 = "000000000000000000";
+// A summary row with no page (href null), as a Morpho Vault V2 holding is stored,
+// and the same row under a family a wallet module takes.
+const noPageRow = (family) => ({
+  chain: "ethereum",
+  family,
+  positionId: `${family}:1`,
+  owner: W2,
+  market: null,
+  status: "open",
+  collateral: null,
+  debt: null,
+  collateralUsd: null,
+  debtUsd: null,
+  usdSource: null,
+  peakCollateral: null,
+  peakDebt: null,
+  openedAt: null,
+  closedAt: null,
+  lastActivityAt: null,
+  txCount: null,
+  liquidationCount: null,
+  readBlock: null,
+  readAt: null,
+  href: null,
+  card: {},
+  writtenAt: "2026-11-24T00:00:00Z",
+});
+const noPageRows = [
+  noPageRow("morpho-vault-v2"),
+  noPageRow("aave-v3"),
+  { ...noPageRow("aave-v3"), chain: "arc", positionId: "arc:1" },
+  { ...noPageRow("aave-v3"), chain: "sepolia", positionId: "sepolia:1" },
+];
 
 // The backend, by route. `v2sp` sets how the V2 deposit listing answers;
 // `ebisuSp` the rows Ebisu's deposit listing answers (the other forks' none).
@@ -52,6 +86,16 @@ globalThis.fetch = async (input, init = {}) => {
   calls.push(url.pathname);
   if (url.pathname === `/api/wallet/${W}/positions`)
     return json({ address: W, rows: [], total: 0, open: 0, closed: 0, limit: 500, offset: 0 });
+  if (url.pathname === `/api/wallet/${W2}/positions`)
+    return json({
+      address: W2,
+      rows: noPageRows,
+      total: noPageRows.length,
+      open: noPageRows.length,
+      closed: 0,
+      limit: 500,
+      offset: 0,
+    });
   if (url.pathname === "/api/liquity-v1/positions")
     return json({
       rows: [
@@ -218,6 +262,61 @@ test("counts: partial while a listing failed, and not kept; whole and kept after
   calls = [];
   await readWalletCounts(W);
   assert.equal(calls.length, 0, "a whole answer is kept");
+});
+
+test("counts: a row with a null href counts and passes through without throwing", async () => {
+  v2sp = "ok";
+  const c = await readWalletCounts(W2);
+  assert.equal(c.error, undefined);
+  // The listings add their own rows. The Sepolia row is a testnet and is not
+  // counted; the Arc row is.
+  const noPage = c.positions.filter((p) => p.href === null);
+  assert.deepEqual(noPage.map((p) => p.chain).sort(), ["arc", "ethereum", "ethereum"]);
+});
+
+test("summary: Sepolia rows stay in the rows and leave the totals", async () => {
+  v2sp = "ok";
+  const s = await readSummary(W2, signal());
+  const counted = s.rows.filter((r) => r.chain !== "sepolia");
+  assert.equal(
+    s.rows.some((r) => r.chain === "sepolia"),
+    true,
+  );
+  assert.equal(s.total, counted.length);
+  assert.equal(s.open, counted.filter((r) => r.status === "open").length);
+  assert.equal(s.closed, 0);
+});
+
+test("menu: a null-href row resolves its protocol by chain and family, through the real roster", async () => {
+  const { protocolEntryOf, menuProtocolOf } = await import("../../lib/wallet/position-protocol.ts");
+  const { walletProtocolMenu } = await import("../../lib/wallet/summary-counts.ts");
+  const withPage = {
+    chain: "ethereum",
+    family: "aave-v3",
+    positionId: "1",
+    status: "open",
+    href: "/ethereum/aave-v3/1",
+  };
+  const noPage = { ...withPage, positionId: "2", href: null };
+  const entry = protocolEntryOf(withPage);
+  assert.ok(entry);
+  assert.equal(protocolEntryOf(noPage), entry);
+  const m = walletProtocolMenu(
+    [noPage, withPage],
+    () => false,
+    (p) => menuProtocolOf(p, W),
+    `/wallet/${W}`,
+  );
+  assert.equal(m.rows.length, 1);
+  assert.equal(m.rows[0].name, entry.label);
+  const alone = walletProtocolMenu(
+    [noPage, { ...noPage, family: "liquity-v2", positionId: "3" }],
+    () => false,
+    (p) => menuProtocolOf(p, W),
+    `/wallet/${W}`,
+  );
+  assert.ok(alone.rows.every((r) => r.name !== r.first.family));
+  assert.equal(protocolEntryOf({ ...noPage, family: "no-such-family" }), undefined);
 });
 
 // The deposit modules' head reads, the pool reader stubbed.
