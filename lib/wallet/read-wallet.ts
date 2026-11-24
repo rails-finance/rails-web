@@ -153,7 +153,7 @@ export function walletFamiliesLine(): string {
     sepolia: "on Sepolia (testnet)",
   };
   return [...byChain.values()]
-    .map((g) => `${list(g.names)} ${where[g.chain]}${g.onVisit ? " where Rails has read the wallet" : ""}`)
+    .map((g) => `${list(g.names)} ${where[g.chain]}${g.onVisit ? " once the wallet has been opened there" : ""}`)
     .join("; ");
 }
 
