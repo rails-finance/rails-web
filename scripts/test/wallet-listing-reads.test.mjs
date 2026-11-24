@@ -86,8 +86,6 @@ globalThis.fetch = async (input, init = {}) => {
   const url = new URL(typeof input === "string" ? input : input.url);
   calls.push(url.pathname);
   if (/^\/api\/wallet\/[^/]+\/positions$/.test(url.pathname)) summaryUrls.push(url);
-  if (/^\/api\/wallet\/[^/]+\/positions$/.test(url.pathname))
-    return json({ address: W, rows: [], total: 0, open: 0, closed: 0, limit: 500, offset: 0 });
   if (url.pathname === `/api/wallet/${W2}/positions`)
     return json({
       address: W2,
@@ -98,6 +96,8 @@ globalThis.fetch = async (input, init = {}) => {
       limit: 500,
       offset: 0,
     });
+  if (/^\/api\/wallet\/[^/]+\/positions$/.test(url.pathname))
+    return json({ address: W, rows: [], total: 0, open: 0, closed: 0, limit: 500, offset: 0 });
   if (url.pathname === "/api/liquity-v1/positions")
     return json({
       rows: [
