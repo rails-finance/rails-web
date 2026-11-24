@@ -119,6 +119,29 @@ export const CENSUS_NOTE =
 export const CENSUS_NO_TOTAL =
   "Vault share values are the census's at each share's census block, so the section states no total.";
 
+/** A family's positions the read counted and did not draw, by status. */
+export interface UndrawnCounts {
+  open: number;
+  closed: number;
+}
+
+/** The positions not drawn that the Status pill counts. */
+export const undrawnCount = (u: UndrawnCounts, status?: "open" | "closed"): number =>
+  status === "open" ? u.open : status === "closed" ? u.closed : u.open + u.closed;
+
+/** The line under a section's cards naming what it does not draw on one
+ *  chain, for the Status pill: "1,180 more holdings on Base are not drawn
+ *  (80 open); the open ones with the largest census value come first." */
+export function undrawnLine(u: UndrawnCounts, chain: string, status?: "open" | "closed"): string {
+  const n = undrawnCount(u, status);
+  const num = n.toLocaleString("en-US");
+  const noun = `${status ? `${status} ` : ""}${n === 1 ? "holding" : "holdings"}`;
+  const head = `${num} more ${noun} on ${chain} ${n === 1 ? "is" : "are"} not drawn`;
+  if (status === "closed") return `${head}.`;
+  if (status === "open") return `${head}; the ones with the largest census value come first.`;
+  return `${head} (${u.open.toLocaleString("en-US")} open); the open ones with the largest census value come first.`;
+}
+
 /** A position on a testnet, which no wallet count or total takes in. */
 export const onTestnet = (p: Pick<WalletPosition, "chain">): boolean => CHAINS[p.chain]?.testnet === true;
 

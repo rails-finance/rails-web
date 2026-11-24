@@ -61,6 +61,8 @@ import {
   walletTotal,
   andList,
   onTestnet,
+  undrawnCount,
+  undrawnLine,
   type WalletSection,
   type WalletTotal,
 } from "@/lib/wallet/wallet-sections";
@@ -192,10 +194,6 @@ function Totals({
  *  vault shares, ui-jobs 783), with its chain. */
 type Undrawn = NonNullable<WalletFamilyRead["undrawn"]> & { chain: ChainId };
 
-/** The positions not drawn that the Status pill counts. */
-const undrawnCount = (u: Undrawn, status?: WalletStatus) =>
-  status === "open" ? u.open : status === "closed" ? u.closed : u.open + u.closed;
-
 /** One protocol's section (W3): its name, the listing's band (N7) where it
  *  holds two positions or more, then its cards, open by risk, then closed
  *  newest first; under them, how many more the read did not draw. */
@@ -231,13 +229,14 @@ function Section({ s, undrawn, status }: { s: WalletSection; undrawn: Undrawn[];
         ))}
       </div>
       {undrawn.map((u) => {
-        const n = u.open + u.closed;
+        // As the heading's count, the Status pill's positions alone.
+        const n = undrawnCount(u, status);
         return (
-          <p key={u.chain} className="mt-3 text-xs text-rb-500" data-wallet-undrawn={n}>
-            {n.toLocaleString("en-US")} more {n === 1 ? "holding" : "holdings"} on {chainMeta(u.chain).name}{" "}
-            {n === 1 ? "is" : "are"} not drawn ({u.open.toLocaleString("en-US")} open); the open ones with the largest
-            census value come first.
-          </p>
+          n > 0 && (
+            <p key={u.chain} className="mt-3 text-xs text-rb-500" data-wallet-undrawn={n}>
+              {undrawnLine(u, chainMeta(u.chain).name, status)}
+            </p>
+          )
         );
       })}
     </section>

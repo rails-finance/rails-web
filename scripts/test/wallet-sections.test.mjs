@@ -551,3 +551,23 @@ test("a stored section holding a Trove on an emptied branch states no subtotal",
   assert.deepEqual(s.band.legs, []);
   assert.equal(s.band.note, unreadNote(2, 2));
 });
+
+test("the undrawn line follows the Status pill, as the heading's count", async () => {
+  const { undrawnCount, undrawnLine } = await import("../../lib/wallet/wallet-sections.ts");
+  const u = { open: 80, closed: 1100 };
+  assert.equal(undrawnCount(u), 1180);
+  assert.equal(
+    undrawnLine(u, "Base"),
+    "1,180 more holdings on Base are not drawn (80 open); the open ones with the largest census value come first.",
+  );
+  assert.equal(
+    undrawnLine(u, "Base", "open"),
+    "80 more open holdings on Base are not drawn; the ones with the largest census value come first.",
+  );
+  assert.equal(undrawnLine(u, "Base", "closed"), "1,100 more closed holdings on Base are not drawn.");
+  assert.equal(
+    undrawnLine({ open: 1, closed: 0 }, "Ethereum", "open").startsWith("1 more open holding on Ethereum is"),
+    true,
+  );
+  assert.equal(undrawnCount({ open: 0, closed: 3 }, "open"), 0);
+});
