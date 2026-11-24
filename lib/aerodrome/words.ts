@@ -494,7 +494,7 @@ export const frontDoorWords = (site: SlipstreamSite) => ({
   // Optimism's door first (ui-jobs 578); Aerodrome's line waits on its own review.
   line:
     site.chainName === "Optimism"
-      ? `Enter a wallet address above to see its ${site.label} Slipstream positions on Optimism, staked or unstaked. You'll see each position's price range, the fees or ${site.reward.symbol} it earned and how its pool did over the last 30 days.`
+      ? `Enter a wallet address above to see its positions in ${site.label}'s Slipstream pools on Optimism, staked or unstaked. You'll see each position's price range and the fees or ${site.reward.symbol} rewards it earned over the last 30 days, with its pool's figures beside them.`
       : `A wallet's ${site.label} Slipstream positions on ${site.chainName}, staked or not, each with its range, fees or ${site.reward.symbol} and pool over the last 30 days.`,
   heading: `${site.label} positions`,
   none: `This address holds no ${site.label} Slipstream position with liquidity in it.`,
