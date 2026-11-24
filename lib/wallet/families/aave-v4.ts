@@ -141,6 +141,7 @@ export const aaveV4Arc: FamilyModule = {
   chain: ARC_CHAIN_ID,
   summaryChain: "arc",
   summaryFamily: "aave-v4",
+  storedOnVisit: true,
   async shape(rows) {
     return rows.map((r): WalletPosition => {
       const read = arcReadOf(r.card as ArcCard);

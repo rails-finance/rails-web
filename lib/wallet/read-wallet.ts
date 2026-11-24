@@ -5,7 +5,9 @@
 // family's listing builder and reads the head state of its open positions,
 // one batched read per family. Every family runs at once under one 8 s budget
 // (allSettled): a family whose head read does not answer keeps its store
-// figures and says `headRead: "failed"`. Answers are kept 60 s per address.
+// figures and says `headRead: "failed"`. The families with no store are read
+// at visit inside the same budget (lib/wallet/families/visit.ts). Answers are
+// kept 60 s per address.
 
 import { WALLET_FORMER_FAMILIES } from "@/lib/wallet/moved-row";
 import { walletRowStatus } from "@/lib/wallet/moved-row";
@@ -35,7 +37,10 @@ import { ARC_ON_WALLET, aaveV4Arc, aaveV4Base, aaveV4Ethereum } from "@/lib/wall
 import { compoundV3Base, compoundV3Ethereum } from "@/lib/wallet/families/compound";
 import { compoundV2 } from "@/lib/wallet/families/compound-v2";
 import { moonwellBase, moonwellEthereum } from "@/lib/wallet/families/moonwell";
-import { eulerV2Base } from "@/lib/wallet/families/euler-base";
+import { eulerV2Arbitrum, eulerV2Base } from "@/lib/wallet/families/euler";
+import { aaveV3Optimism, compoundV3Optimism } from "@/lib/wallet/families/optimism";
+import { morphoArc, morphoOptimism } from "@/lib/wallet/families/morpho-at-block";
+import { readVisitFamilies, visitFamiliesLine, type VisitModule } from "@/lib/wallet/families/visit";
 import { skySavings } from "@/lib/wallet/families/sky-savings";
 import { llamalend } from "@/lib/wallet/families/llamalend";
 import { dolomite } from "@/lib/wallet/families/dolomite";
@@ -106,6 +111,7 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   seamless,
   moonwellEthereum,
   eulerV2Base,
+  eulerV2Arbitrum,
   skySavings,
   llamalend,
   dolomite,
@@ -120,27 +126,40 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   vaultsBase,
 ];
 
+/** The families read at visit, with no store (lib/wallet/families/visit.ts),
+ *  in the decision's order. Each makes no call while its explorer is
+ *  unlaunched. */
+export const WALLET_VISIT_FAMILIES: VisitModule[] = [aaveV3Optimism, compoundV3Optimism, morphoOptimism, morphoArc];
+
 /** The families the page reads, by chain, in one sentence for the empty
- *  state: "Aave V3, … and Asymmetry on Ethereum; … on Base; …". The Arbitrum
- *  and Arc rows are written when Rails reads the wallet there, which the sentence says. */
+ *  state: "Aave V3, … and Asymmetry on Ethereum; … on Base; …". A module whose
+ *  rows are written when Rails reads the wallet there (`storedOnVisit`) is
+ *  named apart, which the sentence says. */
 export function walletFamiliesLine(): string {
-  const byChain = new Map<WalletSummaryRow["chain"], string[]>();
+  const byChain = new Map<string, { chain: WalletSummaryRow["chain"]; onVisit: boolean; names: string[] }>();
   for (const f of WALLET_FAMILIES) {
     if (f.summaryChain === "arc" && !ARC_ON_WALLET) continue;
-    const names = byChain.get(f.summaryChain) ?? [];
-    for (const n of f.lineNames ?? [f.name]) if (!names.includes(n)) names.push(n);
-    byChain.set(f.summaryChain, names);
+    const key = `${f.summaryChain}:${f.storedOnVisit === true}`;
+    const g = byChain.get(key) ?? { chain: f.summaryChain, onVisit: f.storedOnVisit === true, names: [] };
+    for (const n of f.lineNames ?? [f.name]) if (!g.names.includes(n)) g.names.push(n);
+    byChain.set(key, g);
   }
   const list = (n: string[]) => (n.length < 2 ? n.join("") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`);
   const where: Record<WalletSummaryRow["chain"], string> = {
     ethereum: "on Ethereum",
     base: "on Base",
-    arbitrum: "on Arbitrum where Rails has read the wallet",
-    arc: "on Arc where Rails has read the wallet",
+    arbitrum: "on Arbitrum",
+    arc: "on Arc",
     sepolia: "on Sepolia (testnet)",
   };
-  return [...byChain].map(([chain, names]) => `${list(names)} ${where[chain]}`).join("; ");
+  return [...byChain.values()]
+    .map((g) => `${list(g.names)} ${where[g.chain]}${g.onVisit ? " where Rails has read the wallet" : ""}`)
+    .join("; ");
 }
+
+/** The families read at each visit, by chain, for the empty state: "Aave V3,
+ *  Compound V3 and Morpho Blue on Optimism"; empty while none is on. */
+export const walletVisitLine = (): string => visitFamiliesLine(WALLET_VISIT_FAMILIES);
 
 /** A listing read that did not answer, or answered part of the wallet: its
  *  module's part of the answer says so, and no total stands while it does. */
@@ -390,12 +409,13 @@ async function readFamily(
   };
 }
 
-/** The protocols the rows name, in the read's order, with their row counts. */
-function heldOf(rows: WalletSummaryRow[]): WalletRead["held"] {
+/** The protocols the rows and the positions read at visit name, in the
+ *  read's order, with their counts. */
+function heldOf(rows: WalletSummaryRow[], visited: WalletPosition[] = []): WalletRead["held"] {
   return WALLET_PROTOCOLS.map((p) => ({
     slug: p.slug,
     name: p.name,
-    positions: rows.filter((r) => r.family === p.slug).length,
+    positions: rows.filter((r) => r.family === p.slug).length + visited.filter((v) => v.family === p.slug).length,
   })).filter((p) => p.positions > 0);
 }
 
@@ -426,8 +446,11 @@ export async function readWalletUncached(
     };
   }
   const serverMs = Date.now() - t0;
-  const held = heldOf(summary.rows);
   const reading = opts.protocol ? WALLET_FAMILIES.filter((f) => f.summaryFamily === opts.protocol) : WALLET_FAMILIES;
+  // The families read at visit start here, once the summary and the listing
+  // reads have settled, beside the stored families' head reads.
+  const visiting = WALLET_VISIT_FAMILIES.filter((m) => !opts.protocol || m.family === opts.protocol);
+  const visits = readVisitFamilies(visiting, address, Math.max(500, deadline - Date.now()), readerIp);
   const groups = reading
     .map((f) => ({
       f,
@@ -435,6 +458,8 @@ export async function readWalletUncached(
     }))
     .filter((g) => g.rows.length > 0);
   const settled = await Promise.allSettled(groups.map((g) => readFamily(g.f, g.rows, address, deadline, readerIp)));
+  const visited = await visits;
+  const held = heldOf(summary.rows, visited.positions);
   const families: WalletFamilyRead[] = [];
   const positions: WalletPosition[] = [];
   settled.forEach((s, i) => {
@@ -456,6 +481,8 @@ export async function readWalletUncached(
       });
     }
   });
+  positions.push(...visited.positions);
+  families.push(...visited.families);
   // A listing read that did not answer: its module's part says so.
   const failed = summary.listingFailed.filter((x) => !opts.protocol || x.module.summaryFamily === opts.protocol);
   for (const { module: f, what, error, heldOnly } of failed) {
@@ -479,14 +506,16 @@ export async function readWalletUncached(
     positions,
     families,
     // A testnet's rows are not counted (WALLET_COUNTS_SCOPE): readSummary's
-    // total already leaves them out.
-    total: opts.protocol ? groups.reduce((s, g) => s + g.rows.filter(countedRow).length, 0) : summary.total,
+    // total already leaves them out. The positions read at visit count beside them.
+    total:
+      (opts.protocol ? groups.reduce((s, g) => s + g.rows.filter(countedRow).length, 0) : summary.total) +
+      visited.positions.length,
     readAt: Math.floor(Date.now() / 1000),
     serverMs,
     ms: Date.now() - t0,
     protocol: opts.protocol,
     held,
-    ...(failed.length ? { partial: failed.map((x) => x.what) } : {}),
+    ...(failed.length || visited.failed.length ? { partial: [...failed.map((x) => x.what), ...visited.failed] } : {}),
   };
 }
 
