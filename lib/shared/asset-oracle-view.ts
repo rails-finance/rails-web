@@ -132,6 +132,56 @@ export function alsoReadsWords(e: AlsoReadsEntry): { before: string; after: stri
   return { before: `via ${e.route.words}`, after: since ? `, ${since}` : "" };
 }
 
+/** A protocol listing the token on the chain that reads no stored oracle line for it. */
+export interface AlsoListedEntry {
+  name: string;
+  explorer: string;
+  /** Its asset page for the token, null where it has none. */
+  href: string | null;
+  /** Why it reads no line, only where the roster's data states it for the explorer. */
+  reason: string | null;
+}
+
+/** The explorers listing the token on the chain (the card line's chips) that
+ *  the page names nowhere else: not the page's protocol, not "Also reads this
+ *  oracle", not the table's Used by. A vault family no explorer deploys (a chip
+ *  with a token) is no protocol and is left out. `reasonOf` is the data's
+ *  statement of why an explorer reads no line, null where it has none. */
+export function alsoListed(
+  chips: readonly { explorer: string; label: string; chain: number; token?: unknown }[],
+  chain: number,
+  own: string | null,
+  named: { reads: readonly AlsoReadsEntry[]; rows: readonly OracleRow[] },
+  pageOf: (explorer: string) => string | null,
+  reasonOf: (explorer: string) => string | null = () => null,
+): AlsoListedEntry[] {
+  const used = new Set<string>(own ? [own] : []);
+  const names = new Set<string>();
+  for (const p of [...named.reads.map((e) => e.protocol), ...named.rows.flatMap((r) => r.usedBy)]) {
+    if (p.explorer) used.add(p.explorer);
+    names.add(p.name);
+  }
+  const out: AlsoListedEntry[] = [];
+  for (const c of chips) {
+    if (c.chain !== chain || c.token || used.has(c.explorer) || names.has(c.label)) continue;
+    if (out.some((o) => o.explorer === c.explorer)) continue;
+    out.push({ name: c.label, explorer: c.explorer, href: pageOf(c.explorer), reason: reasonOf(c.explorer) });
+  }
+  return out;
+}
+
+/** "A", "A and B", "A, B and C". */
+export const andNames = (xs: readonly string[]): string =>
+  xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+
+/** The line's words as plain text: "Also listed by Morpho Blue", and a reason after its name. */
+export function alsoListedText(entries: readonly AlsoListedEntry[]): string {
+  if (entries.length === 0) return "";
+  const last = entries.length - 1;
+  const words = entries.map((e) => (e.reason ? `${e.name}, ${e.reason}` : e.name));
+  return `Also listed by ${words.map((w, i) => (i === 0 ? w : `${i === last ? " and " : ", "}${w}`)).join("")}`;
+}
+
 // ── Prices ───────────────────────────────────────────────────────────────────
 
 /** "$1,697.10", "$0.9998": cents from $10, four decimals under it. */

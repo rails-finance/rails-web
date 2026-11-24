@@ -1,12 +1,14 @@
 // Under a protocol's asset chart (Miles's mockup of 24 Nov 2026; ui-jobs 818;
-// anatomy A2.3 to A2.6): "Also reads this oracle", the other protocols on the
+// anatomy A2.3 to A2.7): "Also reads this oracle", the other protocols on the
 // page's line (`alsoReads`); "Other oracles for <symbol>", one row per other
 // line with its readers, oracle, contract, price now and gap against the
 // page's price (`oracleRows`), each row opening its markets; and the as-of
-// line (`asOfText`). Prices and gaps carry their receipts. Where the prices
-// stand at different blocks (the stored stub) a price carries its stamp,
-// the Gap column is held back with a line saying why, and the as-of line says
-// each price has its block. Below sm each row is a card.
+// line (`asOfText`); under the table, "Also listed by" (`alsoListed`), the
+// protocols that list the token and read no stored line for it. Prices and
+// gaps carry their receipts. Where the prices stand at different blocks (the
+// stored stub) a price carries its stamp, the Gap column is held back with a
+// line saying why, and the as-of line says each price has its block. Below sm
+// each row is a card.
 
 import Link from "next/link";
 import { ChevronRight, Info } from "lucide-react";
@@ -15,6 +17,7 @@ import { RevealTip } from "@/components/shared/reveal-tip";
 import { shortAddress, type PageLine } from "@/lib/shared/asset-roster";
 import {
   alsoReadsWords,
+  type AlsoListedEntry,
   asOfNote,
   asOfText,
   gapProv,
@@ -267,6 +270,30 @@ export function OracleTable({
         })}
       </ul>
     </section>
+  );
+}
+
+/** "Also listed by Morpho Blue" (A2.7): under the table, the protocols that list the
+ *  token on the chain and read no stored line for it, each linking its page for the token. */
+export function AlsoListed({ entries }: { entries: AlsoListedEntry[] }) {
+  if (entries.length === 0) return null;
+  return (
+    <p className="mt-3 text-sm text-rb-500" data-asset-also-listed="" data-anatomy="A2.7">
+      Also listed by{" "}
+      {entries.map((e, i) => (
+        <span key={e.explorer} data-asset-also-listed-by={e.explorer}>
+          {i > 0 && (i === entries.length - 1 ? " and " : ", ")}
+          {e.href ? (
+            <Link href={e.href} className={INLINE_LINK}>
+              {e.name}
+            </Link>
+          ) : (
+            e.name
+          )}
+          {e.reason && `, ${e.reason}`}
+        </span>
+      ))}
+    </p>
   );
 }
 

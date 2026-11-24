@@ -6,7 +6,7 @@
 //      under a protocol and reads from its side) the chart draws one line, the
 //      price Liquity V2 uses, in blue at 2 px, with no legend; the panel's
 //      header (A3.8) carries the price; no second chart.
-//   L2 the page's words (H7, A1, A1.9, A2.3, A2.4, A2.6): Back falling back
+//   L2 the page's words (H7, A1, A1.9, A2.3, A2.4, A2.7, A2.6): Back falling back
 //      to Liquity V2's Assets list, the title "WETH", the source ending on the
 //      WETH PriceFeed under the chart panel; "Also reads
 //      this oracle" naming Moonwell; one oracle row per other line, Liquity
@@ -97,6 +97,8 @@ try {
         links: [...li.querySelectorAll("a[data-asset-oracle-link]")].map((a) => a.getAttribute("href")),
       })),
       asOf: document.querySelector("[data-asset-as-of]")?.textContent.trim() ?? "",
+      listed: document.querySelector("[data-asset-also-listed]")?.textContent.trim() ?? "",
+      listedAfterTable: !!document.querySelector("[data-asset-oracles] ~ [data-asset-also-listed]"),
     }));
     check(words.title === "WETH", "L2 the title", words.title);
     check(words.back === "/ethereum/liquity-v2/assets", "L2 Back falls back to Liquity V2's Assets list", words.back);
@@ -121,6 +123,11 @@ try {
       links.length > 0 && links.every((h) => new RegExp(`^/ethereum/[a-z0-9-]+/assets/${WETH}$`).test(h)),
       "L2 each protocol links its page for WETH",
       links.join(" "),
+    );
+    check(
+      words.listed === "" || (words.listedAfterTable && words.listed.startsWith("Also listed by ")),
+      "L2 Also listed by, where drawn, sits under the table",
+      words.listed,
     );
     check(words.asOf.length > 0, "L2 the as-of line", words.asOf);
     await layoutCheck(page, "WETH under Liquity V2 1440 light", errors);

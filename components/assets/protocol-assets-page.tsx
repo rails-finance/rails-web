@@ -22,7 +22,7 @@ import { RailHeader } from "@/components/shared/rail-header";
 import { ProtocolAssets } from "@/components/assets/assets-by-protocol";
 import { AssetTitle, SourceRow, UnpricedPanel, type RelationGroup } from "@/components/assets/asset-page-head";
 import { AssetPriceChart } from "@/components/assets/asset-price-chart";
-import { AlsoReads, AsOfLine, OracleTable } from "@/components/assets/asset-oracles";
+import { AlsoListed, AlsoReads, AsOfLine, OracleTable } from "@/components/assets/asset-oracles";
 import { AssetReceipts } from "@/components/assets/asset-receipts";
 import { BoldLivePrice } from "@/components/assets/bold-live-price";
 import { fetchAssetExplorerServer, fetchAssetHeadServer } from "@/lib/api/fetch-asset-explorer-server";
@@ -36,6 +36,7 @@ import { assetCategory, ASSET_CATEGORY_ORDER } from "@/lib/shared/asset-categori
 import { cardLines, type AssetCard } from "@/lib/shared/asset-explorer";
 import { assetPage, mainLine, type AssetPage } from "@/lib/shared/asset-roster";
 import {
+  alsoListed,
   alsoReads,
   oracleRows,
   priceCell,
@@ -250,6 +251,8 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
   const nowMs = Date.now();
   const read = now.prices[pageLine.id];
   const symbol = page.symbol;
+  const reads = alsoReads(pageLine, e.id, pageOf);
+  const rows = oracleRows(section.lines, pageLine, now, pageOf, nowMs);
   return (
     <Frame protocol={e}>
       <AssetTitle chain={chain} token={t} symbol={symbol} backHref={backHref} />
@@ -274,9 +277,9 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
             relations={relationsFor(page)}
             markets={line.markets}
           />
-          <AlsoReads entries={alsoReads(pageLine, e.id, pageOf)} chain={chain} />
+          <AlsoReads entries={reads} chain={chain} />
           <OracleTable
-            rows={oracleRows(section.lines, pageLine, now, pageOf, nowMs)}
+            rows={rows}
             lines={section.lines}
             pageLine={pageLine.id}
             chain={chain}
@@ -284,6 +287,7 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
             refName={own ? `${e.label}'s price` : "the price most protocols read"}
             now={now}
           />
+          <AlsoListed entries={alsoListed(line.line.chips, chain, e.id, { reads, rows }, pageOf)} />
           <AsOfLine now={now} />
         </section>
       </AssetReceipts>

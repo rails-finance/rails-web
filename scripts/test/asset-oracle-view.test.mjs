@@ -363,3 +363,60 @@ test("receipts name the oracle, what was read and the block", () => {
   assert.equal(g.inputs.length, 2);
   assert.match(g.summary, /^Gap from Liquity V2's price — /);
 });
+
+// ── Also listed by (A2.7) ──────────────────────────────────────────────────
+
+const chip = (explorer, label, extra = {}) => ({ explorer, label, chain: 1, ...extra });
+const listedChips = [
+  chip("liquity", "Liquity V2"),
+  chip("moonwell", "Moonwell"),
+  chip("makerdao", "MakerDAO"),
+  chip("morpho", "Morpho Blue"),
+  chip("pendle", "Pendle"),
+  chip("sbold", "sBOLD", { token: { symbol: "BOLD", address: "0x1" } }),
+  chip("morpho-base", "Morpho Blue", { chain: 8453 }),
+];
+const listedNamed = () => {
+  const pageLine = liquity.line;
+  const reads = view.alsoReads(pageLine, "liquity", pageOf);
+  const rows = view.oracleRows(liquity.section.lines, pageLine, sameBlock({}), pageOf, NOW);
+  return { reads, rows };
+};
+
+test("also listed: leaves out the page's protocol, the readers and the table's Used by", () => {
+  const out = view.alsoListed(listedChips, 1, "liquity", listedNamed(), pageOf);
+  assert.deepEqual(
+    out.map((e) => e.explorer),
+    ["morpho", "pendle"],
+  );
+});
+
+test("also listed: a name links to its page for the token, plain where it has none", () => {
+  const out = view.alsoListed(listedChips, 1, "liquity", listedNamed(), (id) =>
+    id === "morpho" ? pageOf("moonwell") : null,
+  );
+  assert.equal(out[0].href, `/ethereum/moonwell/assets/${WETH}`);
+  assert.equal(out[1].href, null);
+});
+
+test("also listed: the words, joined as the page joins names", () => {
+  const out = view.alsoListed(listedChips, 1, "liquity", listedNamed(), pageOf);
+  assert.equal(view.alsoListedText(out), "Also listed by Morpho Blue and Pendle");
+  assert.equal(view.alsoListedText(out.slice(0, 1)), "Also listed by Morpho Blue");
+  assert.equal(view.andNames(["A", "B", "C"]), "A, B and C");
+});
+
+test("also listed: a reason clause only where the data states one", () => {
+  const none = view.alsoListed(listedChips, 1, "liquity", listedNamed(), pageOf);
+  assert.ok(none.every((e) => e.reason === null));
+  const given = view.alsoListed(listedChips.slice(3, 4), 1, "liquity", listedNamed(), pageOf, (id) =>
+    id === "morpho" ? "which prices WETH per market" : null,
+  );
+  assert.equal(view.alsoListedText(given), "Also listed by Morpho Blue, which prices WETH per market");
+});
+
+test("also listed: nobody to list is no entry and no words", () => {
+  const out = view.alsoListed(listedChips.slice(0, 3), 1, "liquity", listedNamed(), pageOf);
+  assert.deepEqual(out, []);
+  assert.equal(view.alsoListedText(out), "");
+});
