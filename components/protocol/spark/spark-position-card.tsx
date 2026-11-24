@@ -171,7 +171,7 @@ const noAmount = (r: SparkReserveAmount) => r.decimalsUnread === true || r.amoun
 function TokenAmountNotRead({ label }: { label: string }) {
   return (
     <RevealTip
-      tip={`The ${label} amount accrues from SparkLend's ${label} index, which was not read on this visit. It shows once it is.`}
+      tip={`SparkLend's ${label} index was not read on this visit. The amount shows once it is.`}
       className="text-rb-500"
     >
       <span data-spark-amount-not-read="">

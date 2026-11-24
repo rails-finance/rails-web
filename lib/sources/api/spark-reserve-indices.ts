@@ -25,7 +25,14 @@ export async function readSparkReserveIndices(opts: AskOpts = {}): Promise<Spark
     "spark-reserve-indices",
     `${process.env.RAILS_API_URL}/api/spark/reserve-indices`,
     createAuthFetchOptions(),
-    { timeoutMs: SPARK_INDICES_WAIT_MS, ...opts },
+    {
+      timeoutMs: SPARK_INDICES_WAIT_MS,
+      ...opts,
+      // The wait for a slot counts too, so a busy wallet read cannot spend Spark's head budget here.
+      signal: opts.signal
+        ? AbortSignal.any([AbortSignal.timeout(SPARK_INDICES_WAIT_MS), opts.signal])
+        : AbortSignal.timeout(SPARK_INDICES_WAIT_MS),
+    },
   );
   return parseSparkReserveIndices(body);
 }
