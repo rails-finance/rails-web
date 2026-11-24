@@ -13,6 +13,11 @@
 // while its caller already holds a slot runs in that slot. Past the wallet
 // read's deadline a request is refused when its turn comes, without a fetch.
 //
+// The queue has two lanes. Each family's head read, each row of a per-row head
+// read and each module read at visit is a chain (`inChain`); once one of a
+// chain's requests has had a slot, its later requests take the priority lane,
+// which a freed slot serves before the normal lane.
+//
 // A limiter in plain code holds whatever fetch each reader calls. Next's
 // server fetch wraps undici, and a shared Agent passed to it as `dispatcher`
 // is not a stable contract across Next releases.
@@ -56,27 +61,30 @@ const abortError = (signal: AbortSignal): unknown =>
   signal.reason ?? Object.assign(new Error("aborted"), { name: "AbortError" });
 
 /** A queue that runs at most `max` of the functions given to it at once, in
- *  the order given. A finishing job hands its slot straight to the next one
- *  waiting, so no newcomer takes it between; a job whose `signal` aborts while
- *  it waits leaves the queue and rejects. */
+ *  the order given within each of two lanes. A finishing job hands its slot
+ *  straight to the oldest job waiting in the priority lane, else to the oldest
+ *  in the normal lane, so no newcomer takes it between; a job whose `signal`
+ *  aborts while it waits leaves its lane and rejects. */
 export function createLimiter(max: number) {
   let running = 0;
-  const waiting: { go: () => void }[] = [];
+  const normal: { go: () => void }[] = [];
+  const priority: { go: () => void }[] = [];
   const release = () => {
-    const next = waiting.shift();
+    const next = priority.shift() ?? normal.shift();
     if (next) next.go();
     else running--;
   };
-  const acquire = (signal?: AbortSignal): Promise<void> => {
+  const acquire = (signal?: AbortSignal, first = false): Promise<void> => {
     if (signal?.aborted) return Promise.reject(abortError(signal));
-    if (running < max && waiting.length === 0) {
+    if (running < max && normal.length === 0 && priority.length === 0) {
       running++;
       return Promise.resolve();
     }
+    const lane = first ? priority : normal;
     return new Promise<void>((resolve, reject) => {
       const onAbort = () => {
-        const i = waiting.indexOf(entry);
-        if (i >= 0) waiting.splice(i, 1);
+        const i = lane.indexOf(entry);
+        if (i >= 0) lane.splice(i, 1);
         reject(abortError(signal!));
       };
       const entry = {
@@ -85,12 +93,13 @@ export function createLimiter(max: number) {
           resolve();
         },
       };
-      waiting.push(entry);
+      lane.push(entry);
       signal?.addEventListener("abort", onAbort, { once: true });
     });
   };
-  return async function limit<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
-    await acquire(signal);
+  /** `fn` once a slot is free; `first` queues it in the priority lane. */
+  return async function limit<T>(fn: () => Promise<T>, signal?: AbortSignal, first = false): Promise<T> {
+    await acquire(signal, first);
     try {
       return await fn();
     } finally {
@@ -131,11 +140,18 @@ export async function retryOnConnectionFailure<T>(
   }
 }
 
+/** One chain of requests inside a wallet read (a family's head read, a row's,
+ *  a module read at visit): `served` once one of its requests has had a slot. */
+interface ChainMark {
+  served: boolean;
+}
+
 /** What a wallet read carries down its calls: whether this call already holds
- *  a slot, and when the read gives up (epoch ms). */
+ *  a slot, when the read gives up (epoch ms), and the chain it belongs to. */
 interface WalletScope {
   holding: boolean;
   deadline?: number;
+  chain?: ChainMark;
 }
 
 /** The one queue and the wallet read's context, kept on globalThis so every
@@ -152,6 +168,14 @@ export function inWalletRead<T>(fn: () => Promise<T>, deadline?: number): Promis
   return shared.scope.run({ holding: false, deadline }, fn);
 }
 
+/** Run `fn` as a chain of its own inside the wallet read: its requests after
+ *  the first queue in the priority lane. Outside a wallet read `fn` runs as is. */
+export function inChain<T>(fn: () => Promise<T>): Promise<T> {
+  const store = shared.scope.getStore();
+  if (!store) return fn();
+  return shared.scope.run({ ...store, chain: { served: false } }, fn);
+}
+
 const PAST_DEADLINE = "PastReadDeadline";
 
 /** Whether `err` is a request refused because its wallet read had given up:
@@ -163,7 +187,8 @@ const pastDeadline = () => Object.assign(new Error("the wallet read's deadline h
 /** `fn` in a slot: queued behind the cap (leaving the queue where `signal`
  *  aborts) and run once granted, so a budget it sets runs from then. Past the
  *  read's deadline it is refused, before the queue or when its turn comes,
- *  and frees the slot at once. A call already holding a slot runs at once.
+ *  and frees the slot at once. A call already holding a slot runs at once. A
+ *  call whose chain has been served queues in the priority lane.
  *
  *  A slot callback makes one request and must not fan out: an apiSlot or
  *  apiHop call inside it inherits `holding` and runs uncapped. */
@@ -171,12 +196,21 @@ function inSlot<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   const store = shared.scope.getStore();
   if (store?.holding) return fn();
   const deadline = store?.deadline;
+  const chain = store?.chain;
   const past = () => deadline != null && Date.now() >= deadline;
   if (past()) return Promise.reject(pastDeadline());
-  return shared.limit(() => {
-    if (past()) return Promise.reject(pastDeadline());
-    return shared.scope.run({ holding: true, deadline }, fn);
-  }, signal);
+  return shared.limit(
+    async () => {
+      if (past()) throw pastDeadline();
+      try {
+        return await shared.scope.run({ holding: true, deadline, chain }, fn);
+      } finally {
+        if (chain) chain.served = true;
+      }
+    },
+    signal,
+    chain?.served === true,
+  );
 }
 
 /** One request to the api host from a client other pages share: inside a

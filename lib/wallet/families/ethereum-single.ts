@@ -45,7 +45,7 @@ import type { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle"
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { morphoHasDebt } from "@/lib/morpho/position-legs";
 import { morphoCardAtHead, storedMorphoCard } from "./morpho-card";
-import { apiHop, createLimiter } from "@/lib/wallet/api-hop";
+import { apiHop, createLimiter, inChain } from "@/lib/wallet/api-hop";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, opt, plural, storeStamp } from "@/lib/wallet/summary-row";
 import { formerHoldOf, movedHistory } from "@/lib/wallet/moved-row";
@@ -78,8 +78,9 @@ async function eachOpen(
 ): Promise<HeadResult> {
   let reads = 0;
   const settled = await Promise.allSettled(
+    // Each row is a chain of its own in the api cap's lanes.
     open.map(async (p) => {
-      const out = await read(p);
+      const out = await inChain(() => read(p));
       if (out !== null) reads++;
       return out ?? p;
     }),

@@ -67,7 +67,7 @@ import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
-import { apiHop, inWalletRead } from "@/lib/wallet/api-hop";
+import { apiHop, inChain, inWalletRead } from "@/lib/wallet/api-hop";
 import { kindOfRow, WALLET_PROTOCOLS } from "@/lib/wallet/wallet-filters";
 
 /** The whole read's budget, the summary route's time included. */
@@ -381,8 +381,11 @@ async function readFamily(
       const remaining = deadline - Date.now();
       // The 500 ms floor gives the chain reads time; an api request past the
       // read's deadline is refused (api-hop.ts), and its row reads the chain.
-      head = await withBudget(Math.max(500, remaining), (signal) =>
-        f.head!(open, address, signal, walletApiWait(remaining), { rows, readerIp }),
+      // The family's requests after its first take the cap's priority lane.
+      head = await inChain(() =>
+        withBudget(Math.max(500, remaining), (signal) =>
+          f.head!(open, address, signal, walletApiWait(remaining), { rows, readerIp }),
+        ),
       );
     } catch (err) {
       error = publicErrorMessage(err);

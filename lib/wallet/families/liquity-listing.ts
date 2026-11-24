@@ -30,6 +30,7 @@ import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-posi
 import type { LiquityV1DepositRow } from "@/lib/sources/api/liquity-v1-sp";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { inChain } from "@/lib/wallet/api-hop";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, plural, scaled, storeStamp, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { FamilyModule, HeadResult } from "./module";
@@ -44,7 +45,8 @@ async function eachOpen(
   open: WalletPosition[],
   read: (p: WalletPosition) => Promise<WalletPosition | null>,
 ): Promise<HeadResult> {
-  const settled = await Promise.allSettled(open.map(read));
+  // Each row is a chain of its own in the api cap's lanes.
+  const settled = await Promise.allSettled(open.map((p) => inChain(() => read(p))));
   return {
     reads: open.length,
     positions: settled.map((s, i) =>
