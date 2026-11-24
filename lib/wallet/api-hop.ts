@@ -18,9 +18,9 @@
 // chain's requests has had a slot, its later requests take the priority lane,
 // which a freed slot serves before the normal lane.
 //
-// A limiter in plain code holds whatever fetch each reader calls. Next's
-// server fetch wraps undici, and a shared Agent passed to it as `dispatcher`
-// is not a stable contract across Next releases.
+// The limiter caps requests in flight; under it, lib/api/api-pool.ts (ui-jobs
+// 825) caps the process's connections to the api host and keeps them open
+// between requests.
 //
 // Its one import is node's, so scripts/test/wallet-api-hop.test.mjs loads it directly.
 
