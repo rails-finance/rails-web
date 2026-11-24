@@ -539,6 +539,8 @@ const OPEN_PILL = "bg-positive/20 text-positive";
  *  AT RISK excepted (`PositionCardEdge`). */
 function StatusPill({ status }: { status: PositionCardStatus | null }) {
   const edge = useContext(PositionCardEdgeContext);
+  // An unread open position carries one mark, the wallet's "Not read" stamp.
+  if (edge?.unread) return null;
   if (!status && edge?.atRisk)
     return (
       <span
