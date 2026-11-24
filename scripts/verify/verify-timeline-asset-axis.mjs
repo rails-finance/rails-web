@@ -104,6 +104,12 @@ async function openMenu(heading) {
  *  next click. */
 async function dismiss() {
   await page.keyboard.press("Escape");
+  // The Filters sheet leaves through its history entries before it goes.
+  await page
+    .locator("[data-filter-sheet]")
+    .first()
+    .waitFor({ state: "detached", timeout: 5000 })
+    .catch(() => {});
 }
 
 /** The toolbar's own count line, and beside it the two row grains the line no
@@ -215,12 +221,12 @@ async function toggle(heading, key) {
   return settled();
 }
 
-/** An open editor's rows as { key, count }, commonest first; a leg nested
- *  under an umbrella type is left out, its umbrella's row counting it. */
+/** An open editor's or Filters sheet view's rows as { key, count }, commonest
+ *  first; a leg nested under an umbrella type is left out, its umbrella's row
+ *  counting it. */
 async function menuRows() {
-  const rows = (await page.locator("[data-pill-option]:not([data-pill-nested])").allTextContents())
-    .map((r) => r.trim())
-    .filter(Boolean);
+  const sel = "[data-pill-option]:not([data-pill-nested]), [data-filter-sheet-option]:not([data-pill-nested])";
+  const rows = (await page.locator(sel).allTextContents()).map((r) => r.trim()).filter(Boolean);
   return rows.map((r) => {
     const m = r.match(/^(.+?)([\d,]+)$/);
     return m ? { key: m[1], count: +m[2].replace(/,/g, "") } : { key: r, count: NaN };

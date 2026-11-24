@@ -1,12 +1,11 @@
-// Every word of the vault comparison (rails-ops ui-jobs 553, door 3): the
-// page (E1), its tick and bar on the asset step and /vaults (E2, E3), and the
-// holder donut (E4). The five readout lines keep lib/vaults/health-words.ts's
+// Every word of the vault comparison (rails-ops ui-jobs 553 door 3, 779): the
+// page (E1), its picker (E1.1), the Differences table (E1.2) and the holder
+// donut (E4). The five readout lines keep lib/vaults/health-words.ts's
 // words; this module adds Fees, Where the money is lent and Who holds it.
 // Each states a reading; nothing here rates, forecasts or recommends.
 //
 // Pure: type imports, the family table and the steward note from health-words.ts.
 
-import type { CompareSort } from "./compare";
 import { VAULT_FAMILIES, type VaultFamily } from "./families";
 import { STEWARD_ATTESTATION } from "./health-words";
 
@@ -16,18 +15,6 @@ export const COMPARE_PAGE = {
   /** Said once, under the heading: the readout's line, with the read times
    *  the columns show, and the steward note each column leaves out. */
   lead: `Readings of the past at the times shown. Rails does not forecast, rate or recommend. ${STEWARD_ATTESTATION}`,
-  sortLabel: "Sort by",
-  sorts: {
-    size: "Size",
-    yield: "30-day yield",
-    range: "Narrowest 90-day yield range",
-    withdrawable: "Share withdrawable",
-  } as Record<CompareSort, string>,
-  /** Under the sort, where it needs saying. */
-  sortNote: {
-    range: "Vaults whose share price grew over the 30 days come first; the others follow.",
-    mixed: "Vaults in different assets sort by asset first, then by size within each.",
-  },
   /** The column's read time; the block stays off the surface (decision 0059 point 4). */
   readAt: (iso: string) => `Read ${new Date(iso).toISOString().slice(11, 16)} UTC`,
   unread: "The chain read did not answer",
@@ -35,29 +22,44 @@ export const COMPARE_PAGE = {
   fees: "Fees",
   exposure: "Where the money is lent",
   holders: "Who holds it",
-  /** Fewer than two vaults the index knows. */
-  tooFew: "Choose two to four vaults to compare: tick them on the vault index or on an asset's step.",
-  toIndex: "Vaults",
   notFound: (keys: readonly string[]) => `Not found in the vault index: ${keys.join(", ")}.`,
+  differences: "Differences",
+  /** Under Differences where every fact it names is the same. */
+  noDifferences: "These vaults agree on every fact in this table.",
+  record: "The full record",
 };
 
-// ── The tick and the bar ───────────────────────────────────────────────────
+// ── The picker ─────────────────────────────────────────────────────────────
 
-export const COMPARE_TICK = {
-  label: "Compare",
-  /** For a screen reader, with the vault's name. */
-  aria: (name: string) => `Compare ${name}`,
-  /** The /vaults row ⋮ entry (D7). */
-  add: "Add to compare",
-  remove: "Remove from compare",
+export const COMPARE_PICKER = {
+  label: "Vaults to compare",
+  placeholder: "Search a vault by name, symbol or address",
+  /** For a screen reader, with the slot's number. */
+  slot: (i: number) => `Vault ${i}`,
+  vs: "vs",
+  add: "Add a vault",
+  clear: (name: string) => `Clear ${name}`,
+  go: "Compare",
+  /** Under the button while fewer than two are picked. */
+  needTwo: "Pick two to four vaults.",
+  noMatch: "No vault Rails reads matches.",
+  loading: "Loading the vaults…",
+  failed: "The vault list did not load. Reload the page to try again.",
 };
 
-export const COMPARE_BAR = {
-  go: (n: number) => `Compare ${n} vaults`,
-  clear: "Clear",
-  refused: "Four vaults is the most one comparison holds.",
-  label: "Vaults chosen to compare",
-};
+/** The Differences table's facts, in order. */
+export const DIFFERENCE_LABELS = {
+  asset: "Asset",
+  family: "Family",
+  chain: "Chain",
+  totalAssets: "Total assets",
+  sharePrice: "Share price",
+  yield: "Yield",
+  holders: "Holders",
+  steward: "Steward",
+  fees: "Fees",
+  withdrawals: "Withdrawals",
+} as const;
 
 // ── Fees ───────────────────────────────────────────────────────────────────
 
@@ -82,21 +84,9 @@ export const FEE_WORDS = {
         },
   yearn: (performance: number, management: number): CompareCell => ({
     headline: performance === 0 ? "No performance fee" : `${pct(performance)} performance fee`,
-    sentence: `${management === 0 ? "No management fee" : `A ${pct(management)} yearly management fee`}. Both are set by the vault's accountant.`,
+    sentence: `${management === 0 ? "No management fee" : `A ${pct(management)} yearly management fee`}. The vault's accountant sets both.`,
     read: true,
   }),
-  yearnNoAccountant: {
-    headline: "None stated",
-    sentence: "The vault names no accountant, the contract that charges its fees.",
-    read: true,
-  } as CompareCell,
-  stata: {
-    headline: "None stated",
-    sentence:
-      "The wrapper sets no fee. Aave keeps its reserve factor's part of the interest before it reaches the reserve's suppliers.",
-    read: true,
-  } as CompareCell,
-  umbrella: { headline: "None stated", sentence: "The stake token sets no fee.", read: true } as CompareCell,
   notRead: { headline: null, sentence: "Not read yet.", read: false } as CompareCell,
   unanswered: { headline: null, sentence: "The read did not answer.", read: false } as CompareCell,
 };

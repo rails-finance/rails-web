@@ -4,16 +4,18 @@
 // 390 px viewport every text field a page carries must compute to at least
 // 16px; at 1440 px the desktop sizes stay (the field sizes are printed, not
 // asserted). Sliders, the file picker, checkboxes and the display:none
-// honeypot do not count. Below sm a listing's facets are the filter sheet,
+// honeypot do not count. A listing's search rests as an icon and is opened
+// first; its facets are the Filters sheet (below sm) or panel (from sm),
 // opened with each of its sub-views.
 // Run: BASE=http://localhost:3086 node scripts/verify/verify-input-font-size.mjs
 import { chromium } from "playwright";
+import { openListingSearch } from "./lib/listing-toolbar.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const PAGES = [
   ["/ethereum/liquity-v2", "listing toolbar field, its filter panels, the feedback modal"],
   ["/ethereum/yearn/vaults", "vault roster search"],
-  ["/assets", "asset explorer select"],
+  ["/ethereum/aave-v3/assets", "protocol assets search"],
 ];
 
 let failures = 0;
@@ -56,18 +58,27 @@ for (const [width, height] of [
     const seen = new Map();
     const note = (fs) => fs.forEach((f) => seen.set(`${f.tag}:${f.type}:${f.label}`, f));
     note(await readFields(page));
+    // The listing's search draws its field once its icon is pressed (N1.1,
+    // ui-jobs 801); an empty field collapses on blur, so it is read now.
+    const searchOpener = page.locator('[data-skel-section="listing-toolbar"] [data-search-open]');
+    if (await searchOpener.count()) {
+      await openListingSearch(page, page.locator('[data-skel-section="listing-toolbar"]'));
+      note(await readFields(page));
+    }
     const sheetButton = page.locator('[data-skel-section="listing-toolbar"] [data-filter-sheet-open]');
-    if (width < 640 && (await sheetButton.count())) {
-      // Below sm the facets are the filter sheet (N1, ui-jobs 544): its list
-      // draws the range fields in place, and each row opens a sub-view whose
-      // option search is read too.
+    if (await sheetButton.count()) {
+      // The facets are the Filters sheet below sm and a panel in the page from
+      // sm (N1, ui-jobs 544, 801): its list draws the range fields in place,
+      // and each row opens a sub-view whose option search is read too.
       await sheetButton.click({ timeout: 5000 });
       await page.locator("[data-filter-sheet]").waitFor({ timeout: 5000 });
       note(await readFields(page));
       const rows = await page
         .locator("[data-filter-sheet-row]")
         .evaluateAll((els) =>
-          els.filter((e) => e.getAttribute("role") !== "switch").map((e) => e.getAttribute("data-filter-sheet-row")),
+          els
+            .filter((e) => e.tagName === "BUTTON" && e.getAttribute("role") !== "switch")
+            .map((e) => e.getAttribute("data-filter-sheet-row")),
         );
       for (const id of rows.slice(0, 8)) {
         await page.locator(`[data-filter-sheet-row="${id}"]`).click({ timeout: 3000 });

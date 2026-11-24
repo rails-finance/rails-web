@@ -31,6 +31,9 @@ export interface FilterOptionDef {
    *  735): the editors nest the legs under a row that ticks them all. The
    *  umbrella is a heading, never an option. */
   parent?: { value: string; label: string; meta?: string };
+  /** The option that lists every row ("All" in Status, ui-jobs 805): a
+   *  single-choice default resting on it constrains nothing and draws no pill. */
+  every?: boolean;
 }
 
 export interface FilterDimension<F> {
@@ -84,6 +87,9 @@ export interface FilterDimension<F> {
   property?: boolean;
   /** Hide from the + Filter menu when false (e.g. Borrowing while Supply-only). */
   available?: (f: F) => boolean;
+  /** A single-choice dimension drawn in the filter panel as one segmented row
+   *  whatever its option count (Status: Open / Closed / All, ui-jobs 805). */
+  segmented?: boolean;
   /** One short line at the foot of the dimension's group panel (the price
    *  source a USD range is valued at). A group draws the first one it holds. */
   panelNote?: ReactNode;

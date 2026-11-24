@@ -1,6 +1,6 @@
 // An illiquid MetaMorpho vault (rails-ops ui-jobs 540, Miles's ruling of
-// 8 Nov 2026): the test, the arithmetic and the words, shared by the index,
-// the rosters and the vault page.
+// 8 Nov 2026): the test, the arithmetic and the words, shared by the rosters
+// and the vault page.
 // ----------------------------------------------------------------------------
 // A vault is illiquid at a block when a market in its withdraw queue holds 10%
 // or more of the queue's sum, is 99.9% or more borrowed, and has its

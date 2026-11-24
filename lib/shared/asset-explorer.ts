@@ -1,5 +1,6 @@
-// The asset explorer at /assets (rails-ops reference/asset-key-map.md, "The
-// asset explorer"): one card per asset, its Prices-list figures, its chains,
+// The asset cards (rails-ops reference/asset-key-map.md, "The asset
+// explorer"; since decision 0069 read by each protocol's Assets pages and the
+// asset-page resolver): one card per asset, its Prices-list figures, its chains,
 // the Rails explorers that list it (lib/api/asset-explorer-chips.ts) and the
 // tokens it wraps or is wrapped as.
 //
@@ -18,8 +19,8 @@
 
 import type { ChipUse } from "@/lib/shared/asset-uses";
 import { assetHref, type LinkKind, type RosterLinkRef } from "@/lib/shared/asset-roster";
-import type { AssetPriceList, AssetPriceRow } from "@/lib/shared/asset-prices";
-import { ASSET_CATEGORY_ORDER, assetCategory, type AssetCategory } from "@/lib/shared/asset-categories";
+import type { AssetPriceList, AssetPriceRow, ChainPrice } from "@/lib/shared/asset-prices";
+import { assetCategory, type AssetCategory } from "@/lib/shared/asset-categories";
 
 /** A one-for-one wrapper (WETH, WBTC, cbBTC, tBTC, FBTC, BTC.b, USDbC):
  *  "own" gives it a card of its own beside its underlying's, linked both ways;
@@ -47,6 +48,9 @@ export interface AssetChip {
    *  debt" and "Stability Pools" on Liquity V2, a Pendle market's PT
    *  (lib/shared/asset-uses.ts). */
   uses?: ChipUse[];
+  /** On Aave V3 on Ethereum: the markets the token is a reserve of ("core",
+   *  "prime", "etherfi"), each a reserve page (ui-jobs 786). */
+  markets?: string[];
 }
 
 export interface CardChain {
@@ -106,6 +110,52 @@ export interface AssetCard {
   wrapped: CardLink[];
   /** With WRAPPER_CARDS "merged": the wrappers whose cards this one took. */
   takes: string[];
+  /** The Prices-list rows of the same symbol's pages on other chains, merged
+   *  into this card: each chain's line reads its price from them (ui-jobs 781). */
+  others?: AssetPriceRow[];
+}
+
+/** One chain of a card, as its line on /assets (A5.4; ui-jobs 781): the
+ *  asset's page on that chain, its price on that chain where a stored line
+ *  prices it, and the explorers that list it there. */
+export interface CardLine {
+  chain: number;
+  token: string;
+  href: string | null;
+  /** The chain's main line: the page row's own where `main`, else the row's
+   *  line on this chain (`elsewhere`). */
+  price: ChainPrice | null;
+  /** The page row the price comes from (its unit, its flag). */
+  row: AssetPriceRow | null;
+  /** The line is the row's own chain: its flag shows here. */
+  main: boolean;
+  chips: AssetChip[];
+}
+
+/** A card's lines, one per chain, in `order` (the chains' order). */
+export function cardLines(c: AssetCard, order: readonly number[]): CardLine[] {
+  const rows = [c.row, ...(c.others ?? [])].filter((r): r is AssetPriceRow => r != null);
+  // A row prices its token alone, on its chain or its other chains, so a
+  // merged wrapper (USDbC in USDC's card) cannot take USDC's price.
+  const at = (chain: number, token: string) => {
+    for (const r of rows) {
+      if (r.token.toLowerCase() !== token.toLowerCase()) continue;
+      if (r.chain === chain) return { price: r as ChainPrice, row: r, main: true };
+      const e = r.elsewhere.find((x) => x.chain === chain);
+      if (e) return { price: e, row: r, main: false };
+    }
+    return { price: null, row: null, main: false };
+  };
+  const rank = (chain: number) => (order.indexOf(chain) < 0 ? order.length : order.indexOf(chain));
+  return [...c.chains]
+    .sort((a, b) => rank(a.chain) - rank(b.chain))
+    .map((x) => ({
+      chain: x.chain,
+      token: x.token,
+      href: x.href,
+      ...at(x.chain, x.token),
+      chips: c.chips.filter((ch) => ch.chain === x.chain),
+    }));
 }
 
 const link = (r: RosterLinkRef): CardLink => ({
@@ -162,6 +212,8 @@ export function assetCards(
       // The wrappers the other chain's row names ("also USDbC") join this card's row.
       const more = (c.row?.also ?? []).filter((a) => !into.row?.also?.some((x) => x.symbol === a.symbol));
       if (into.row && more.length) into.row = { ...into.row, also: [...(into.row.also ?? []), ...more] };
+      // Its row prices its chains' lines.
+      if (c.row) into.others = [...(into.others ?? []), c.row];
       continue;
     }
     bySymbol.set(c.symbol, [...same, c]);
@@ -220,69 +272,4 @@ export function assetCards(
       c.short = `${t.slice(0, 6)}…${t.slice(-4)}`;
     }
   return cards;
-}
-
-export type CardSort = "read" | "flagged" | "symbol" | "change" | "explorers";
-
-export const CARD_SORTS: readonly { value: CardSort; label: string }[] = [
-  { value: "read", label: "Most read" },
-  { value: "flagged", label: "Flagged first" },
-  { value: "symbol", label: "Symbol" },
-  { value: "change", label: "30-day change" },
-  { value: "explorers", label: "Explorers" },
-];
-
-/** The assets in a sort: the most read (protocol series on the page; an
- *  asset with no price after, by its explorers), flagged ones first (the
- *  Prices list's order), by symbol, by the 30-day change (none last) or by
- *  how many explorers list it. `dir` "asc" flips the order. */
-export function sortCards(cards: readonly AssetCard[], sort: CardSort, dir: "asc" | "desc" = "desc"): AssetCard[] {
-  const read = (a: AssetCard, b: AssetCard) =>
-    Number(b.row != null) - Number(a.row != null) ||
-    (b.row?.readers ?? 0) - (a.row?.readers ?? 0) ||
-    b.chips.length - a.chips.length ||
-    a.symbol.localeCompare(b.symbol);
-  const out = [...cards];
-  if (sort === "symbol") out.sort((a, b) => a.symbol.localeCompare(b.symbol, "en-US", { sensitivity: "base" }));
-  else if (sort === "flagged")
-    out.sort((a, b) => Number(b.row?.flag != null) - Number(a.row?.flag != null) || read(a, b));
-  else if (sort === "change") {
-    out.sort((a, b) => {
-      const x = a.row?.change ?? null;
-      const y = b.row?.change ?? null;
-      if (x == null || y == null) return x == null ? (y == null ? read(a, b) : 1) : -1;
-      return y - x || read(a, b);
-    });
-  } else if (sort === "explorers") out.sort((a, b) => b.chips.length - a.chips.length || read(a, b));
-  else out.sort(read);
-  // Symbol reads A to Z first; the rest most first.
-  const flip = sort === "symbol" ? dir === "desc" : dir === "asc";
-  return flip ? out.reverse() : out;
-}
-
-export interface ExplorerState {
-  cats: AssetCategory[];
-  chains: number[];
-  explorers: string[];
-  /** "in" or "out" of the reader's focus; [] is both. */
-  focus: string[];
-  sort: CardSort;
-  dir: "asc" | "desc";
-}
-
-/** The state a URL's params name; unknown values fall back to the defaults. */
-export function explorerState(sp: Record<string, string | string[] | undefined>): ExplorerState {
-  const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : sp[k]) as string | undefined;
-  const list = (k: string) => (one(k) ?? "").split(",").filter(Boolean);
-  const sort = one("sort");
-  return {
-    cats: list("cat").filter((c): c is AssetCategory => ASSET_CATEGORY_ORDER.includes(c as AssetCategory)),
-    chains: list("chain")
-      .map(Number)
-      .filter((n) => Number.isInteger(n) && n > 0),
-    explorers: list("explorer"),
-    focus: list("focus").filter((f) => f === "in" || f === "out"),
-    sort: CARD_SORTS.some((s) => s.value === sort) ? (sort as CardSort) : "read",
-    dir: one("dir") === "asc" ? "asc" : "desc",
-  };
 }

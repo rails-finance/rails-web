@@ -131,6 +131,7 @@ const reads: InfoReads = {
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "Listing",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>Each row is one wallet&apos;s full history in the protocol, open or closed.</li>
@@ -144,6 +145,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Wallet page",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>The top card shows the wallet&apos;s supply, borrows and account liquidity as read from the chain now.</li>
@@ -156,6 +158,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Markets page",
+    section: "markets",
     body: (
       <p>
         The markets page lists every market the Comptroller holds, with how much is supplied, borrowed and available in

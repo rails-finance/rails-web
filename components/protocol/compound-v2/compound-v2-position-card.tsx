@@ -29,6 +29,8 @@
 // $14.4263): their lines carry the flag, and any USD headline they contribute
 // to says so in its receipt.
 
+import { mainAssetFigure, useClosedPeaks, withPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
+import { pickMainAsset } from "@/lib/shared/main-asset";
 import { positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { headReadOf, serverReadOf, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
@@ -44,6 +46,7 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
+  assetsHead,
 } from "@/components/shared/position-card";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { AssetAmount } from "@/components/shared/asset-amount";
@@ -93,6 +96,7 @@ import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { shownUsd } from "@/lib/shared/holder-usd-receipt";
 import { compoundV2DebtDollars, compoundV2UsdReceipt } from "@/lib/compound-v2/usd-receipt";
 import { compoundV2LastEventDebtNote, type CompoundV2Face } from "@/lib/compound-v2/price-notes";
+import { positionLink } from "@/lib/shared/position-link";
 
 export interface CompoundV2PositionView {
   wallet: string;
@@ -295,27 +299,31 @@ function UsdFigure({ usd, info, form }: { usd: number; info: Provenance; form: "
   );
 }
 
+/** A market's highest-recorded receipt. */
+const peakProvOf = (r: CompoundV2PeakAmount, side: "supply" | "debt"): Provenance =>
+  side === "supply" ? peakSupplyProv(r.symbol, ctokenOf(r.market)) : peakDebtProv(r.symbol, ctokenOf(r.market));
+
 /** One market's peak amounts (highest recorded), each traced to the lane's
  *  maximum (the supply balance at a row on supply, emitted accountBorrows on
  *  debt); no USD, the token amount only. Null where nothing was recorded. */
-function peakValue(lines: CompoundV2PeakAmount[], side: "supply" | "debt"): ReactNode | null {
+function peakValue(
+  lines: CompoundV2PeakAmount[],
+  side: "supply" | "debt",
+  /** A line whose receipt differs (the face's main market, with its ranking). */
+  receiptFor?: (r: CompoundV2PeakAmount) => Provenance | undefined,
+): ReactNode | null {
   if (lines.length === 0) return null;
   return (
     <div className="flex flex-col gap-1">
       {lines.map((r) => (
         <div key={r.market}>
-          <Prov
-            info={
-              side === "supply"
-                ? peakSupplyProv(r.symbol, ctokenOf(r.market))
-                : peakDebtProv(r.symbol, ctokenOf(r.market))
-            }
-          >
+          <Prov info={receiptFor?.(r) ?? peakProvOf(r, side)}>
             <AssetAmount
               value={r.amount}
               symbol={r.symbol}
               address={underlyingOf(r.market)}
               exact={formatUnitsExact(r.amountRaw, r.decimals)}
+              iconSize={16}
             />
           </Prov>
         </div>
@@ -346,7 +354,7 @@ function CompoundV2MenuRows({ wallet }: { wallet: string }) {
         icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this position"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}/ethereum/compound-v2/${wallet}`)}
+        onClick={() => copy("link", positionLink(`/ethereum/compound-v2/${wallet}`))}
       />
     </>
   );
@@ -364,11 +372,12 @@ export interface CompoundV2PositionCardProps {
   captions?: CompoundV2CardCaptions;
   /** The (i) pane's prose (narration describing the position NOW). */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes (`compoundV2Exports`). Absent: the ⋮ holds the
    *  account's rows and the provenance row alone. */
   exports?: PositionCardExports;
+  /** The page's Lifetime flows timeline and its read: a closed card's peak
+   *  value per side (components/shared/closed-peak.tsx). */
+  flows?: ClosedPeakFlows;
 }
 
 /** The Compound V2 slots for the shared position card. */
@@ -378,10 +387,14 @@ export function useCompoundV2CardSlots({
   chain = null,
   captions,
   explanation,
-  viewHref,
   exports,
+  flows,
 }: CompoundV2PositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
+  const peakOf = useClosedPeaks(flows, v.status !== "open", {
+    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, key: r.market })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, key: r.market })),
+  });
   const marketBy = marketReadBy(v);
   const supplyLine = (r: CompoundV2SupplyAmount): UsdLine => ({
     market: r.market,
@@ -459,21 +472,73 @@ export function useCompoundV2CardSlots({
   };
   const detailCommon = {
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: compoundV2PositionModal({ status: v.status, hasDebt: v.borrows.length > 0 }),
     menu,
   };
 
-  // Closed / liquidated: the wallet holds no open markets, so the headline is
-  // what each asset held at its height: the highest recorded per-market supply
-  // and debt (replayed MAX over the wallet's life, per asset; no USD). The
+  // Closed / liquidated: the wallet holds no open markets, so each side states
+  // the assets it held, and the highest recorded per-market supply and debt
+  // (replayed MAX over the wallet's life, per asset; no USD) open behind the
+  // press under the peak label (C19). The
   // liquidated outcome appears only here: an open survivor never reaches this
   // branch, however many liquidations its counters show.
   if (ended) {
-    const heads: PositionCardHead[] = [
-      { id: "peak-collateral", label: CARD_VOCAB.peakCollateral, value: peakValue(v.peakSupplies, "supply") },
-      { id: "peak-debt", label: CARD_VOCAB.peakDebt, value: peakValue(v.peakBorrows, "debt") },
-    ];
+    // Each side leads with its main market at its highest recorded balance,
+    // the same on the listing row and the position page (both read the
+    // listing's prices, keyed by market, `pickMainAsset`, at the market
+    // read's block).
+    const peakHead = (
+      id: string,
+      label: string,
+      peakLabel: string,
+      lines: CompoundV2PeakAmount[],
+      side: "supply" | "debt",
+    ) => {
+      const pick = pickMainAsset(
+        lines.map((r) => ({ ...r, key: r.market })),
+        v.priceByMarket,
+      );
+      const figure = pick
+        ? mainAssetFigure({
+            main: {
+              ...markOf(pick.main),
+              amount: pick.main.amount,
+              exact: formatUnitsExact(pick.main.amountRaw, pick.main.decimals),
+            },
+            receipt: peakProvOf(pick.main, side),
+            block: v.marketRead?.blockNumber ?? null,
+            skipped: pick.skipped,
+            side,
+          })
+        : undefined;
+      // The main market's line carries the ranking row its figure carries.
+      const receiptFor = (r: CompoundV2PeakAmount) =>
+        figure && pick && r.market === pick.main.market ? figure.info : undefined;
+      return {
+        id,
+        label,
+        value: null,
+        ...(lines.length > 0
+          ? assetsHead(
+              peakLabel,
+              lines.map(markOf),
+              <span className="text-sm font-semibold tabular-nums text-foreground">
+                {peakValue(lines, side, receiptFor)}
+              </span>,
+              figure,
+            )
+          : {}),
+      };
+    };
+    const heads: PositionCardHead[] = withPeaks(
+      [
+        peakHead("peak-collateral", CARD_VOCAB.headSupplied, CARD_VOCAB.peakSupplied, v.peakSupplies, "supply"),
+        peakHead("peak-debt", CARD_VOCAB.headDebt, CARD_VOCAB.peakDebt, v.peakBorrows, "debt"),
+      ],
+      peakOf,
+      detail,
+    );
     const outcome: PositionCardOutcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: outcomeDates(v) ?? [{ at: v.lastActivityAt }],

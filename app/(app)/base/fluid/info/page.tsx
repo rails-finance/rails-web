@@ -92,6 +92,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "A wallet's positions",
+    section: "intro",
     body: (
       <>
         <p>
@@ -111,6 +112,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Position page",
+    section: "intro",
     body: (
       <p>
         The position page shows the position&apos;s collateral and debt

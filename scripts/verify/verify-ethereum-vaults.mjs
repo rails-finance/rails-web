@@ -686,14 +686,19 @@ check(
 // script's own read, so a runtime-locale format would already have gone red on
 // 6 and 7c. This check names the one figure those do not cover — the block —
 // so the assertion is explicit rather than a side effect.
-// ui-jobs 485: the block is printed in the "about these vaults" panel.
-const blockText = (
-  (await page.locator("[data-roster-panel] [data-intro-drawer] [data-block-ref]").first().textContent()) ?? ""
-).replace(/\s+/g, " ");
+// ui-jobs 771: the roster prints no block (its read stamp shows the age); the
+// block is printed beside the catalogue count on the vaults info page, read
+// through the same five-minute cache, so it is the roster's block or a later one.
+const infoText = (await (await fetch(`${BASE}${ROSTER}/info`)).text())
+  .replace(/<!--.*?-->/g, "")
+  .replace(/<[^>]+>/g, "")
+  .replace(/\s+/g, " ");
+const infoBlockText = infoText.match(/name \d+ vaults at block ([\d,]+)/)?.[1] ?? "";
+const infoBlock = Number(infoBlockText.replace(/,/g, ""));
 check(
   "9  the block is printed in en-US, not in the runtime's locale",
-  blockText.includes(statedBlock.toLocaleString("en-US")),
-  `wanted "${statedBlock.toLocaleString("en-US")}" in "${blockText.slice(0, 60)}…"`,
+  infoBlock >= statedBlock && infoBlockText === infoBlock.toLocaleString("en-US"),
+  `info page prints "${infoBlockText}"; the roster read ${statedBlock}`,
 );
 
 // ── 10: the dev provenance tripwire ─────────────────────────────────────────
@@ -747,16 +752,17 @@ check(
 );
 await page.locator(`${CHOOSER} [role='tab'][aria-label='Ethereum']`).click();
 // Aave vaults is not among Ethereum's eight most used (explorer-rank.json),
-// so its row is behind "View all".
+// so its row is behind "View all", which opens /protocols on Ethereum (ui-jobs 781).
 await page.locator(`${CHOOSER} [data-chooser-view-all]`).click();
+await page.waitForSelector("[data-protocol-row]", { timeout: 60_000 }).catch(() => {});
 const aaveVaultsRow = await page
-  .locator(`${CHOOSER} a[href='/ethereum/aave']`)
+  .locator("[data-protocol-row] a[data-protocol-hub][href='/ethereum/aave']")
   .evaluateAll((els) => els.map((e) => (e.textContent ?? "").replace(/\s+/g, " ").trim()));
 // Aave's vault layer launched on 20 Oct 2026 (ui-jobs 412; `unlaunched` left
 // its entry in lib/shared/protocols.ts), so the switcher's Ethereum column
 // carries it as an ordinary row, "Aave vaults".
 check(
-  "11b …and Aave's vault layer is a switcher row, launched",
+  "11b …and Aave's vault layer is an Ethereum explorer, launched, on the chooser's View all",
   aaveVaultsRow.length === 1 && /^Aave vaults/.test(aaveVaultsRow[0]),
   JSON.stringify(aaveVaultsRow),
 );
@@ -891,9 +897,8 @@ check(
     : `${FIRST_PARTY.urls.length} matched, fetched ${FIRST_PARTY.fetchedOn}`,
 );
 
-await openRoster();
-// The citation block is in the roster's intro drawer (ui-jobs 407): open it.
-await page.locator('button[aria-controls="vault-roster-intro"]').click();
+// The citation block is on the vaults info page (ui-jobs 771).
+await page.goto(`${BASE}${ROSTER}/info`, { waitUntil: "networkidle" });
 const citation = page.locator("[data-first-party-sources]");
 const citationDrawn = (await citation.count()) === 1;
 const citedHrefs = citationDrawn
@@ -956,9 +961,7 @@ const missingClause = wantClauses.filter((c) => !citationText.includes(c));
 check(
   "14e the block states both facts — that a holder here is the holder's own address and no row names an app, and that Aave's surfaces carry no per-address route",
   citationDrawn && missingClause.length === 0,
-  missingClause.length
-    ? `missing "${missingClause.join('", "')}"`
-    : `${wantClauses.length} clauses in the intro drawer`,
+  missingClause.length ? `missing "${missingClause.join('", "')}"` : `${wantClauses.length} clauses on the info page`,
 );
 
 // The block is a citation. A tile inside it, or an app's name inside it, would

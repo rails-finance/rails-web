@@ -1,19 +1,18 @@
 // The wallet page's filters (ui-jobs 738): the Protocol pill and the
 // position-kind pill, as URL params `protocol` and `kind`. With one protocol
 // chosen the page reads that protocol alone (lib/wallet/read-wallet.ts,
-// `readWallet(…, { protocol })`); a protocol with a listing on the wallet
-// page (Liquity V2) draws its listing's pills and sort there
-// (components/wallet/wallet-protocol-listing.tsx). Client-safe: no reads.
+// `readWallet(…, { protocol })`). Client-safe: no reads.
 
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { WalletSummaryRow } from "@/lib/wallet/summary-row";
 
-export type WalletKind = "troves" | "deposits" | "loans" | "vaults";
+export type WalletKind = "troves" | "deposits" | "stakes" | "loans" | "vaults";
 
 export const WALLET_KINDS: { value: WalletKind; label: string }[] = [
   { value: "troves", label: "Troves" },
   { value: "deposits", label: "Deposits" },
+  { value: "stakes", label: "LQTY stakes" },
   { value: "loans", label: "Loans" },
   { value: "vaults", label: "Vaults" },
 ];
@@ -34,20 +33,51 @@ export const WALLET_PROTOCOLS: WalletProtocol[] = [
   { slug: "aave-v3", name: "Aave V3", kinds: ["loans", "deposits"], arbitrum: true },
   { slug: "compound-v3", name: "Compound V3", kinds: ["loans", "deposits"], arbitrum: true },
   { slug: "morpho", name: "Morpho Blue", kinds: ["loans", "deposits"], arbitrum: true },
-  { slug: "liquity-v2", name: "Liquity V2", kinds: ["troves"] },
+  { slug: "liquity-v2", name: "Liquity V2", kinds: ["troves", "deposits"] },
+  { slug: "liquity-v1", name: "Liquity V1", kinds: ["troves", "deposits", "stakes"] },
   { slug: "makerdao", name: "MakerDAO", kinds: ["vaults"] },
   { slug: "spark", name: "SparkLend", kinds: ["loans", "deposits"] },
   { slug: "fluid", name: "Fluid", kinds: ["vaults"] },
-  { slug: "ebisu", name: "Ebisu", kinds: ["troves"] },
-  { slug: "asymmetry", name: "Asymmetry", kinds: ["troves"] },
-  { slug: "basedollar", name: "Basedollar", kinds: ["troves"] },
+  { slug: "ebisu", name: "Ebisu", kinds: ["troves", "deposits"] },
+  { slug: "asymmetry", name: "Asymmetry", kinds: ["troves", "deposits"] },
+  { slug: "basedollar", name: "Basedollar", kinds: ["troves", "deposits"] },
 ];
 
 export const walletProtocol = (slug: string | null | undefined): WalletProtocol | undefined =>
   slug ? WALLET_PROTOCOLS.find((p) => p.slug === slug) : undefined;
 
-/** The protocols whose wallet view is their listing, with its pills. */
-export const LISTED_ON_WALLET = new Set(["liquity-v2"]);
+/** The /wallet page for a wallet a listing search names, where that page
+ *  reads the protocol (`WALLET_PROTOCOLS`); null where it does not, so a
+ *  protocol it leaves out (Polaris on Sepolia, ui-jobs 691) draws no link
+ *  to an empty page. */
+export const walletPageHref = (protocol: string | undefined, wallet: string | undefined): string | null =>
+  wallet && walletProtocol(protocol) ? `/wallet/${encodeURIComponent(wallet)}` : null;
+
+/** A wallet address, as the wallet page takes it. */
+export const WALLET_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+
+/** An ENS name the wallet page resolves: no space, ending ".eth", seven
+ *  characters or more. A listing search sends only these to the wallet page. */
+export const isWalletEnsName = (v: string): boolean => /^[^\s]+\.eth$/i.test(v) && v.length >= 7;
+
+/** The families whose listings send a wallet search to the wallet page
+ *  (ui-jobs 738): their Trove and Stability Pool listings. The session id of
+ *  each explorer is its slug here. */
+export const WALLET_SEARCH_FAMILIES = new Set(["liquity-v2", "ebisu", "asymmetry", "basedollar"]);
+
+/** The wallet page for a wallet within one protocol. */
+export const walletProtocolHref = (wallet: string, protocol: string): string =>
+  `/wallet/${encodeURIComponent(wallet.toLowerCase())}?protocol=${protocol}`;
+
+/** Where a listing search lands: the wallet page with the protocol chosen,
+ *  where the search names a whole address or an ENS name and the family's
+ *  listings send a wallet there; null for anything else, which the listing
+ *  searches itself. */
+export function walletSearchHref(protocol: string | undefined, q: string | null | undefined): string | null {
+  if (!protocol || !WALLET_SEARCH_FAMILIES.has(protocol)) return null;
+  const v = (q ?? "").trim();
+  return WALLET_ADDRESS.test(v) || isWalletEnsName(v) ? walletProtocolHref(v, protocol) : null;
+}
 
 /** Fields that name a market's figures or a count, never the account's debt. */
 const NOT_THE_ACCOUNTS = /total|bad_?debt|rate|count|symbol|address|apy|index|share|cap/i;
@@ -68,13 +98,17 @@ function owedIn(v: unknown, underDebt = false, depth = 0): boolean {
   return false;
 }
 
-/** A summary row's kind: a lending account is a loan where it owes or ever
- *  owed, a deposit where it never borrowed. The row's own debt fields are
+/** A summary row's kind: the row's own where it states one; a lending
+ *  account is a loan where it owes or ever owed, a deposit where it never
+ *  borrowed. The row's own debt fields are
  *  read first; the lending families leave them empty, so their listing row
  *  (`card`) is read next. */
 export function kindOfRow(row: WalletSummaryRow): WalletKind {
+  if (row.kind) return row.kind;
   const kinds = walletProtocol(row.family)?.kinds ?? ["loans"];
   if (kinds.length === 1) return kinds[0];
+  // A Trove protocol's deposits carry their kind (listing-summary-rows.ts).
+  if (kinds.includes("troves")) return "troves";
   const owed = positive(row.debt?.amount) || positive(row.peakDebt) || positive(row.debtUsd) || owedIn(row.card);
   return owed ? "loans" : "deposits";
 }
@@ -113,8 +147,7 @@ export function walletHref(
   const sp = new URLSearchParams();
   if (p) sp.set("protocol", p.slug);
   if (keep.length) sp.set("kind", keep.join(","));
-  // A protocol listed on the page reads its own Status pill.
-  if (status && !(p && LISTED_ON_WALLET.has(p.slug))) sp.set("status", status);
+  if (status) sp.set("status", status);
   const s = sp.toString().replace(/%2C/gi, ",");
   return `/wallet/${address}${s ? `?${s}` : ""}`;
 }

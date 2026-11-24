@@ -120,6 +120,7 @@ const FIGURES_IN_LOAN_TOKEN =
 function marketsView(href: string, body: ReactNode): InfoView {
   return {
     heading: "Markets",
+    section: "markets",
     body: (
       <p>
         The{" "}
@@ -218,6 +219,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
         views={[
           {
             heading: "Listing",
+            section: "positions",
             body: (
               <p>
                 Each card shows one position: the wallet, its market, its collateral, what it borrowed and its status.
@@ -227,6 +229,33 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
             ),
           },
           marketsView("/ethereum/morpho/markets", LOAN_TOKEN_ROWS),
+          {
+            heading: "Vaults",
+            section: "vaults",
+            body: (
+              <ul className={UL}>
+                <li>
+                  <Link href="/ethereum/morpho/vaults" className={INLINE_LINK}>
+                    The vault roster
+                  </Link>{" "}
+                  lists every MetaMorpho vault (Morpho&apos;s vault kind, run by a curator who picks its markets) that
+                  Rails has found on Ethereum, with its total assets, share price and 30-day yield.
+                </li>
+                <li>
+                  <Link href="/ethereum/morpho/vaults/positions" className={INLINE_LINK}>
+                    The vault positions listing
+                  </Link>{" "}
+                  shows each address that holds shares in a vault.
+                </li>
+                <li>
+                  <Link href="/ethereum/morpho/vaults/info" className={INLINE_LINK}>
+                    The vault layer&apos;s about page
+                  </Link>{" "}
+                  explains how Rails builds the roster and that listing.
+                </li>
+              </ul>
+            ),
+          },
         ]}
         search={
           <>
@@ -281,6 +310,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
         views={[
           {
             heading: "Listing",
+            section: "positions",
             body: (
               <>
                 <p>
@@ -301,6 +331,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
           marketsView("/base/morpho/markets", LOAN_TOKEN_ROWS),
           {
             heading: "Vaults",
+            section: "vaults",
             body: (
               <ul className={UL}>
                 <li>
@@ -322,7 +353,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
                   <Link href="/base/morpho/vaults/info" className={INLINE_LINK}>
                     The vault layer&apos;s about page
                   </Link>{" "}
-                  explains how Rails builds that listing.
+                  explains how Rails builds the roster and that listing.
                 </li>
               </ul>
             ),
@@ -382,6 +413,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
       views={[
         {
           heading: "Listing",
+          section: "positions",
           body: (
             <p>
               The listing holds the positions Rails has read, which come from each day&apos;s most active wallets since

@@ -11,6 +11,7 @@
 import { v4Apy } from "@/lib/aave-v4/rates";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardSlots } from "@/components/shared/position-card";
+import { ListingTag } from "@/components/shared/listing-tag";
 import {
   DataTable,
   DataTableAmount,
@@ -157,7 +158,8 @@ function slots(r: ArcPositionRead): PositionCardSlots {
     surface: "detail",
     heading: CARD_WORDS.heading,
     status: null,
-    identity: <span className="text-xs font-semibold text-rb-500">{r.spoke.name} spoke</span>,
+    // The spoke (the market) as the tag, as an Aave V4 listing names it.
+    tag: <ListingTag market={r.spoke.name} />,
     heads: [
       {
         id: "supplied",

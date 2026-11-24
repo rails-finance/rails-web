@@ -1,48 +1,44 @@
 "use client";
 
-// The vault comparison (E1; rails-ops ui-jobs 553, door 3): a column per
-// chosen vault, its name linking the vault's page under its protocol, then
+// The vault comparison (E1; rails-ops ui-jobs 553 door 3, 779): a column per
+// chosen vault in the order the reader picked them, its name linking the
+// vault's page under its protocol. First Differences (E1.2): the facts on
+// which the vaults differ, each figure in its receipt; then the full record:
 // the readout's five lines, Fees, Where the money is lent and Who holds it.
-// "Sort by" orders the columns only (teal presses, color-grammar.md §4c); the
-// sort lives in `?sort=`, written only off its default. Below md each row
-// stands alone with the chosen vaults listed beneath it, so the page never
-// scrolls sideways. The read is lib/vaults/compare-read.ts; every word is
-// lib/vaults/compare-words.ts's or lib/vaults/health-words.ts's.
+// Nothing is scored, ranked or sorted. Below md each row stands alone with the
+// chosen vaults listed beneath it, so the page never scrolls sideways. The
+// read is lib/vaults/compare-read.ts; every word is lib/vaults/compare-words.ts's
+// or lib/vaults/health-words.ts's.
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
-import { VaultLead } from "@/components/vaults/vault-heads";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { VaultLead, vaultHeads } from "@/components/vaults/vault-heads";
 import { HolderDonut } from "@/components/vaults/holder-donut";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { useAssetScope } from "@/lib/shared/asset-scope";
 import { assetKey } from "@/lib/shared/asset-family";
 import { VAULT_FAMILIES } from "@/lib/vaults/families";
-import { COMPARE_SORTS, mixedAssets, sortColumns, type CompareSort } from "@/lib/vaults/compare";
-import { COMPARE_PAGE, EXPOSURE_WORDS, type CompareCell } from "@/lib/vaults/compare-words";
+import { differs } from "@/lib/vaults/compare";
+import { COMPARE_PAGE, DIFFERENCE_LABELS as D, EXPOSURE_WORDS, type CompareCell } from "@/lib/vaults/compare-words";
 import { flooredPct, type HealthLine } from "@/lib/vaults/health-words";
+import { vaultHoldersProv } from "@/lib/vaults/row-provenance";
 import type { CompareColumn, CompareExposure, CompareHolders } from "@/lib/vaults/compare-read";
 
 const MUTED = "text-rb-500";
-const TEAL_PRESS =
-  "text-teal-600 hover:underline dark:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 dark:focus-visible:ring-teal-400 rounded";
-const DEFAULT_SORT: CompareSort = "size";
+const n = (v: number) => v.toLocaleString("en-US");
 
 /** A share as a place's figure: under 0.1% but above none reads "<0.1%". */
 const placeShare = (x: number) => (x > 0 && x < 0.001 ? "<0.1%" : flooredPct(x));
 
-type RowKey = HealthLine["key"] | "fees" | "exposure" | "holders";
+const withProv = (info: Provenance | null | undefined, node: ReactNode) =>
+  info ? <Prov info={info}>{node}</Prov> : node;
 
-interface Row {
-  key: RowKey;
-  label: string;
-  cell: (c: CompareColumn) => ReactNode;
-}
-
-function Cell({ c }: { c: CompareCell | HealthLine }) {
+function Cell({ c, prov }: { c: CompareCell | HealthLine; prov?: Provenance | null }) {
   return (
     <div className="space-y-0.5">
-      {c.headline && <div className="font-semibold text-foreground">{c.headline}</div>}
+      {c.headline && <div className="font-semibold text-foreground">{withProv(prov, c.headline)}</div>}
       {c.sentence && <div className={c.read ? "text-rb-600 dark:text-rb-300" : MUTED}>{c.sentence}</div>}
     </div>
   );
@@ -71,17 +67,115 @@ function Holders({ h }: { h: CompareHolders }) {
   return <HolderDonut top={h.top} live={h.live} />;
 }
 
-const ROWS: readonly Row[] = [
+/** One row of a table: its label, and per column what it draws and, for
+ *  Differences, the value it is compared by. */
+interface Row {
+  key: string;
+  label: string;
+  cell: (c: CompareColumn) => ReactNode;
+  /** What the column prints, for Differences; absent on the full record. */
+  same?: (c: CompareColumn) => string | null;
+}
+
+const line = (c: CompareColumn, k: HealthLine["key"]) => c.lines.find((l) => l.key === k);
+const lineText = (l: HealthLine | CompareCell | undefined) =>
+  l ? [l.headline, l.sentence].filter(Boolean).join(" ") || null : null;
+const none = <span className={MUTED}>—</span>;
+/** A fact of identity: no receipt, as the roster row states it. */
+const plain = (text: string) => (
+  <span className="text-foreground" data-prov-exempt="">
+    {text}
+  </span>
+);
+
+const head = (c: CompareColumn, id: string) =>
+  vaultHeads({
+    vault: c.vault,
+    holdersHref: null,
+    receipts: c.receipts,
+  }).find((h) => h.id === id)?.value ?? none;
+
+const DIFFERENCES: readonly Row[] = [
+  { key: "asset", label: D.asset, cell: (c) => plain(c.vault.asset.symbol), same: (c) => c.vault.asset.symbol },
+  { key: "family", label: D.family, cell: (c) => plain(c.family), same: (c) => c.family },
+  { key: "chain", label: D.chain, cell: (c) => plain(c.chain), same: (c) => c.chain },
+  {
+    key: "total-assets",
+    label: D.totalAssets,
+    cell: (c) => head(c, "total-assets"),
+    same: (c) => (c.vault.totalAssets ? `${c.vault.totalAssets.raw} ${c.vault.asset.address}` : null),
+  },
+  {
+    key: "share-price",
+    label: D.sharePrice,
+    cell: (c) => head(c, "share-price"),
+    same: (c) => (c.vault.sharePrice ? `${c.vault.sharePrice.raw} ${c.vault.asset.address}` : null),
+  },
+  // The readout's line, as the full record states it: one yield figure per
+  // vault on the page.
+  {
+    key: "yield",
+    label: D.yield,
+    cell: (c) => (line(c, "yield") ? <Cell c={line(c, "yield")!} prov={c.lineProvs.yield} /> : none),
+    same: (c) => lineText(line(c, "yield")),
+  },
+  {
+    key: "holder-count",
+    label: D.holders,
+    cell: (c) =>
+      c.vault.census ? (
+        <span className="font-semibold text-foreground">
+          <Prov info={vaultHoldersProv(c.vault, c.vault.census)}>{n(c.vault.census.live)}</Prov>
+        </span>
+      ) : (
+        <span className={MUTED}>{c.holders.kind === "none" ? c.holders.why : "—"}</span>
+      ),
+    same: (c) => (c.vault.census ? String(c.vault.census.live) : null),
+  },
+  {
+    key: "steward",
+    label: D.steward,
+    cell: (c) => (line(c, "steward") ? <Cell c={line(c, "steward")!} prov={c.lineProvs.steward} /> : none),
+    same: (c) => lineText(line(c, "steward")),
+  },
+  { key: "fees", label: D.fees, cell: (c) => <Cell c={c.fees} prov={c.feeProv} />, same: (c) => lineText(c.fees) },
+  {
+    key: "withdrawals",
+    label: D.withdrawals,
+    cell: (c) => (line(c, "withdrawals") ? <Cell c={line(c, "withdrawals")!} prov={c.lineProvs.withdrawals} /> : none),
+    same: (c) => lineText(line(c, "withdrawals")),
+  },
+];
+
+const RECORD: readonly Row[] = [
   ...(["size", "yield", "withdrawals", "losses", "steward"] as const).map(
-    (k, i): Row => ({
+    (k): Row => ({
       key: k,
       label: "",
-      cell: (c) => <Cell c={c.lines.find((l) => l.key === k) ?? c.lines[i]} />,
+      cell: (c) => (line(c, k) ? <Cell c={line(c, k)!} prov={c.lineProvs[k]} /> : none),
     }),
   ),
-  { key: "fees", label: COMPARE_PAGE.fees, cell: (c) => <Cell c={c.fees} /> },
-  { key: "exposure", label: COMPARE_PAGE.exposure, cell: (c) => <Exposure e={c.exposure} /> },
-  { key: "holders", label: COMPARE_PAGE.holders, cell: (c) => <Holders h={c.holders} /> },
+  { key: "fees", label: COMPARE_PAGE.fees, cell: (c) => <Cell c={c.fees} prov={c.feeProv} /> },
+  // Where the money is lent and the holder donut state shares the vault's
+  // page traces leg by leg and holder by holder; here they stand without.
+  {
+    key: "exposure",
+    label: COMPARE_PAGE.exposure,
+    cell: (c) => (
+      <div data-prov-exempt="the vault's page traces each place's share">
+        <Exposure e={c.exposure} />
+      </div>
+    ),
+  },
+  {
+    key: "holders",
+    label: COMPARE_PAGE.holders,
+    cell: (c) => (
+      <div data-prov-exempt="the census's holder shares; the vault's holders page traces each">
+        <Holders h={c.holders} />
+      </div>
+    ),
+  },
 ];
 
 /** A row's label: the readout's own for its five lines. */
@@ -132,59 +226,15 @@ function FocusCompareNote({ columns }: { columns: CompareColumn[] }) {
   );
 }
 
-export function VaultCompare({ columns, initialSort }: { columns: CompareColumn[]; initialSort: CompareSort }) {
-  const [sort, setSort] = useState<CompareSort>(initialSort);
-  const cols = sortColumns(columns, sort);
-  const note =
-    sort === "range"
-      ? COMPARE_PAGE.sortNote.range
-      : sort === "size" && mixedAssets(cols)
-        ? COMPARE_PAGE.sortNote.mixed
-        : null;
-
-  const choose = (k: CompareSort) => {
-    setSort(k);
-    try {
-      const p = new URLSearchParams(window.location.search);
-      if (k === DEFAULT_SORT) p.delete("sort");
-      else p.set("sort", k);
-      const qs = p.toString().replace(/%2C/gi, ",").replace(/%3A/gi, ":");
-      window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
-    } catch {
-      // The order still changes on the page.
-    }
-  };
-
+/** One table: from md a column per vault, below md each row with the vaults beneath it. */
+function Table({ rows, cols, part }: { rows: readonly Row[]; cols: CompareColumn[]; part: "differences" | "record" }) {
   return (
-    <div data-compare-columns={cols.map((c) => c.key).join(",")}>
-      <FocusCompareNote columns={columns} />
-      <div
-        className="mb-2 flex flex-wrap items-center gap-x-1 gap-y-2 text-sm"
-        role="group"
-        aria-label={COMPARE_PAGE.sortLabel}
-      >
-        <span className={`mr-1 ${MUTED}`}>{COMPARE_PAGE.sortLabel}</span>
-        {COMPARE_SORTS.map((k) => (
-          <button
-            key={k}
-            type="button"
-            aria-pressed={k === sort}
-            onClick={() => choose(k)}
-            data-compare-sort={k}
-            className={`rounded-md px-2 py-0.5 ${k === sort ? "bg-rb-100 font-medium text-foreground dark:bg-rb-700" : TEAL_PRESS}`}
-          >
-            {COMPARE_PAGE.sorts[k]}
-          </button>
-        ))}
-      </div>
-      <p className={`mb-4 min-h-5 text-sm ${MUTED}`} data-compare-sort-note="">
-        {note}
-      </p>
-
-      {/* From md: a table, a column per vault; it scrolls inside its frame if it must. */}
+    <>
       <div className="hidden overflow-x-auto rounded-xl border border-rb-200 bg-raised md:block dark:border-rb-600">
-        <table className="w-full min-w-[760px] table-fixed text-sm" data-compare-table="">
-          <caption className="sr-only">{COMPARE_PAGE.caption}</caption>
+        <table className="w-full min-w-[760px] table-fixed text-sm" data-compare-table={part}>
+          <caption className="sr-only">
+            {part === "differences" ? COMPARE_PAGE.differences : COMPARE_PAGE.caption}
+          </caption>
           <colgroup>
             <col className="w-36" />
             {cols.map((c) => (
@@ -202,7 +252,7 @@ export function VaultCompare({ columns, initialSort }: { columns: CompareColumn[
             </tr>
           </thead>
           <tbody>
-            {ROWS.map((row) => (
+            {rows.map((row) => (
               <tr
                 key={row.key}
                 className="border-b border-rb-200 align-top last:border-0 dark:border-rb-600"
@@ -222,22 +272,14 @@ export function VaultCompare({ columns, initialSort }: { columns: CompareColumn[
         </table>
       </div>
 
-      {/* Below md: the vaults once, then each row with the vaults beneath it. */}
-      <div className="space-y-4 md:hidden" data-compare-phone="">
-        <ol className="space-y-3 rounded-xl border border-rb-200 bg-raised p-4 dark:border-rb-600">
-          {cols.map((c) => (
-            <li key={c.key} data-compare-column={c.key}>
-              <VaultHead c={c} />
-            </li>
-          ))}
-        </ol>
-        {ROWS.map((row) => (
+      <div className="space-y-4 md:hidden" data-compare-phone={part}>
+        {rows.map((row) => (
           <section
             key={row.key}
             className="rounded-xl border border-rb-200 bg-raised p-4 text-sm dark:border-rb-600"
             data-compare-row={row.key}
           >
-            <h2 className="mb-3 font-semibold text-foreground">{labelOf(row, cols)}</h2>
+            <h3 className="mb-3 font-semibold text-foreground">{labelOf(row, cols)}</h3>
             <ul className="divide-y divide-rb-200 dark:divide-rb-600">
               {cols.map((c) => (
                 <li key={c.key} className="py-3 first:pt-0 last:pb-0" data-compare-cell={c.key}>
@@ -249,6 +291,43 @@ export function VaultCompare({ columns, initialSort }: { columns: CompareColumn[
           </section>
         ))}
       </div>
+    </>
+  );
+}
+
+export function VaultCompare({ columns }: { columns: CompareColumn[] }) {
+  const differing = DIFFERENCES.filter((r) => differs(columns.map((c) => r.same!(c))));
+  return (
+    <div data-compare-columns={columns.map((c) => c.key).join(",")}>
+      <FocusCompareNote columns={columns} />
+
+      {/* Below md the vaults once, then each table's rows. */}
+      <ol
+        className="mb-4 space-y-3 rounded-xl border border-rb-200 bg-raised p-4 md:hidden dark:border-rb-600"
+        data-compare-phone=""
+      >
+        {columns.map((c) => (
+          <li key={c.key} data-compare-column={c.key}>
+            <VaultHead c={c} />
+          </li>
+        ))}
+      </ol>
+
+      <section className="mb-8" data-anatomy="E1.2" data-compare-differences={differing.map((r) => r.key).join(",")}>
+        <h2 className="mb-3 text-lg font-semibold text-foreground">{COMPARE_PAGE.differences}</h2>
+        {differing.length > 0 ? (
+          <Table rows={differing} cols={columns} part="differences" />
+        ) : (
+          <p className={`text-sm ${MUTED}`} data-compare-no-differences="">
+            {COMPARE_PAGE.noDifferences}
+          </p>
+        )}
+      </section>
+
+      <section data-compare-record="">
+        <h2 className="mb-3 text-lg font-semibold text-foreground">{COMPARE_PAGE.record}</h2>
+        <Table rows={RECORD} cols={columns} part="record" />
+      </section>
     </div>
   );
 }

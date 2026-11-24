@@ -3,7 +3,7 @@ import Link from "next/link";
 import { HistoryTag } from "@/components/shared/history-tag";
 import { formatFlowUsd } from "@/lib/shared/flows-timeline";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
-import { formatValueHeld, spokenValueHeld, type ValueHeld, type ValueHeldPlace } from "@/lib/home/value-held";
+import type { ValueHeld, ValueHeldPlace } from "@/lib/home/value-held";
 import type { ChainId } from "@/lib/shared/chains";
 import {
   DataTable,
@@ -19,8 +19,8 @@ import {
 
 /**
  * The body of /about/figures (ui-jobs 523; the home band's (i) modal until 6 Nov
- * 2026): what the home figures are and how they are counted. In order: the lead
- * (when a value is stated), the open and closed caption, then three tables on
+ * 2026): what the home figures are and how they are counted. In order: the claim
+ * the page backs, the home sentence restated (ui-jobs 785), the open and closed caption, then three tables on
  * one set of columns (FiguresTable): the per-explorer breakdown, what is not
  * counted and what counted explorers left out, each explorer linking to its
  * listing and its chain a glyph; the overlaps and the floor sentence; how
@@ -118,19 +118,20 @@ function Heading({ children }: { children: ReactNode }) {
   return <h2 className="mt-12 mb-4 text-2xl font-semibold tracking-tight text-foreground">{children}</h2>;
 }
 
-export function FiguresBody({ value, caption }: { value: ValueHeld | null; caption: ReactNode }) {
+export function FiguresBody({
+  value,
+  claim,
+  caption,
+}: {
+  value: ValueHeld | null;
+  claim: ReactNode;
+  caption: ReactNode;
+}) {
   return (
     <div data-anatomy="S3.4">
-      {value && (
-        <p className="text-lg leading-relaxed text-foreground">
-          From the smallest position to the largest, Rails shows each in the same detail. Together, the open positions
-          hold{" "}
-          <span className="font-semibold tabular-nums" aria-label={spokenValueHeld(value.totalUsd)}>
-            {formatValueHeld(value.totalUsd)}
-          </span>
-          .
-        </p>
-      )}
+      <p className="text-lg leading-relaxed text-foreground" data-figures-claim="">
+        {claim}
+      </p>
       <p className="body-text mt-3">{caption}</p>
 
       {value && (

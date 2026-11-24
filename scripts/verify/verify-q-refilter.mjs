@@ -24,7 +24,8 @@
 // `button[aria-haspopup="menu"]`, and since decision 0051 its last row opens the
 // wallet view rather than the listing. The Liquity V2 arm reads the owner from
 // that trigger and makes the same in-app transition with the App Router's
-// `window.next.router.push` to `/ethereum/liquity-v2?q=<owner>`.
+// `window.next.router.push` to `/ethereum/liquity-v2?q=<owner>`, which since
+// ui-jobs 738 redirects to `/wallet/<owner>?protocol=liquity-v2`.
 //
 // The counts. A listing selector that matches nothing reads as "zero wallets",
 // and "zero wallets, all of them the filtered one" is trivially true — the shape
@@ -207,14 +208,6 @@ const V2_ROW = "a[href*='/ethereum/liquity-v2/trove/']";
     );
     failures++;
   } else {
-    // The identity the page DISPLAYS for this owner — an ENS name where one
-    // resolves, the truncated address otherwise. The listing rows render the
-    // same display identity, never the raw hex, so the filtered-listing
-    // assertion below compares display identity to display identity (an
-    // ENS-named owner made an older hex-only grep fail on a correctly filtered
-    // page, 2026-08-10).
-    const ownerDisplay = (await ownerTrigger.locator("[data-wallet-label]").first().innerText()).trim();
-    const ownerLabel = ownerDisplay;
     const markerBefore = await page.evaluate(() => window.__verifyMarker || (window.__verifyMarker = Math.random()));
     const ownerAddress = ((await ownerTrigger.getAttribute("title")) ?? "").match(/0x[0-9a-fA-F]{40}/)?.[0];
     ok("liquity-v2: the address menu names the owner's address", !!ownerAddress, String(ownerAddress));
@@ -222,47 +215,33 @@ const V2_ROW = "a[href*='/ethereum/liquity-v2/trove/']";
       (href) => window.next.router.push(href),
       `/ethereum/liquity-v2?q=${(ownerAddress ?? "").toLowerCase()}`,
     );
-    await page.waitForURL((u) => u.pathname === "/ethereum/liquity-v2", { timeout: 60_000 }).catch(() => {});
+    await page.waitForURL((u) => u.pathname.startsWith("/wallet/"), { timeout: 60_000 }).catch(() => {});
     await page.waitForTimeout(1500);
     const markerAfter = await page.evaluate(() => window.__verifyMarker);
     ok(
-      "liquity-v2: in-app nav (detail page -> listing) did NOT cause a full page reload",
+      "liquity-v2: in-app nav (detail page -> wallet page) did NOT cause a full page reload",
       markerBefore === markerAfter,
     );
 
+    // A wallet search on the Liquity V2 listing opens the wallet page with
+    // Liquity V2 chosen (ui-jobs 738): the in-app transition lands there.
     const url = new URL(page.url());
-    const qParam = url.searchParams.get("q");
-    ok("liquity-v2: URL updated to carry q after in-app owner click", !!qParam, url.toString());
-    ok("liquity-v2: landed on the listing route", url.pathname === "/ethereum/liquity-v2");
+    ok(
+      "liquity-v2: in-app nav to ?q=<owner> lands on /wallet/<owner>?protocol=liquity-v2",
+      url.pathname === `/wallet/${(ownerAddress ?? "").toLowerCase()}` &&
+        url.searchParams.get("protocol") === "liquity-v2",
+      url.toString(),
+    );
 
-    // The filtered listing's own cards are the evidence: every card must carry
-    // the same owner identity the detail page showed. Reading the whole body
-    // for a substring of the address would pass on an unfiltered listing that
-    // merely happens to contain that owner somewhere.
-    const cardCountFiltered = (await rows(page, "liquity-v2 filtered rows", V2_ROW, "href", 1)).length;
-    // The listing card's owner is the WalletPill again (Miles, 17 Oct 2026), whose label carries `data-wallet-label`.
-    const OWNER_TEXT = `${V2_ROW} [data-wallet-label]`;
-    await page
-      .locator(OWNER_TEXT)
-      .first()
-      .waitFor({ state: "attached", timeout: 60_000 })
-      .catch(() => {});
-    const filteredOwners = await page.$$eval(OWNER_TEXT, (els) => els.map((el) => el.textContent.trim()));
-    ok(
-      "liquity-v2 filtered owners: selector matched ≥1 (" + OWNER_TEXT + ")",
-      filteredOwners.length >= 1,
-      `${filteredOwners.length} matched`,
-    );
-    const distinctOwners = new Set(filteredOwners);
-    ok(
-      "liquity-v2: in-app SPA nav to ?q=<owner> shows a listing of THAT owner and nobody else",
-      distinctOwners.size === 1 && distinctOwners.has(ownerLabel),
-      `${cardCountFiltered} row(s), owners=[${[...distinctOwners].join(" | ")}], expected "${ownerLabel}"`,
-    );
+    // The wallet page's Liquity V2 section holds the owner's Troves; its cards
+    // draw no wallet pill (W3), so the section and its cards are the evidence.
+    const SECTION_ROW = `[data-wallet-section="liquity-v2"] ${V2_ROW}`;
+    const cardCountFiltered = (await rows(page, "liquity-v2 wallet-page Troves", SECTION_ROW, "href", 1)).length;
+    ok("liquity-v2: the wallet page lists the owner's Troves", cardCountFiltered >= 1, `${cardCountFiltered} card(s)`);
 
     // (4) In-app nav back to the unfiltered listing.
-    await page.evaluate(() => window.history.pushState(null, "", "/ethereum/liquity-v2"));
-    await page.evaluate(() => window.dispatchEvent(new PopStateEvent("popstate")));
+    await page.evaluate(() => window.next.router.push("/ethereum/liquity-v2"));
+    await page.waitForURL((u) => u.pathname === "/ethereum/liquity-v2", { timeout: 60_000 }).catch(() => {});
     await page.waitForTimeout(1500);
     const cardCountUnfiltered = (await rows(page, "liquity-v2 rows after clearing q", V2_ROW, "href", MIN_LISTING_ROWS))
       .length;

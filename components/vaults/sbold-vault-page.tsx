@@ -31,7 +31,12 @@ import { assetText, pctText, sharePriceText, shareText, shortAddress } from "@/l
 import { sboldVaultPageSummary } from "@/lib/vaults/summary";
 import { vaultVenueShareProv } from "@/lib/vaults/card-provenance";
 import { vaultAssetsExports, vaultPointsCsv, type VaultExportModel } from "@/lib/vaults/card-export";
-import { SHARES_ISSUED_TIP, sboldVaultAssetsContent, sboldVaultCardContent } from "@/lib/vaults/card-words";
+import {
+  SBOLD_OWNER_TIP,
+  SHARES_ISSUED_TIP,
+  sboldVaultAssetsContent,
+  sboldVaultCardContent,
+} from "@/lib/vaults/card-words";
 import { SBOLD_ASSET, SBOLD_CREATED_BLOCK, SBOLD_DEPOSITS_HREF, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
 import {
   engineeringParts,
@@ -366,7 +371,7 @@ export function SboldVaultPage({
     {
       id: "owner",
       label: "Owner",
-      tip: "The address the vault's owner() names.",
+      tip: SBOLD_OWNER_TIP,
       value: fig(
         "owner",
         undefined,
@@ -491,7 +496,7 @@ export function SboldVaultPage({
     {
       item: "sp-deposits",
       title: "Stability Pool deposits",
-      subtitle: "The vault's three deposits in the listing",
+      subtitle: "The vault's deposits on its wallet page",
       href: SBOLD_DEPOSITS_HREF,
     },
     {

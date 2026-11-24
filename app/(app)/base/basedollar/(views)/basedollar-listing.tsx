@@ -1,18 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { formerHoldFor } from "@/lib/liquity-fork/former-holders";
-
 // Basedollar Trove listing — client half. One row per Trove (across 5 collateral branches),
 // replayed straight from the Basedollar TroveUpdated events — chain-direct values only
 // (branch collateral + BD debt, user-set interest rate, status). There is no
 // collateral ratio, no USD (interpreted layers, off by default). Holds the
 // presentation config + the in-memory strategy and hands them to the shared
 // ChainTruthListingPage driver with the SSR first-paint data from page.tsx.
+// The count names the Status choice ("open Troves"); the in-memory tier draws
+// the listing's noun, so the noun follows the filters (ui-jobs 805).
 
+import { useState } from "react";
 import type { BasedollarTroveSummary } from "@/lib/sources/api/basedollar-troves";
 import { fetchBasedollarTroves } from "@/lib/api/fetch-basedollar-troves";
 import { ChainTruthListingPage, memoryStrategy } from "@/components/shared/chain-truth-listing-page";
+import { decodeListFilters } from "@/lib/shared/list-filter";
+import { troveCountLine } from "@/lib/liquity-v2/listing-visibility";
 import { BasedollarPositionCard, viewFromSummary } from "@/components/protocol/basedollar/basedollar-position-card";
 import {
   basedollarListDimensions,
@@ -30,21 +32,27 @@ export interface BasedollarListingProps {
 }
 
 export function BasedollarListing({ initialItems, initialTotal, initialKey, initialSearch }: BasedollarListingProps) {
-  // The search, so a Trove the searched wallet passed on reads "moved to"
-  // (lib/liquity-fork/former-holders.ts).
-  const [q, setQ] = useState(() => new URLSearchParams(initialSearch ?? "").get("q") ?? "");
+  const [noun, setNoun] = useState(
+    () =>
+      troveCountLine(
+        decodeListFilters(
+          basedollarListDimensions([]),
+          new URLSearchParams(initialSearch ?? ""),
+          BASEDOLLAR_LIST_DEFAULTS,
+        ),
+      ).noun,
+  );
   return (
     <ChainTruthListingPage<BasedollarTroveSummary, BasedollarListFilters>
       title="Basedollar Troves"
-      noun="Troves"
+      noun={noun}
+      onFilters={(f) => setNoun(troveCountLine(f).noun)}
       basePath="/base/basedollar"
       defaults={BASEDOLLAR_LIST_DEFAULTS}
       sortOptions={BASEDOLLAR_SORT_OPTIONS}
       searchPlaceholder="Search trove id or collateral"
-      renderCard={(t) => (
-        <BasedollarPositionCard v={{ ...viewFromSummary(t), formerHold: formerHoldFor(t, q) }} compact />
-      )}
-      onFilters={(filters) => setQ(filters.q ?? "")}
+      renderCard={(t) => <BasedollarPositionCard v={viewFromSummary(t)} compact />}
+      walletSearch="basedollar"
       hrefFor={(t) => `/base/basedollar/${t.collateralType}/${t.id}`}
       keyFor={(t) => `${t.collateralType}-${t.id}`}
       strategy={memoryStrategy<BasedollarTroveSummary, BasedollarListFilters>({

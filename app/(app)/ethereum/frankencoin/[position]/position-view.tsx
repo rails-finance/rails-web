@@ -423,7 +423,6 @@ export default function FrankencoinPositionView({
                     ending={ending}
                     lifetimeDebt={lifetimeDebt}
                     surface="detail"
-                    viewHref={tl.viewHref}
                     // The running challenge comes from the position's slots
                     // at head; the challenge tally from the index.
                     live={chain}

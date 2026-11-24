@@ -11,6 +11,7 @@ import { redirect } from "next/navigation";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { SboldPageHeader } from "@/components/vaults/sbold-page-header";
 import { SboldVaultPage } from "@/components/vaults/sbold-vault-page";
+import { SBOLD_LEAD } from "@/lib/vaults/family-leads";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { loadSboldVault } from "@/lib/sources/chain/sbold-vault";
@@ -49,6 +50,9 @@ export default async function SboldVaultRoute({ searchParams }: Props) {
         <div className="py-8">
           <header className="mb-5" data-skel-section="page-header">
             <SboldPageHeader />
+            <p className="mt-2 max-w-3xl text-sm text-rb-500" data-family-lead="sbold">
+              {SBOLD_LEAD}
+            </p>
           </header>
 
           {data.chainStale ? (

@@ -127,7 +127,6 @@ import {
 } from "@/lib/basedollar/asset-catalog";
 import { TroveIdentityRow } from "./trove-identity-row";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
-import { PositionNameId } from "@/components/shared/position-name-id";
 import { positionName } from "@/lib/shared/position-name";
 import { ListingTag } from "@/components/shared/listing-tag";
 import { TroveMenuRows } from "./trove-menu-rows";
@@ -145,7 +144,7 @@ import type {
 } from "./types";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { branchShutdownState, type BranchShutdownState } from "@/lib/liquity-fork/shutdown";
-import { recordedShutdown } from "@/lib/shared/liquity-family-shutdown";
+import { recordedShutdown, shutdownDateProv, withdrawalDateProv } from "@/lib/shared/liquity-family-shutdown";
 import { SAME_TX_CLOSE_WORD, sameTxCloseProv } from "@/lib/liquity-v2/same-tx-close";
 
 // The shared card renders inside Link-wrapped rows on
@@ -580,8 +579,6 @@ export interface LiquityPositionCardProps {
   compact?: boolean;
   /** The (i) pane's prose. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   explanationDefaultOpen?: boolean;
   onExplanationToggle?: (open: boolean) => void;
   /** A liquidated Trove's collateral surplus, read at the head. */
@@ -598,7 +595,10 @@ export interface LiquityPositionCardProps {
   /** V2's snapshot and loading status, on one line in the (i) row. */
   status?: ReactNode;
   /** The branch's shutdown (ui-jobs 612), from the page's `useBranchShutdown`.
-   *  Absent (a listing row), the catalog's record stands alone. */
+   *  Absent (a listing row), the catalog's record stands alone. Handed to a
+   *  listing card (the wallet page's head read, ui-jobs 802), a shut-down
+   *  branch's card states no ratio, and an emptied pool "pool holds 0
+   *  <symbol>" from the record's withdrawal. */
   shutdown?: BranchShutdownState | null;
   /** A notice about the Trove's branch at the card's head (Liquity V2's
    *  Safety Mode, ui-jobs 747), under the delegate's. */
@@ -615,7 +615,6 @@ export function useLiquityCardSlots({
   live,
   compact = false,
   explanation,
-  viewHref,
   explanationDefaultOpen,
   onExplanationToggle,
   surplus,
@@ -736,6 +735,14 @@ export function useLiquityCardSlots({
   const ended = v.status === "closed" || v.status === "liquidated";
   // The pool's collateral below the Trove's own (ui-jobs 607's comparison).
   const poolColl = shut && lv?.branchColl != null && lv.branchColl < coll ? lv.branchColl : null;
+  // A listing card handed the branch's state (the wallet page, ui-jobs 802):
+  // no ratio on a shut-down branch, and the record's emptied pool under the
+  // collateral, with the withdrawal's receipt.
+  const handedShut = !detail && shutdown !== undefined && shut != null;
+  const recordPool =
+    handedShut && shut.record?.withdrawal && lv?.branchColl == null
+      ? withdrawalDateProv(protocol, ct, shut.record)
+      : null;
   const status: PositionCardStatus | null =
     v.status === "liquidated"
       ? { word: "Liquidated", tone: "danger" }
@@ -744,7 +751,14 @@ export function useLiquityCardSlots({
           ? { word: SAME_TX_CLOSE_WORD, tone: "muted", anatomy: "C6.2·liquity", prov: sameTxCloseProv(ct, v.id) }
           : { word: "Closed", tone: "muted" }
         : shut
-          ? { word: "Shut down", tone: "caution", anatomy: "C6.1" }
+          ? {
+              word: "Shut down",
+              tone: "caution",
+              anatomy: "C6.1",
+              // On the wallet the word carries the shutdown date's receipt,
+              // a disagreement with the live read stated as the page states it.
+              ...(handedShut ? { prov: shutdownDateProv(protocol, ct, shut) } : {}),
+            }
           : zombie
             ? { word: terms.dormant, tone: "muted" }
             : null;
@@ -752,10 +766,8 @@ export function useLiquityCardSlots({
   // The position's name (ui-jobs 703): the branch's collateral and the Trove id.
   const name = positionName({ market: ops.collateralSymbol(ct), noun: POSITION_NOUN[protocol], id: v.id });
   // The listing names the owner; the delegate shows under Interest rate. The
-  // page's wallet row names the owner, so the detail heading carries the id.
-  const identity = detail ? (
-    <PositionNameId name={name} />
-  ) : (
+  // page's wallet row names the owner; both surfaces carry the ID as the tag.
+  const identity = detail ? undefined : (
     <TroveIdentityRow
       protocol={protocol}
       troveId={v.id}
@@ -907,6 +919,14 @@ export function useLiquityCardSlots({
               </Prov>{" "}
               {ct}
             </span>
+          ) : recordPool ? (
+            <span className="text-rb-500" data-pool-coll="">
+              pool holds{" "}
+              <Prov info={recordPool} value="0">
+                0
+              </Prov>{" "}
+              {ct}
+            </span>
           ) : shut?.record?.withdrawal ? null : collUsd !== null && collUsd > 0 ? (
             <Prov info={fp.collUsd}>
               <HighlightableValue type="collateralUsd" state="after" value={collUsd} className="text-green-400">
@@ -941,29 +961,28 @@ export function useLiquityCardSlots({
         ? {
             id: "collateral-ratio",
             label: LTV_LABEL,
-            value:
-              ltvPct(crPct) != null ? (
-                <Prov info={fp.cr}>
-                  <HighlightableValue
-                    type="collRatio"
-                    state="after"
-                    value={parseFloat((ltvPct(crPct) as number).toFixed(1))}
-                    className="text-foreground/80"
-                  >
-                    <FadeNumber value={ltvPct(crPct) as number} decimals={1} animateOnMount={animate} />%
-                  </HighlightableValue>
-                </Prov>
-              ) : debt <= 0 ? (
-                <span data-ltv-none="no-debt">—</span>
-              ) : null,
-            pending: ltvPct(crPct) == null && pending && debt > 0,
-            unavailable: ltvPct(crPct) == null && priceFailed && debt > 0 ? true : undefined,
+            value: handedShut ? null : ltvPct(crPct) != null ? (
+              <Prov info={fp.cr}>
+                <HighlightableValue
+                  type="collRatio"
+                  state="after"
+                  value={parseFloat((ltvPct(crPct) as number).toFixed(1))}
+                  className="text-foreground/80"
+                >
+                  <FadeNumber value={ltvPct(crPct) as number} decimals={1} animateOnMount={animate} />%
+                </HighlightableValue>
+              </Prov>
+            ) : debt <= 0 ? (
+              <span data-ltv-none="no-debt">—</span>
+            ) : null,
+            pending: !handedShut && ltvPct(crPct) == null && pending && debt > 0,
+            unavailable: !handedShut && ltvPct(crPct) == null && priceFailed && debt > 0 ? true : undefined,
           }
         : {
             id: "collateral-ratio",
             label: terms.ratio,
             value:
-              crPct != null && crPct > 0 ? (
+              !handedShut && crPct != null && crPct > 0 ? (
                 <Prov info={fp.cr}>
                   <HighlightableValue
                     type="collRatio"
@@ -975,8 +994,8 @@ export function useLiquityCardSlots({
                   </HighlightableValue>
                 </Prov>
               ) : null,
-            pending: !(crPct != null && crPct > 0) && pending && debt > 0,
-            unavailable: !(crPct != null && crPct > 0) && priceFailed && debt > 0 ? true : undefined,
+            pending: !handedShut && !(crPct != null && crPct > 0) && pending && debt > 0,
+            unavailable: !handedShut && !(crPct != null && crPct > 0) && priceFailed && debt > 0 ? true : undefined,
           },
       {
         id: "interest-rate",
@@ -1022,14 +1041,13 @@ export function useLiquityCardSlots({
     counters,
     outcome,
     name,
+    tag: <ListingTag id={v.id} />,
   };
-  // The listing's right end: the branch and the Trove ID.
   if (!detail)
     return {
       ...common,
       surface: "listing",
       menu: null,
-      tag: <ListingTag id={v.id} />,
     };
 
   const menu: PositionCardMenu | null =
@@ -1048,7 +1066,6 @@ export function useLiquityCardSlots({
       body: explanation ?? null,
       defaultOpen: explanationDefaultOpen,
       onToggle: onExplanationToggle,
-      viewHref,
     },
     learnMore,
     menu,

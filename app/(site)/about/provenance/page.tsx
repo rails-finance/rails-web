@@ -106,7 +106,8 @@ export default function ProvenancePage() {
       <Section title="What a receipt holds">
         <p className="body-text">
           The receipt below is a real one, for the collateral a Liquity V2 trove held after one event. The TroveManager
-          contract recorded it at block {EXAMPLE.block.toLocaleString("en-US")}. Its parts, top to bottom:
+          contract recorded it at block {EXAMPLE.block.toLocaleString("en-US")}. The list after the receipt defines its
+          parts, top to bottom.
         </p>
         <div className="py-2">
           <ProvenanceExample />
@@ -155,7 +156,8 @@ export default function ProvenancePage() {
           A receipt names where its figure can be checked. A figure read from a contract has a line naming the call and
           the block: &ldquo;To check: ask any Ethereum archive node for the vault&rsquo;s totalAssets() at block
           26400704.&rdquo; A block explorer shows a contract&rsquo;s current state, so a past block needs an archive
-          node. A figure from an event links to its transaction. The example above checks in four steps:
+          node. A figure from an event links to its transaction. The list below gives the four steps that check the
+          example above.
         </p>
         <ol className="body-text list-decimal space-y-2 pl-5">
           <li>

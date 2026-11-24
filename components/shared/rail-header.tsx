@@ -4,7 +4,8 @@
 // 68, 497, 514, 680). The protocol's identity (ProtocolIdentity), the chain's
 // glyph after the name (ChainLabel), then the sections menu (SectionsMenu,
 // H5): the current section's name and a chevron, opening the explorer's
-// sections as links — the position listing (named by the protocol's noun:
+// sections as links — a front-door explorer's front door ("Overview"), the
+// position listing (named by the protocol's noun:
 // Troves, Vaults, Accounts; absent on an explorer that has none), each of the
 // roster's sub-pages in order (Markets, Branches, System, …), then About, the
 // info page. On a sub-page the current section is the one whose route holds
@@ -18,10 +19,10 @@
 import { LifecycleLine } from "@/components/shared/lifecycle-line";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { SessionProtocol } from "@/lib/shared/sessions";
-import { positionNounPlural, protocolForSession, subPageForPathname } from "@/lib/shared/protocols";
+import { explorerSections, protocolForSession, subPageForPathname } from "@/lib/shared/protocols";
 import { ProtocolIdentity } from "@/components/shared/protocol-identity";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
@@ -79,9 +80,6 @@ export type RailVenue = "listing" | "subPage" | "info";
 export const TAB_ACTIVE = `${TAB_BASE} border-current text-foreground`;
 export const TAB_IDLE = `${TAB_BASE} border-transparent text-rb-500 transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]`;
 
-/** The info page's name in the sections menu, as the front door's link (N5). */
-const ABOUT = "About";
-
 /** A menu row: 44px tall, neutral at rest, link blue on hover and keyboard
  *  focus (each row opens another page; color-grammar §4a), the blue focus
  *  ring as the profile menu's rows (H20). */
@@ -90,7 +88,7 @@ const SECTION_ITEM =
 
 const ITEMS = '[role="menuitem"]';
 
-interface Section {
+export interface Section {
   href: string;
   name: string;
   current: boolean;
@@ -104,8 +102,15 @@ interface Section {
  *  Keyboard as the profile menu (H20): the current row takes focus on
  *  opening; the arrow keys, Home and End move through the rows; Escape closes
  *  it and returns focus to the trigger; Tab, a press outside and a
- *  navigation close it. */
-function SectionsMenu({ sections }: { sections: Section[] }) {
+ *  navigation close it. The /vaults head draws it too (ui-jobs 776). */
+export function SectionsMenu({
+  sections,
+  label = "Explorer sections",
+}: {
+  sections: Section[];
+  /** The nav's accessible name; /vaults names its own (ui-jobs 776). */
+  label?: string;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLElement>(null);
@@ -167,7 +172,7 @@ function SectionsMenu({ sections }: { sections: Section[] }) {
   }, [open, close]);
 
   return (
-    <nav ref={wrap} aria-label="Explorer sections" className="relative shrink-0" data-anatomy="H5">
+    <nav ref={wrap} aria-label={label} className="relative shrink-0" data-anatomy="H5">
       <button
         ref={trigger}
         id={triggerId}
@@ -236,8 +241,9 @@ export function RailHeader({
   venue: RailVenue;
   /** Render the shared RecencyStamp on a row under the title (decision 0006's
    *  freshness signal). On for listings; off where the page reads no chain
-   *  head (the info page). */
-  stamp?: boolean;
+   *  head (the info page). A node takes its place where the rows come from a
+   *  read behind the head (Aave V3's hourly refresh, ui-jobs 806). */
+  stamp?: boolean | ReactNode;
 }) {
   const pathname = usePathname();
   const entry = protocolForSession(session);
@@ -251,16 +257,18 @@ export function RailHeader({
       : venue === "listing" && entry.positionListing === false
         ? entry.subPages[0]
         : undefined;
-  const sections: Section[] = [
-    // A vault-native explorer has no position listing — a share in a vault is
-    // not a position in the roster's sense (rails-ops decision 0027 call 2) —
-    // so its first section is its first sub-page.
-    ...(entry.positionListing !== false
-      ? [{ href: entry.listingHref, name: positionNounPlural(session), current: venue === "listing" }]
-      : []),
-    ...entry.subPages.map((sub) => ({ href: sub.href, name: sub.tab, current: sub === litSubPage })),
-    { href: entry.infoHref, name: ABOUT, current: venue === "info" },
-  ];
+  // The menu's entries (explorerSections, lib/shared/protocols.ts): a front
+  // door is never current, as it draws no rail header.
+  const sections: Section[] = explorerSections(entry).map((x) => ({
+    href: x.href,
+    name: x.name,
+    current:
+      x.kind === "listing"
+        ? venue === "listing"
+        : x.kind === "info"
+          ? venue === "info"
+          : x.kind === "subPage" && x.sub === litSubPage,
+  }));
   return (
     <div className="flex flex-col gap-2">
       {/* The page's largest type (rails-ops TO-DO-ui-jobs 67), set in
@@ -268,7 +276,10 @@ export function RailHeader({
           chain's glyph and the sections menu stay on the line. */}
       <div className="flex items-center gap-3" data-anatomy="H3">
         <div className="flex min-w-0">
-          <ProtocolIdentity session={session} scale="title" />
+          {/* Plain text where the sections menu is the way to the explorer's
+              pages (ui-jobs 786); an explorer with About alone draws no menu,
+              so its title keeps the link back to its route. */}
+          <ProtocolIdentity session={session} scale="title" linked={sections.length <= 1} />
         </div>
         <ChainLabel chainId={entry.chainId} />
         {/* An explorer with one section (About alone) draws no menu. */}
@@ -280,9 +291,7 @@ export function RailHeader({
           Its line is held from first paint, so the stamp's arrival moves
           nothing under it. */}
       {stamp && (
-        <div className="flex min-h-7 items-center justify-end">
-          <RecencyStamp />
-        </div>
+        <div className="flex min-h-7 items-center justify-end">{stamp === true ? <RecencyStamp /> : stamp}</div>
       )}
     </div>
   );

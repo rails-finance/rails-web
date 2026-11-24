@@ -34,14 +34,17 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
+  assetsHead,
 } from "@/components/shared/position-card";
 import { Icon } from "@/components/icons/icon";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import { mainAssetFigure, useClosedPeaks, withPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
+import { pickMainAsset, splitSupplied } from "@/lib/shared/main-asset";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
-import { PanelFigure } from "@/components/shared/position-card-panel";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { TokenAmountNotLoaded, loadedMarks } from "@/components/shared/not-loaded";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -82,6 +85,7 @@ import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { shownUsd } from "@/lib/shared/holder-usd-receipt";
 import { aaveV3PriceOf, aaveV3UsdOf, type AaveV3UsdRows } from "@/lib/aave-v3/usd-receipt";
 import type { AaveV3Face } from "@/lib/aave-v3/price-notes";
+import { positionLink } from "@/lib/shared/position-link";
 
 /** One reserve the wallet holds on a given side, scaled to display units. The
  *  `amountRaw` integer wei string backs the exact reveal (the raw chain figure). */
@@ -95,6 +99,9 @@ export interface AaveV3ReserveAmount {
    *  is never shown (see AaveV3ReserveSummary.decimalsUnread). */
   decimalsUnread?: true;
 }
+
+/** The listing row's mark where its account has an event after the refresh. */
+const AAVE_V3_CHANGED_SINCE_REFRESH = "changed since the refresh";
 
 export interface AaveV3PositionView {
   wallet: string;
@@ -132,6 +139,18 @@ export interface AaveV3PositionView {
    *  none), by lowercased address; `priceBlock` for the rest (ui-jobs 743). */
   priceBlockByAddress?: Record<string, number | null>;
   atBlock?: number;
+  /** The listing row's newest event: the block the index's balances stand at
+   *  (mv_aave_v3_positions, refreshed about hourly). */
+  indexBlock?: number;
+  /** A listing row whose account has an event after `indexBlock`: the newest
+   *  event's block (ui-jobs 806 follow-up). */
+  changedAfterIndex?: number;
+  /** The position page holds the balances back: the event tail has an event
+   *  after `indexBlock` and the Pool read has not answered yet (ui-jobs 806). */
+  figuresHeld?: boolean;
+  /** The Pool read failed while the event tail is ahead of the index: the
+   *  balances shown are the index's, and the card names both blocks. */
+  indexTrails?: { indexBlock: number; tailBlock: number };
   /** rails-server's head read and the block it read at, where it answered the page's read. */
   readBy?: PositionHeadStamp & { block: number };
   /** The position page's live health factor (the Pool's getUserAccountData,
@@ -239,15 +258,19 @@ function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
 }
 
 /** A headline's reserves as token amounts, one per line, each traced: an
- *  unpriced side's figure, and a closed account's highest recorded balances
- *  (no USD there: the peaks are maxima at different moments, so pricing them
- *  at one block would assert a portfolio that never existed). */
+ *  unpriced side's figure, and in a closed account's dropdown its highest
+ *  recorded balances (no USD there: the peaks are maxima at different moments,
+ *  so pricing them at one block would assert a portfolio that never existed;
+ *  the head's peak value is one day's sum, components/shared/closed-peak.tsx). */
 function ReserveAmounts({
   reserves,
   receipt,
+  iconSize,
 }: {
   reserves: AaveV3ReserveAmount[];
   receipt: (r: AaveV3ReserveAmount) => Provenance;
+  /** The icon's size: a headline's default, 16 in an overlay. */
+  iconSize?: number;
 }) {
   return (
     <span className="flex flex-col gap-1">
@@ -261,6 +284,7 @@ function ReserveAmounts({
               symbol={r.symbol}
               address={r.address}
               exact={formatUnitsExact(r.amountRaw, r.decimals)}
+              iconSize={iconSize}
             />
           )}
         </Prov>
@@ -279,7 +303,7 @@ function AaveV3MenuRows({ pagePath }: { pagePath: string }) {
       title="Link to this position"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() =>
-        void navigator.clipboard.writeText(`${window.location.origin}${pagePath}`).then(() => {
+        void navigator.clipboard.writeText(positionLink(pagePath)).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         })
@@ -303,8 +327,6 @@ export interface AaveV3PositionCardProps {
   receipts?: boolean;
   /** The card's (i) Explanation. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** Detail-page figures (accrued interest, borrow rate) — computed from the
    *  event stream + live Pool read (computeAaveV3CardCaptions). */
   captions?: AaveV3CardCaptions;
@@ -332,6 +354,9 @@ export interface AaveV3PositionCardProps {
    *  no borrowing (lib/aave-v3/collateral-split.ts): the card states them apart
    *  from the collateral. Unset until read; every supply then heads Collateral. */
   notCollateral?: ReadonlySet<string> | null;
+  /** The page's Lifetime flows timeline and its read: a closed card's peak
+   *  value per side (components/shared/closed-peak.tsx). */
+  flows?: ClosedPeakFlows;
 }
 
 /** The Aave V3 family's slots for the shared position card. */
@@ -339,7 +364,6 @@ export function useAaveV3CardSlots({
   v,
   receipts = false,
   explanation,
-  viewHref,
   captions,
   chain,
   hfPending = false,
@@ -347,37 +371,51 @@ export function useAaveV3CardSlots({
   pricesPending = false,
   exports,
   notCollateral,
+  flows,
 }: Omit<AaveV3PositionCardProps, "deployment">): PositionCardSlots {
   const dep = useAaveV3CardDeployment();
   const lane = useV3Pool();
   const dust = useDustOpen();
   const detail = receipts;
+  // A closed side's assets as the heads list them: the collateral without
+  // the supplies that back no borrowing, where the switches are read.
+  const peakOf = useClosedPeaks(flows, v.status !== "open", {
+    // The supply side's peak counts every supplied reserve, as the face does.
+    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, key: r.address })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, key: r.address })),
+  });
 
   const marketLabel = dep.marketLabel(v.market);
   // What the market label is, on hover (270 item 6: it carries information).
   const marketTitle = marketLabel
     ? `${marketLabel} is one of the Aave V3 markets on Ethereum. Each market is a separate account with a separate health factor.`
     : undefined;
-  const marketBadge = marketLabel ? (
-    <span
-      className="text-xs font-semibold text-rb-500 header-badge-tip focus-ring rounded-sm"
-      title={marketTitle}
-      data-tooltip={marketTitle}
-      tabIndex={detail ? 0 : undefined}
-    >
-      {marketLabel}
-    </span>
-  ) : null;
+  // The market in the tag on both surfaces (ui-jobs 807); the position page
+  // keeps its tip.
+  const tag = !marketLabel ? undefined : (
+    <ListingTag
+      market={
+        detail ? (
+          <span
+            className="header-badge-tip focus-ring rounded-sm"
+            title={marketTitle}
+            data-tooltip={marketTitle}
+            tabIndex={0}
+          >
+            {marketLabel}
+          </span>
+        ) : (
+          marketLabel
+        )
+      }
+    />
+  );
   // The listing names the wallet on the left (its controls are buttons, which
-  // can sit inside the row's <Link>) and the market at the right end; the
-  // position page names the wallet in its top row (ui-jobs 228) and keeps the
-  // market at the heading's right end.
-  const identity = detail ? (
-    (marketBadge ?? undefined)
-  ) : (
+  // can sit inside the row's <Link>); the position page names the wallet in
+  // its top row (ui-jobs 228).
+  const identity = detail ? undefined : (
     <WalletPill wallet={v.wallet} ensName={null} filterProtocol={dep.session} bookmark />
   );
-  const tag = detail || !marketLabel ? undefined : <ListingTag market={marketLabel} />;
   // The position's name (ui-jobs 703): the market and the account's wallet.
   const name = positionName({ market: marketLabel, noun: POSITION_NOUN[dep.session], id: v.wallet });
 
@@ -390,6 +428,17 @@ export function useAaveV3CardSlots({
     countRule: v.countRule,
     liquidationRule: v.liquidationRule,
     ...(detail ? { order: "age-last" as const } : {}),
+    // A listing row whose account moved after the hourly refresh says so; the
+    // position page reads the account at head.
+    ...(!detail && v.changedAfterIndex != null
+      ? {
+          extra: (
+            <span className="text-xs text-rb-500" data-row-changed-after={v.changedAfterIndex}>
+              {AAVE_V3_CHANGED_SINCE_REFRESH}
+            </span>
+          ),
+        }
+      : {}),
   };
 
   // The "?" every state panel owns — the same content function serves Aave V3
@@ -404,118 +453,133 @@ export function useAaveV3CardSlots({
     leading: () => <AaveV3MenuRows pagePath={pagePathOf(dep.session, v)} />,
     exports: exports ?? null,
   };
-  const explainer = { body: explanation ?? null, viewHref };
+  const explainer = { body: explanation ?? null };
   const isOther = (r: AaveV3ReserveAmount) => notCollateral?.has(r.address.toLowerCase()) === true;
+
+  // The Pool read failed while the event tail is ahead of the index row.
+  const trailNotice =
+    detail && v.indexTrails ? (
+      <div className="mb-2 text-xs text-rb-500" data-index-trails={v.indexTrails.indexBlock}>
+        Balances from the index at block {v.indexTrails.indexBlock.toLocaleString("en-US")}. The account has a later
+        event at block {v.indexTrails.tailBlock.toLocaleString("en-US")}; the Pool read did not answer.
+      </div>
+    ) : undefined;
 
   // Closed / liquidated: the account holds no open reserves, so the headline is
   // what each asset held at its height — highest recorded per-reserve supply +
   // debt (chain-state MAX over the account's life, per asset; no USD).
   if (v.status === "closed" || v.status === "liquidated") {
     const notRecorded = peaks ? undefined : notRecordedNote("position");
+    // Each side leads with its main asset at its highest recorded balance,
+    // picked from the listing's prices (`pickMainAsset`): the same face on
+    // the listing row and the position page where the listing carries the
+    // account's peaks (Ethereum). Base, Arbitrum and Seamless listings carry
+    // none, so their rows read "not recorded" while the page shows the face.
+    // The other assets sit on the small line, and every peak opens behind the
+    // press under the peak label (C19).
     const peakHead = (
       id: string,
       label: string,
+      peakLabel: string,
       reserves: AaveV3ReserveAmount[],
       receipt: (symbol: string) => Provenance,
-    ): PositionCardHead => ({
-      id,
-      label,
-      value:
-        peaks && reserves.length > 0 ? <ReserveAmounts reserves={reserves} receipt={(r) => receipt(r.symbol)} /> : null,
-      sub: notRecorded,
-    });
+      /** The dropdown's body, given each line's receipt. */
+      panel: (receiptOf: (r: AaveV3ReserveAmount) => Provenance) => ReactNode,
+    ): PositionCardHead => {
+      const pick = pickMainAsset(
+        reserves.map((r) => ({ ...r, key: r.address })),
+        v.priceByAddress,
+      );
+      const figure = pick
+        ? mainAssetFigure({
+            main: { ...pick.main, exact: formatUnitsExact(pick.main.amountRaw, pick.main.decimals) },
+            receipt: receipt(pick.main.symbol),
+            block: v.priceBlock,
+            skipped: pick.skipped,
+            side: id === "peak-debt" ? "debt" : "supply",
+          })
+        : undefined;
+      // The main asset's line carries the ranking row its figure carries.
+      const receiptOf = (r: AaveV3ReserveAmount) =>
+        figure && pick && r.address === pick.main.address ? figure.info : receipt(r.symbol);
+      return {
+        id,
+        label,
+        value: null,
+        sub: notRecorded,
+        ...(peaks && reserves.length > 0
+          ? assetsHead(
+              peakLabel,
+              reserves.map((r) => ({ symbol: r.symbol, address: r.address })),
+              panel(receiptOf),
+              figure,
+            )
+          : {}),
+      };
+    };
     const liquidated = v.status === "liquidated";
     const status: PositionCardStatus = liquidated
       ? { word: "Liquidated", tone: "danger" }
       : { word: "Closed", tone: "muted" };
-    // Where the switches are read, the peaks of reserves never turned on as
-    // collateral leave the headline for a stat of their own; unread, the
-    // headline holds every supplied peak, collateral or not.
-    const split = peaks && notCollateral != null;
-    const peakColl = split ? v.peakSupplies.filter((r) => !isOther(r)) : v.peakSupplies;
-    const peakOthers = split ? v.peakSupplies.filter(isOther) : [];
-    const supplyHead = split
-      ? {
-          ...peakHead("peak-collateral", CARD_VOCAB.peakCollateral, peakColl, dep.peakSupply),
-          ...(peakColl.length === 0 && v.peakSupplies.length > 0
-            ? {
-                value: (
-                  <span className="text-rb-400" data-aave-peak-none="">
-                    None
-                  </span>
-                ),
-              }
-            : {}),
-        }
-      : peakHead("peak-supplied", "Highest recorded supplied", v.peakSupplies, dep.peakSupply);
-    const othersLines = (iconSize?: number) => (
-      <span className="flex flex-col gap-1">
-        {peakOthers.map((r) => (
-          <span key={r.address}>
-            <Prov info={dep.peakSupply(r.symbol)}>
-              {r.decimalsUnread ? (
-                <TokenAmountNotLoaded address={r.address} label={r.symbol} />
-              ) : (
-                <AssetAmount
-                  value={r.amount}
-                  symbol={r.symbol}
-                  address={r.address}
-                  exact={formatUnitsExact(r.amountRaw, r.decimals)}
-                  iconSize={iconSize}
-                />
-              )}
-            </Prov>
-          </span>
-        ))}
-      </span>
+    // The face holds every supplied peak under "Peak supplied", as the listing row
+    // does, so it never moves when the collateral switches land; read, they
+    // order the supply dropdown: the collateral peaks first, then the
+    // supplies that backed no borrowing under "Supplied, not collateral".
+    const lines = (reserves: AaveV3ReserveAmount[], receiptOf: (r: AaveV3ReserveAmount) => Provenance) => (
+      <ReserveAmounts reserves={reserves} receipt={receiptOf} iconSize={16} />
     );
-    const closedRows: PositionPanelRow[] =
-      peakOthers.length === 0
-        ? []
-        : [
-            {
-              id: "peak-not-collateral",
-              label: "Supplied, not collateral",
-              tip: PEAK_NOT_COLLATERAL_TIP,
-              // Many assets: their count opens the peaks, so the cell holds
-              // one line. The peaks carry no USD (ReserveAmounts).
-              value:
-                peakOthers.length > 1 ? (
-                  // A count of the peaks the overlay lists, each with its receipt.
-                  <span data-prov-exempt="">{peakOthers.length} assets</span>
-                ) : (
-                  othersLines(16)
-                ),
-              breakdown:
-                peakOthers.length > 1
-                  ? {
-                      assets: loadedMarks(peakOthers),
-                      panel: (
-                        <span className="text-sm font-semibold tabular-nums text-foreground">{othersLines(16)}</span>
-                      ),
-                    }
-                  : undefined,
-            },
-          ];
+    const { first, others } = splitSupplied(v.peakSupplies, notCollateral != null ? isOther : undefined);
+    const supplyHead = peakHead(
+      "peak-supplied",
+      CARD_VOCAB.headSupplied,
+      CARD_VOCAB.peakSupplied,
+      v.peakSupplies,
+      dep.peakSupply,
+      (receiptOf) => (
+        <span className="flex flex-col gap-3 text-sm font-semibold tabular-nums text-foreground">
+          {first.length > 0 && lines(first, receiptOf)}
+          {others.length > 0 && (
+            <span className="flex flex-col gap-1" data-aave-peak-not-collateral="">
+              <span className="text-xs font-medium text-rb-500">
+                <HeadingTip text="Supplied, not collateral" tip={PEAK_NOT_COLLATERAL_TIP} />
+              </span>
+              {lines(others, receiptOf)}
+            </span>
+          )}
+        </span>
+      ),
+    );
+    const debtHead = peakHead(
+      "peak-debt",
+      CARD_VOCAB.headDebt,
+      CARD_VOCAB.peakDebt,
+      v.peakBorrows,
+      dep.peakDebt,
+      (receiptOf) => (
+        <span className="text-sm font-semibold tabular-nums text-foreground">{lines(v.peakBorrows, receiptOf)}</span>
+      ),
+    );
     const common = {
       name,
       status,
-      heads: [supplyHead, peakHead("peak-debt", CARD_VOCAB.peakDebt, v.peakBorrows, dep.peakDebt)],
+      heads: withPeaks([supplyHead, debtHead], peakOf, detail),
       identity,
+      tag,
       counters,
       outcome: {
         word: liquidated ? "Liquidated" : "Closed",
         dates: v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined,
       },
     };
-    if (!detail) return { ...common, surface: "listing", menu: null, tag };
+    if (!detail) return { ...common, surface: "listing", menu: null };
     return {
       ...common,
       surface: "detail",
       explainer,
       learnMore,
       menu: menuSlot,
-      panel: closedRows.length > 0 ? [closedRows, []] : undefined,
+      notice: trailNotice,
+      panel: undefined,
     };
   }
 
@@ -604,7 +668,7 @@ export function useAaveV3CardSlots({
             }
           />
         ),
-      pending: reserves.length > 0 && pending,
+      pending: v.figuresHeld === true || (reserves.length > 0 && pending),
       total: usd != null && usdInfo ? { usd, info: usdInfo } : undefined,
       assets: reserves.length > 0 && usd != null ? <InlineAssetCluster assets={loadedMarks(shown)} /> : undefined,
     };
@@ -613,8 +677,8 @@ export function useAaveV3CardSlots({
   // The health factor: the position page's live read. Omitted on every
   // listing view and on a deployment with no live HF receipt — an unasserted
   // layer, per the chain-state charter; pending on a page still reading. A
-  // read wallet with no debt reads "No debt" (HF is undefined, ∞ in protocol
-  // terms) — but only when the card shows no debt either. The balances are
+  // read wallet with no debt draws a dash, as Debt does (HF is undefined, ∞ in
+  // protocol terms) — but only when the card shows no debt either. The balances are
   // the index's, which trails the live read: a debt the read no longer finds
   // gets a dash and the reason in the notice.
   const hfProv = dep.healthFactor;
@@ -627,25 +691,40 @@ export function useAaveV3CardSlots({
           label: ratioLabel("pooled"),
           labelTip: detail && ratioLabel("pooled") === "Health factor" ? HF_TIP : undefined,
           pending: !hfRead,
-          value: !hfRead ? null : noDebtRead ? null : v.healthFactor == null ? (
-            <span className="text-rb-400">No debt</span>
-          ) : (
+          value: !hfRead ? null : noDebtRead ? null : v.healthFactor == null ? null : (
             <Prov info={hfProv(v.market, v.atBlock, v.readBy)}>{hfLabel(v.healthFactor)}</Prov>
           ),
         }
       : null;
 
+  // An account none of whose supplies back borrowing heads them "Supplied",
+  // with the not-collateral tip, and draws no stat row for them (ui-jobs 806).
+  const othersHead = collSupplies.length === 0 && otherSupplies.length > 0;
   const heads = [
-    sideHead(
-      "collateral",
-      CARD_VOCAB.collateral,
-      collSupplies,
-      suppliesSplit.shown,
-      collUsd,
-      collPending,
-      "Collateral",
-      "supply",
-    ),
+    othersHead
+      ? {
+          ...sideHead(
+            "collateral",
+            "Supplied",
+            otherSupplies,
+            othersSplit.shown,
+            otherUsd,
+            pricesPending && otherUsd == null,
+            "Supplied",
+            "supply",
+          ),
+          labelTip: detail ? NOT_COLLATERAL_TIP : undefined,
+        }
+      : sideHead(
+          "collateral",
+          CARD_VOCAB.collateral,
+          collSupplies,
+          suppliesSplit.shown,
+          collUsd,
+          collPending,
+          "Collateral",
+          "supply",
+        ),
     sideHead("debt", CARD_VOCAB.debt, v.borrows, borrowsSplit.shown, debtUsd, debtPending, "Borrowed", "debt"),
     ...(hfHead ? [hfHead] : []),
   ];
@@ -664,10 +743,12 @@ export function useAaveV3CardSlots({
       The Pool reads no debt{v.atBlock != null ? ` at block ${v.atBlock.toLocaleString("en-US")}` : ""}; the balances
       shown predate the account&rsquo;s latest events
     </div>
-  ) : undefined;
+  ) : (
+    trailNotice
+  );
 
-  const common = { status, heads, identity, counters, notice, name };
-  if (!detail) return { ...common, surface: "listing", menu: null, tag };
+  const common = { status, heads, identity, tag, counters, notice, name };
+  if (!detail) return { ...common, surface: "listing", menu: null };
 
   // ── Each side's reserve rows, and the panel: the supplied side's values
   //    on the left, the borrowed side's and the risk on the right.
@@ -861,7 +942,6 @@ export function useAaveV3CardSlots({
   const emodeIdentity =
     emode && chainPool ? (
       <span className="flex items-center gap-2">
-        {marketBadge}
         <span className="text-xs font-semibold text-rb-500" data-emode={emode.id}>
           E-Mode: <Prov info={userEmodeProv(emode.label, chainPool)}>{emode.label}</Prov>
         </span>
@@ -877,7 +957,7 @@ export function useAaveV3CardSlots({
       ? dep.usd("Supplied, not collateral", "supply", usdRows(v, otherSupplies, "compact"), v.market)?.prov
       : undefined;
   const notCollRow: PositionPanelRow | null =
-    otherSupplies.length === 0
+    otherSupplies.length === 0 || othersHead
       ? null
       : otherSupplies.length > 1 && otherUsd != null && otherInfo
         ? {
@@ -904,11 +984,6 @@ export function useAaveV3CardSlots({
             tip: NOT_COLLATERAL_TIP,
             value: (
               <span className="flex flex-col gap-0.5">
-                {otherUsd != null && otherInfo && (
-                  <Prov info={otherInfo}>
-                    <PanelFigure>{formatCompactUsd(otherUsd)}</PanelFigure>
-                  </Prov>
-                )}
                 {othersRanked.map((r) => (
                   <span key={r.address}>
                     {r.decimalsUnread ? (
@@ -928,6 +1003,12 @@ export function useAaveV3CardSlots({
                     )}
                   </span>
                 ))}
+                {/* The dollars under the amounts, in the headline's green. */}
+                {otherUsd != null && otherInfo && (
+                  <Prov info={otherInfo}>
+                    <span className="text-xs font-bold tabular-nums text-green-400">{formatUsdValue(otherUsd)}</span>
+                  </Prov>
+                )}
               </span>
             ),
           };
@@ -1006,7 +1087,7 @@ export function useAaveV3CardSlots({
     explainer,
     learnMore,
     menu: menuSlot,
-    panel: [present([interestRow("supply"), notCollRow]), present([rateHeld, interestRow("debt"), roomHeld, liqHeld])],
+    panel: [present([notCollRow, interestRow("supply")]), present([rateHeld, interestRow("debt"), roomHeld, liqHeld])],
   };
 }
 
@@ -1104,6 +1185,10 @@ export function viewFromSummary(row: AaveV3PositionRow): AaveV3PositionView {
     priceBlock: row.priceBlock ?? null,
     // A Base lender's row names the block its chain figures were read at.
     atBlock: row.chainBlock ?? undefined,
+    indexBlock: row.lastBlockNumber,
+    ...(row.latestEventBlock != null && row.latestEventBlock > row.lastBlockNumber
+      ? { changedAfterIndex: row.latestEventBlock }
+      : {}),
     // A listing view never carries a health factor (0018): the row's snapshot
     // HF is not read, and the position page's live read is the only one
     // the card shows.

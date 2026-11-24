@@ -37,13 +37,18 @@ function readChainSlugs() {
   return slugs;
 }
 
-/** The roster's (id, chainId, slug) triples, read from the source of truth. */
+/** The roster's (id, chainId, slug) triples and each entry's sub-page segments, read from the source of truth. */
 function readRoster() {
   const src = fs.readFileSync(path.join(ROOT, "lib", "shared", "protocols.ts"), "utf8");
   const body = src.slice(src.indexOf("const SPECS"), src.indexOf("const SEEN"));
   const entries = [];
   for (const m of body.matchAll(/id: "([^"]+)",[\s\S]*?chainId: (\d+),[\s\S]*?slug: "([^"]+)",/g)) {
-    entries.push({ id: m[1], chainId: Number(m[2]), slug: m[3] });
+    // The entry runs to its closing brace; its sub-pages' segments are in it.
+    const rest = body.slice(m.index);
+    const block = rest.slice(0, rest.indexOf("\n  },"));
+    const subs = block.slice(block.indexOf("subPages:"));
+    const segments = [...subs.matchAll(/segment: "([^"]+)"/g)].map((x) => x[1]);
+    entries.push({ id: m[1], chainId: Number(m[2]), slug: m[3], segments });
   }
   return entries;
 }
@@ -232,6 +237,17 @@ function hrefServed(href) {
   }
   return dirs.some((d) => servesPage(d));
 }
+// 5. Every sub-page the roster names (a sections-menu entry, a sitemap row)
+//    has a page that serves it, so a roster line cannot add a menu entry that
+//    404s (ui-jobs 786).
+for (const e of roster) {
+  const chainSlug = chainSlugs.get(e.chainId);
+  for (const seg of e.segments) {
+    const href = `/${chainSlug}/${e.slug}/${seg}`;
+    if (!hrefServed(href)) fail(`${e.id}'s sub-page "${seg}" (${href}) has no page that serves it`);
+  }
+}
+
 for (const row of legacy) {
   const explorer = [...expected.keys()].find((href) => row.to === href || row.to.startsWith(`${href}/`));
   if (explorer && row.to !== explorer) {

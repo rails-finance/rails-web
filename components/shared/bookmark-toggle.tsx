@@ -10,23 +10,15 @@
 // outline when not). A bookmark is an affordance state, not a risk/value
 // signal — so it stays out of the valence palette (no green/red, no amber).
 
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
+import { ListingRowContext } from "@/components/shared/position-card-edge";
 import { isBookmarked, toggleBookmark, SESSIONS_CHANGED_EVENT } from "@/lib/shared/sessions";
 
-export function BookmarkToggle({
-  wallet,
-  ensName,
-  size = 13,
-}: {
-  wallet: string;
-  ensName: string | null;
-  size?: number;
-}) {
+/** Whether the wallet is saved, kept in step with every change anywhere
+ *  (another card on the page, the panel's remove action, or another tab via
+ *  the native `storage` event). */
+function useBookmarked(wallet: string): [boolean, (v: boolean) => void] {
   const [fav, setFav] = useState(false);
-
-  // Subscribe so every bookmark toggle for the same wallet stays in sync after a change
-  // anywhere (another card on the page, the panel's remove action, or a
-  // change in another tab via the native `storage` event).
   useEffect(() => {
     const sync = () => setFav(isBookmarked(wallet));
     sync();
@@ -37,6 +29,57 @@ export function BookmarkToggle({
       window.removeEventListener("storage", sync);
     };
   }, [wallet]);
+  return [fav, setFav];
+}
+
+function BookmarkGlyph({ size, filled }: { size: number; filled: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+/** A listing row's bookmark (ui-jobs 807): a filled mark where the wallet is
+ *  saved, nothing otherwise. Not a control: the row stays one press target. */
+export function BookmarkMark({ wallet, size = 12 }: { wallet: string; size?: number }) {
+  const [fav] = useBookmarked(wallet);
+  if (!fav) return null;
+  return (
+    <span className="inline-flex shrink-0 items-center text-foreground" data-bookmark-mark="">
+      <BookmarkGlyph size={size} filled />
+      <span className="sr-only">Saved wallet</span>
+    </span>
+  );
+}
+
+/** The save toggle; inside a listing row's header, the inert mark (ui-jobs
+ *  807), so no family can nest a control in the row's link. */
+export function BookmarkToggle(props: { wallet: string; ensName: string | null; size?: number }) {
+  const listingRow = useContext(ListingRowContext);
+  return listingRow ? <BookmarkMark wallet={props.wallet} /> : <BookmarkToggleButton {...props} />;
+}
+
+function BookmarkToggleButton({
+  wallet,
+  ensName,
+  size = 13,
+}: {
+  wallet: string;
+  ensName: string | null;
+  size?: number;
+}) {
+  const [fav, setFav] = useBookmarked(wallet);
 
   return (
     <button
@@ -55,19 +98,7 @@ export function BookmarkToggle({
         fav ? "text-foreground hover:text-rb-500" : "text-rb-500 hover:text-foreground"
       }`}
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width={size}
-        height={size}
-        viewBox="0 0 24 24"
-        fill={fav ? "currentColor" : "none"}
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-      </svg>
+      <BookmarkGlyph size={size} filled={fav} />
     </button>
   );
 }

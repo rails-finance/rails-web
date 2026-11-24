@@ -52,6 +52,10 @@ export const PRIMARY_BUTTON = `rounded-lg bg-teal-700 font-semibold text-white t
 /** A quiet text control in the editor's footer: Remove, Reset to default. */
 const QUIET_TEXT = `text-sm text-rb-500 dark:text-rb-400/75 hover:text-foreground transition-colors ${FOCUS} rounded`;
 
+/** Wait after a draft edit before counting it, so a run of edits costs one
+ *  read (the pill editors and the filter sheet). */
+export const COUNT_DELAY_MS = 250;
+
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
 /** Whether the viewport is a phone's, or null until that is known: an editor
@@ -238,20 +242,33 @@ export function GroupEditor<F>({
     }
   };
 
-  // The draft's count, where counting it costs no read.
-  const dirty = draft !== applied;
+  // The draft's count, read after a short pause so a run of edits costs a
+  // server listing one read (ui-jobs 801). Edited means a dimension of the
+  // group reads differently: a listing can hand a new filter object each
+  // render.
+  const moved = (a: F, b: F) =>
+    group.dims.some((d) => [...d.get(a)].sort().join("\u0000") !== [...d.get(b)].sort().join("\u0000"));
+  const dirty = moved(draft, applied);
   const [draftCount, setDraftCount] = useState<number | null>(count?.total ?? null);
+  const [draftPending, setDraftPending] = useState(false);
   const countForRef = useRef(countFor);
   countForRef.current = countFor;
   useEffect(() => {
     if (!dirty || !countForRef.current) return;
     let cancelled = false;
-    Promise.resolve(countForRef.current(draft)).then(
-      (n) => !cancelled && setDraftCount(n),
-      () => !cancelled && setDraftCount(null),
-    );
+    setDraftPending(true);
+    const t = window.setTimeout(() => {
+      Promise.resolve()
+        .then(() => countForRef.current!(draft))
+        .then(
+          (n) => !cancelled && setDraftCount(n),
+          () => !cancelled && setDraftCount(null),
+        )
+        .finally(() => !cancelled && setDraftPending(false));
+    }, COUNT_DELAY_MS);
     return () => {
       cancelled = true;
+      window.clearTimeout(t);
     };
   }, [draft, dirty]);
   const shown = dirty ? draftCount : (count?.total ?? null);
@@ -268,30 +285,37 @@ export function GroupEditor<F>({
   const apply = () => {
     flushers.current.forEach((r) => r.current?.());
     const next = draftRef.current;
-    leave(next !== applied ? () => onChange(next) : undefined);
+    leave(moved(next, applied) ? () => onChange(next) : undefined);
   };
   const remove = () => leave(() => onChange(resetGroup(group, applied)));
   const removeLabel = locked ? "Reset to default" : isPhone ? "Remove filter" : "Remove";
-  const removeButton =
-    locked || appliedActive ? (
-      <button
-        type="button"
-        onClick={remove}
-        disabled={locked && !appliedActive}
-        className={`${QUIET_TEXT} disabled:cursor-default disabled:opacity-50 disabled:hover:text-rb-500`}
-        data-pill-editor-remove=""
-      >
-        {removeLabel}
-      </button>
-    ) : null;
+  // A locked single choice lists its resting option: picking it is the way
+  // back, so the editor draws no reset (Miles, 22 Nov 2026, ui-jobs 805).
+  const singleChoice = group.dims.every((d) => d.cardinality === "single");
+  const removeButton = (locked ? !singleChoice : appliedActive) ? (
+    <button
+      type="button"
+      onClick={remove}
+      disabled={locked && !appliedActive}
+      className={`${QUIET_TEXT} disabled:cursor-default disabled:opacity-50 disabled:hover:text-rb-500`}
+      data-pill-editor-remove=""
+    >
+      {removeLabel}
+    </button>
+  ) : null;
   const primary = (
     <button
       type="button"
       onClick={apply}
       className={`${PRIMARY_BUTTON} ${isPhone ? "h-12 w-full text-base" : "h-9 px-4 text-sm"}`}
+      aria-busy={(dirty && draftPending) || undefined}
       data-pill-editor-apply={countFor && shown != null ? shown : ""}
     >
-      <span aria-live="polite" className="tabular-nums">
+      {/* The last figure stays, dimmed, while a draft's count is read. */}
+      <span
+        aria-live="polite"
+        className={`tabular-nums transition-opacity ${dirty && draftPending ? "opacity-60" : ""}`}
+      >
         {label}
       </span>
     </button>

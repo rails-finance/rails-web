@@ -28,6 +28,7 @@ import { exact, pctString, rayExact, rayNumber, skyYearlyEarnings, units, yearly
 import { chiProv, earnedProv, rateProv, sharesHeldProv, valueProv, yearlyProv } from "@/lib/sky-savings/provenance";
 import type { SkyAsOf, SkyPosition } from "@/lib/sky-savings/types";
 import { PanelFigure } from "@/components/shared/position-card-panel";
+import { positionLink } from "@/lib/shared/position-link";
 
 const worthHead = (p: SkyPosition, asOf: SkyAsOf): PositionCardHead => {
   const v = p.value ? units(p.value.raw) : 0;
@@ -120,7 +121,7 @@ function SkyMenuRows({ holder }: { holder: string }) {
         icon={copied === "link" ? <Icon name="check" size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this position"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}/ethereum/sky-savings/${holder}`)}
+        onClick={() => copy("link", positionLink(`/ethereum/sky-savings/${holder}`))}
       />
     </>
   );
@@ -133,7 +134,6 @@ export interface SkySavingsPositionCardProps {
   explanation?: ReactNode;
   /** A line at the card's foot: the block the gate checked the page against. */
   foot?: ReactNode;
-  viewHref?: () => string;
 }
 
 export function skySavingsCardSlots({
@@ -142,7 +142,6 @@ export function skySavingsCardSlots({
   surface = "listing",
   explanation,
   foot,
-  viewHref,
 }: SkySavingsPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
   // A position that holds nothing keeps its figures (the interest it earned)
@@ -213,7 +212,7 @@ export function skySavingsCardSlots({
         : [],
     ],
     foot,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: skyPositionContent(),
     menu: { leading: () => <SkyMenuRows holder={p.holder} />, exports: null },
   };

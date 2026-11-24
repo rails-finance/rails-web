@@ -247,9 +247,10 @@
   --card-border-hover: oklch(0.997 calc(0.0041 * var(--paper-chroma)) var(--paper-hue));
   --card-border-drag: oklch(0.8642 calc(0.0226 * var(--paper-chroma)) var(--paper-hue));
   --sidebar-header-hover: oklch(0.9432 calc(0.0111 * var(--paper-chroma)) var(--paper-hue));
-  /* The one scrim behind every window and sheet (H16.1's): white at 80% in
-     light, rb-950 at 85% in dark, never blurred (ui-jobs 770). */
-  --backdrop-bg: rgb(255 255 255 / 0.8);
+  /* The one scrim behind every window and sheet (H16.1): rb-950 at 45% in
+     light, so a white sheet stands off the page; 85% in dark; never blurred
+     (ui-jobs 770, 810). */
+  --backdrop-bg: color-mix(in oklab, var(--color-rb-950) 45%, transparent);
   --panel-shadow: -8px 0 30px oklch(0.2518 calc(0.0251 * var(--paper-chroma)) var(--paper-hue) / 0.15);
   --facehash-ring: oklch(0.967 calc(0.0082 * var(--paper-chroma)) var(--paper-hue));
   /* The mono facehash (H20): outlined in light, filled in dark (ui-jobs 509). */
@@ -2260,6 +2261,12 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
     border-bottom: 1px solid var(--edge-row-line);
     transition: border-color 150ms;
   }
+  /* A row that continues the group above it (`data-dt-cont`: a protocol's
+     next chain on /protocols, ui-jobs 781): the hairline between the two is
+     dashed; a group ends on the solid one. */
+  table.dt > tbody > tr:has(+ tr[data-dt-cont]) > :is(td, th) {
+    border-bottom-style: dashed;
+  }
   table.dt > tbody > tr:last-child > *,
   table.dt > tbody > tr:has(+ tr.hidden:last-child) > *,
   table.dt > tbody > tr:has(+ tr[data-dt-drawer]:not(.hidden)) > *,
@@ -2361,6 +2368,9 @@ table.dt-stacked {
       border-bottom: 1px solid var(--edge-row-line);
       transition: border-color 150ms;
     }
+    & > tbody > tr:has(+ tr[data-dt-cont]) {
+      border-bottom-style: dashed;
+    }
     & > tbody > tr:last-child,
     & > tbody > tr:has(+ tr.hidden:last-child),
     & > tbody > tr:has(+ tr[data-dt-drawer]:not(.hidden)),
@@ -2434,6 +2444,12 @@ table.dt-stacked {
       z-index: 10;
     }
     & > tbody > tr > [role="cell"]:empty {
+      display: none;
+    }
+    /* A cell the table draws and the stacked card does not (`data-dt-stack-hidden`:
+       /assets's and /protocols' lines, whose card carries a compact row in
+       its place; ui-jobs 781). */
+    & > tbody > tr > [data-dt-stack-hidden] {
       display: none;
     }
     /* The lead zone: a 4px bar in the protocol's hue at the card's left, its
@@ -2538,14 +2554,6 @@ html[data-chain-focus] [data-chain-gate]:not([data-scope-ready]) {
   visibility: hidden;
 }
 
-/* The feedback button (H26) rises over the compare bar (E3) below 768px, where
-   the bar spans the window's width. */
-@media (max-width: 767px) {
-  body:has([data-compare-bar]) [data-feedback-button] {
-    bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 4.5rem);
-  }
-}
-
 /* The feedback button's eyes (H26) blink twice every 7s; still under reduced
    motion. */
 .feedback-blink {
@@ -2574,4 +2582,11 @@ html[data-chain-focus] [data-chain-gate]:not([data-scope-ready]) {
   .feedback-blink[data-blinking] {
     animation: none;
   }
+}
+
+/* What follows an open filter panel on the page (ui-jobs 801): dimmed as the
+   toolbar's row is; FilterSheet sets the attribute, and `inert` with it. */
+[data-filters-dimmed] {
+  opacity: 0.4;
+  transition: opacity 150ms;
 }

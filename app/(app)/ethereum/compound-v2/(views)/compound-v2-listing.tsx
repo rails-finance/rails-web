@@ -5,6 +5,7 @@
 // page.tsx. The driver owns the toolbar, pagination, debounced search and the
 // fetch lifecycle; this file is just the Compound-V2-specific config.
 
+import { compoundV2CountLine } from "@/lib/compound-v2/listing-visibility";
 import type { CompoundV2PositionSummary } from "@/lib/sources/api/compound-v2-positions";
 import { fetchCompoundV2Positions } from "@/lib/api/fetch-compound-v2-positions";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
@@ -30,6 +31,7 @@ export function CompoundV2Listing({ initialItems, initialTotal, initialKey, init
     <ChainTruthListingPage<CompoundV2PositionSummary, CompoundV2ListFilters>
       title="Compound V2 Positions"
       noun="positions"
+      countLine={compoundV2CountLine}
       basePath="/ethereum/compound-v2"
       defaults={COMPOUND_V2_LIST_DEFAULTS}
       sortOptions={COMPOUND_V2_SORT_OPTIONS}
@@ -45,6 +47,11 @@ export function CompoundV2Listing({ initialItems, initialTotal, initialKey, init
             data: r.data,
             total: r.pagination.total,
           })),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchCompoundV2Positions({ ...compoundV2FiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

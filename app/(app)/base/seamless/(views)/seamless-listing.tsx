@@ -5,7 +5,7 @@
 // (base-lending-coverage-banner) live on the rail's /info page with the rest
 // of the intro prose.
 
-import { aaveV3RestingCountLine } from "@/lib/aave-v3/listing-visibility";
+import { aaveV3CountLine } from "@/lib/aave-v3/listing-visibility";
 import { fetchAaveV3Positions, type AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import {
@@ -43,7 +43,7 @@ export function SeamlessListing({ initialItems, initialTotal, initialKey, initia
     <ChainTruthListingPage<AaveV3PositionRow, AaveV3ListFilters>
       title="Seamless Positions"
       noun="positions"
-      countLine={aaveV3RestingCountLine}
+      countLine={aaveV3CountLine}
       basePath="/base/seamless"
       defaults={SEAMLESS_LIST_DEFAULTS}
       sortOptions={SEAMLESS_SORT_OPTIONS}
@@ -68,6 +68,11 @@ export function SeamlessListing({ initialItems, initialTotal, initialKey, initia
             data: r.rows,
             total: r.total,
           })),
+        // A draft\'s total, one row asked (the editors\' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchAaveV3Positions({ ...seamlessFiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.total,
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

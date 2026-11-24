@@ -658,7 +658,7 @@ const LISTINGS = [
     match: re(`/ethereum/liquity-v1`),
     routes: listing(
       () => liquityV1List.liquityV1ListDimensions(),
-      liquityV1List.liquityV1ListDefaults(""),
+      liquityV1List.LIQUITY_V1_LIST_DEFAULTS,
       (f, p) => fetchLiquityV1Positions(liquityV1List.liquityV1FiltersToFetchParams(f, p)),
     ),
   },

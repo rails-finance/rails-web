@@ -36,7 +36,7 @@ import {
   debtInFrontProv,
   trovesAheadProv,
 } from "@/lib/liquity-v1/position-provenance";
-import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
+import { COLLATERAL_ADDRESS, COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
 import { V1_WORDS } from "@/lib/liquity-v1/event-templates";
 import type { LiquityV1PositionChainResponse } from "@/lib/api/fetch-liquity-v1-position";
 import { serverReadOf, stampServerRead } from "@/lib/shared/server-head-read";
@@ -130,7 +130,7 @@ export function liquityV1Panel(chain: LiquityV1PositionChainResponse): PositionP
               tip: "The ETH price at which this Trove's collateral ratio reaches the 110% minimum: its debt times 110% over its collateral, from the TroveManager's reads at the latest block.",
               value: (
                 <span className="inline-flex items-center gap-1">
-                  <TokenChipIcon symbol={COLLATERAL_SYMBOL} size={14} filterable={false} />
+                  <TokenChipIcon symbol={COLLATERAL_SYMBOL} address={COLLATERAL_ADDRESS} size={14} filterable={false} />
                   <Prov
                     info={stampServerRead(
                       liquidationPriceProv({ debt: chain.debt, coll: chain.coll }),

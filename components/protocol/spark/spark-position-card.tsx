@@ -26,23 +26,25 @@ import {
   type PositionCardOutcome,
   type PositionCardSlots,
   type PositionCardStatus,
-  type PositionPanelColumns,
   type PositionPanelRow,
+  assetsHead,
 } from "@/components/shared/position-card";
 import { formatDate, formatDateRange, formatDuration } from "@/lib/date";
 import { useMountedNow } from "@/hooks/useMountedNow";
-import { TipLabel } from "@/components/shared/tip-label";
+import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
 import type { SparkLife } from "@/lib/spark/lives";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { TokenAmountNotLoaded, loadedMarks } from "@/components/shared/not-loaded";
+import { mainAssetFigure, useClosedPeaks, withPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
+import { pickMainAsset, splitSupplied } from "@/lib/shared/main-asset";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { Icon } from "@/components/icons/icon";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
   positionSupplyProv,
   positionDebtProv,
@@ -69,6 +71,7 @@ import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { FigureSlot } from "@/components/shared/skeleton-card";
+import { positionLink } from "@/lib/shared/position-link";
 
 export interface SparkPositionView {
   wallet: string;
@@ -89,6 +92,9 @@ export interface SparkPositionView {
    *  lowercased token address. A reserve the oracle didn't price is absent
    *  (the side's total then omits). */
   priceByAddress?: Record<string, number>;
+  /** The block `priceByAddress` was read at, where the listing's read names
+   *  one. */
+  priceBlock?: number | null;
   /** The block each price merged in later was read at (null: the read named
    *  none), by lowercased address (ui-jobs 743). */
   priceBlockByAddress?: Record<string, number | null>;
@@ -281,18 +287,22 @@ function TokenStack({
 function PeakLines({
   reserves,
   side,
-  iconSize,
+  receiptFor,
 }: {
   reserves: SparkReserveAmount[];
   side: "supply" | "debt";
-  /** The icon's size: a headline's default, 16 in a panel row. */
-  iconSize?: number;
+  /** A line whose receipt differs (the face's main asset, with its ranking). */
+  receiptFor?: (r: SparkReserveAmount) => Provenance | undefined;
 }) {
   return (
     <span className="flex flex-col gap-1">
       {reserves.map((r) => (
         <span key={r.address}>
-          <Prov info={side === "supply" ? sparkPeakSupplyProv(r.symbol) : sparkPeakBorrowProv(r.symbol)}>
+          <Prov
+            info={
+              receiptFor?.(r) ?? (side === "supply" ? sparkPeakSupplyProv(r.symbol) : sparkPeakBorrowProv(r.symbol))
+            }
+          >
             {r.decimalsUnread ? (
               <TokenAmountNotLoaded address={r.address} label={r.symbol} />
             ) : (
@@ -301,7 +311,7 @@ function PeakLines({
                 symbol={r.symbol}
                 address={r.address}
                 exact={formatUnitsExact(r.amountRaw, r.decimals)}
-                iconSize={iconSize}
+                iconSize={16}
               />
             )}
           </Prov>
@@ -330,7 +340,7 @@ function SparkMenuRows({ wallet }: { wallet: string }) {
       title="Link to this position"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() => {
-        void navigator.clipboard.writeText(`${window.location.origin}/ethereum/spark/${wallet}`).then(() => {
+        void navigator.clipboard.writeText(positionLink(`/ethereum/spark/${wallet}`)).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         });
@@ -386,48 +396,11 @@ export interface SparkPositionCardProps {
   outcomeAt?: number;
   /** The (i) pane's prose. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes; `null` leaves the link and the provenance row. */
   exports?: PositionCardExports | null;
-}
-
-/** A closed card's panel: the peaks of reserves that never backed borrowing. */
-function closedPanel(peakOthers: SparkReserveAmount[]): PositionPanelColumns | undefined {
-  if (peakOthers.length === 0) return undefined;
-  return [
-    [
-      {
-        id: "peak-not-collateral",
-        label: "Supplied, not collateral",
-        tip: PEAK_NOT_COLLATERAL_TIP,
-        value: (
-          <span data-spark-not-collateral="">
-            {peakOthers.length > 1 ? (
-              // A count of the peaks the overlay lists, each with its receipt.
-              <span data-prov-exempt="">{peakOthers.length} assets</span>
-            ) : (
-              <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
-            )}
-          </span>
-        ),
-        // Many assets: their count opens the peaks, so the cell holds one
-        // line. The peaks carry no USD (PeakLines).
-        breakdown:
-          peakOthers.length > 1
-            ? {
-                assets: loadedMarks(peakOthers),
-                panel: (
-                  <span className="text-sm font-semibold tabular-nums text-foreground" data-spark-peak-breakdown="">
-                    <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
-                  </span>
-                ),
-              }
-            : undefined,
-      },
-    ],
-    [],
-  ];
+  /** The page's Lifetime flows timeline and its read: a closed card's peak
+   *  value per side (components/shared/closed-peak.tsx). */
+  flows?: ClosedPeakFlows;
 }
 
 /** SparkLend's slots for the shared position card. */
@@ -440,11 +413,16 @@ export function useSparkCardSlots({
   lives,
   outcomeAt,
   explanation,
-  viewHref,
   exports,
+  flows,
 }: SparkPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
   const isOther = (r: SparkReserveAmount) => notCollateral?.has(r.address.toLowerCase()) === true;
+  const peakOf = useClosedPeaks(flows, v.status !== "open", {
+    // The supply side's peak counts every supplied reserve, as the face does.
+    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, key: r.address })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, key: r.address })),
+  });
   const collSupplies = v.supplies.filter((r) => !isOther(r));
   const otherSupplies = v.supplies.filter(isOther);
   const collUsd = totalUsd(v, collSupplies);
@@ -484,34 +462,80 @@ export function useSparkCardSlots({
   let outcome: PositionCardOutcome | undefined;
   let notice: ReactNode;
   if (ended) {
-    // The wallet holds no open reserves, so the headline is what each asset
-    // held at its height. Where the peaks are read, a side the account never
-    // held reads "None": no supply backed borrowing (the switches read), or
-    // nothing was borrowed.
-    const peakColl = v.peakSupplies.filter((r) => !isOther(r));
+    // The wallet holds no open reserves, so each side states the assets it
+    // held, and their peaks, each at a different moment, open behind the
+    // press under the peak label (C19). Where the peaks are read, a side the
+    // account never held reads "None". The face holds every supplied peak
+    // under "Peak supplied", as the listing row does, so it never moves when the
+    // collateral switches land; read, they order the supply dropdown: the
+    // collateral peaks first, then the supplies that backed no borrowing
+    // under "Supplied, not collateral".
     const peaksRead = v.peakSupplies.length + v.peakBorrows.length > 0;
-    heads = [
-      {
-        id: "peak-collateral",
-        label: CARD_VOCAB.peakCollateral,
-        value:
-          peakColl.length > 0 ? (
-            <PeakLines reserves={peakColl} side="supply" />
-          ) : peaksRead && notCollateral != null ? (
-            <PeakNone />
-          ) : null,
-      },
-      {
-        id: "peak-debt",
-        label: CARD_VOCAB.peakDebt,
-        value:
-          v.peakBorrows.length > 0 ? (
-            <PeakLines reserves={v.peakBorrows} side="debt" />
-          ) : peaksRead ? (
-            <PeakNone />
-          ) : null,
-      },
-    ];
+    // Each side leads with its main asset at its highest recorded balance,
+    // the same on the listing row and the position page (both read the
+    // listing's prices, `pickMainAsset`, at the listing read's oracle block).
+    const { first, others } = splitSupplied(v.peakSupplies, notCollateral != null ? isOther : undefined);
+    const held = (reserves: SparkReserveAmount[], side: "supply" | "debt") => {
+      if (reserves.length === 0) return {};
+      const pick = pickMainAsset(
+        reserves.map((r) => ({ ...r, key: r.address })),
+        v.priceByAddress,
+      );
+      const figure = pick
+        ? mainAssetFigure({
+            main: { ...pick.main, exact: formatUnitsExact(pick.main.amountRaw, pick.main.decimals) },
+            receipt: side === "supply" ? sparkPeakSupplyProv(pick.main.symbol) : sparkPeakBorrowProv(pick.main.symbol),
+            block: v.priceBlock,
+            skipped: pick.skipped,
+            side,
+          })
+        : undefined;
+      // The main asset's line carries the ranking row its figure carries.
+      const receiptFor = (r: SparkReserveAmount) =>
+        figure && pick && r.address === pick.main.address ? figure.info : undefined;
+      const panel =
+        side === "debt" ? (
+          <span className="text-sm font-semibold tabular-nums text-foreground">
+            <PeakLines reserves={v.peakBorrows} side="debt" receiptFor={receiptFor} />
+          </span>
+        ) : (
+          <span className="flex flex-col gap-3 text-sm font-semibold tabular-nums text-foreground">
+            {first.length > 0 && <PeakLines reserves={first} side="supply" receiptFor={receiptFor} />}
+            {others.length > 0 && (
+              <span className="flex flex-col gap-1" data-spark-peak-breakdown="">
+                <span className="text-xs font-medium text-rb-500">
+                  <HeadingTip text="Supplied, not collateral" tip={PEAK_NOT_COLLATERAL_TIP} />
+                </span>
+                <PeakLines reserves={others} side="supply" receiptFor={receiptFor} />
+              </span>
+            )}
+          </span>
+        );
+      return assetsHead(
+        side === "debt" ? CARD_VOCAB.peakDebt : CARD_VOCAB.peakSupplied,
+        reserves.map((r) => ({ symbol: r.symbol, address: r.address })),
+        panel,
+        figure,
+      );
+    };
+    heads = withPeaks(
+      [
+        {
+          id: "peak-supplied",
+          label: CARD_VOCAB.headSupplied,
+          value: peaksRead ? <PeakNone /> : null,
+          ...held(v.peakSupplies, "supply"),
+        },
+        {
+          id: "peak-debt",
+          label: CARD_VOCAB.headDebt,
+          value: peaksRead ? <PeakNone /> : null,
+          ...held(v.peakBorrows, "debt"),
+        },
+      ],
+      peakOf,
+      detail,
+    );
     outcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: [{ at: v.status === "liquidated" && outcomeAt != null ? outcomeAt : v.lastActivityAt }],
@@ -624,11 +648,11 @@ export function useSparkCardSlots({
   const detailCommon = {
     ...common,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: ended ? sparkPositionModal(v.status) : sparkPositionModal(v.status, v.borrows.length > 0),
     menu: { leading: () => <SparkMenuRows wallet={v.wallet} />, exports: exports ?? null },
   };
-  if (outcome) return { ...detailCommon, outcome, panel: closedPanel(v.peakSupplies.filter(isOther)) };
+  if (outcome) return { ...detailCommon, outcome };
 
   // ── Each side's reserve rows, and the panel: the supply side's values on
   //    the left, the debt's and its risk on the right. A side whose total is
@@ -804,6 +828,7 @@ export function viewFromSummary(s: SparkPositionSummary): SparkPositionView {
     txCount: s.txCount,
     lastActivityAt: s.lastActivityAt,
     priceByAddress: s.priceByAddress,
+    priceBlock: s.priceBlock ?? null,
     // A listing view never carries a health factor (0018): the row's snapshot
     // HF is not read, and the position page's own live read is the only one
     // the card shows.

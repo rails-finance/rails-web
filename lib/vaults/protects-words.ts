@@ -202,6 +202,24 @@ export function mapleWait(f: Extract<ProtectsFact, { kind: "maple" }>): { delay:
   return waits.every((w) => w.delay === first.delay && w.window === first.window) ? first : null;
 }
 
+/** The rules of each family's waits, said here and on /vaults/products. */
+export const METAMORPHO_TIMELOCKED =
+  "Adding a market, raising a cap, removing a market that still holds deposits, shortening the timelock and replacing the guardian";
+export const METAMORPHO_AT_ONCE = "Lowering a cap and moving money between markets take effect at once.";
+export const YEARN_NO_WAIT =
+  "The vault applies a role holder's change in the transaction that makes it, with no wait of its own.";
+export const YEARN_HANDOVER = "Handing on the role manager takes two steps: the new address must accept.";
+export const MAPLE_UPGRADES_WAIT = "The pool delegate's upgrades wait on Maple's timelock";
+export const MAPLE_VERSIONS_GAP = "Rails has not matched the deployed managers' versions to Maple's published source.";
+/** "Maple's security admin, 0x1234…abcd, can upgrade without the wait."; unnamed where no address is at hand. */
+export const mapleSecurityAdminText = (address?: string) =>
+  `Maple's security admin${address ? `, ${shortHex(address)},` : ""} can upgrade without the wait.`;
+export const STATA_GOV_TEXT = "Aave governance can change this wrapper and the pool it lends into.";
+export const STATA_UNVOTED_GAP = "Roles that act without a vote, such as the emergency admin's pause, are not read.";
+export const SGHO_YIELD_MANAGER_GAP = "Which addresses hold its yield manager role is not read.";
+const SGHO_ADMIN_UNTRACED = "Rails could not trace who holds sGHO's admin role.";
+const UMBRELLA_CHANGER_UNREAD = "Who can change Umbrella was not read.";
+
 export function protectsLine(f: ProtectsFact): ProtectsLine {
   switch (f.kind) {
     case "metamorpho": {
@@ -222,12 +240,12 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
         };
       return {
         label: "Timelock",
-        headline: `Adding a market, raising a cap, removing a market that still holds deposits, shortening the timelock and replacing the guardian each wait ${days(f.timelock)}`,
+        headline: `${METAMORPHO_TIMELOCKED} each wait ${days(f.timelock)}`,
         sentence: [
           f.guardian
             ? `The guardian, ${shortHex(f.guardian)}, or the owner, ${shortHex(f.owner)}, can cancel any of them during the wait.`
             : `No guardian is set; the owner, ${shortHex(f.owner)}, can cancel any of them during the wait.`,
-          "Lowering a cap and moving money between markets take effect at once.",
+          METAMORPHO_AT_ONCE,
           ...pending,
         ].join(" "),
         gap: null,
@@ -244,8 +262,8 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
           (f.roleManager === ZERO
             ? "No role manager is set."
             : `The role manager, ${shortHex(f.roleManager)}, assigns every role.`) +
-          " The vault applies a role holder's change in the transaction that makes it, with no wait of its own." +
-          " Handing on the role manager takes two steps: the new address must accept.",
+          ` ${YEARN_NO_WAIT}` +
+          ` ${YEARN_HANDOVER}`,
         gap: "Whether a role holder's address is a timelock or a multisig is not read.",
       };
     case "aave-gov": {
@@ -255,14 +273,11 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
         headline: `Changes need a ${dayAdj(f.gov.votingDuration)} Aave vote, then wait ${days(f.gov.delay)}`,
         sentence:
           f.subject === "stata"
-            ? `Aave governance can change this wrapper and the pool it lends into. ${guardian}`
+            ? `${STATA_GOV_TEXT} ${guardian}`
             : f.govAdmin
               ? `Aave governance holds sGHO's admin role. ${guardian}`
-              : `Rails could not trace who holds sGHO's admin role. ${guardian}`,
-        gap:
-          f.subject === "sgho"
-            ? "Which addresses hold its yield manager role is not read."
-            : "Roles that act without a vote, such as the emergency admin's pause, are not read.",
+              : `${SGHO_ADMIN_UNTRACED} ${guardian}`,
+        gap: f.subject === "sgho" ? SGHO_YIELD_MANAGER_GAP : STATA_UNVOTED_GAP,
       };
     }
     case "umbrella":
@@ -271,9 +286,7 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
         headline: `Withdrawing takes a ${dayAdj(f.cooldown)} cooldown, then a ${dayAdj(f.window)} window to unstake`,
         sentence:
           `Umbrella, ${shortHex(f.umbrella)}, can slash the stake: take part of it to cover a shortfall in the Aave reserve it backs.` +
-          (f.govAdmin
-            ? `Aave governance can change Umbrella ${govWait(f.gov)}.`
-            : "Who can change Umbrella was not read."),
+          (f.govAdmin ? `Aave governance can change Umbrella ${govWait(f.gov)}.` : UMBRELLA_CHANGER_UNREAD),
         gap: null,
       };
     case "maple": {
@@ -282,13 +295,12 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
         label: "Upgrades",
         headline: w
           ? `The pool delegate's upgrades wait ${days(w.delay)}, then must run within ${days(w.window)}`
-          : "The pool delegate's upgrades wait on Maple's timelock",
+          : MAPLE_UPGRADES_WAIT,
         sentence:
           (f.delegate
             ? `The pool delegate, ${shortHex(f.delegate)}, runs the pool's lending; `
-            : "The pool delegate runs the pool's lending; ") +
-          `Maple's security admin, ${shortHex(f.securityAdmin)}, can upgrade without the wait.`,
-        gap: "Rails has not matched the deployed managers' versions to Maple's published source.",
+            : "The pool delegate runs the pool's lending; ") + mapleSecurityAdminText(f.securityAdmin),
+        gap: MAPLE_VERSIONS_GAP,
       };
     }
   }

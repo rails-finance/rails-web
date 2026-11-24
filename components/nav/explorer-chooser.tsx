@@ -4,10 +4,12 @@
 // the search in the wallet panel (H16). The chain glyphs across the top
 // select a chain, each named by its tooltip and the selected one by a muted
 // heading under them; the chain's explorers stand in two columns below, the most
-// used shown and the long tail behind "View all <n> explorers"
-// (lib/shared/explorer-rank.ts). The coverage pages are reached from the
-// home directory and the site footer, not from here (Miles, 5 Nov 2026). It opens on Ethereum, the first chain, whatever the page's chain (Miles,
-// 4 Nov 2026).
+// used shown and "View all <n> explorers" opening /protocols on that chain
+// (lib/shared/explorer-rank.ts; decision 0068 point 7, ui-jobs 781). Under
+// the chooser, a Vaults row (ui-jobs 775) in the explorer rows' shape, one
+// for every chain. The coverage pages are reached from the home directory and
+// the site footer, not from here (Miles, 5 Nov 2026). It opens on Ethereum, the
+// first chain, whatever the page's chain (Miles, 4 Nov 2026).
 //
 // Under the asset preference (ui-jobs 557) only the explorers that list one of
 // the reader's assets stand here, every one of them on its chain, and only the
@@ -19,6 +21,7 @@
 
 import { CHROME_HOVER } from "@/components/nav/chrome-hover";
 import { useState } from "react";
+import { Vault } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CHAINS, MAINNET_CHAIN_ID, ROBINHOOD_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
@@ -29,6 +32,7 @@ import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-soon";
 import { ScopeNote } from "@/components/shared/asset-scope-note";
 import { useScopedRoster } from "@/lib/shared/explorer-scope";
+import { PROTOCOLS_INDEX_HREF } from "@/lib/shared/protocol-index";
 
 // Row states (Miles 13 Nov 2026, ui-jobs 661):
 //   rest    → text-foreground on a transparent border; hover → the border turns
@@ -63,6 +67,10 @@ function ExplorerRow({
   );
 }
 
+/** A link out of the panel to an index: blue, as every link that opens a page. */
+const INDEX_LINK =
+  "text-sm font-medium text-blue-600 transition-colors hover:underline focus-ring dark:text-[var(--text-link)]";
+
 const TAB = "flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg transition-colors focus-ring";
 const TAB_ON = "bg-rb-200 dark:bg-rb-700";
 const TAB_OFF = CHROME_HOVER;
@@ -81,16 +89,14 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
   // Robinhood: a chain with no explorers yet; selecting it shows the
   // coming-soon line in place of the roster.
   const [robinhood, setRobinhood] = useState(false);
-  const [showAll, setShowAll] = useState(false);
   const selectChain = (id: ChainId) => {
     setSelectedId(id);
     setRobinhood(false);
-    setShowAll(false);
   };
 
   const chain = chains.find((c) => c.id === selectedId) ?? chains[0] ?? CHAINS[MAINNET_CHAIN_ID];
   const { featured, all } = chainExplorers(chain.id);
-  const rows = filtering ? all.filter((p) => roster.shows(p.id)) : showAll ? all : featured;
+  const rows = filtering ? all.filter((p) => roster.shows(p.id)) : featured;
   const onRobinhood = robinhood && !filtering;
   const name = onRobinhood ? ROBINHOOD_LABEL : chain.name;
   const none = filtering && chains.length === 0;
@@ -165,18 +171,36 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
               />
             ))}
           </div>
+          {/* The long tail is the protocols index on this chain (decision 0068
+              point 7, ui-jobs 781). */}
           {!filtering && all.length > featured.length && (
-            <button
-              type="button"
-              onClick={() => setShowAll((v) => !v)}
-              aria-expanded={showAll}
-              className="-mx-2 mt-3 cursor-pointer rounded-sm px-2 py-1 text-sm text-rb-500 transition-colors hover:text-foreground focus-ring"
+            <Link
+              href={`${PROTOCOLS_INDEX_HREF}?chain=${chain.id}`}
+              onClick={onNavigate}
+              className={`-mx-2 mt-3 inline-flex rounded-sm px-2 py-1 ${INDEX_LINK}`}
               data-chooser-view-all=""
             >
-              {showAll ? "Show the most used" : `View all ${all.length} explorers`}
-            </button>
+              View all {all.length} explorers
+            </Link>
           )}
         </nav>
+      )}
+      {/* Vaults (ui-jobs 775): the cross-chain index, a row in the explorer rows'
+          shape under the roster. Not an explorer (no data-switcher-explorer),
+          and absent under the asset preference, which narrows to explorers. */}
+      {!filtering && (
+        <Link
+          href="/vaults"
+          onClick={onNavigate}
+          data-chooser-vaults=""
+          aria-current={pathname === "/vaults" ? "page" : undefined}
+          className={`-mx-2 mt-2 flex min-w-0 items-center gap-2.5 rounded-lg border border-transparent px-[7px] py-[11px] text-sm transition-colors focus-ring ${
+            pathname === "/vaults" ? ROW_CURRENT : ROW_REST
+          }`}
+        >
+          <Vault className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <span className="truncate">Vaults</span>
+        </Link>
       )}
       <ScopeNote scoped={roster} noun={["explorer", "explorers"]} className="mt-3" />
     </div>

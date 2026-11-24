@@ -7,8 +7,9 @@
 //
 // Facets:
 //   • Market  — USDp / GOLDp (single). Every CDP lives in exactly one.
-//   • Status  — open / closed / liquidated, the API's whole lifecycle
-//     vocabulary, resting on a CONTEXTUAL default (listing-visibility.ts).
+//   • Status  — Open, Closed or All (ui-jobs 805) over the API's open /
+//     closed / liquidated, resting on a CONTEXTUAL default
+//     (listing-visibility.ts). "Closed by liquidation" (`ended`) narrows Closed.
 //   • Size    — two USD ranges, Debt and Collateral (lib/shared/size-dimensions.ts),
 //     over the CDP's last state, valued on the server at the market's latest indexed oracle price
 //     (polaris_oracle_at_block: 1 USDp at the ETH/USD medianiser over the usdp
@@ -22,7 +23,7 @@
 //     price row drops its CDPs with a balance from a USD range.
 //   • (There is no "Liquidated before" facet. On Polaris a liquidation clears
 //     the whole CDP and burns the NFT, and the id is never reused, so "ever
-//     liquidated" is the Status bucket "Liquidated" — the two-axis shape
+//     liquidated" is "Closed by liquidation" — the two-axis shape
 //     belongs to the lenders where a position survives a partial liquidation.
 //     Retired 2026-09-10; it had been a server no-op since it shipped.)
 //   • Transactions — a range over tx_count, the distinct transactions on the
@@ -58,12 +59,12 @@ import { parsePolarisSearch } from "@/lib/polaris/search";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import {
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  isAllStatuses,
-  sameStatusSet,
+  defaultStatusChoice,
+  endedByLiquidation,
+  polarisStatusBuckets,
+  statusChoice,
 } from "@/lib/polaris/listing-visibility";
+import { ENDED_BY_LIQUIDATION, setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 export const POLARIS_ITEMS_PER_PAGE = 20;
 
@@ -74,9 +75,12 @@ const POLARIS_TX_TOP = 100;
 export interface PolarisListFilters extends BaseListFilters {
   /** "" | "usdp" | "goldp" */
   market: string[];
-  /** open / closed / liquidated — multi (OR). RAW intent: empty is "no
-   *  opinion" and resolves to the contextual default (listing-visibility.ts). */
+  /** One of open / closed / all, or [] for the resting choice
+   *  (listing-visibility.ts, ui-jobs 805). */
   status: string[];
+  /** "" | "liquidated" — with Closed, the CDPs that ended by liquidation.
+   *  URL param `ended`. */
+  ended: string[];
   /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
    *  debt) or [] for no bound. URL param `debt`. */
   debt: string[];
@@ -90,15 +94,14 @@ export interface PolarisListFilters extends BaseListFilters {
 // No status is written into the page defaults: an empty `status` is "no
 // opinion", and listing-visibility.ts resolves it per context — the open CDPs on
 // the bare directory, every status once the search names a holder or a CDP
-// number. The default is contextual rather than a selection: it shows as the
-// removable "Status: Open" chip (defaultChip / clearDefault), and a cleared selection always resolves back to
-// whatever the current context rests on.
+// number.
 export const POLARIS_LIST_DEFAULTS: PolarisListFilters = {
   q: "",
   sortBy: "recent",
   sortOrder: "desc",
   market: [],
   status: [],
+  ended: [],
   debt: [],
   coll: [],
   tx: [],
@@ -127,12 +130,6 @@ export function polarisSortOptions(f: PolarisListFilters): SortOption[] {
 export const MARKET_OPTIONS: FilterOptionDef[] = [
   { value: "usdp", label: "USDp" },
   { value: "goldp", label: "GOLDp" },
-];
-
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated" },
 ];
 
 /**
@@ -165,27 +162,35 @@ export function polarisListDimensions(
         return named ? `Market: ${MARKET_OPTIONS.find((o) => o.value === named)?.label ?? named}` : null;
       },
     },
-    // Status is a multi-select over the three lifecycle buckets. All three
-    // selected = "show everything" (no server filter). Empty = the contextual
-    // default (open CDPs while browsing, everything on an identity search), so
-    // `set` writes the empty intent whenever the choice equals that default —
-    // keeping the URL clean and the relax-on-search behaviour intact.
+    // Status is one choice of three. Empty = the contextual default (open CDPs
+    // while browsing, All on an identity search), so `set` writes the empty
+    // intent whenever the choice equals that default.
     {
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
-      set: (f, v) => {
-        const sel = canonicalStatuses(v);
-        const def = defaultStatuses(f);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, def) ? [] : sel };
-      },
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses (ui-jobs 805).
+      set: (f, v) => ({ ...f, ...setStatusChoice(v, defaultStatusChoice(f), f.ended) }),
+    },
+    {
+      id: "ended",
+      label: "Closed by liquidation",
+      // Its own group, for its pill; in the panel it sits under Status.
+      group: "Closed by liquidation",
+      cardinality: "single",
+      param: "ended",
+      options: [{ value: ENDED_BY_LIQUIDATION, label: "Closed by liquidation" }],
+      // Offered with Closed, which it narrows.
+      available: (f) => statusChoice(f) === "closed",
+      get: (f) => (endedByLiquidation(f) ? [ENDED_BY_LIQUIDATION] : []),
+      set: (f, v) => ({ ...f, ended: v }),
+      chipLabel: () => "Closed by liquidation",
     },
     ...sizeDimensions<PolarisListFilters>({
       getDebt: (f) => f.debt,
@@ -233,8 +238,8 @@ export function polarisFiltersToFetchParams(filters: PolarisListFilters, page: n
     market: market ?? undefined,
     cdpId,
     wallet: ownerAddress,
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // All maps to no status filter; Closed asks for closed and liquidated.
+    status: polarisStatusBuckets(filters) as FetchPolarisPositionsParams["status"],
     ...usdBounds(filters),
     ...transactionBounds(filters.tx),
     sortBy,

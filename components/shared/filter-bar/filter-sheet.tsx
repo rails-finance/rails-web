@@ -1,10 +1,15 @@
 "use client";
 
 /**
- * FilterSheet — every filter at once below sm (ui-jobs 544): the Filters
- * button at the head of the pill row (a sliders glyph and, while any group is
- * set, a badge with how many; ui-jobs 681), opening a bottom sheet over a
- * scrim.
+ * FilterSheet — every filter at once (ui-jobs 544, 801): the Filters button in
+ * the toolbar's row (the list-filter glyph; below sm a badge with how many
+ * groups are set, ui-jobs 681). Below sm it opens a bottom sheet over a scrim.
+ * From sm it opens a panel in the page, in the toolbar's `slot` under the row
+ * and above the results: the filters that open a sub-view at the left, the
+ * Size ranges in the middle, the section's other filters and the primary
+ * button at the right; while it is open the results under it are dimmed and
+ * inert, and a second press on the button or a press outside the panel
+ * closes it.
  * The sheet lists one row per dimension, its name at the left and the current
  * choice with a chevron at the right; a row opens that dimension's options
  * (multi, or single with three or more) as a sub-view with its own back
@@ -16,29 +21,35 @@
  * the primary button: the count the edits would give where the listing counts
  * a draft from rows it holds, else "Apply".
  *
- * Edits are staged: the sheet holds a draft of the filters, and only the
- * primary button writes it, through the same `onChange` the desktop panels
- * use (so the URL, Save listing and Copy link follow). Its count is the
- * listing's own until the draft changes, then `countFor(draft)`, which runs
- * the listing's own filtering (in memory, or the server's total). Escape and
- * the back control at the top close the sheet and drop the draft; a facet's
- * back returns to the list keeping it.
+ * Edits are staged: the sheet holds the edits made in it, by dimension, and
+ * the draft is the listing's applied filters with those edits over them, so a
+ * change made outside the sheet while it is open (a search, a type hidden
+ * from a row's ⋮) stands. Only the primary button writes the draft, through
+ * the same `onChange` the pill editors use (so the URL, Save listing and Copy
+ * link follow), and with no edit it writes nothing. Its count is the
+ * listing's until an edit is made, then `countFor(draft)`, which runs the
+ * listing's filtering (in memory, or the server's total). Escape and the back
+ * control at the top close the sheet and drop the edits; a facet's back
+ * returns to the list keeping them.
  *
- * A modal dialog: focus is held inside while it is open and returns to the
- * Filters button on close; the page behind does not scroll.
+ * Below sm a modal dialog: focus is held inside while it is open and returns
+ * to the Filters button on close; the page behind does not scroll. The panel
+ * in the page is a labelled region and holds neither.
  *
- * Browser back steps back inside the sheet (a phone's edge swipe or back
- * button fires it): opening the sheet and opening a sub-view each push a
+ * Below sm, browser back steps back inside the sheet (a phone's edge swipe or
+ * back button fires it): opening the sheet and opening a sub-view each push a
  * history entry at the same URL, marked in `history.state[SHEET_STATE]`, and
  * popstate closes the sub-view or the sheet (dropping the draft, as Escape
  * does). The sheet's own controls leave through the same entries, so none is
  * left behind, and Show writes the draft only once they are gone. A sub-view
- * also returns to the list on a swipe to the right.
+ * also returns to the list on a swipe to the right. The panel in the page
+ * pushes no history entry.
  */
 
 import {
   Fragment,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -47,10 +58,10 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronLeft, ChevronRight, Minus, SlidersHorizontal } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ListFilter, Minus } from "lucide-react";
 import { CTRL_GHOST, CTRL_OFF, RESET_LINK } from "@/lib/shared/ui-grammar";
-import { PILL_NEUTRAL } from "@/components/shared/filter-bar/filter-pill";
-import { PRIMARY_BUTTON } from "@/components/shared/filter-bar/pill-editor";
+import { PILL_ICON_BUTTON } from "@/components/shared/filter-bar/filter-pill";
+import { COUNT_DELAY_MS, PRIMARY_BUTTON, usePhone } from "@/components/shared/filter-bar/pill-editor";
 import { activeGroupCount, groupDimensions } from "@/components/shared/filter-bar/pill-model";
 import {
   type FilterDimension,
@@ -83,10 +94,13 @@ export interface FilterSheetProps<F> {
   /** The noun for a draft, where the selection names it ("open positions"
    *  while Status rests on Open). Without it, `count.noun`. */
   nounFor?: (draft: F) => string;
+  /** The element under the toolbar's row that the filters open in from sm
+   *  (ui-jobs 801): a panel in the page, above the results. */
+  slot?: HTMLElement | null;
+  /** Told when the panel in the page opens and closes, so the toolbar can
+   *  set its other controls back while the filters hold the focus. */
+  onPanelOpenChange?: (open: boolean) => void;
 }
-
-/** Wait after a draft edit before counting it, so a run of taps costs one read. */
-const COUNT_DELAY_MS = 250;
 
 /** The `history.state` key the sheet's entries carry: "list" or "view". */
 const SHEET_STATE = "filterSheet";
@@ -101,6 +115,16 @@ const SWIPE_MS = 180;
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
+/** The groups the sheet draws together as one section, and its heading. */
+const SECTION_GROUPS = ["Size", "Transactions", "History"];
+const SECTION_TITLE = "Size and history";
+/** In the page a column's last row has no rule under it. */
+const LAST_ROW_OPEN = "[&>li:last-child]:border-b-0";
+
+/** Two selections of one dimension hold the same values. */
+const sameValues = (a: string[], b: string[]) =>
+  a.length === b.length && [...a].sort().join("\u0000") === [...b].sort().join("\u0000");
+
 /** The dimension back at its default. */
 const resetDim = <F,>(dim: FilterDimension<F>, f: F): F => dim.set(f, dim.defaultValues?.(f) ?? []);
 
@@ -108,7 +132,8 @@ const resetDim = <F,>(dim: FilterDimension<F>, f: F): F => dim.set(f, dim.defaul
 const isToggle = <F,>(dim: FilterDimension<F>) => dim.cardinality === "single" && dim.options.length === 1;
 
 /** A dimension short enough to choose in place: Any or one of two. */
-const isSegmented = <F,>(dim: FilterDimension<F>) => dim.cardinality === "single" && dim.options.length === 2;
+const isSegmented = <F,>(dim: FilterDimension<F>) =>
+  dim.cardinality === "single" && (dim.options.length === 2 || dim.segmented === true);
 
 /** The row's right-hand text: the current choice in the option words. */
 function currentChoice<F>(dim: FilterDimension<F>, f: F): string {
@@ -133,9 +158,56 @@ export function FilterSheet<F>({
   countPending,
   countFor,
   nounFor,
+  slot,
+  onPanelOpenChange,
 }: FilterSheetProps<F>) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const phone = usePhone();
+  const inline = slot != null && phone === false;
+  // The open sheet's close, so a second press on the button leaves through
+  // the sheet's history entries.
+  const requestClose = useRef<(() => void) | null>(null);
+  const regionId = useId();
+  // The sheet opened as a dialog or as the panel in the page; when the width
+  // crosses sm or the slot goes while it is open, it closes.
+  const openedInline = useRef(inline);
+  useLayoutEffect(() => {
+    if (open && openedInline.current !== inline) requestClose.current?.();
+  }, [open, inline]);
+  const panelOpen = open && inline;
+  const onPanelOpenChangeRef = useRef(onPanelOpenChange);
+  onPanelOpenChangeRef.current = onPanelOpenChange;
+  useEffect(() => {
+    onPanelOpenChangeRef.current?.(panelOpen);
+  }, [panelOpen]);
+  // While the panel is open in the page, the results it narrows stand back
+  // as the row does: the nearest `[data-filters-results]` the surface draws
+  // (one stable wrapper around its rows, so what loads into it later stands
+  // back too) is dimmed (`[data-filters-dimmed]`, globals.css) and inert.
+  useEffect(() => {
+    if (!panelOpen || !slot) return;
+    let found: HTMLElement[] = [];
+    // A surface marks one wrapper for its toolbar. The walk up stops where it
+    // would take in another toolbar, so a toolbar whose surface marks none
+    // dims nothing.
+    for (let at = slot.parentElement; at && found.length === 0; at = at.parentElement) {
+      if (at.querySelectorAll("[data-filter-sheet-slot]").length > 1) break;
+      found = [...at.querySelectorAll<HTMLElement>("[data-filters-results]")];
+      if (at.tagName === "MAIN") break;
+    }
+    const held = found.map((el) => ({ el, inert: el.inert }));
+    for (const { el } of held) {
+      el.inert = true;
+      el.setAttribute("data-filters-dimmed", "");
+    }
+    return () => {
+      for (const { el, inert } of held) {
+        el.inert = inert;
+        el.removeAttribute("data-filters-dimmed");
+      }
+    };
+  }, [panelOpen, slot]);
   // The badge counts what the pills show set: groups off their default.
   const active = activeGroupCount(groupDimensions(dimensions, filters), filters);
 
@@ -145,22 +217,31 @@ export function FilterSheet<F>({
         ref={buttonRef}
         type="button"
         onClick={() => {
-          // The sheet's history entry, at the same URL (no query change, so
-          // Copy link and the listing do not see it).
-          window.history.pushState({ [SHEET_STATE]: "list" }, "");
+          if (open) {
+            requestClose.current?.();
+            return;
+          }
+          // Below sm the sheet's history entry, at the same URL (no query
+          // change, so Copy link and the listing do not see it).
+          openedInline.current = inline;
+          if (!inline) window.history.pushState({ [SHEET_STATE]: "list" }, "");
           setOpen(true);
         }}
-        className={`${PILL_NEUTRAL} sm:hidden inline-flex shrink-0 items-center h-11 gap-2 px-3.5 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
-        aria-haspopup="dialog"
+        className={`${PILL_ICON_BUTTON} relative ${open && inline ? "border-teal-600! dark:border-teal-400!" : ""}`}
+        aria-haspopup={inline ? undefined : "dialog"}
+        aria-controls={open && inline ? regionId : undefined}
         aria-expanded={open}
         aria-label={active > 0 ? `Filters, ${active} active` : "Filters"}
+        title="Filters"
         data-filter-sheet-open=""
         data-anatomy="N1.8.1"
       >
-        <SlidersHorizontal className="w-[18px] h-[18px]" aria-hidden="true" />
+        <ListFilter className="w-[18px] h-[18px]" aria-hidden="true" />
+        {/* Below sm the set pills can scroll out of sight, so the button
+            counts them; from sm the pills beside it say it. */}
         {active > 0 && (
           <span
-            className="inline-flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-teal-700 text-white dark:bg-teal-400 dark:text-rb-900 text-xs font-bold tabular-nums"
+            className="absolute -right-1 -top-1 inline-flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-teal-700 text-white dark:bg-teal-400 dark:text-rb-900 text-xs font-bold tabular-nums sm:hidden"
             aria-hidden="true"
             data-filter-sheet-count={active}
             data-prov-exempt
@@ -178,6 +259,11 @@ export function FilterSheet<F>({
           countPending={countPending}
           countFor={countFor}
           nounFor={nounFor}
+          inline={openedInline.current}
+          slot={slot}
+          regionId={regionId}
+          buttonRef={buttonRef}
+          requestCloseRef={requestClose}
           onClose={() => {
             setOpen(false);
             buttonRef.current?.focus();
@@ -196,8 +282,19 @@ function Sheet<F>({
   countPending,
   countFor,
   nounFor,
+  inline,
+  slot,
+  regionId,
+  buttonRef,
+  requestCloseRef,
   onClose,
 }: {
+  /** Opened as the panel in the page; fixed for the sheet's life. */
+  inline: boolean;
+  slot?: HTMLElement | null;
+  regionId: string;
+  buttonRef: React.RefObject<HTMLButtonElement | null>;
+  requestCloseRef: MutableRefObject<(() => void) | null>;
   dimensions: FilterDimension<F>[];
   applied: F;
   onApply: (next: F) => void;
@@ -207,14 +304,47 @@ function Sheet<F>({
   nounFor?: (draft: F) => string;
   onClose: () => void;
 }) {
-  // The staged filters: every control in the sheet reads and writes these.
-  const [filters, setDraft] = useState<F>(applied);
-  // The newest draft, for Show after a range flush has written one this tick.
-  const draftRef = useRef<F>(applied);
+  // The edits made in the sheet, by dimension id; the draft every control
+  // reads is the applied filters with them over it, in registry order.
+  const [edits, setEdits] = useState<ReadonlyMap<string, string[]>>(() => new Map());
+  const editsRef = useRef(edits);
+  const appliedRef = useRef(applied);
+  appliedRef.current = applied;
+  const dimensionsRef = useRef(dimensions);
+  dimensionsRef.current = dimensions;
+  const compose = (base: F, e: ReadonlyMap<string, string[]>) =>
+    dimensionsRef.current.reduce((f, d) => (e.has(d.id) ? d.set(f, e.get(d.id)!) : f), base);
+  /** The newest draft, for a write that lands after this render (a range's
+   *  delayed slider move, Show after a flush). */
+  const currentDraft = () => compose(appliedRef.current, editsRef.current);
+  const filters = compose(applied, edits);
+  // A control hands back the whole filter object: every dimension it moved
+  // becomes an edit (one dimension's `set` may move another).
   const onChange = (next: F) => {
-    draftRef.current = next;
-    setDraft(next);
+    const cur = currentDraft();
+    const e = new Map(editsRef.current);
+    for (const d of dimensionsRef.current) {
+      const v = d.get(next);
+      if (!sameValues(v, d.get(cur))) e.set(d.id, v);
+    }
+    editsRef.current = e;
+    setEdits(e);
   };
+  // A dimension the listing moved while the sheet is open (a type hidden from
+  // a row's ⋮) takes the listing's value: its edit goes.
+  const seenApplied = useRef(applied);
+  useLayoutEffect(() => {
+    const was = seenApplied.current;
+    seenApplied.current = applied;
+    if (was === applied || editsRef.current.size === 0) return;
+    const e = new Map(editsRef.current);
+    for (const d of dimensionsRef.current) if (e.has(d.id) && !sameValues(d.get(was), d.get(applied))) e.delete(d.id);
+    if (e.size === editsRef.current.size) return;
+    editsRef.current = e;
+    setEdits(e);
+  }, [applied]);
+  const isDirty = (base: F, e: ReadonlyMap<string, string[]>) =>
+    dimensionsRef.current.some((d) => e.has(d.id) && !sameValues(e.get(d.id)!, d.get(base)));
   // Each range row's pending slider move, written before Show.
   const flushers = useRef(new Map<string, MutableRefObject<(() => void) | null>>());
   const flushFor = (id: string) => {
@@ -223,22 +353,30 @@ function Sheet<F>({
     return r;
   };
   const flushRanges = () => flushers.current.forEach((r) => r.current?.());
-  const dirty = filters !== applied;
+  const dirty = isDirty(applied, edits);
   const dims = dimensions.filter((d) => !d.available || d.available(filters));
+  // What the draft selects, as text: the count is read again when it changes.
+  const draftKey = `${dimensions.map((d) => d.get(filters).join(",")).join("|")}|${(filters as { q?: string }).q ?? ""}`;
 
   // The draft's count, read after a short pause; null until it lands (or
   // when the read fails, and the button then names no figure).
-  const [draftCount, setDraftCount] = useState<number | null>(count?.total ?? null);
+  const [draftCount, setDraftCount] = useState<number | null>(null);
   const [draftPending, setDraftPending] = useState(false);
   const countForRef = useRef(countFor);
   countForRef.current = countFor;
   useEffect(() => {
-    if (!dirty || !countForRef.current) return;
+    // Unedited there is no draft figure: the next first edit starts from none.
+    if (!dirty) {
+      setDraftCount(null);
+      setDraftPending(false);
+      return;
+    }
+    if (!countForRef.current) return;
     let cancelled = false;
     setDraftPending(true);
     const t = window.setTimeout(() => {
       Promise.resolve()
-        .then(() => countForRef.current!(filters))
+        .then(() => countForRef.current!(currentDraft()))
         .then(
           (n) => !cancelled && setDraftCount(n),
           () => !cancelled && setDraftCount(null),
@@ -249,7 +387,8 @@ function Sheet<F>({
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [filters, dirty]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the draft by its key
+  }, [draftKey, dirty]);
 
   // The dimension whose options are open, or null for the list.
   const [openId, setOpenId] = useState<string | null>(null);
@@ -266,7 +405,8 @@ function Sheet<F>({
   // History: how many of the sheet's entries stand above the listing's (1
   // with the list showing, 2 with a sub-view), and the draft Show writes once
   // they are gone.
-  const depth = useRef(1);
+  const modal = inline === false;
+  const depth = useRef(modal ? 1 : 0);
   const pendingApply = useRef<{ draft: F } | null>(null);
   const closing = useRef(false);
   const finished = useRef(false);
@@ -293,8 +433,10 @@ function Sheet<F>({
     } else finishClose();
   };
   const openSub = (id: string) => {
-    window.history.pushState({ [SHEET_STATE]: "view" }, "");
-    depth.current = 2;
+    if (modal) {
+      window.history.pushState({ [SHEET_STATE]: "view" }, "");
+      depth.current = 2;
+    }
     setOpenId(id);
   };
   /** Back to the list, keeping the draft: through history when the sub-view
@@ -309,6 +451,7 @@ function Sheet<F>({
 
   useEffect(() => {
     const onPop = () => {
+      if (!modal) return;
       const st = sheetState();
       if (st === "list") {
         depth.current = 1;
@@ -346,16 +489,24 @@ function Sheet<F>({
 
   const closeSheetRef = useRef(() => closeSheet());
   closeSheetRef.current = () => closeSheet();
+  requestCloseRef.current = closeSheetRef.current;
 
-  // Escape closes; Tab cycles inside the sheet; the page does not scroll.
+  // Escape closes; in the dialog Tab cycles inside it and the page does not
+  // scroll. In the page (from sm, in the toolbar's slot) the filters are no
+  // modal: the page scrolls, Tab moves on through it, and Escape is the
+  // panel's only while focus is in it, on its button or nowhere.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !e.defaultPrevented) {
+        const at = document.activeElement;
+        const ours =
+          modal || at == null || at === document.body || at === buttonRef.current || panelRef.current?.contains(at);
+        if (!ours) return;
         e.preventDefault();
         closeSheetRef.current();
         return;
       }
-      if (e.key !== "Tab" || !panelRef.current) return;
+      if (!modal || e.key !== "Tab" || !panelRef.current) return;
       const els = [...panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
       if (els.length === 0) return;
       const first = els[0];
@@ -369,14 +520,25 @@ function Sheet<F>({
         first.focus();
       }
     };
+    // In the page a press outside the panel and its button closes it and
+    // drops the edits, as Escape does (a press on the dimmed, inert results
+    // lands on an ancestor of theirs).
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (modal || !t || panelRef.current?.contains(t) || buttonRef.current?.contains(t)) return;
+      closeSheetRef.current();
+    };
     document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onDown);
     const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (modal) document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = prev;
+      document.removeEventListener("pointerdown", onDown);
+      if (modal) document.body.style.overflow = prev;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reads refs only
+  }, [modal]);
 
   const anyActive = dims.some((d) => isDimensionActive(d, filters));
   const clearAll = () => {
@@ -385,8 +547,9 @@ function Sheet<F>({
     onChange(next);
   };
 
-  // Unedited, the listing's own count; edited, the draft's once read (the
-  // last figure stays, dimmed, while a read is in flight).
+  // Unedited, the listing's count; edited, the draft's once read: "Apply",
+  // dimmed, until the first figure lands, and after it the last figure,
+  // dimmed, while a read is in flight.
   const shown = dirty ? (countFor ? draftCount : null) : (count?.total ?? null);
   const pending = dirty ? draftPending : countPending;
   const noun = count ? (dirty && nounFor ? nounFor(filters) : count.noun) : "";
@@ -396,15 +559,181 @@ function Sheet<F>({
       : "Apply";
   const apply = () => {
     flushRanges();
-    closeSheet(draftRef.current !== applied ? draftRef.current : undefined);
+    closeSheet(isDirty(appliedRef.current, editsRef.current) ? currentDraft() : undefined);
   };
+
+  // One dimension's row in the list.
+  const dimRow = (dim: FilterDimension<F>) => (
+    <li key={dim.id} className="border-b border-rb-200 dark:border-rb-800">
+      {dim.pinned?.(filters) ? (
+        // Fixed from outside (a search naming a market): its choice
+        // as plain text, with nothing to pick.
+        <div
+          className="flex w-full min-h-14 items-center gap-3 py-3"
+          data-filter-sheet-row={dim.id}
+          data-filter-sheet-pinned=""
+        >
+          <span className="text-sm">{dim.label}</span>
+          <span className="ml-auto truncate text-sm font-medium text-foreground">{currentChoice(dim, filters)}</span>
+        </div>
+      ) : isToggle(dim) ? (
+        <ToggleRow dim={dim} filters={filters} onChange={onChange} />
+      ) : isSegmented(dim) ? (
+        <SegmentRow dim={dim} filters={filters} onChange={onChange} />
+      ) : dim.cardinality === "range" ? (
+        <RangeRow
+          dim={dim}
+          filters={filters}
+          // A delayed slider write lands on the newest draft, so it
+          // never undoes an edit made in another row meanwhile.
+          onChange={(next) => onChange(dim.set(currentDraft(), dim.get(next)))}
+          flushRef={flushFor(dim.id)}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => openSub(dim.id)}
+          className="flex w-full min-h-14 items-center gap-3 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          data-filter-sheet-row={dim.id}
+          data-anatomy="N1.8.3"
+        >
+          <span className="text-sm">{dim.label}</span>
+          <span
+            className={`ml-auto truncate text-sm ${isDimensionActive(dim, filters) ? "text-foreground font-medium" : "text-rb-500"}`}
+          >
+            {currentChoice(dim, filters)}
+          </span>
+          <ChevronRight className="w-4 h-4 shrink-0 text-rb-500" aria-hidden="true" />
+        </button>
+      )}
+    </li>
+  );
+  // Size, Transactions and History as one section, where the first of them
+  // stood (ui-jobs 801); every other dimension keeps its row.
+  const inSection = (d: FilterDimension<F>) => SECTION_GROUPS.includes(d.group ?? d.label);
+  const sectioned = dims.filter(inSection);
+  const section = sectioned.length > 1 ? sectioned : [];
+  const plain = dims.filter((d) => !section.includes(d));
+  const sizeDims = section.filter((d) => (d.group ?? d.label) === SECTION_GROUPS[0]);
+  // In the page: the Size ranges in the middle column, the section's other
+  // dimensions in the last.
+  const sectionA = sizeDims.length > 0 && sizeDims.length < section.length ? sizeDims : section;
+  const sectionB = section.filter((d) => !sectionA.includes(d));
+  const listItems = dims.flatMap((dim) => {
+    if (!section.includes(dim)) return [dimRow(dim)];
+    if (dim !== section[0]) return [];
+    return [
+      <li key="section" data-filter-sheet-section="" data-anatomy="N1.8.10">
+        <h3 className="pt-5 pb-1 text-xs font-semibold text-rb-500 dark:text-rb-400/75">{SECTION_TITLE}</h3>
+        <ul>{section.map(dimRow)}</ul>
+      </li>,
+    ];
+  });
 
   const title = openDim ? openDim.label : "Filters";
 
   if (typeof document === "undefined") return null;
 
+  const resetOpenDim = openDim && isDimensionActive(openDim, filters) && (
+    <button type="button" onClick={() => onChange(resetDim(openDim, filters))} className={`${RESET_LINK} px-3 py-2`}>
+      Reset
+    </button>
+  );
+  const showButton = (cls: string) => (
+    <button
+      type="button"
+      onClick={apply}
+      className={`${cls} text-sm ${PRIMARY_BUTTON}`}
+      aria-busy={pending || undefined}
+      data-filter-sheet-show={shown ?? ""}
+    >
+      <span aria-live="polite" className={`tabular-nums transition-opacity ${pending ? "opacity-60" : ""}`}>
+        {showLabel}
+      </span>
+    </button>
+  );
+
+  // The panel's slot can go while it closes (a timeline row unmounting).
+  if (inline && !slot) return null;
+  if (inline && slot) {
+    const sectionHead = <h3 className="pb-1 text-xs font-semibold text-rb-500 dark:text-rb-400/75">{SECTION_TITLE}</h3>;
+    const columns = section.length === 0 ? "lg:grid-cols-2" : "lg:grid-cols-3";
+    return createPortal(
+      <div
+        ref={panelRef}
+        id={regionId}
+        role="region"
+        aria-labelledby="filter-sheet-title"
+        className="mt-3 rounded-2xl bg-raised p-6 text-foreground dark:bg-rb-900 [&_.overlay-search]:bg-raised! dark:[&_.overlay-search]:bg-rb-900!"
+        data-filter-sheet="inline"
+        data-anatomy="N1.8"
+      >
+        <h2 id="filter-sheet-title" className="pb-4 text-base font-semibold" data-anatomy="N1.8.2">
+          Filters
+        </h2>
+        <div className={`grid gap-y-4 ${columns} lg:divide-x lg:divide-rb-200 dark:lg:divide-rb-800`}>
+          <div className="min-w-0 lg:pr-8">
+            {openDim ? (
+              <>
+                <div className="flex h-12 items-center gap-1 border-b border-rb-200 dark:border-rb-800">
+                  <button
+                    type="button"
+                    onClick={leaveSub}
+                    className={`${CTRL_GHOST} ${CTRL_OFF} size-10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    aria-label="Back to filters"
+                    data-filter-sheet-back=""
+                  >
+                    <ChevronLeft className="w-5 h-5" aria-hidden="true" />
+                  </button>
+                  <h3 className="flex-1 truncate text-sm font-semibold">{openDim.label}</h3>
+                  {resetOpenDim}
+                </div>
+                <div className="-mx-4 max-h-80 overflow-y-auto overscroll-contain">
+                  <DimensionView dim={openDim} filters={filters} onChange={onChange} onPicked={leaveSub} />
+                </div>
+              </>
+            ) : (
+              <ul className={LAST_ROW_OPEN}>{plain.map(dimRow)}</ul>
+            )}
+          </div>
+          {section.length > 0 && (
+            <div className="min-w-0 lg:px-8" data-filter-sheet-section="" data-anatomy="N1.8.10">
+              {sectionHead}
+              <ul className={LAST_ROW_OPEN}>{sectionA.map(dimRow)}</ul>
+            </div>
+          )}
+          <div className="flex min-w-0 flex-col lg:pl-8">
+            {sectionB.length > 0 && (
+              <>
+                {/* The heading's line, kept so the two columns' rows start level. */}
+                <div className="invisible max-lg:hidden" aria-hidden="true">
+                  {sectionHead}
+                </div>
+                <ul className={LAST_ROW_OPEN}>{sectionB.map(dimRow)}</ul>
+              </>
+            )}
+            <div className="mt-auto flex items-center justify-end gap-4 pt-6" data-anatomy="N1.8.8">
+              {anyActive && (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className={`${RESET_LINK} px-3 py-2`}
+                  data-filter-sheet-clear=""
+                >
+                  Reset
+                </button>
+              )}
+              {showButton("h-11 px-6")}
+            </div>
+          </div>
+        </div>
+      </div>,
+      slot,
+    );
+  }
+
   return createPortal(
-    <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col justify-end sm:hidden">
+    <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col justify-end">
       {/* The scrim: a press on it closes the sheet and drops the draft. */}
       <div className="absolute inset-0 bg-[var(--backdrop-bg)]" onClick={() => closeSheet()} aria-hidden="true" />
       <div
@@ -438,15 +767,7 @@ function Sheet<F>({
           <h2 id="filter-sheet-title" className="flex-1 truncate text-base font-semibold">
             {title}
           </h2>
-          {openDim && isDimensionActive(openDim, filters) && (
-            <button
-              type="button"
-              onClick={() => onChange(resetDim(openDim, filters))}
-              className={`${RESET_LINK} px-3 py-2`}
-            >
-              Reset
-            </button>
-          )}
+          {resetOpenDim}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -455,55 +776,7 @@ function Sheet<F>({
               <DimensionView dim={openDim} filters={filters} onChange={onChange} onPicked={leaveSub} />
             </SwipeBack>
           ) : (
-            <ul className="px-4">
-              {dims.map((dim) => (
-                <li key={dim.id} className="border-b border-rb-200 dark:border-rb-800">
-                  {dim.pinned?.(filters) ? (
-                    // Fixed from outside (a search naming a market): its choice
-                    // as plain text, with nothing to pick.
-                    <div
-                      className="flex w-full min-h-14 items-center gap-3 py-3"
-                      data-filter-sheet-row={dim.id}
-                      data-filter-sheet-pinned=""
-                    >
-                      <span className="text-sm">{dim.label}</span>
-                      <span className="ml-auto truncate text-sm font-medium text-foreground">
-                        {currentChoice(dim, filters)}
-                      </span>
-                    </div>
-                  ) : isToggle(dim) ? (
-                    <ToggleRow dim={dim} filters={filters} onChange={onChange} />
-                  ) : isSegmented(dim) ? (
-                    <SegmentRow dim={dim} filters={filters} onChange={onChange} />
-                  ) : dim.cardinality === "range" ? (
-                    <RangeRow
-                      dim={dim}
-                      filters={filters}
-                      // A delayed slider write lands on the newest draft, so it
-                      // never undoes an edit made in another row meanwhile.
-                      onChange={(next) => onChange(dim.set(draftRef.current, dim.get(next)))}
-                      flushRef={flushFor(dim.id)}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => openSub(dim.id)}
-                      className="flex w-full min-h-14 items-center gap-3 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                      data-filter-sheet-row={dim.id}
-                      data-anatomy="N1.8.3"
-                    >
-                      <span className="text-sm">{dim.label}</span>
-                      <span
-                        className={`ml-auto truncate text-sm ${isDimensionActive(dim, filters) ? "text-foreground font-medium" : "text-rb-500"}`}
-                      >
-                        {currentChoice(dim, filters)}
-                      </span>
-                      <ChevronRight className="w-4 h-4 shrink-0 text-rb-500" aria-hidden="true" />
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <ul className="px-4">{listItems}</ul>
           )}
         </div>
 
@@ -521,17 +794,7 @@ function Sheet<F>({
           >
             Reset
           </button>
-          <button
-            type="button"
-            onClick={apply}
-            className={`flex-1 h-12 text-sm ${PRIMARY_BUTTON}`}
-            aria-busy={pending || undefined}
-            data-filter-sheet-show={shown ?? ""}
-          >
-            <span aria-live="polite" className={`tabular-nums transition-opacity ${pending ? "opacity-60" : ""}`}>
-              {showLabel}
-            </span>
-          </button>
+          {showButton("flex-1 h-12")}
         </div>
       </div>
     </div>,
@@ -595,7 +858,9 @@ function SegmentRow<F>({
   const options = dim.options.map((o) => ({ value: o.value as string | null, label: o.label }));
   const segments = preset ? options : [{ value: null as string | null, label: "Any" }, ...options];
   const picked = segments.findIndex((s) => s.value != null && cur.includes(s.value));
-  const at = preset ? Math.max(picked, 0) : isDimensionActive(dim, filters) ? picked : 0;
+  // A value outside the segments (the queue link's link-only Open) checks
+  // none of them; the first still takes the Tab stop.
+  const at = preset ? picked : isDimensionActive(dim, filters) ? picked : 0;
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const pick = (i: number) => {
     const v = segments[i].value;
@@ -633,7 +898,7 @@ function SegmentRow<F>({
               type="button"
               role="radio"
               aria-checked={on}
-              tabIndex={on ? 0 : -1}
+              tabIndex={i === Math.max(at, 0) ? 0 : -1}
               onClick={() => pick(i)}
               className={`flex-auto h-10 whitespace-nowrap rounded-md px-3 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                 on

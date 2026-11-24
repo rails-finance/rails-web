@@ -20,7 +20,13 @@ import { useRouter } from "next/navigation";
 import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
 import { WalletHeader } from "@/components/wallet/wallet-header";
 import { WalletFilterBar } from "@/components/wallet/wallet-filter-bar";
-import { walletProtocol, type WalletKind, type WalletStatus } from "@/lib/wallet/wallet-filters";
+import {
+  walletProtocol,
+  WALLET_KINDS,
+  WALLET_STATUSES,
+  type WalletKind,
+  type WalletStatus,
+} from "@/lib/wallet/wallet-filters";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { WalletLookup } from "@/components/shared/wallet-lookup";
@@ -47,12 +53,13 @@ import type { CowWalletEntry } from "@/lib/cow/types";
 import type { WalletFamilyRead, WalletRead } from "@/lib/wallet/types";
 import { WALLET_COUNTS_SCOPE } from "@/lib/wallet/summary-counts";
 import {
-  byRisk,
+  closestToLiquidation,
   DUST_USD,
   unreadAtHead,
   walletNet,
   walletSections,
   walletTotal,
+  andList,
   type WalletSection,
   type WalletTotal,
 } from "@/lib/wallet/wallet-sections";
@@ -97,9 +104,18 @@ const across = (t: WalletTotal | null) => (t?.figure ? `across ${plural(t.of, "p
 
 /** The wallet's totals (W2): each figure the sum of the protocol sections'
  *  figures below it, with its receipt. */
-function Totals({ sections, filtered }: { sections: WalletSection[]; filtered: boolean }) {
-  const coll = walletTotal(sections, "collateral");
-  const debt = walletTotal(sections, "debt");
+function Totals({
+  sections,
+  filtered,
+  unanswered,
+}: {
+  sections: WalletSection[];
+  filtered: boolean;
+  /** What the listing reads that did not answer read. */
+  unanswered: string[];
+}) {
+  const coll = walletTotal(sections, "collateral", unanswered);
+  const debt = walletTotal(sections, "debt", unanswered);
   const net = walletNet(coll, debt);
   // Each reason a total is absent, said once under the row.
   const gaps = [...new Set([coll?.gap, debt?.gap].filter((g): g is string => g != null))];
@@ -109,10 +125,7 @@ function Totals({ sections, filtered }: { sections: WalletSection[]; filtered: b
   const rated = owing.filter((p) => p.debtRate != null);
   const ratedUsd = rated.reduce((s, p) => s + p.debtUsd!, 0);
   const rate = ratedUsd > 0 ? rated.reduce((s, p) => s + p.debtUsd! * p.debtRate!, 0) / ratedUsd : null;
-  const closest = sections
-    .flatMap((s) => s.ranked)
-    .filter((p) => p.buffer != null && p.riskFigure)
-    .sort(byRisk)[0];
+  const closest = closestToLiquidation(sections);
   return (
     <section aria-label="Totals" data-wallet-tiles="" data-anatomy="W2">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -152,7 +165,8 @@ function Totals({ sections, filtered }: { sections: WalletSection[]; filtered: b
         ))
       ) : (
         <p className="mt-2 text-xs text-rb-500">
-          {filtered ? "The positions shown" : "Each protocol’s total below"}, summed in dollars at its own oracle.
+          {filtered ? "The positions shown" : "Each protocol’s total below"}, summed in dollars at the sources each
+          receipt names.
         </p>
       )}
     </section>
@@ -260,6 +274,34 @@ function Trades({ address, cow }: { address: string; cow: Promise<CowWalletEntry
 
 const familyChain = (r: WalletFamilyRead) => `${r.name} on ${chainMeta(r.chain).name}`;
 
+/** An ENS name that resolves to no address: the page's heading names it and
+ *  the empty state's body says so, with the lookup to try another. */
+export function WalletUnresolved({ name, back }: { name: string; back: { href: string; name: string } | null }) {
+  return (
+    <div className="flex flex-col gap-7 py-8" data-wallet-unresolved={name}>
+      <WalletHeader address={null} ensName={name} />
+      <section className="flex max-w-xl flex-col gap-3" data-wallet-empty="">
+        <p className="text-sm text-foreground/80" data-wallet-reads="">
+          {name} resolves to no address, so there is no wallet to read.
+        </p>
+        {back && (
+          <p className="text-sm">
+            <Link
+              href={back.href}
+              className="text-foreground underline underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
+              data-wallet-back=""
+            >
+              Back to {back.name}
+            </Link>
+          </p>
+        )}
+        <WalletLookup positionHref={(w) => `/wallet/${w}`} placeholder="Wallet address or ENS name" />
+        <StartHereLine />
+      </section>
+    </div>
+  );
+}
+
 export function WalletView({
   address,
   ensName,
@@ -297,11 +339,13 @@ export function WalletView({
   const byKind = kinds.length > 0;
   const focused = scoped.on && !scoped.peek;
   const filtered = focused || byKind || status != null;
-  const all = scoped.rows.filter(
-    (p) =>
-      (!byKind || (p.kind != null && kinds.includes(p.kind))) &&
-      (status == null || (status === "open") === (p.status === "open")),
-  );
+  const narrow = (k: WalletKind[], s: WalletStatus | undefined) =>
+    scoped.rows.filter(
+      (p) =>
+        (k.length === 0 || (p.kind != null && k.includes(p.kind))) &&
+        (s == null || (s === "open") === (p.status === "open")),
+    );
+  const all = narrow(kinds, status);
   const chosen = walletProtocol(read.protocol);
   // The heading counts the wallet's positions whatever the pills hold.
   const wallet = {
@@ -310,11 +354,18 @@ export function WalletView({
     closed: scoped.rows.filter((p) => p.status !== "open" && p.status !== "moved").length,
   };
   // The bands state a protocol's whole holding: drawn while no pill narrows it.
-  const sections = walletSections(all, { bands: !filtered });
+  // The listing reads that did not answer (read-wallet.ts, readListingRows).
+  const unanswered = read.families.flatMap((r) => (r.unanswered ? [r.unanswered] : []));
+  const missing = unanswered.map((u) => u.what);
+  // The reads that stop the wallet total (`total: false` stops none).
+  const blocking = unanswered.filter((u) => u.total !== false).map((u) => u.what);
+  const sections = walletSections(all, { bands: !filtered, unanswered });
   const open = sections.flatMap((s) => s.open);
   const scope = useAssetScope();
   // Under Focus, only the families on a chain in focus.
-  const unread = read.families.filter((r) => r.headRead === "failed" && (!focused || scope.chainOk(r.chain)));
+  const unread = read.families.filter(
+    (r) => r.headRead === "failed" && !r.unanswered && (!focused || scope.chainOk(r.chain)),
+  );
   const stamps = open.map((p) => p.readAt).filter((t): t is number => t != null);
   const oldest = stamps.length ? Math.min(...stamps) : undefined;
   const registry = useReceiptRegistry();
@@ -329,11 +380,16 @@ export function WalletView({
       address={address}
       protocol={read.protocol}
       held={read.held}
+      statuses={WALLET_STATUSES.map((s) => s.value).filter((s) =>
+        scoped.rows.some((p) => (s === "open") === (p.status === "open")),
+      )}
+      offered={WALLET_KINDS.map((k) => k.value).filter((k) => scoped.rows.some((p) => p.kind === k))}
       kinds={kinds}
       setKinds={setKinds}
       status={status}
       setStatus={setStatus}
       shown={all.length}
+      countFor={(k, s) => narrow(k, s).length}
       navigate={navigate}
     />
   );
@@ -342,6 +398,8 @@ export function WalletView({
       className={`flex flex-col gap-7 transition-opacity ${reading ? "pointer-events-none opacity-50" : ""}`}
       aria-busy={reading || undefined}
       data-wallet-reading={reading ? "" : undefined}
+      // What the filter bar narrows: its open panel sets this back.
+      data-filters-results=""
     >
       {children}
     </div>
@@ -435,7 +493,11 @@ export function WalletView({
             {body(
               <>
                 <section className="flex max-w-xl flex-col gap-3" data-wallet-empty="">
-                  {chosen ? (
+                  {missing.length > 0 ? (
+                    <p className="text-sm text-foreground/80" data-wallet-unanswered="">
+                      {andList(missing)} could not be read.
+                    </p>
+                  ) : chosen ? (
                     <p className="text-sm text-foreground/80" data-wallet-reads="">
                       Rails holds no {chosen.name} position for this wallet.
                     </p>
@@ -467,10 +529,15 @@ export function WalletView({
             {filterBar}
             {body(
               <>
-                {open.length > 0 && <Totals sections={sections} filtered={filtered} />}
+                {open.length > 0 && <Totals sections={sections} filtered={filtered} unanswered={blocking} />}
                 {sections.map((s) => (
                   <Section key={s.slug} s={s} />
                 ))}
+                {/* What the filter bar leaves shown, with its noun: the bar
+                    draws no count (ui-jobs 801; Miles, 22 Nov 2026). */}
+                <p className="text-sm text-rb-500" data-wallet-shown={all.length} data-prov-exempt="">
+                  {plural(all.length, status ? `${status} position` : "position")}
+                </p>
                 {trades}
               </>,
             )}
@@ -483,6 +550,11 @@ export function WalletView({
           <ArbitrumNote address={address} />
         )}
 
+        {missing.length > 0 && all.length > 0 && (
+          <p className="text-xs text-rb-500" data-wallet-unanswered="">
+            {andList(missing)} could not be read.
+          </p>
+        )}
         {unread.length > 0 && (
           <p className="text-xs text-rb-500" data-wallet-unread={unread.map((r) => r.id).join(",")}>
             Not read at head: {unread.map(familyChain).join(", ")}. Their cards show the stored figures.

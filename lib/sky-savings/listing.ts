@@ -3,20 +3,21 @@
 // sorts and pages the holders; the dimensions here carry a URL param and no
 // in-memory predicate.
 //
-// Facets: Status (open / closed, multi) and Transactions (the holder's distinct
-// transactions, sent as minTx / maxTx). The resting default is the open
-// positions while browsing and both once the search names a wallet, so a
-// holder that has left still answers a lookup. Sorts: value (the default),
+// Facets: Status (Open / Closed / All, ui-jobs 805; lib/sky-savings/listing-visibility.ts)
+// and Transactions (the holder's distinct transactions, sent as minTx / maxTx). Sorts: value (the default),
 // interest earned, last activity, events. Search: an address, or an ENS name
 // resolved through this deployment's resolver.
 
 import { resolveEnsViaApi } from "@/lib/shared/listing-search";
-import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import { RECENT_ACTIVITY_LABEL } from "@/components/shared/filter-bar/sort-control";
 import type { BaseListFilters, SerializableDimension } from "@/lib/shared/list-filter";
 import type { SkyAsOf, SkyPosition, SkyPositionsPage } from "@/lib/sky-savings/types";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
+import { defaultStatusChoice, parseSkySearch, statusChoice } from "@/lib/sky-savings/listing-visibility";
+
+export { parseSkySearch };
 
 /** The Transactions slider's top. The busiest holder is a router with 164,075
  *  transactions and the 99th percentile is 279 (21 Oct 2026), so a top at the
@@ -52,6 +53,7 @@ export type SkyListRow = SkyPosition & { asOf: SkyAsOf; counts?: SkyListCounts }
 export const SKY_ITEMS_PER_PAGE = 20;
 
 export interface SkyListFilters extends BaseListFilters {
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
@@ -66,51 +68,20 @@ export const skySortOptions: SortOption[] = [
   { value: "events", label: "Events" },
 ];
 
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-];
-const ALL = ["open", "closed"];
-
-/** An address or an ENS name in the search box. Anything else filters nothing. */
-export function parseSkySearch(q: string): { address?: string; ens?: string } {
-  const v = q.trim();
-  if (/^0x[a-fA-F0-9]{40}$/.test(v)) return { address: v.toLowerCase() };
-  if (v.toLowerCase().endsWith(".eth")) return { ens: v };
-  return {};
-}
-
-const namesWallet = (q: string | undefined) => {
-  const s = parseSkySearch(q ?? "");
-  return Boolean(s.address ?? s.ens);
-};
-
-const canonical = (v: string[]) => ALL.filter((s) => v.includes(s));
-const defaultStatuses = (f: SkyListFilters) => (namesWallet(f.q) ? ALL : ["open"]);
-export const effectiveStatuses = (f: SkyListFilters) => {
-  const sel = canonical(f.status);
-  return sel.length > 0 ? sel : defaultStatuses(f);
-};
-
 export function skyListDimensions(): SerializableDimension<SkyListFilters>[] {
   return [
     {
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
-      set: (f, v) => {
-        const sel = canonical(v);
-        const def = defaultStatuses(f);
-        const same = sel.length === def.length && sel.every((s) => def.includes(s));
-        return { ...f, status: sel.length === 0 || same ? [] : sel };
-      },
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses (ui-jobs 805).
+      set: (f, v) => ({ ...f, status: setStatusChoice(v, defaultStatusChoice(f), []).status }),
     },
     transactionsDimension<SkyListFilters>({
       get: (f) => f.tx,
@@ -128,22 +99,24 @@ export class SkyGateError extends Error {
 }
 
 /** One page and the index's total for the selection. Throws SkyGateError when
- *  the answer's gate is not ok, so the driver draws the refusal and no row. */
+ *  the answer's gate is not ok, so the driver draws the refusal and no row.
+ *  `limit` is the page size; a draft's count asks for one row. */
 export async function fetchSkyListingPage(
   filters: SkyListFilters,
   page: number,
   baseUrl?: string,
   signal?: AbortSignal,
   headers?: HeadersInit,
+  limit: number = SKY_ITEMS_PER_PAGE,
 ): Promise<{ data: SkyListRow[]; total: number }> {
   const qs = new URLSearchParams();
-  const statuses = effectiveStatuses(filters);
-  qs.set("status", statuses.length === 2 ? "all" : statuses[0]);
+  // The route takes open, closed or all, and rests an absent one on open.
+  qs.set("status", statusChoice(filters));
   const sortBy = skySortOptions.some((o) => o.value === filters.sortBy) ? filters.sortBy : "value";
   qs.set("sortBy", sortBy);
   qs.set("sortOrder", filters.sortOrder);
-  qs.set("limit", String(SKY_ITEMS_PER_PAGE));
-  qs.set("offset", String((page - 1) * SKY_ITEMS_PER_PAGE));
+  qs.set("limit", String(limit));
+  qs.set("offset", String((page - 1) * limit));
   const { minTx, maxTx } = transactionBounds(filters.tx);
   if (minTx != null) qs.set("minTx", String(minTx));
   if (maxTx != null) qs.set("maxTx", String(maxTx));

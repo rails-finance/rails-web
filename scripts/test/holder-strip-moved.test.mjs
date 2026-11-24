@@ -94,7 +94,7 @@ test("Polaris: 15 held and 10 moved over a page of 20 is a slice, stated as 15 h
   const s = polarisHolderStrip(page, 25, board, 20, 10);
   assert.equal(s.truncated, true);
   assert.equal(s.countsLine, "This wallet holds 15 positions.");
-  assert.match(s.note, /this one holds 15\./);
+  assert.match(s.note, /this wallet holds 15 positions\./);
 });
 
 test("Polaris: a whole answer leaves the moved CDPs out of the counts", () => {
@@ -110,7 +110,7 @@ test("Liquity V2: the same truncation on the answer's total", () => {
   ];
   const s = liquityV2HolderStrip(page, 25, prices, 20, 10);
   assert.equal(s.truncated, true);
-  assert.equal(s.countsLine, "This wallet holds 15 troves.");
+  assert.equal(s.countsLine, "This wallet holds 15 Troves.");
   const whole = liquityV2HolderStrip([trove("1"), trove("2", true)], 2, prices, 20, 1);
   assert.equal(whole.truncated, false);
   assert.equal(whole.counts.open, 1);

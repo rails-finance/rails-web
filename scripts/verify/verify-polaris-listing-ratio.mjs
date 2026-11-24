@@ -468,10 +468,14 @@ await page7.close();
   );
 
   const page8 = await openListing(context, `${BASE}/sepolia/polaris?market=usdp&sortBy=ratio&sortOrder=asc`);
-  // The sort is one pill (N1.3, ui-jobs 681), found by its hook: its text is
-  // the key's label.
+  // The sort is one pill (N1.3, ui-jobs 681), found by its hook. The resting
+  // sort draws its arrow alone (ui-jobs 801), so the key's label is read from
+  // the accessible name, "Sort: Ratio, ascending".
   const readSortLabel = (page) =>
-    page.evaluate(() => document.querySelector("[data-sort-pill]")?.textContent?.trim() ?? "");
+    page.evaluate(() => {
+      const name = document.querySelector("[data-sort-pill]")?.getAttribute("aria-label") ?? "";
+      return /^Sort: (.+), (?:ascending|descending)$/.exec(name)?.[1] ?? "";
+    });
   const sortLabel = await readSortLabel(page8);
   check("8c. the sort control reads Ratio with a market chosen", sortLabel === "Ratio", `"${sortLabel}"`);
   const cards8 = await readCards(page8);
@@ -504,8 +508,9 @@ await page7.close();
 }
 
 // ── 9. the Debt facet is the Borrowing / Collateral-only pair, and there is no
-//       History facet (server 53dbf65 + web: "ever liquidated" is the Status
-//       bucket on Polaris — the NFT is burned, the id never reused). ─────────
+//       History facet (server 53dbf65 + web: "ever liquidated" is Closed with
+//       the "Closed by liquidation" switch on Polaris, ui-jobs 805 — the NFT is
+//       burned, the id never reused). ─────────────────────────────────────────
 {
   const all = await api("/api/polaris/positions?status=open&limit=1");
   const borrowing = await api("/api/polaris/positions?status=open&hasDebt=1&limit=1");

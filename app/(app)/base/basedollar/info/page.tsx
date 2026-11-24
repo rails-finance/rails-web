@@ -8,6 +8,7 @@ import Link from "next/link";
 import { ProtocolInfoPage, GlossaryLink, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { forkSpInfoView } from "@/lib/liquity-fork/sp-info-view";
 import { fmtLtv } from "@/lib/liquity/ltv";
 
 export const metadata = infoMetadata("basedollar");
@@ -108,6 +109,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "Listing",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>Each row is one Trove, with its collateral, its BD debt and the interest rate its borrower chose.</li>
@@ -127,6 +129,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Trove page",
+    section: "positions",
     body: (
       <p>
         The Trove page shows one Trove&apos;s collateral and debt, and a timeline lists each event on that Trove, newest
@@ -136,6 +139,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Branches page",
+    section: "branches",
     body: (
       <p>
         The branches page shows one card for each of the five branches, with its price, its size and the range of
@@ -148,6 +152,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
       </p>
     ),
   },
+  forkSpInfoView("basedollar"),
 ];
 
 export default function InfoPage() {

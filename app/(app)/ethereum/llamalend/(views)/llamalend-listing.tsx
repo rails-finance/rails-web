@@ -9,6 +9,7 @@
 // literally the protocol's grain: each controller is an isolated market
 // liquidated independently. keyFor is the pair for the same reason.
 
+import { llamalendCountLine } from "@/lib/llamalend/listing-visibility";
 import type { LlamalendPositionSummary } from "@/lib/sources/api/llamalend-positions";
 import { fetchLlamalendPositions } from "@/lib/api/fetch-llamalend-positions";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
@@ -34,6 +35,7 @@ export function LlamalendListing({ initialItems, initialTotal, initialKey, initi
     <ChainTruthListingPage<LlamalendPositionSummary, LlamalendListFilters>
       title="LlamaLend Positions"
       noun="positions"
+      countLine={llamalendCountLine}
       basePath="/ethereum/llamalend"
       defaults={LLAMALEND_LIST_DEFAULTS}
       sortOptions={LLAMALEND_SORT_OPTIONS}
@@ -49,6 +51,11 @@ export function LlamalendListing({ initialItems, initialTotal, initialKey, initi
             data: r.data,
             total: r.pagination.total,
           })),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchLlamalendPositions({ ...llamalendFiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

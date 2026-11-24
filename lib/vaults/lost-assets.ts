@@ -1,6 +1,6 @@
 // A MetaMorpho V1.1 vault whose total includes lost assets (rails-ops ui-jobs
 // 543, Miles's ruling of 8 Nov 2026): the test, the held figure and the words,
-// shared by the index, the rosters and the vault page.
+// shared by the rosters and the vault page.
 // ----------------------------------------------------------------------------
 // V1.1's `totalAssets()` is the markets' expected supply plus `lostAssets()`,
 // and the share price is not lowered for the loss. A vault carries the

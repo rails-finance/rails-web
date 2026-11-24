@@ -50,6 +50,7 @@ export default function InfoPage() {
       views={[
         {
           heading: "Listing",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>
@@ -70,6 +71,7 @@ export default function InfoPage() {
         },
         {
           heading: "Position page",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>
@@ -88,6 +90,7 @@ export default function InfoPage() {
         },
         {
           heading: "System page",
+          section: "system",
           body: (
             <p>
               The system page shows the ZCHF supply, the equity and reserve behind it, the base rate and the opening

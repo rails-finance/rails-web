@@ -23,6 +23,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
   const read = await readWallet(address.toLowerCase(), readerIpFromRequest(request));
   if (read.error) return NextResponse.json(read, { status: 502, headers: { "Cache-Control": "no-store" } });
+  // Part of the wallet (a listing read did not answer): served, never kept.
+  if (read.partial) return NextResponse.json(read, { headers: { "Cache-Control": "no-store" } });
   return NextResponse.json(read, {
     headers: { "Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=60" },
   });

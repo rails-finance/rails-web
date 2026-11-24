@@ -139,10 +139,10 @@ export function FxPositionExplanation({
     lead = v.everLiquidated ? (
       <>
         This position is closed after <H>{v.liquidationCount}</H> liquidation
-        {v.liquidationCount === 1 ? "" : "s"} . The pool&rsquo;s figures stand at zero collateral and zero fxUSD debt:
+        {v.liquidationCount === 1 ? "" : "s"} . The pool&rsquo;s figures stand at zero collateral and zero fxUSD debt.
       </>
     ) : (
-      <>This position is closed. The pool&rsquo;s figures stand at zero collateral and zero fxUSD debt:</>
+      <>This position is closed. The pool&rsquo;s figures stand at zero collateral and zero fxUSD debt.</>
     );
 
     if (hasEvents) {
@@ -209,11 +209,11 @@ export function FxPositionExplanation({
     // ── the pending mood: the pool's own figure hasn't arrived ──────────────
     lead =
       implied > 0 ? (
-        <>This position is borrowing fxUSD, with the pool&rsquo;s current figures still to arrive:</>
+        <>This position is borrowing fxUSD, with the pool&rsquo;s current figures still to arrive.</>
       ) : (
         <>
           This position&rsquo;s events show no outstanding fxUSD debt, and the pool&rsquo;s current figures are still to
-          arrive:
+          arrive.
         </>
       );
 
@@ -252,7 +252,7 @@ export function FxPositionExplanation({
           <H>
             <AmountText value={debts} format="compact" /> fxUSD
           </H>{" "}
-          of debt:
+          of debt.
         </>
       ) : colls != null ? (
         <>
@@ -260,7 +260,7 @@ export function FxPositionExplanation({
           <H>
             <AmountText value={colls} format="compact" /> {v.normalizedSymbol}
           </H>{" "}
-          of collateral and owes nothing:
+          of collateral and owes nothing.
         </>
       ) : (
         <>
@@ -268,7 +268,7 @@ export function FxPositionExplanation({
           <H>
             <AmountText value={debts} format="compact" /> fxUSD
           </H>
-          :
+          .
         </>
       );
 

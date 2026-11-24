@@ -20,13 +20,13 @@
 
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { SubPageHeader } from "@/components/shared/sub-page-header";
-import { morphoVaultCardContent } from "@/lib/vaults/card-words";
+import { RailHeader } from "@/components/shared/rail-header";
 import { VaultDirectoryView } from "@/components/vaults/vault-directory-view";
 import { loadMetaMorphoVaultDirectory } from "@/lib/sources/chain/morpho-base-vault-directory";
 import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
 import { ssrHop } from "@/lib/shared/listing-ssr";
 import { protocolForPathname } from "@/lib/shared/protocols";
+import { chainMeta } from "@/lib/shared/chains";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import type { MetaMorphoChainId } from "@/lib/metamorpho/vault-roster";
 import { morphoBaseVaultSummaries, withAssetScale } from "@/lib/vaults/summary";
@@ -76,7 +76,11 @@ export async function MetaMorphoRosterPage({
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader protocol={protocol} title="Vaults" learnMore={morphoVaultCardContent()} />
+        {/* The rail alone, as on IPOR Fusion's roster (ui-jobs 771); the h1 is for screen readers. */}
+        <header className="mb-5" data-skel-section="page-header">
+          <RailHeader session={protocol.session} venue="subPage" />
+          <h1 className="sr-only">MetaMorpho vaults{chainId === 1 ? "" : ` on ${chainMeta(chainId).name}`}</h1>
+        </header>
 
         {/* `data-roster-panel` marks the rows for the readers that hold them to
             the chain. The view states a refused read in words, so this is never
@@ -91,8 +95,6 @@ export async function MetaMorphoRosterPage({
             readBy={serverReadOf(data)}
             chainStale={data.chainStale}
             catalogSize={data.catalogSize}
-            censusBlock={data.censusBlock}
-            withCensus={census.length > 0}
           />
         </div>
 

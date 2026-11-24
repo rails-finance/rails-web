@@ -4,7 +4,7 @@ import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metad
 import { getCoveredPositions } from "@/lib/home/covered-positions-data";
 import { getHomeStats } from "@/lib/home/home-stats-data";
 import { getValueHeld } from "@/lib/home/value-held-data";
-import { CoveredCaption } from "@/components/home/covered-stats";
+import { CoveredCaption, CoveredClaim } from "@/components/home/covered-stats";
 import { FiguresBody } from "@/components/about/figures-body";
 import { IndexNotice } from "@/components/shared/index-notice";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
@@ -47,7 +47,11 @@ export default async function FiguresPage() {
       </h1>
 
       {covered ? (
-        <FiguresBody value={valueHeld} caption={<CoveredCaption covered={covered} stats={stats} />} />
+        <FiguresBody
+          value={valueHeld}
+          claim={<CoveredClaim covered={covered} valueHeld={valueHeld} />}
+          caption={<CoveredCaption covered={covered} stats={stats} />}
+        />
       ) : (
         <IndexNotice />
       )}

@@ -26,8 +26,16 @@ import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { moveFocus } from "@/components/shared/tools-menu";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
-import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, chainMeta, type ChainId } from "@/lib/shared/chains";
-import { PROTOCOLS, listingHrefForWallet, protocolForPathname } from "@/lib/shared/protocols";
+import {
+  ARBITRUM_CHAIN_ID,
+  ARC_CHAIN_ID,
+  BASE_CHAIN_ID,
+  MAINNET_CHAIN_ID,
+  SEPOLIA_CHAIN_ID,
+  chainMeta,
+  type ChainId,
+} from "@/lib/shared/chains";
+import { menuProtocolOf, protocolEntryOf } from "@/lib/wallet/position-protocol";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import {
   MENU_TESTNETS,
@@ -45,6 +53,8 @@ const CHAIN_ID: Record<WalletCountsChain, ChainId> = {
   ethereum: MAINNET_CHAIN_ID,
   base: BASE_CHAIN_ID,
   arbitrum: ARBITRUM_CHAIN_ID,
+  arc: ARC_CHAIN_ID,
+  sepolia: SEPOLIA_CHAIN_ID,
 };
 
 // One read per address per page load; the route keeps its answer 60 s.
@@ -58,7 +68,7 @@ function readCounts(address: string): Promise<WalletCounts | null> {
       .catch(() => null);
     reads.set(address, read);
     void read.then((c) => {
-      if (!c) reads.delete(address);
+      if (!c || c.partial) reads.delete(address);
     });
   }
   return read;
@@ -66,21 +76,13 @@ function readCounts(address: string): Promise<WalletCounts | null> {
 
 type Menu = NonNullable<ReturnType<typeof walletProtocolMenu<WalletCountsPosition>>>;
 
-/** A position's explorer on the roster: its name, its place, and its listing
- *  searched by the wallet (every wallet family's listing reads `q`). */
-function protocolOf(p: WalletCountsPosition, address: string): MenuProtocol | undefined {
-  const entry = protocolForPathname(p.href.split("?")[0]);
-  if (!entry) return undefined;
-  return { name: entry.label, order: PROTOCOLS.indexOf(entry), listing: listingHrefForWallet(entry.session, address) };
-}
-
 const ROW = "mx-1 my-0.5 flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-left";
 const ROW_LINK = `${ROW} transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]`;
 const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />;
 
 /** The protocol's and the chain's icons, each named for screen readers and on hover. */
 function ProtocolIcons({ p }: { p: WalletCountsPosition }) {
-  const entry = protocolForPathname(p.href.split("?")[0]);
+  const entry = protocolEntryOf(p);
   const protocol = entry?.label ?? p.family;
   const chain = chainMeta(CHAIN_ID[p.chain]).name;
   return (
@@ -131,7 +133,7 @@ export function WalletPositionsMenu({ wallet }: { wallet: string }) {
         walletProtocolMenu(
           c.positions,
           (p) => rowIsPage(p.href, pathname, search),
-          (p) => protocolOf(p, address),
+          (p) => menuProtocolOf(p, address),
           `/wallet/${address}`,
         ),
       );

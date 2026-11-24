@@ -1,13 +1,14 @@
-// The live read behind a Liquity V2 deposit page, as
-// /api/chain/liquity-v2/stability-pool answers it
+// The live read behind a Liquity V2 or fork deposit page, as
+// /api/chain/<deployment>/stability-pool answers it
 // (lib/sources/chain/liquity-v2-sp.ts). Raw integer strings beside the block
 // they were read at; the page scales them.
 
-import type { SpBranch } from "@/lib/liquity-v2/sp-routes";
 import type { DepositChainFigures } from "@/lib/liquity-v2/sp-math";
+import { LIQUITY_V2_SP, type SpDeployment } from "@/lib/liquity-v2/sp-deployment";
 
 export interface LiquityV2DepositChain extends DepositChainFigures {
-  branch: SpBranch;
+  /** The branch symbol, as the routes key it. */
+  branch: string;
   depositor: string;
   blockNumber: number;
   blockTimestamp: number;
@@ -20,8 +21,15 @@ export interface LiquityV2DepositChain extends DepositChainFigures {
   chainStale?: boolean;
 }
 
-export async function fetchLiquityV2DepositChain(branch: SpBranch, depositor: string): Promise<LiquityV2DepositChain> {
-  const url = `/api/chain/liquity-v2/stability-pool?collateralType=${branch}&wallet=${depositor}`;
+/** The deployment's chain read (`dep.chainApi`), Liquity V2's by default. A
+ *  fork's collateral figures and price come back in 1e18
+ *  (lib/liquity-v2/sp-decimals.ts). */
+export async function fetchLiquityV2DepositChain(
+  branch: string,
+  depositor: string,
+  dep: SpDeployment = LIQUITY_V2_SP,
+): Promise<LiquityV2DepositChain> {
+  const url = `${dep.chainApi}?collateralType=${branch}&wallet=${depositor}`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`${url} failed: ${res.status}`);
   return (await res.json()) as LiquityV2DepositChain;

@@ -3,11 +3,9 @@
 // Liquity V2 Trove listing — client half. Holds the presentation config (card / href) + the server-driven strategy and hands them to the shared
 // ChainTruthListingPage driver along with the SSR first-paint data from page.tsx.
 // The driver owns the toolbar, pagination, debounced search, URL and the fetch
-// lifecycle; this file is just the V2-specific config plus the two pieces of
-// interpretation the driver models through opt-in seams:
-//   • the oracle-price side-fetch (USD on the open cards) → passed into renderCard,
-//   • the wallet-view dispatch (search a wallet ⇒ header pill + recents) → the
-//     driver's onFilters seam, resolving ENS the same way the old body did.
+// lifecycle; this file is just the V2-specific config plus the oracle-price
+// side-fetch (USD on the open cards), passed into renderCard. A search by a
+// whole address or an ENS name opens the wallet page (`walletSearch`, ui-jobs 738).
 //
 // Graduated from the old bespoke TrovesPageContent (decision 0009): the framer
 // entrance, hand-rolled URL encode/decode, manual pagination and direct
@@ -15,24 +13,19 @@
 // the shared driver + useUrlSearchParams replace them, and this now SSR-first-paints
 // like the rest of the tier.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LiquityPositionCard } from "@/components/protocol/liquity-family/liquity-position-card";
+import { useMemo, useState } from "react";
 import { troveWords } from "@/lib/liquity/event-templates";
-import { viewFromTroveSummary } from "@/lib/liquity/trove-card-view";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { useWalletContext } from "@/components/nav/wallet-context";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import { fetchTroves } from "@/lib/api/fetch-troves";
 import type { TroveSummary } from "@/types/api/trove";
-import type { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
-import { HolderStrip } from "@/components/shared/holder-strip";
-import { liquityV2HolderStrip } from "@/lib/liquity-v2/holder-strip";
-import { namesHolder, parseTroveSearch } from "@/lib/liquity-v2/search";
-import { isAllStatuses } from "@/lib/liquity-v2/listing-visibility";
+import { liquityV2TroveCard, liquityV2TroveHref, liquityV2TroveKey } from "@/lib/liquity-v2/listing-cards";
+import { useLiquityV2Prices } from "@/hooks/useLiquityV2Prices";
 import { useLiquityV2BranchCcr } from "@/hooks/useLiquityV2BranchCcr";
 import { BranchCcrNotice } from "@/components/protocol/liquity/branch-ccr-notice";
 import { normalizeCcrBranch } from "@/lib/liquity-v2/branch-ccr";
+import { troveCountLine } from "@/lib/liquity-v2/listing-visibility";
 import {
   liquityV2ListDimensions,
   liquityV2FiltersToFetchParams,
@@ -46,40 +39,14 @@ import {
 export interface LiquityV2ListingProps {
   initialItems?: TroveSummary[];
   initialTotal?: number;
-  /** Of `initialTotal`, the Troves the searched wallet passed on (ui-jobs 705). */
-  initialPassedOn?: number;
   initialKey?: string;
   initialSearch?: string;
 }
 
-export function LiquityV2Listing({
-  initialItems,
-  initialTotal,
-  initialPassedOn = 0,
-  initialKey,
-  initialSearch,
-}: LiquityV2ListingProps) {
-  // Oracle prices — a one-time side-fetch (USD on the open cards is an interpreted
-  // layer). When it lands the config re-renders and renderCard closes over the new
-  // value; it's outside the driver's fetch lifecycle, so it never triggers a
-  // listing refetch. Best-effort: the cards render without USD until it resolves.
-  const [prices, setPrices] = useState<OraclePricesData | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/oracle/liquity-v2");
-        if (!res.ok) return;
-        const json = (await res.json()) as OraclePricesResponse;
-        if (!cancelled && json.success && json.data) setPrices(json.data);
-      } catch {
-        /* prices are an optional enhancement — the listing still loads */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initialSearch }: LiquityV2ListingProps) {
+  // The branch prices: USD on the open cards. Outside the driver's fetch
+  // lifecycle, so its landing never refetches the listing.
+  const prices = useLiquityV2Prices();
 
   // The branches against their CCR (ui-jobs 747): a branch the listing is
   // narrowed to draws its Safety Mode notice above the rows. The read runs
@@ -98,110 +65,40 @@ export function LiquityV2Listing({
     [],
   );
 
-  // Wallet-view dispatch: when the search resolves to an identity, surface it in
-  // the header pill + recents (the listing doubles as the wallet view). ENS is
-  // forward-resolved for the pill; the /api/troves proxy resolves independently
-  // for the query itself. Guarded by the last identity so a page/sort change (which
-  // re-fires onFilters with the same q) doesn't re-dispatch or re-resolve.
-  const { setWallets } = useWalletContext();
-  const lastIdentityRef = useRef<string | null>(null);
-  // The last answer's count of Troves the searched wallet passed on: the
-  // holder strip leaves them out of the wallet's total (ui-jobs 705).
-  const passedOn = useRef(initialPassedOn);
-  const onFilters = useCallback(
-    (f: LiquityV2ListFilters) => {
-      setCollateralFacet((f.collateralTypes?.length ?? 0) > 0);
-      const { ownerAddress, ownerEns } = parseTroveSearch(f.q);
-      const key = (ownerAddress ?? ownerEns ?? "").toLowerCase();
-      if (lastIdentityRef.current === key) return;
-      lastIdentityRef.current = key;
-      if (ownerAddress) {
-        const lower = ownerAddress.toLowerCase();
-        setWallets([lower], { [lower]: null });
-        return;
-      }
-      if (ownerEns) {
-        (async () => {
-          try {
-            const res = await fetch(`/api/ens/resolve?name=${encodeURIComponent(ownerEns)}`);
-            if (!res.ok) return;
-            const { address } = (await res.json()) as { address: string | null };
-            if (!address) return;
-            const lower = address.toLowerCase();
-            setWallets([lower], { [lower]: ownerEns });
-          } catch {
-            /* best-effort — the listing still loads via the proxy */
-          }
-        })();
-      }
-    },
-    [setWallets],
-  );
-
-  // The wallet's strip above the rows.
-  const holderStrip = (items: TroveSummary[], total: number, filters: LiquityV2ListFilters) =>
-    // The strip is a statement about a WALLET, so it mounts only where the
-    // page IS that wallet's own set: the search names a holder, the status
-    // selection is the relaxed default a holder search rests on, and no
-    // facet has narrowed the rows further. Tick a facet and the page is a
-    // subset of the wallet — counts of the subset said as the wallet's — so
-    // the band goes rather than misstate what it is about. It also needs
-    // the oracle read: three branches hold three different tokens, and
-    // without a price there is no sum of them to state.
-    namesHolder(filters.q) &&
-    isAllStatuses(filters) &&
-    !filters.collateralTypes?.length &&
-    !filters.hasRedemptions &&
-    !filters.batchOnly &&
-    !filters.individualOnly &&
-    prices ? (
-      <HolderStrip
-        {...liquityV2HolderStrip(
-          items,
-          total,
-          prices,
-          LIQUITY_V2_ITEMS_PER_PAGE,
-          passedOn.current,
-          (() => {
-            const { ownerAddress, ownerEns } = parseTroveSearch(filters.q);
-            return ownerAddress ?? ownerEns;
-          })(),
-        )}
-      />
-    ) : null;
-
   return (
     <ChainTruthListingPage<TroveSummary, LiquityV2ListFilters>
       title={troveWords("listing_title")}
       noun={troveWords("listing_noun")}
+      countLine={(f) => troveCountLine(f, troveWords("listing_noun"))}
       basePath="/ethereum/liquity-v2"
       defaults={LIQUITY_V2_LIST_DEFAULTS}
       sortOptions={LIQUITY_V2_SORT_OPTIONS}
       searchPlaceholder={troveWords("listing_search")}
-      renderCard={(t) => (
-        <LiquityPositionCard protocol="liquity-v2" surface="listing" v={viewFromTroveSummary(t, prices)} compact />
-      )}
-      hrefFor={(t) => `/ethereum/liquity-v2/trove/${t.collateralType}/${t.id}`}
-      keyFor={(t) => `${t.collateralType}-${t.id}`}
+      renderCard={(t) => liquityV2TroveCard(t, prices)}
+      hrefFor={liquityV2TroveHref}
+      keyFor={liquityV2TroveKey}
       strategy={serverStrategy<TroveSummary, LiquityV2ListFilters>({
         dimensions: liquityV2ListDimensions(collateralOptions),
         itemsPerPage: LIQUITY_V2_ITEMS_PER_PAGE,
         fetchPage: (filters, page) =>
-          fetchTroves(liquityV2FiltersToFetchParams(filters, page)).then((r) => {
-            passedOn.current = r.pagination.passedOn ?? 0;
-            return { data: r.data, total: r.pagination.total };
-          }),
+          fetchTroves(liquityV2FiltersToFetchParams(filters, page)).then((r) => ({
+            data: r.data,
+            total: r.pagination.total,
+          })),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchTroves({ ...liquityV2FiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
-      onFilters={onFilters}
-      renderAbove={({ items, total, filters }) => (
-        <>
-          {(filters.collateralTypes ?? []).map((t) => {
-            const b = normalizeCcrBranch(t);
-            return b ? <BranchCcrNotice key={b} state={branchCcr[b]} anatomy="N8·liquity" /> : null;
-          })}
-          {holderStrip(items, total, filters)}
-        </>
-      )}
+      walletSearch="liquity-v2"
+      onFilters={(f) => setCollateralFacet((f.collateralTypes?.length ?? 0) > 0)}
+      renderAbove={({ filters }) =>
+        (filters.collateralTypes ?? []).map((t) => {
+          const b = normalizeCcrBranch(t);
+          return b ? <BranchCcrNotice key={b} state={branchCcr[b]} anatomy="N8·liquity" /> : null;
+        })
+      }
       initialItems={initialItems}
       initialTotal={initialTotal}
       initialKey={initialKey}

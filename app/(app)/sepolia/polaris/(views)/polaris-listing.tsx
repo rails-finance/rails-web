@@ -16,8 +16,8 @@
 // through the driver's onFilters seam, as Liquity V2 does.
 //
 // The one interpretation this listing adds is the market board: a SINGLE
-// side-fetch of /api/chain/polaris/markets on mount (Liquity V2's own pattern
-// — liquity-v2-listing.tsx), which carries both markets' price legs, MCRs,
+// side-fetch of /api/chain/polaris/markets on mount (hooks/usePolarisMarkets.ts),
+// which carries both markets' price legs, MCRs,
 // mode and rate at one head block. Every row's approximate ratio, floor,
 // liquidation price and rate is computed from that one read; nothing is read
 // per CDP, so the roster's size is irrelevant and decision 0018 (no scheduled
@@ -29,18 +29,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PolarisPositionSummary } from "@/lib/sources/api/polaris-positions";
-import type { PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-position";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
-import { PolarisPositionCard, viewFromSummary } from "@/components/protocol/polaris/polaris-position-card";
 import { HolderStrip } from "@/components/shared/holder-strip";
-import { fetchPolarisListingPage } from "@/lib/polaris/listing-fetch";
+import { countPolarisListing, fetchPolarisListingPage } from "@/lib/polaris/listing-fetch";
 import { polarisHolderStrip } from "@/lib/polaris/holder-strip";
 import { namesHolder, parsePolarisSearch } from "@/lib/polaris/search";
-import { isAllStatuses } from "@/lib/polaris/listing-visibility";
+import { polarisCountLine, statusChoice } from "@/lib/polaris/listing-visibility";
 import type { PolarisUsdValuation } from "@/lib/sources/api/polaris-positions";
 import { polarisUsdSourceNote } from "@/lib/polaris/usd-source-note";
 import {
@@ -50,7 +48,19 @@ import {
   POLARIS_ITEMS_PER_PAGE,
   type PolarisListFilters,
 } from "@/lib/polaris/list-filter-dimensions";
-import { POLARIS_BASE_PATH, polarisPositionHref } from "@/lib/polaris/routes";
+import { POLARIS_BASE_PATH } from "@/lib/polaris/routes";
+import { HolderKinds, useHolderKinds, type HolderKindPage } from "@/components/shared/holder-kinds";
+import {
+  POLARIS_DEPOSITS,
+  POLARIS_LOANS,
+  polarisCdpCard,
+  polarisCdpHref,
+  polarisCdpKey,
+} from "@/lib/polaris/holder-kinds";
+import type { PolarisDepositRow, PolarisLoanRow } from "@/lib/sources/api/polaris-sp-loans";
+import { readListQuery } from "@/lib/shared/list-filter";
+import { useUrlSearchParams } from "@/lib/shared/use-url-search-params";
+import { usePolarisMarkets } from "@/hooks/usePolarisMarkets";
 
 export interface PolarisListingProps {
   initialItems?: PolarisPositionSummary[];
@@ -60,6 +70,8 @@ export interface PolarisListingProps {
   initialKey?: string;
   initialSearch?: string;
 }
+
+const OTHER_KINDS = [POLARIS_DEPOSITS, POLARIS_LOANS];
 
 export function PolarisListing({
   initialItems,
@@ -71,27 +83,13 @@ export function PolarisListing({
   // The last answer's count of CDPs the searched wallet passed on: the holder
   // strip leaves them out of the wallet's total.
   const passedOn = useRef(initialPassedOn);
-  const [markets, setMarkets] = useState<PolarisMarketsChainResponse | null>(null);
-  const [marketsSettled, setMarketsSettled] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/chain/polaris/markets");
-        if (res.ok) {
-          const json = (await res.json()) as PolarisMarketsChainResponse;
-          if (!cancelled && !json.chainStale) setMarkets(json);
-        }
-      } catch {
-        /* the board is an enhancement — the listing still lists */
-      } finally {
-        if (!cancelled) setMarketsSettled(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { markets, settled: marketsSettled } = usePolarisMarkets();
+
+  // The wallet's Stability Pool deposits and reserve loans, under the rows and
+  // counted in the strip (rails-ops TO-DO-stability-pool-deposits §1b).
+  const { wallet, reads } = useHolderKinds(OTHER_KINDS, readListQuery(useUrlSearchParams(initialSearch ?? "")));
+  const deposits = reads[POLARIS_DEPOSITS.id];
+  const loans = reads[POLARIS_LOANS.id];
 
   // The oracle-at-block row each market's USD figures are valued at, for the
   // Size panel's source line. One read on mount; the server values every
@@ -166,13 +164,14 @@ export function PolarisListing({
     <ChainTruthListingPage<PolarisPositionSummary, PolarisListFilters, PolarisUsdValuation | null>
       title="Polaris positions"
       noun="Positions"
+      countLine={polarisCountLine}
       basePath={POLARIS_BASE_PATH}
       defaults={POLARIS_LIST_DEFAULTS}
       sortOptions={polarisSortOptions}
       searchPlaceholder="Address, ENS, or position number (usdp:34)"
-      renderCard={(p) => <PolarisPositionCard v={viewFromSummary(p, markets, !marketsSettled)} surface="listing" />}
-      hrefFor={(p) => polarisPositionHref(p.market, p.cdpId)}
-      keyFor={(p) => `${p.market}:${p.cdpId}`}
+      renderCard={(p) => polarisCdpCard(p, markets, !marketsSettled)}
+      hrefFor={polarisCdpHref}
+      keyFor={polarisCdpKey}
       strategy={serverStrategy<PolarisPositionSummary, PolarisListFilters, PolarisUsdValuation | null>({
         // The valuation is external state, so the Size panel's source line
         // re-renders when the read lands.
@@ -184,6 +183,8 @@ export function PolarisListing({
             passedOn.current = r.passedOn;
             return r;
           }),
+        // A draft's total, one row asked, leaving `passedOn` to the applied page.
+        countDraft: countPolarisListing,
       })}
       onFilters={onFilters}
       renderAbove={({ items, total, filters }) => {
@@ -195,15 +196,19 @@ export function PolarisListing({
         // then be counts of the subset, said as if they were the wallet's — so
         // the band goes rather than misstate what it is about. It also needs
         // the board read: without a price nothing here can be summed across
-        // the two markets, and a stale board is kept as no board at all.
+        // the two markets, and a stale board is kept as no board at all. It
+        // waits for the deposits' and the loans' reads; a failed one leaves
+        // its kind unsaid.
         const strip =
           namesHolder(filters.q) &&
-          isAllStatuses(filters) &&
+          statusChoice(filters) === "all" &&
           filters.market.length === 0 &&
           filters.debt.length === 0 &&
           filters.coll.length === 0 &&
           filters.tx.length === 0 &&
-          markets ? (
+          markets &&
+          deposits !== undefined &&
+          loans !== undefined ? (
             <HolderStrip
               {...polarisHolderStrip(
                 items,
@@ -215,11 +220,16 @@ export function PolarisListing({
                   const { ownerAddress, ownerEns } = parsePolarisSearch(filters.q);
                   return ownerAddress ?? ownerEns;
                 })(),
+                {
+                  deposits: deposits === "failed" ? undefined : (deposits as HolderKindPage<PolarisDepositRow>),
+                  loans: loans === "failed" ? undefined : (loans as HolderKindPage<PolarisLoanRow>),
+                },
               )}
             />
           ) : null;
         return strip;
       }}
+      renderBelow={() => <HolderKinds kinds={OTHER_KINDS} reads={reads} wallet={wallet} />}
       initialItems={initialItems}
       initialTotal={initialTotal}
       initialKey={initialKey}

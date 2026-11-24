@@ -1,7 +1,7 @@
 // Asymmetry trove listing filter registry (chain-state tier, IN-MEMORY). Asymmetry is a small
 // set (~287 Troves across 7 branches), so — like Maker / Morpho — the page fetches all
-// of them once and filters client-side. Declares the categorical facets (Status,
-// Collateral branch) as ListDimensions over the in-memory row set; sort + search are
+// of them once and filters client-side. Declares the categorical facets (Status and
+// its switches, Collateral branch) as ListDimensions over the in-memory row set; sort + search are
 // the non-categorical controls. All values are read from the chain (replayed status, raw
 // collateral / USDaf debt, user-set interest rate).
 //
@@ -16,6 +16,8 @@ import { matchesFormerHolder } from "@/lib/liquity-fork/former-holders";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { DEBT_SYMBOL, indexZombie } from "@/lib/asymmetry/asset-catalog";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
+import { troveStatusDimensions } from "@/lib/liquity-v2/list-filter-dimensions";
+import { troveDimensionAdmits, type TroveLifecycle } from "@/lib/liquity-v2/listing-visibility";
 import type { ListDimension, BaseListFilters, ApplyConfig } from "@/lib/shared/list-filter";
 import type { AsymmetryTroveSummary } from "@/lib/sources/api/asymmetry-troves";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -23,7 +25,13 @@ import { rangeAdmits, sizeDimensions } from "@/lib/shared/size-dimensions";
 import { transactionsDimension } from "@/lib/shared/transactions-dimension";
 
 export interface AsymmetryListFilters extends BaseListFilters {
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
+  /** "" | "dormant" — with Open, the troves below the minimum debt. URL param `open`. */
+  dormant: string[];
+  /** "" | "liquidated" — with Closed, the troves that ended by liquidation.
+   *  URL param `ended`. */
+  ended: string[];
   branches: string[];
   /** Debt range in USDaf, one encodeRange value or [] for no bound. */
   debt: string[];
@@ -38,6 +46,8 @@ export const ASYMMETRY_LIST_DEFAULTS: AsymmetryListFilters = {
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
+  dormant: [],
+  ended: [],
   branches: [],
   debt: [],
   coll: [],
@@ -58,19 +68,15 @@ export const ASYMMETRY_SORT_OPTIONS: SortOption[] = [
   { value: "rate", label: "Interest rate" },
 ];
 
-// Zombie is a first-class bucket (V2-reference parity): the index derivation
-// — an open Trove below the MIN_DEBT floor — is the same predicate the row
-// pill renders, so the buckets are disjoint: a zombie row does not answer
-// "Open". A zombie whose redemption escaped the captured record still reads
-// Open (the index can't see it; incomplete, never false).
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "zombie", label: "Dormant" },
-  { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated" },
-];
+// Status is Open / Closed / All with the Dormant and Closed by liquidation
+// switches (ui-jobs 805; lib/liquity-v2/listing-visibility.ts), applied here over
+// the fetched rows. Dormant is the index derivation — an open Trove below the
+// MIN_DEBT floor — the predicate the row pill renders. A dormant trove whose
+// redemption escaped the captured record still reads open (the index can't see
+// it; incomplete, never false).
 
-const lifecycleOf = (row: AsymmetryTroveSummary): string => (indexZombie(row.status, row.debt) ? "zombie" : row.status);
+const lifecycleOf = (row: AsymmetryTroveSummary): TroveLifecycle =>
+  indexZombie(row.status, row.debt) ? "zombie" : row.status;
 
 /** Collateral in USD: $0 once the trove holds none, null while its branch is
  *  unpriced. */
@@ -91,17 +97,10 @@ export function asymmetryListDimensions(
   }
 
   return [
-    {
-      id: "status",
-      label: "Status",
-      group: "Status",
-      cardinality: "multi",
-      param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => f.status,
-      set: (f, v) => ({ ...f, status: v }),
-      matches: (row, v) => v.includes(lifecycleOf(row)),
-    },
+    ...troveStatusDimensions<AsymmetryListFilters>().map((d) => ({
+      ...d,
+      matches: (row: AsymmetryTroveSummary, v: string[]) => troveDimensionAdmits(d.id, v, lifecycleOf(row)),
+    })),
     {
       id: "branches",
       label: "Collateral",

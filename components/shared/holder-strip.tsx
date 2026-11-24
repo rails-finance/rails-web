@@ -11,7 +11,10 @@
 // `?q=<address|ens>` URL, so it is shareable as it is.
 //
 // WHAT IT STATES, in this order: the counts by status, and one leg per unit the
-// wallet holds (a total collateral, a total debt).
+// wallet holds (a total collateral, a total debt, a deposit). Where the
+// protocol has a second position kind (rails-ops TO-DO-stability-pool-deposits
+// §1b), the counts and legs take in the wallet's positions of every kind; a
+// deposit is its own leg and never sums with a debt.
 //
 // WHAT IT NEVER STATES is a wallet-wide collateral ratio. Liquidation is per
 // position: a wallet holding one CDP at 118% and one at 400% has no single
@@ -41,6 +44,7 @@ import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { formatUsdValue } from "@/lib/utils/format";
 import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import Link from "next/link";
+import { walletPageHref } from "@/lib/wallet/wallet-filters";
 import { Fragment } from "react";
 
 /** One summed unit the wallet holds — a collateral, a debt. */
@@ -83,6 +87,17 @@ export interface HolderLeg {
   };
 }
 
+/** One other position kind, counted. */
+export interface HolderKindCount {
+  /** Stable machine name ("deposit"). */
+  id: string;
+  /** The kind's noun, singular and plural, as the share card's status word
+   *  writes it ("deposit", "deposits"). */
+  noun: [string, string];
+  open: number;
+  closed: number;
+}
+
 export interface HolderStripProps {
   /** The counts by status, as the adapter's own sentence — "CDPs across both
    *  markets" and "troves, one on each branch" are protocol facts, not a
@@ -103,9 +118,19 @@ export interface HolderStripProps {
    *  the band draws only from two (one would repeat its card) and its totals
    *  only from two open ones (ui-jobs 737). Unset, it draws as given. */
   positions?: number;
+  /** The protocol's other position kinds the wallet holds (a Stability Pool
+   *  deposit beside its Troves), counted by status. `counts` stays the
+   *  searched kind's; the band's two-position rules count across every kind,
+   *  and the share card names each kind in its status word. */
+  kinds?: HolderKindCount[];
   /** The wallet the search names: the band links its wallet page,
-   *  "Everything this wallet holds" (ui-jobs 737). */
+   *  "Everything this wallet holds" (ui-jobs 737), where that page reads
+   *  `protocol`. */
   wallet?: string;
+  /** The explorer slug the band states ("liquity-v2"). The wallet link is
+   *  drawn only for a protocol the /wallet page reads (`WALLET_PROTOCOLS`):
+   *  a page that leaves the protocol out would answer the link with nothing. */
+  protocol?: string;
 }
 
 /** RevealTip's bubble is sized for a number (nowrap, tabular figures); a
@@ -186,7 +211,9 @@ export function HolderStrip({
   truncated,
   note,
   wallet,
+  protocol,
   positions,
+  kinds,
   scoped = false,
 }: HolderStripProps & {
   /** Drawn inside a page's receipts scope (the wallet page, ui-jobs 738):
@@ -195,9 +222,11 @@ export function HolderStrip({
 }) {
   if (positions != null && positions < 2) return null;
   const Scope = scoped ? Fragment : ProvUnscoped;
-  const totals = !truncated && legs.length > 0 && (positions == null || counts.open >= 2);
+  const open = counts.open + (kinds ?? []).reduce((n, k) => n + k.open, 0);
+  const totals = !truncated && legs.length > 0 && (positions == null || open >= 2);
+  const walletHref = walletPageHref(protocol, wallet);
   // The wallet page's sections pass no counts sentence: their cards are under it.
-  if (!countsLine && !totals && !note && !wallet) return null;
+  if (!countsLine && !totals && !note && !walletHref) return null;
   return (
     // A BAND, not a card: the raised rounded surface belongs to a position, and
     // this states something about several of them. A rule under it separates it
@@ -215,6 +244,7 @@ export function HolderStrip({
         data-holder-open={counts.open}
         data-holder-closed={counts.closed}
         data-holder-liquidated={counts.liquidated}
+        data-holder-kinds={kinds?.map((k) => `${k.id}:${k.open}:${k.closed}`).join(" ") || undefined}
         className="mb-5 border-b border-rb-300/60 dark:border-rb-700/60 pb-4"
       >
         {countsLine && (
@@ -224,7 +254,10 @@ export function HolderStrip({
         )}
         {totals && (
           <div
-            className={`${countsLine ? "mt-2 " : ""}grid grid-cols-2 gap-4 ${legs.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+            // Four legs (a Polaris wallet's CDPs, deposit and loan; a Liquity
+            // V1 wallet's Troves, deposit and stake) stand in one row once
+            // there is room, two by two below that.
+            className={`${countsLine ? "mt-2 " : ""}grid grid-cols-2 gap-4 ${legs.length === 4 ? "lg:grid-cols-4" : legs.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
           >
             {legs.map((leg) => (
               <div key={leg.id} data-holder-leg={leg.id} data-anatomy="N7.1">
@@ -269,9 +302,9 @@ export function HolderStrip({
         )}
         {/* The listing search is the wallet within this protocol; the wallet
             page is the wallet everywhere. */}
-        {wallet && (
+        {walletHref && (
           <Link
-            href={`/wallet/${encodeURIComponent(wallet)}`}
+            href={walletHref}
             className={`mt-2 text-sm ${FOOT_LINK}`}
             data-holder-wallet-link=""
             data-anatomy="N7.2"

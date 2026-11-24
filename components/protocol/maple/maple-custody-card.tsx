@@ -140,14 +140,11 @@ export function MapleCustodyCard({
   infra,
   wallet,
   holdings,
-  viewHref,
 }: {
   infra: CcipEscrow;
   /** The escrow contract's address. */
   wallet: string;
   holdings: MapleCustodyHolding[];
-  /** Copy-this-view control: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
 }) {
   const live = holdings.filter((h) => h.shares > 0);
   const valued = live.filter((h) => h.supplyShare != null);
@@ -195,6 +192,7 @@ export function MapleCustodyCard({
   const slots: PositionCardSlots = {
     surface: "detail",
     status: null,
+    lifecycle: false,
     heads,
     // Custody is what this address is.
     identity: (
@@ -206,7 +204,7 @@ export function MapleCustodyCard({
     counters: null,
     // The saved name, as the tab names the address (lib/shared/position-name.ts).
     name: positionName({ noun: POSITION_NOUN.maple, id: wallet }),
-    explainer: { body: <CustodyExplanation infra={infra} holdings={live} />, viewHref },
+    explainer: { body: <CustodyExplanation infra={infra} holdings={live} /> },
     learnMore: null,
     menu: {
       leading: () => (

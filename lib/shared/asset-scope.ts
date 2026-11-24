@@ -455,8 +455,3 @@ export function useAssetScope(): AssetScope {
     clear,
   };
 }
-
-/** `/assets` in its manage state (`?manage=1`): every asset shown, to add to
- *  the focus. */
-export const MANAGE_PARAM = "manage";
-export const manageHref = (manage = true): string => (manage ? `/assets?${MANAGE_PARAM}=1` : "/assets");

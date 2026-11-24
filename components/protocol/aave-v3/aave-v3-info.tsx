@@ -8,6 +8,7 @@ import { GlossaryLink, ProtocolInfoPage, type InfoView } from "@/components/shar
 import { BaseLendingCoverageNote } from "@/components/shared/base-lending-coverage-banner";
 import { aaveV3Glossary } from "@/lib/aave-v3/event-templates";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { CowAaveFigures } from "@/components/protocol/cow/cow-aave-figures";
 
 const UL = "list-disc space-y-1 pl-5";
 
@@ -40,6 +41,7 @@ const PRICES = (
 
 const POSITION_PAGE: InfoView = {
   heading: "Position page",
+  section: "positions",
   body: (
     <ul className={UL}>
       <li>
@@ -51,16 +53,17 @@ const POSITION_PAGE: InfoView = {
   ),
 };
 
-function marketView(href: string, body: string, linkText: string): InfoView {
+function marketView(href: string, market: string): InfoView {
   return {
     heading: "Market view",
+    section: "markets",
     body: (
       <p>
-        {body}{" "}
+        The{" "}
         <Link href={href} className={INLINE_LINK}>
-          {linkText}
+          market page
         </Link>{" "}
-        to open it.
+        shows each {market} reserve with its size, rates, risk settings and price.
       </p>
     ),
   };
@@ -99,6 +102,7 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
         views={[
           {
             heading: "Listing",
+            section: "positions",
             body: (
               <ul className={UL}>
                 <li>
@@ -112,13 +116,10 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
             ),
           },
           POSITION_PAGE,
-          marketView(
-            "/ethereum/aave-v3/markets",
-            "The market view shows each Core reserve with its size, rates, risk settings and price.",
-            "Use the Core market link",
-          ),
+          marketView("/ethereum/aave-v3/markets", "Core"),
         ]}
         docs={docs}
+        figures={<CowAaveFigures family="aave-v3" />}
       />
     );
   }
@@ -166,6 +167,7 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
         base
           ? {
               heading: "Listing",
+              section: "positions",
               body: (
                 <>
                   <ul className={UL}>
@@ -183,6 +185,7 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
             }
           : {
               heading: "Listing",
+              section: "positions",
               body: (
                 <ul className={UL}>
                   <li>
@@ -196,11 +199,7 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
               ),
             },
         POSITION_PAGE,
-        marketView(
-          base ? "/base/aave-v3/markets" : "/arbitrum/aave-v3/markets",
-          `The market view shows each ${chain} reserve with its size, rates, risk settings and price.`,
-          `Use the ${chain} market link`,
-        ),
+        marketView(base ? "/base/aave-v3/markets" : "/arbitrum/aave-v3/markets", chain),
       ]}
       docs={docs}
     />

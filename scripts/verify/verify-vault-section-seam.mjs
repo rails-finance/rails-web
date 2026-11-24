@@ -633,28 +633,29 @@ for (const f of fixtures) {
     JSON.stringify({ rows: migrated, legacyKeyKept: kept != null }),
   );
 
-  // …and the VAULT positions listing, filtered to the same address, shows the
-  // row bookmarked.
+  // …and the VAULT positions listing, filtered to the same address, marks the
+  // row bookmarked. A listing row draws a filled mark and no toggle (ui-jobs 807).
   await page.goto(`${BASE_URL}${vaultRoot(f.chain)}/positions?q=${holder}`, {
     waitUntil: "networkidle",
     timeout: 180_000,
   });
-  const pressed = await page.evaluate((addr) => {
+  const marked = await page.evaluate((addr) => {
     const card = [...document.querySelectorAll("[data-position-card]")].find(
       (c) => (c.getAttribute("data-holder") || "").toLowerCase() === addr,
     );
     if (!card) return { card: false };
-    const b = card.querySelector('button[aria-label="Saved"], button[aria-label="Save wallet"]');
-    return { card: true, pressed: b?.getAttribute("aria-pressed") ?? null };
+    return {
+      card: true,
+      mark: card.querySelector("[data-bookmark-mark]") != null,
+      toggles: card.querySelectorAll('button[aria-label="Saved"], button[aria-label="Save wallet"]').length,
+    };
   }, holder);
-  check(`S4e·${f.label} the filtered listing carries this holder's row`, pressed.card, JSON.stringify(pressed));
-  check(`S4f·${f.label} that row's toggle reads bookmarked`, pressed.pressed === "true", JSON.stringify(pressed));
-
-  if (pressed.card) {
-    await page.locator('[data-position-card] button[aria-label="Saved"]').first().click();
-    const after = await page.evaluate((k) => window.localStorage.getItem(k), KEY);
-    check(`S4g·${f.label} toggling it off removes the key entirely`, after === null, `key ${KEY} now ${String(after)}`);
-  }
+  check(`S4e·${f.label} the filtered listing carries this holder's row`, marked.card, JSON.stringify(marked));
+  check(
+    `S4f·${f.label} that row carries the filled bookmark and no toggle`,
+    marked.mark === true && marked.toggles === 0,
+    JSON.stringify(marked),
+  );
 
   await context.close();
 }

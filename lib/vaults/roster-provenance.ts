@@ -34,6 +34,19 @@ const utc = (at: number | null) =>
         .replace("T", " ")
         .replace(/\.\d+Z$/, " UTC");
 
+/** One roster's vault count on its /vaults overview card (ui-jobs 776):
+ *  every vault its roster lists, or every one over `asset` under `?asset=`,
+ *  funded or not, read at its block. */
+export const rosterCountProv = (read: RosterRead, count: number, asset?: string): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  ...(read.block > 0 ? { source: { block: read.block } } : {}),
+  summary: `${read.label} — ${n(count)} vaults${asset ? ` over ${asset}` : ""} on this roster, funded or not, read at ${
+    read.block > 0 ? `block ${n(read.block)} (${utc(read.at)})` : "its roster's read block"
+  }.`,
+  via: "vault overview · the roster's rows @ its read block",
+});
+
 /** The read stamp's receipt: each roster's block and its time. The stamp's age
  *  is the oldest of them. */
 export const rosterReadProv = (reads: RosterRead[]): Provenance => {
@@ -50,3 +63,23 @@ export const rosterReadProv = (reads: RosterRead[]): Provenance => {
       : "vault index · each roster's contract calls @ its read block",
   };
 };
+
+/** One family's part of a roster that carries several (Aave's: Savings GHO,
+ *  static aTokens, Umbrella stake tokens) on /vaults/products (ui-jobs 773):
+ *  the roster's rows of that family, out of all its rows, at its block. */
+export const rosterFamilyCountProv = (
+  read: RosterRead,
+  roster: string,
+  family: string,
+  count: number,
+  total: number,
+): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  ...(read.block > 0 ? { source: { block: read.block } } : {}),
+  summary: `${n(count)} of the ${roster} roster's ${n(total)} vaults are ${family}, read at ${
+    read.block > 0 ? `block ${n(read.block)} (${utc(read.at)})` : "its roster's read block"
+  }.`,
+  via: `vault products · the ${roster} roster's rows @ its read block, filtered to family ${family}`,
+  formula: `count of the roster's rows whose family is ${family}`,
+});

@@ -38,6 +38,7 @@ const [USDC, ...REST] = COMPOUND_OPTIMISM_DEPLOYMENT.markets;
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "A wallet's accounts",
+    section: "intro",
     body: (
       <>
         <p>
@@ -64,6 +65,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Market view",
+    section: "markets",
     body: (
       <p>
         <Link href={`${OPC_ROUTE}/markets`} className={INLINE_LINK}>

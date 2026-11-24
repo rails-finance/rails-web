@@ -20,7 +20,7 @@ export function dolomitePositionContent(opts: {
   const peakConcept = opts.peaksInTokens
     ? {
         bold: "Highest recorded",
-        text: "each market's largest balance just before or just after any event, in tokens with interest included. The panel above states the same figures in words.",
+        text: "each market's largest balance just before or just after any event, in tokens with interest included. The panel above lists the markets the account held; a press on them opens these figures.",
       }
     : {
         bold: "Highest recorded, in par",

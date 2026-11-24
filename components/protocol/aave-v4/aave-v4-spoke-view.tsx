@@ -744,7 +744,6 @@ function AaveV4SpokePageInner({
             riskPremium={parseRiskPremiumFraction(chainPosition?.riskPremiumRaw ?? null)}
             exports={exports}
             pagePath={`${deployment.basePath}/spoke/${rawSpoke}/${wallet}`}
-            viewHref={tl.viewHref}
             foot={
               deployment.key === "base" && chainPosition && !chainPosition.chainStale ? (
                 <AaveV4BaseReserveNotice reserves={chainPosition.reserves} />

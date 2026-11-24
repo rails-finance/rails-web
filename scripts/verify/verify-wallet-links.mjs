@@ -44,13 +44,16 @@ const ROW = 'a[class~="group/listing-row"]';
 // (A second alternative, `Filter troves by owner`, was carried here long after
 // the last component emitting it was retired; a dead selector alternative
 // cannot fail, so it was only ever noise.)
-const FILTER_BTN = 'button[aria-label^="Filter positions by wallet"]';
+// A Liquity V2 family pill opens the wallet page and reads "Open wallet …"
+// (ui-jobs 738).
+const FILTER_BTN = 'button[aria-label^="Filter positions by wallet"], button[aria-label^="Open wallet"]';
 // On a position page the owner's wallet is its address menu (ui-jobs 271,
 // `components/shared/wallet-menu.tsx`), whose "View wallet" row opens the
 // wallet view, `/wallet/<address>` (rails-ops decision 0051). For those
 // explorers the run asserts that landing, then loads `<route>?q=<address>`
 // itself to prove the listing filters. The listings that draw a pill of their
-// own (Liquity V2, Aave V4) keep the filter button and its `?q=` link.
+// own (Liquity V2, Aave V4) keep the filter button: Aave V4's links `?q=`,
+// Liquity V2's the wallet page with Liquity V2 chosen (ui-jobs 738).
 const OWNER_MENU = '[data-wallet-menu] button[aria-haspopup="menu"]';
 const OWNER_MENU_WALLET = '[data-wallet-menu] [role="menuitem"]:has-text("View wallet")';
 // Since fb80809a the menu carries the page it opened from as `?from=`, so
@@ -74,7 +77,9 @@ const check = (name, cond, detail = "") => {
 // rest render the pill only on the detail page (the receipts branch), reached
 // via the first row's href.
 const PROTOCOLS = [
-  { slug: "liquity-v2", route: "/ethereum/liquity-v2", onListing: true },
+  // A Liquity V2 wallet pill opens the wallet page with Liquity V2 chosen
+  // (ui-jobs 738): the listing no longer filters by wallet.
+  { slug: "liquity-v2", route: "/ethereum/liquity-v2", onListing: true, walletPage: true },
   { slug: "aave-v4", route: "/ethereum/aave-v4", onListing: true },
   { slug: "morpho", route: "/ethereum/morpho" },
   { slug: "compound", route: "/ethereum/compound-v3" },
@@ -243,7 +248,7 @@ async function waitForFilteredCount(full, timeoutMs = 45000) {
   return { count: last, settled: false };
 }
 
-for (const { slug, route, onListing } of subjects) {
+for (const { slug, route, onListing, walletPage } of subjects) {
   console.log(`\n── ${slug} ${"─".repeat(Math.max(1, 40 - slug.length))}`);
   try {
     // 1) Unfiltered listing → full count. Navigate to the canonical route and
@@ -297,6 +302,16 @@ for (const { slug, route, onListing } of subjects) {
     );
     if (!navigated) continue;
     withPill++;
+
+    if (walletPage) {
+      const path = navigated.url.replace(BASE, "");
+      check(
+        `${slug}: pill → /wallet/0x…?protocol=${slug} lowercased`,
+        new RegExp(`^/wallet/0x[0-9a-f]{40}\\?protocol=${slug}$`).test(path),
+        path,
+      );
+      continue;
+    }
 
     let url = navigated.url;
     // The address menu lands on the wallet view; the listing's `?q=` form for

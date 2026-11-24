@@ -1,10 +1,11 @@
-// Server-side reads of rails-server's CoW wallet routes (api/src/routes/cow.ts),
-// with the bearer token. Imported by the CoW wallet page, the trades proxy and
-// the wallet view's page (/wallet/<address>) only.
+// Server-side reads of rails-server's CoW routes (api/src/routes/cow.ts), with
+// the bearer token. Imported by the CoW wallet page, the trades proxy, the
+// wallet view's page (/wallet/<address>) and the Aave CoW figures' proxies only.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import type { CowTradesPage, CowWalletEntry, CowWalletTokens } from "@/lib/cow/types";
 import type { CowSettlement } from "@/lib/cow/settlement";
+import type { CowAaveFamily, CowAaveFigure, CowAaveSort, CowAaveSwapsPage, CowAaveTotals } from "@/lib/cow/aave-totals";
 
 export class CowReadError extends Error {
   constructor(
@@ -124,4 +125,31 @@ export async function readCowSettlement(
     }
   }
   return read<CowSettlement>(`/${block}/${tx}`, readerIp, signal, "/api/cow/ethereum/settlement");
+}
+
+/** The Aave CoW figures' budget: a cold read on the server takes about 7 s (Aave V3's 92,000 swaps), then it is held
+ *  for an hour. Past this the proxy answers 504 and the block keeps its loading line. */
+const COW_AAVE_MS = 15_000;
+
+const timeoutOr = (signal?: AbortSignal) =>
+  signal ? AbortSignal.any([signal, AbortSignal.timeout(COW_AAVE_MS)]) : AbortSignal.timeout(COW_AAVE_MS);
+
+/** The CoW figures across one Aave family's swaps (rails-server GET /api/cow/ethereum/aave/:family/totals). */
+export function readCowAaveTotals(
+  family: CowAaveFamily,
+  readerIp?: string,
+  signal?: AbortSignal,
+): Promise<CowAaveTotals> {
+  return read<CowAaveTotals>(`/${family}/totals`, readerIp, timeoutOr(signal), "/api/cow/ethereum/aave");
+}
+
+/** One page of the swaps behind a figure (rails-server GET /api/cow/ethereum/aave/:family/swaps). */
+export function readCowAaveSwaps(
+  family: CowAaveFamily,
+  q: { figure: CowAaveFigure; sort: CowAaveSort; offset: number; limit: number },
+  readerIp?: string,
+  signal?: AbortSignal,
+): Promise<CowAaveSwapsPage> {
+  const p = new URLSearchParams({ figure: q.figure, sort: q.sort, offset: String(q.offset), limit: String(q.limit) });
+  return read<CowAaveSwapsPage>(`/${family}/swaps?${p}`, readerIp, timeoutOr(signal), "/api/cow/ethereum/aave");
 }

@@ -35,10 +35,11 @@ const VAULT_ABI = parseAbi([
 ]);
 const PER = 4;
 
-/** Multicall3 requests the roster is split across: about 60 vaults, 240
- *  calls, each. `batchSize: 0` stops viem splitting further, so the count is
- *  a fact about the code. */
-const DIRECTORY_REQUESTS = 3;
+/** Multicall3 requests each chain's roster is split across, so a request
+ *  holds about 290 calls (four per vault): Ethereum's 181 vaults in 3,
+ *  Arbitrum's 257 and Base's 291 in 4. `batchSize: 0` stops viem splitting
+ *  further, so the count is a fact about the code. */
+const DIRECTORY_REQUESTS: Record<IporFusionChainId, number> = { 1: 3, 42161: 4, 8453: 4 };
 
 export const IPOR_FUSION_DIRECTORY_REVALIDATE_SECONDS = 300;
 
@@ -97,8 +98,9 @@ async function readDirectory(chainId: IporFusionChainId): Promise<IporFusionVaul
     const client = vaultHeadClient(chainId);
     const blockNumber = await client.getBlockNumber();
     const vaults = roster.vaults;
-    const size = Math.ceil(vaults.length / DIRECTORY_REQUESTS);
-    const chunks = Array.from({ length: DIRECTORY_REQUESTS }, (_, i) => vaults.slice(i * size, (i + 1) * size)).filter(
+    const requests = DIRECTORY_REQUESTS[chainId];
+    const size = Math.ceil(vaults.length / requests);
+    const chunks = Array.from({ length: requests }, (_, i) => vaults.slice(i * size, (i + 1) * size)).filter(
       (c) => c.length > 0,
     );
     const results = (await Promise.all(

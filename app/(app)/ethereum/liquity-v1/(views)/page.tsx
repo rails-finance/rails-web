@@ -15,10 +15,9 @@ import { fetchLiquityV1Positions } from "@/lib/api/fetch-liquity-v1-positions";
 import {
   liquityV1ListDimensions,
   liquityV1FiltersToFetchParams,
-  liquityV1ListDefaults,
+  LIQUITY_V1_LIST_DEFAULTS,
 } from "@/lib/liquity-v1/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
-import { readListQuery } from "@/lib/shared/list-filter";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 
 export const dynamic = "force-dynamic";
@@ -35,12 +34,11 @@ export const metadata = listingMetadata({
 async function LiquityV1ListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = liquityV1ListDimensions();
   const sp = toURLSearchParams(await searchParams);
-  const defaults = liquityV1ListDefaults(readListQuery(sp));
-  const { filters, page } = ssrDecode(dims, sp, defaults);
+  const { filters, page } = ssrDecode(dims, sp, LIQUITY_V1_LIST_DEFAULTS);
 
   const initial = await ssrInitial({
     dims,
-    defaults,
+    defaults: LIQUITY_V1_LIST_DEFAULTS,
     filters,
     page,
     label: "Liquity V1",

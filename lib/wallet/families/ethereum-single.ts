@@ -34,6 +34,8 @@ import { loadFluidPositionFromChain } from "@/lib/sources/chain/fluid-position";
 import { chainClient } from "@/lib/sources/chain/rpc";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { branchMcr } from "@/lib/liquity/event-safety";
+import { walletBranchShutdowns } from "./branch-shutdown";
+import { shutDownTrove } from "@/lib/wallet/trove-shutdown";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -389,17 +391,28 @@ export const liquityV2: FamilyModule = {
   },
   async head(open, _address, signal): Promise<HeadResult> {
     if (open.length === 0) return { positions: open, reads: 0 };
-    const prices = await liquityPrices(signal);
-    if (!prices) return { reads: 1, positions: open.map((p) => ({ ...p, headRead: "failed" })) };
+    const rowOf = (p: WalletPosition) => (p.card as { row: TroveSummary }).row;
+    // Each open Trove's branch shutdown beside the prices (ui-jobs 802).
+    const [prices, shutdowns] = await Promise.all([
+      liquityPrices(signal),
+      walletBranchShutdowns(
+        "liquity-v2",
+        open.map((p) => rowOf(p).collateralType),
+      ),
+    ]);
+    const shut = (p: WalletPosition) => shutDownTrove(p, shutdowns.states.get(rowOf(p).collateralType));
+    // The price route's read, and the shutdown read where the cache did not answer.
+    const reads = 1 + shutdowns.reads;
+    if (!prices) return { reads, positions: open.map((p) => shut({ ...p, headRead: "failed" })) };
     return {
-      reads: 1,
+      reads,
       positions: open.map((p): WalletPosition => {
-        const t = (p.card as { row: TroveSummary }).row;
+        const t = rowOf(p);
         const price = priceOf(t.collateralType, prices);
         const collateralUsd = price != null ? t.collateral.amount * price : undefined;
         const cr = collateralUsd != null && t.debt.current > 0 ? collateralUsd / t.debt.current : undefined;
         const mcr = branchMcr(t.collateralType);
-        return {
+        return shut({
           ...p,
           card: { kind: "liquity-v2", row: t, prices },
           collateralUsd,
@@ -419,7 +432,7 @@ export const liquityV2: FamilyModule = {
           headRead: "read",
           // The price read states no block; the Trove's figures are its last event's.
           readAt: now(),
-        };
+        });
       }),
     };
   },

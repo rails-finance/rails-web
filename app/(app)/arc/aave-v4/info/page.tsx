@@ -28,6 +28,7 @@ const [MAIN, FOREX, MAPLE] = AAVE_V4_ARC_CONTRACTS.spokes;
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "A wallet's accounts",
+    section: "intro",
     body: (
       <>
         <p>
@@ -48,6 +49,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Account page",
+    section: "intro",
     body: (
       <p>
         The account page shows what the wallet supplies and owes on one spoke, each in dollars at the spoke&apos;s
@@ -57,23 +59,30 @@ const views: readonly [InfoView, ...InfoView[]] = [
     ),
   },
   {
-    heading: "Spokes, reserves and hubs",
+    heading: "Spokes",
+    section: "markets",
     body: (
-      <ul className={UL}>
-        <li>
-          <Link href={`${ROUTE}/markets`} className={INLINE_LINK}>
-            Spokes
-          </Link>{" "}
-          lists the three spokes with what each has supplied and borrowed; each opens its reserves, and each reserve its
-          page, with the spoke&apos;s terms beside the hub&apos;s figures for that asset.
-        </li>
-        <li>
-          <Link href={`${ROUTE}/hubs`} className={INLINE_LINK}>
-            Hubs
-          </Link>{" "}
-          shows the Core hub&apos;s assets, its credit lines to each spoke and their APYs.
-        </li>
-      </ul>
+      <p>
+        The{" "}
+        <Link href={`${ROUTE}/markets`} className={INLINE_LINK}>
+          spokes page
+        </Link>{" "}
+        lists the three spokes with what each has supplied and borrowed; each opens its reserves, and each reserve its
+        page, with the spoke&apos;s terms beside the hub&apos;s figures for that asset.
+      </p>
+    ),
+  },
+  {
+    heading: "Hubs",
+    section: "hubs",
+    body: (
+      <p>
+        The{" "}
+        <Link href={`${ROUTE}/hubs`} className={INLINE_LINK}>
+          hubs page
+        </Link>{" "}
+        shows the Core hub&apos;s assets, its credit lines to each spoke and their APYs.
+      </p>
     ),
   },
 ];

@@ -18,6 +18,9 @@
 // facets, sort and search can't drift or go missing per protocol.
 
 import { listingSearchNote } from "@/lib/shared/listing-search";
+import { useRouter } from "next/navigation";
+import { walletSearchHref } from "@/lib/wallet/wallet-filters";
+import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChainTruthListing, ListingUnavailable } from "@/components/shared/chain-truth-listing";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -63,6 +66,12 @@ export interface ServerStrategy<T, F extends BaseListFilters, Ext = undefined> {
   dimensions: SerializableDimension<F>[] | ((filters: F, ext: Ext) => SerializableDimension<F>[]);
   /** Map the selection + page onto a backend fetch; returns the slice + total. */
   fetchPage: (filters: F, page: number) => Promise<{ data: T[]; total: number }>;
+  /** The total a staged selection would give, for the editors' "Show {n}"
+   *  (ui-jobs 801), read with no effect on the page. Unset, the driver reads
+   *  `fetchPage(draft, 1).total`, so a `fetchPage` that writes page state (a
+   *  census line, an overlay's block, a cut) gives its own reader here, or
+   *  `false` for an "Apply" button and no read. */
+  countDraft?: ((filters: F) => Promise<number>) | false;
   itemsPerPage: number;
   /** The listing's search box reads an address, an ENS name and, where
    *  `takesId`, a position id (lib/shared/listing-search.ts): a query it cannot
@@ -123,6 +132,11 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
   /** False: no search box, for a page that names its subject (the wallet
    *  page's protocol listing, ui-jobs 738). */
   search?: boolean;
+  /** The wallet page's protocol slug, on a family whose listings send a
+   *  search by a whole address or an ENS name to /wallet/<wallet>?protocol=
+   *  (`WALLET_SEARCH_FAMILIES`, ui-jobs 738); the box keeps searching the
+   *  family's identifiers. */
+  walletSearch?: string;
   renderCard: (item: T) => ReactNode;
   hrefFor: (item: T) => string;
   keyFor: (item: T) => string;
@@ -157,6 +171,9 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
   /** Opt-in slot rendered between the header block and the toolbar — e.g. a
    *  protocol-level stats band. Passed through to the presentation shell. */
   headerExtra?: ReactNode;
+  /** In place of the rail header's head stamp: a stamp for a listing whose
+   *  rows come from a read behind the head (Aave V3's refresh, ui-jobs 806). */
+  stamp?: ReactNode;
   /** Opt-in slot rendered ABOVE the row column, fed with the rows the page is
    *  showing — the holder strip a wallet search draws over its own positions
    *  (`components/shared/holder-strip.tsx`). Called with the displayed rows,
@@ -167,6 +184,10 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
    *  page or sort change must not replay the fade on a band that did not change).
    *  Every other listing passes nothing. */
   renderAbove?: (ctx: { items: T[]; total: number; filters: F }) => ReactNode;
+  /** Opt-in slot under the rows and their pagination, given the decoded
+   *  selection: the wallet's positions of the protocol's other kinds on a
+   *  listing searched by wallet (`components/shared/holder-kinds.tsx`). */
+  renderBelow?: (filters: F) => ReactNode;
   /** A section listing's identity line (mark + word) above the h1 — for a
    *  route with no roster entry, where no RailHeader can be derived. Passed
    *  through to the presentation shell. */
@@ -213,6 +234,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   sortOptions,
   searchPlaceholder,
   search,
+  walletSearch,
   renderCard,
   hrefFor,
   keyFor,
@@ -224,7 +246,9 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   renderError,
   onFilters,
   headerExtra,
+  stamp,
   renderAbove,
+  renderBelow,
   identity,
   titleHidden,
   titleAs,
@@ -392,8 +416,17 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
     };
   }, [strategy.kind, filters, page, retryTick]);
 
+  const router = useRouter();
   const pushFilters = useCallback(
     (next: F, nextPage: number) => {
+      // A wallet named in the search opens the wallet page.
+      const wallet = walletSearchHref(walletSearch, next.q);
+      if (wallet) {
+        // The wallet page reads for up to its 8 s budget: the bar says so.
+        startNavigationProgress(wallet);
+        router.push(wallet);
+        return;
+      }
       const qs = encodeListFilters(dims, next, defaults);
       if (nextPage > 1) qs.set("page", String(nextPage));
       const s = qs.toString().replace(/%2C/gi, ",");
@@ -413,7 +446,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
       // pushState doesn't fire popstate; nudge useUrlSearchParams to re-read.
       notifyUrlChanged();
     },
-    [dims, defaults, basePath],
+    [dims, defaults, basePath, walletSearch, router],
   );
 
   // Reconcile seam (opt-in, server tier): once the external state resolves, drop
@@ -472,16 +505,18 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   );
   const viewKey = strategy.kind === "server" ? serverViewKey : memoryViewKey;
 
-  // A staged selection's count, for the pill editors' "Show {n}": only where
-  // it costs no read, the in-memory rows filtered. A server listing's editors
-  // read "Apply" (ui-jobs 681), so a staged edit costs no read.
+  // A staged selection's count, for the editors' "Show {n}" (ui-jobs 801): the
+  // in-memory rows filtered, or a server listing's total for the draft, one
+  // read per settled edit (the editors wait COUNT_DELAY_MS). None where the
+  // strategy rules it out (`countDraft: false`): the editors read "Apply".
   const countFor =
-    strategy.kind === "memory"
-      ? (draft: F): number => {
+    strategy.kind === "server" && strategy.countDraft === false
+      ? undefined
+      : (draft: F): number | Promise<number> => {
           const s = strategyRef.current;
-          return s.kind === "memory" ? applyListFilter(fetched, s.dimensions(fetched), draft, s.apply).length : 0;
-        }
-      : undefined;
+          if (s.kind === "memory") return applyListFilter(fetched, s.dimensions(fetched), draft, s.apply).length;
+          return s.countDraft ? s.countDraft(draft) : s.fetchPage(draft, 1).then((res) => res.total);
+        };
 
   const line = countLine?.(filters) ?? null;
   const pagination =
@@ -551,7 +586,9 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
         title={typeof title === "function" ? title(filters) : title}
         protocol={directoryEntry}
         headerExtra={headerExtra}
+        stamp={stamp}
         above={above}
+        below={renderBelow?.(filters)}
         emptyNote={
           (strategy.kind === "server" && strategy.search
             ? listingSearchNote(filters.q, strategy.search.takesId)

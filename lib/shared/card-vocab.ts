@@ -12,9 +12,11 @@
 //   collateral ratio, pooled lenders a health factor. The label must describe
 //   the figure it sits over — a card whose native figure is the inverse (a
 //   debt ratio) converts it or keeps its own label; it never borrows this one.
-// - Terminal cards say "Highest recorded …" for a lifetime peak and "Final
-//   recorded …" for a last-known state that is not a peak; "not recorded" has
-//   one sentence.
+// - Terminal cards name a lifetime maximum "Peak <side>" ("Peak supplied",
+//   "Peak debt", "Peak collateral"), and a last-known state that is not a
+//   peak "Final recorded …"; "not recorded" has one sentence. "Peak value"
+//   is the side's assets valued together on their highest day. Surfaces
+//   still reading "Highest recorded" are listed in ui-jobs 809.
 //
 // Labels here are the column HEADERS (12px, sentence case). Tower segment
 // names ("Borrowed (all time)") and mode-pill words ("Borrowing", "Supply
@@ -33,10 +35,16 @@ export const CARD_VOCAB = {
     cdp: "Collateral ratio",
     pooled: "Health factor",
   } satisfies Record<RatioFamily, string>,
-  /** Lifetime peaks on closed / liquidated cards. */
+  /** Still "Highest recorded": the surfaces in ui-jobs 809. */
   peakCollateral: "Highest recorded collateral",
   peakSupply: "Highest recorded supply",
+  /** Every supplied reserve or market, collateral or not. */
+  peakSupplied: "Highest recorded supplied",
   peakDebt: "Highest recorded debt",
+  /** A closed account card's side heads: the largest asset leads. */
+  headSupplied: "Peak supplied",
+  headDebt: "Peak debt",
+  headCollateral: "Peak collateral",
   /** Last-known state on terminal cards whose lane records no peak. */
   finalCollateral: "Final recorded collateral",
   finalDebt: "Final recorded debt",
@@ -54,5 +62,9 @@ export function ratioLabel(family: RatioFamily): string {
  *  position (most explorers) or the wallet (Morpho, where a wallet hub holds
  *  every market position). */
 export function notRecordedNote(open: "position" | "wallet" = "position"): string {
-  return `not recorded on this lane; open the ${open} for its whole history`;
+  return `${NOT_RECORDED} on this lane; open the ${open} for its whole history`;
 }
+
+/** The note's words alone, where the reader is on the position's
+ *  page: its history holds no figure for the column. */
+export const NOT_RECORDED = "not recorded";

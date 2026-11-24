@@ -17,7 +17,7 @@ import {
 } from "@/components/shared/position-card";
 import { Prov } from "@/components/shared/provenance";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
-import { PositionNameId } from "@/components/shared/position-name-id";
+import { ListingTag } from "@/components/shared/listing-tag";
 import { positionName } from "@/lib/shared/position-name";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
@@ -26,6 +26,7 @@ import { liquityV2RedeemerHref } from "@/lib/liquity-v2/redeemer-routes";
 import { redeemerSumProv } from "@/lib/liquity-v2/redeemer-provenance";
 import type { LiquityV2RedeemerResponse } from "@/lib/sources/api/liquity-v2-redeemer";
 import { RawFigure, tokenIcon } from "./sp-parts";
+import { positionLink } from "@/lib/shared/position-link";
 
 const BOLD = "BOLD";
 
@@ -49,7 +50,7 @@ function RedeemerMenuRows({ address }: { address: string }) {
         icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
         title="Link to this page"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}${liquityV2RedeemerHref(address)}`)}
+        onClick={() => copy("link", positionLink(liquityV2RedeemerHref(address)))}
       />
     </>
   );
@@ -151,13 +152,10 @@ export function liquityV2RedeemerSlots({
   return {
     surface: "detail",
     status: null,
+    lifecycle: false,
     heads,
-    identity: (
-      <span className="flex items-center gap-2">
-        <span className="text-xs text-rb-500">Liquity V2 redemptions</span>
-        <PositionNameId name={name} />
-      </span>
-    ),
+    // The redemptions and the wallet as the tag, the deposit card's (ui-jobs 807).
+    tag: <ListingTag market="Liquity V2 redemptions" id={data.address} />,
     // The transactions are a headline, with their receipt: the counters state the age alone.
     counters: { lastActivityAt: lastAt, eventCount: null, liquidationCount: null, order: "age-last" },
     name,

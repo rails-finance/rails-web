@@ -8,6 +8,7 @@ import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/
 import { ASYMMETRY_DOCS_AND_CHAIN } from "@/lib/asymmetry/docs-and-chain";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { forkSpInfoView } from "@/lib/liquity-fork/sp-info-view";
 
 export const metadata = infoMetadata("asymmetry");
 
@@ -79,6 +80,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "Listing",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>Each row is one Trove.</li>
@@ -95,6 +97,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Branches page",
+    section: "branches",
     body: (
       <p>
         The branches page shows the seven branches side by side. It also shows the order in which redemptions reach the
@@ -106,6 +109,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
       </p>
     ),
   },
+  forkSpInfoView("asymmetry"),
 ];
 
 export default function InfoPage() {

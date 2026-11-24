@@ -80,7 +80,7 @@ import {
   type SparkActivityCounts,
 } from "@/components/protocol/spark/spark-position-explanation";
 import { sparkExports } from "@/components/protocol/spark/spark-export-menu";
-import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { sparkFlowSeriesTimeline, sparkFocusEvents } from "@/lib/spark/flows-timeline";
 import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
@@ -741,6 +741,16 @@ export default function SparkPositionDetail({
     emode: switches?.emode ?? null,
   });
   const flowFocus = useFlowFocusValue(focusRoot, flowTimeline);
+  // A closed card's peak value per side reads the same day rows, through the
+  // flow-focus value's model, so the page builds it once for both.
+  const peakFlows = useMemo(
+    () => ({
+      read: (flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading") as FlowsRead,
+      timeline: flowTimeline,
+      model: flowFocus.model,
+    }),
+    [flowSeries, flowSeriesFailed, flowTimeline, flowFocus.model],
+  );
   // The supplies that back no borrowing, which the card lists apart: open, the
   // live read's collateral switch and threshold (the e-mode category's where
   // the reserve is in it); closed, the reserves the account never turned on
@@ -832,7 +842,6 @@ export default function SparkPositionDetail({
               <SparkPositionCard
                 v={cardView ?? liveView}
                 surface="detail"
-                viewHref={tl.viewHref}
                 outcomeAt={lastLiquidationAt}
                 notCollateral={notCollateral}
                 lives={lives}
@@ -840,6 +849,7 @@ export default function SparkPositionDetail({
                 // The room left to borrow, from the Pool read, is a panel row.
                 chain={chain}
                 exports={exports}
+                flows={peakFlows}
                 // The Explanation is layman prose about the card's figures; the
                 // reserve rates live on the market view.
                 explanation={

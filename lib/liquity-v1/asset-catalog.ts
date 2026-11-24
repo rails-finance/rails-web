@@ -6,6 +6,8 @@
 // LUSD — so this file holds only the protocol's own addresses (used as the
 // `contract` on every provenance entry) plus the two fixed asset descriptors.
 
+import { NATIVE } from "@/lib/shared/asset-roster";
+
 export const LIQUITY_V1_ADDRESSES = {
   /** TroveManager — emits TroveUpdated on liquidation / redemption paths. */
   TROVE_MANAGER: "0xa39739ef8b0231dbfa0dcda07d7e29faabcf4bb2",
@@ -13,6 +15,9 @@ export const LIQUITY_V1_ADDRESSES = {
   BORROWER_OPERATIONS: "0x24179cd81c9e782a4096035f7ec97fb8b783e007",
   /** StabilityPool — LUSD deposits absorb liquidated debt, earn ETH. */
   STABILITY_POOL: "0x66017d22b0f8556afdd19fc67041899eb65a21bb",
+  /** LQTYStaking — LQTY stakes, paid the protocol's ETH redemption fees and
+   *  LUSD borrowing fees (docs.liquity.org, "lqtyStaking"; TroveManager.lqtyStaking()). */
+  LQTY_STAKING: "0x4f9fbb3f1e99b56e0fe2892e623ed36a76fc605d",
   /** PriceFeed — the protocol's own ETH:USD oracle (Chainlink + Tellor fallback).
    *  Named by TroveManager.priceFeed(); verified by scripts/verify-liquity-v1-chain.mjs. */
   PRICE_FEED: "0x4c517d4e2c851ca76d7ec94b805269df0f2201de",
@@ -48,5 +53,9 @@ export const LIQUITY_V1_CCR = 1.5;
 
 /** Collateral is always native ETH; debt is always LUSD — both 18 decimals. */
 export const COLLATERAL_SYMBOL = "ETH";
+/** Native ETH's sentinel (the asset roster's NATIVE). Passed with the
+ *  collateral's icon, it draws the plain ETH mark and opens native ETH's asset
+ *  page. */
+export const COLLATERAL_ADDRESS = NATIVE;
 export const DEBT_SYMBOL = "LUSD";
 export const ASSET_DECIMALS = 18;

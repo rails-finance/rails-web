@@ -226,6 +226,9 @@ export interface FlowLive {
 export interface FlowAssetHeld {
   side: FlowSide;
   symbol: string;
+  /** The asset's key in the timeline (its address, where the family keys by
+   *  address), on a past stop's rows. */
+  asset?: string;
   /** Token units, where known. */
   amount: number | null;
   usd: number;
@@ -1231,9 +1234,10 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     valued.push({ collateral: coll, debt });
     if (unpricedHere.collateral.length || unpricedHere.debt.length) heldUnpriced.set(stop, unpricedHere);
     heldAt.push(
-      lines.map(({ h, usd, p, grown }) => ({
+      lines.map(({ asset, h, usd, p, grown }) => ({
         side: h.side,
         symbol: h.symbol,
+        asset,
         amount: h.amount,
         usd,
         ...(p

@@ -15,10 +15,12 @@
  * than re-listing.
  */
 
+import type { ProtocolType } from "@/lib/shared/protocol-types";
 import { CHAINS, MAINNET_CHAIN_ID, type ChainId, type ChainMeta } from "@/lib/shared/chains";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import type { ProtocolLifecycle } from "@/lib/shared/lifecycle";
 import { POLARIS_TESTNET_CLOSED } from "@/lib/polaris/asset-catalog";
+import { walletProtocolHref, WALLET_SEARCH_FAMILIES } from "@/lib/wallet/wallet-filters";
 
 /** A roster entry as it is written down. `href` is NOT here: it is derived from
  *  `(chainId, slug)` below, so the path text exists in exactly one place. */
@@ -68,6 +70,11 @@ type ProtocolSpec = {
    *  to confirm, read off each protocol's mark or site; Aave's and Morpho's
    *  match the 22 Oct 2026 mock-ups. */
   brand?: number;
+  /** The protocol's primary type, Rails' classification (decision 0068
+   *  point 8; lib/shared/protocol-types.ts): one per protocol, the same on
+   *  every chain row of a version. Required, so an entry cannot be added
+   *  without one. */
+  type: ProtocolType;
   /** Capability tags shown as pills (Borrow / Lend / CDP / …). Provenance
    *  meta-tags like "Chain state" are surfaced elsewhere, not here. */
   tags: string[];
@@ -217,9 +224,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "aave-v3",
     brand: 339,
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Single-pool lending on Ethereum: one cross-collateralised account per wallet, valued at Aave's oracle, with every liquidation traced",
-    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Market overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "aave-v3-base",
@@ -228,9 +239,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 8453,
     slug: "aave-v3",
     protocolKey: "aave-v3",
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Aave V3's Base deployment, a separate Pool with its own reserves and risk parameters: every wallet's account read whole from the contracts",
-    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Market overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Aave V3 on Arbitrum One, position-first (rails-ops
@@ -243,6 +258,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 42161,
     slug: "aave-v3",
     protocolKey: "aave-v3",
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Aave V3's Arbitrum deployment, a separate Pool with its own reserves and risk parameters: any wallet's account read whole from the contracts",
     frontDoor: true,
@@ -260,6 +276,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 5042,
     slug: "morpho",
     protocolKey: "morpho",
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Morpho Blue on Arc: a wallet's positions across every market, each with its collateral, debt and LTV against the market's line, and 30 days of interest",
     positionListing: false,
@@ -277,6 +294,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 10,
     slug: "morpho",
     protocolKey: "morpho",
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Morpho Blue on Optimism: a wallet's positions across every market, each with its collateral, debt and LTV against the market's line, and 30 days of interest",
     positionListing: false,
@@ -291,11 +309,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "aave-v4",
     brand: 294,
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Multi-spoke lending with unified liquidity across asset classes",
     subPages: [
       { segment: "markets", label: "Spokes", tab: "Spokes" },
       { segment: "hubs", label: "Hubs", tab: "Hubs" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },
   {
@@ -310,6 +330,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 8453,
     slug: "aave-v4",
     protocolKey: "aave-v4",
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Aave V4 on Base: the Equities hub's Mag7 spoke, where Coinbase tokenized stocks back USDC loans, each stock price stated with when it was published",
     subPages: [
@@ -330,6 +351,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 5042,
     slug: "aave-v4",
     protocolKey: "aave-v4",
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Aave V4 on Arc: a wallet's accounts on the Core hub's three spokes, each with its balances in dollars at the spoke's oracle, its health factor and 30 days of interest",
     positionListing: false,
@@ -352,6 +374,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 10,
     slug: "aave-v3",
     protocolKey: "aave-v3",
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Aave V3 on Optimism: a wallet's account on the Pool, its balances in dollars at Aave's oracle, its health factor and 30 days of interest",
     positionListing: false,
@@ -371,6 +394,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "aave",
     brand: 339,
+    type: "vaults",
     tags: ["Vaults", "Savings"],
     desc: "Aave's vaults (savings GHO, Umbrella stake tokens and static aTokens): each vault's size and share price, and every address that holds one",
     // No position listing: a holder's share in a vault is not a position in the
@@ -393,6 +417,7 @@ const SPECS: ProtocolSpec[] = [
     // Hue 256.5 (427's spread, between wallet-view hues), from Aerodrome's blue #0433FF (264) in oklch (the mark's second stripe, from
     // the favicon in aerodrome-finance/agents on GitHub).
     brand: 256.5,
+    type: "dex",
     tags: ["Liquidity"],
     desc: "Concentrated liquidity on Base, staked or not: a position's range, fees or AERO and pool over the last 30 days",
     positionListing: false,
@@ -412,6 +437,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Balancer V3",
     chainId: 1,
     slug: "balancer-v3",
+    type: "dex",
     tags: ["Liquidity"],
     desc: "BPT on Ethereum: a wallet's part of each pool's tokens and the pool over the last 30 days",
     positionListing: false,
@@ -427,6 +453,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 42161,
     slug: "balancer-v3",
     protocolKey: "balancer-v3",
+    type: "dex",
     tags: ["Liquidity"],
     desc: "BPT on Arbitrum: a wallet's part of each pool's tokens and the pool over the last 30 days",
     positionListing: false,
@@ -444,6 +471,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "alchemix",
     brand: 99,
+    type: "cdp",
     tags: ["CDP", "Yield"],
     desc: "Self-repaying loans against yield-bearing vault tokens: each position's debt and collateral, dated by block, and the redemptions that moved them",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
@@ -462,6 +490,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 8453,
     slug: "alchemix",
     protocolKey: "alchemix",
+    type: "cdp",
     tags: ["CDP", "Yield"],
     desc: "Alchemix V3 on Base: every position on the alUSDb market, its debt and collateral rebuilt from its events and dated by block",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
@@ -473,9 +502,14 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "asymmetry",
     brand: 189,
+    type: "cdp",
     tags: ["CDP"],
     desc: "A Liquity V2 fork minting USDaf across seven collateral branches: each Trove's collateral and debt read from events",
-    subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
+    subPages: [
+      { segment: "branches", label: "Branches", tab: "Branches" },
+      { segment: "stability-pool", label: "Stability Pool deposits", tab: "Stability Pool" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "compound-v2",
@@ -484,9 +518,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "compound-v2",
     brand: 159,
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "The original cToken markets over six years: every account's supplies, borrows and liquidations, with the markets read live at /compound-v2/markets",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "compound",
@@ -495,9 +533,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "compound-v3",
     brand: 159,
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Compound V3 markets replayed from events: each account's signed base principal and every collateral asset traceable",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Compound V3's Base deployment — five Comets of its own, none of them the
@@ -511,9 +553,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 8453,
     slug: "compound-v3",
     protocolKey: "compound",
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Compound V3's Base deployment: five Comets read live, and a wallet's standing in every one of them found by asking each market",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Compound V3 on Arbitrum One, position-first (rails-ops
@@ -526,6 +572,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 42161,
     slug: "compound-v3",
     protocolKey: "compound",
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Compound V3's Arbitrum deployment: four Comets read live, and any wallet's standing in each one read from the contracts at one block",
     frontDoor: true,
@@ -544,6 +591,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 10,
     slug: "compound-v3",
     protocolKey: "compound",
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Compound V3 on Optimism: a wallet's account in each of three Comets, its balances at each Comet's price feeds, its borrowing limit and 30 days of interest",
     positionListing: false,
@@ -566,6 +614,7 @@ const SPECS: ProtocolSpec[] = [
     // Hue 31.5 (427's spread), from Velodrome's red #FF1100 (30) in oklch (the mark's outer band, from
     // the favicon on velodrome.finance).
     brand: 31.5,
+    type: "dex",
     tags: ["Liquidity"],
     desc: "Concentrated liquidity on Optimism, staked or not: a position's range, fees or VELO and pool over the last 30 days",
     positionListing: false,
@@ -580,9 +629,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "dolomite",
     brand: 144,
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Dolomite margin accounts, one per owner and account number: balances and debts from the contract's events, each account's liquidation line read live",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "basedollar",
@@ -591,9 +644,14 @@ const SPECS: ProtocolSpec[] = [
     chainId: 8453,
     slug: "basedollar",
     brand: 114,
+    type: "cdp",
     tags: ["CDP"],
     desc: "A Liquity V2 fork on Base minting BD across five collateral branches, captured from Base: each Trove's collateral and debt read from events",
-    subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
+    subPages: [
+      { segment: "branches", label: "Branches", tab: "Branches" },
+      { segment: "stability-pool", label: "Stability Pool deposits", tab: "Stability Pool" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "ebisu",
@@ -602,11 +660,16 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "ebisu",
     brand: 9,
+    type: "cdp",
     tags: ["CDP"],
     // The shutdown's date is the catalog's record (lib/ebisu/asset-catalog.ts,
     // EBISU_SHUTDOWN; ui-jobs 608, 612).
     desc: "A Liquity V2 fork that minted ebUSD across five collateral branches, shut down on 20 Aug 2026: each Trove's collateral and debt read from events",
-    subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
+    subPages: [
+      { segment: "branches", label: "Branches", tab: "Branches" },
+      { segment: "stability-pool", label: "Stability Pool deposits", tab: "Stability Pool" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Euler V2 on Base and Arbitrum (rails-ops reference/read-on-visit-candidates-572.md,
@@ -624,6 +687,7 @@ const SPECS: ProtocolSpec[] = [
     protocolKey: "euler-v2",
     // DRAFT: hue 166.5 (427's spread), near the green of Euler's app (160); Miles to confirm.
     brand: 166.5,
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Euler's vaults on Base: a wallet's 256 accounts, each loan with its collateral and health, and each deposit over the last 30 days",
     positionListing: false,
@@ -638,6 +702,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 42161,
     slug: "euler-v2",
     protocolKey: "euler-v2",
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Euler's vaults on Arbitrum: a wallet's 256 accounts, each loan with its collateral and health, and each deposit over the last 30 days",
     positionListing: false,
@@ -651,6 +716,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "fluid",
     brand: 234,
+    type: "cdp",
     tags: ["Lend", "Borrow", "CDP"],
     desc: "Fluid vault positions as NFTs: deposits and borrows from the chain, and each liquidation's effect on every position it touched",
     subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
@@ -667,6 +733,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 8453,
     slug: "fluid",
     protocolKey: "fluid",
+    type: "cdp",
     tags: ["Borrow", "CDP"],
     desc: "Fluid vault positions on Base: a position's collateral, debt, ratio to its limits and interest over the last 30 days",
     positionListing: false,
@@ -681,9 +748,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "frankencoin",
     brand: 39,
+    type: "cdp",
     tags: ["Borrow", "CDP"],
     desc: "Oracle-free ZCHF loans, each a separate contract whose owner declares the liquidation price, which anyone can challenge by auction, all in native units",
-    subPages: [{ segment: "system", label: "System overview", tab: "System" }],
+    subPages: [
+      { segment: "system", label: "System overview", tab: "System" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "fx",
@@ -692,9 +763,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "fx",
     brand: 54,
+    type: "cdp",
     tags: ["Leverage", "CDP"],
     desc: "f(x) positions on wstETH and WBTC: every event from the chain, current state from the pools, and shared funding costs split per position",
-    subPages: [{ segment: "pools", label: "Pools overview", tab: "Pools" }],
+    subPages: [
+      { segment: "pools", label: "Pools overview", tab: "Pools" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Lido on Ethereum (rails-ops ui-jobs 570): a front door taking a wallet
@@ -709,6 +784,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "lido",
     // Hue 241.5 (427's spread), a draft read off Lido's blue mark (public/icons/protocols/lido.png).
     brand: 241.5,
+    type: "staking",
     tags: ["Staking"],
     desc: "Staked ether on Ethereum: a wallet's stETH and wstETH in ETH, its change over the last 30 days, and its withdrawal requests",
     positionListing: false,
@@ -723,9 +799,15 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "liquity-v1",
     brand: 279,
+    type: "cdp",
     tags: ["Borrow"],
     desc: "The original interest-free Trove: ETH collateral and exact LUSD debt emitted per event",
-    subPages: [{ segment: "system", label: "System overview", tab: "System" }],
+    subPages: [
+      { segment: "system", label: "System overview", tab: "System" },
+      { segment: "stability-pool", label: "Stability Pool deposits", tab: "Stability Pool" },
+      { segment: "staking", label: "LQTY stakes", tab: "Staking" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "liquity",
@@ -734,11 +816,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "liquity-v2",
     brand: 279,
+    type: "cdp",
     tags: ["Borrow"],
     desc: "Borrow the BOLD stablecoin with user-set interest rates",
     subPages: [
       { segment: "branches", label: "Branches", tab: "Branches" },
       { segment: "stability-pool", label: "Stability Pool deposits", tab: "Stability Pool" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },
   {
@@ -748,9 +832,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "llamalend",
     brand: 24,
+    type: "lending",
     tags: ["Borrow"],
     desc: "Curve's LlamaLend markets, where liquidation happens gradually across a price band: each loan's soft-liquidation state read live and cross-checked",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "makerdao",
@@ -759,9 +847,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "makerdao",
     brand: 174,
+    type: "cdp",
     tags: ["CDP"],
     desc: "MakerDAO vaults and LockStake urns read from the chain, every value traceable",
-    subPages: [{ segment: "system", label: "System overview", tab: "System" }],
+    subPages: [
+      { segment: "system", label: "System overview", tab: "System" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "maple",
@@ -770,9 +862,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "maple",
     brand: 84,
+    type: "lending",
     tags: ["Lend", "RWA"],
     desc: "Maple's institutional credit pools from the lender's side: share balances, the withdrawal queue, and what is liquid now against what is lent out",
-    subPages: [{ segment: "pools", label: "Pools overview", tab: "Pools" }],
+    subPages: [
+      { segment: "pools", label: "Pools overview", tab: "Pools" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "moonwell",
@@ -781,9 +877,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "moonwell",
     brand: 204,
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "A Compound v2 fork newly on Ethereum: exact mToken balances replayed from events, debt from emitted balances",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Moonwell's Base deployment — the protocol's real home, and a separate
@@ -797,9 +897,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 8453,
     slug: "moonwell",
     protocolKey: "moonwell",
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Moonwell's Base deployment: twenty-one markets under one Comptroller, every account's standing read from the contracts",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     id: "morpho",
@@ -808,6 +912,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "morpho",
     brand: 264,
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Morpho Blue's isolated lending markets on Ethereum: every position replayed from events and priced in its market's loan token",
     // MetaMorpho on Ethereum hangs off this explorer as it does on Base
@@ -815,6 +920,7 @@ const SPECS: ProtocolSpec[] = [
     subPages: [
       { segment: "markets", label: "Markets overview", tab: "Markets" },
       { segment: "vaults", label: "Vaults overview", tab: "Vaults", holderListing: true },
+      { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },
   {
@@ -829,6 +935,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 8453,
     slug: "morpho",
     protocolKey: "morpho",
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Morpho Blue on Base: more than 4,300 isolated markets, every borrower listed, and any wallet's positions across all of them",
     // MetaMorpho is Morpho's own vault layer, so it is a view of this explorer
@@ -838,6 +945,7 @@ const SPECS: ProtocolSpec[] = [
     subPages: [
       { segment: "markets", label: "Markets overview", tab: "Markets" },
       { segment: "vaults", label: "Vaults overview", tab: "Vaults", holderListing: true },
+      { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },
   {
@@ -851,6 +959,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 42161,
     slug: "morpho",
     protocolKey: "morpho",
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Morpho Blue's Arbitrum deployment: 258 isolated markets censused from the singleton, any wallet's positions read from the contract at one block",
     frontDoor: true,
@@ -870,6 +979,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "pancakeswap-v3",
     // Hue 61.5 (427's spread), from the bunny's #D1884F (57) in oklch (pancakeswap/pancake-developer, docs/public/logo.svg).
     brand: 61.5,
+    type: "dex",
     tags: ["Liquidity"],
     desc: "PancakeSwap V3 on Base, staked in its farm or not: a position's range, fees, CAKE and pool over the last 30 days",
     positionListing: false,
@@ -884,6 +994,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 42161,
     slug: "pancakeswap-v3",
     protocolKey: "pancakeswap-v3-base",
+    type: "dex",
     tags: ["Liquidity"],
     desc: "PancakeSwap V3 on Arbitrum, staked in its farm or not: a position's range, fees, CAKE and pool over the last 30 days",
     positionListing: false,
@@ -901,6 +1012,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 5042,
     slug: "uniswap-v3",
     protocolKey: "uniswap-v3",
+    type: "dex",
     tags: ["Liquidity"],
     desc: "Uniswap V3 on Arc: a position's range, fees and pool over the last 30 days",
     positionListing: false,
@@ -915,6 +1027,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 5042,
     slug: "uniswap-v4",
     protocolKey: "uniswap-v4",
+    type: "dex",
     tags: ["Liquidity"],
     desc: "Uniswap's singleton pools on Arc, hooks included: a position's range, fees and pool over the last 30 days",
     positionListing: false,
@@ -935,10 +1048,14 @@ const SPECS: ProtocolSpec[] = [
     // Hue 219 (427's spread), from pendle.finance's favicon #1A2E4F (258) (known-infrastructure's
     // PENDLE_BAR).
     brand: 219,
+    type: "fixed-rate",
     tags: ["Fixed yield", "Yield trading"],
     desc: "A wallet's principal, yield and liquidity tokens in each Pendle market, valued at Pendle's oracle and read at one block",
     positionListing: false,
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // The first testnet explorer. A Sepolia figure is a test figure, and the
@@ -950,6 +1067,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 11155111,
     slug: "polaris",
     brand: 211.5,
+    type: "cdp",
     tags: ["CDP", "Stablecoin"],
     // The closing's date is the catalog's record (lib/polaris/asset-catalog.ts,
     // POLARIS_TESTNET_CLOSED; ui-jobs 621).
@@ -968,6 +1086,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "pwn",
     brand: 129,
+    type: "fixed-rate",
     tags: ["P2P", "Fixed-term"],
     desc: "Peer-to-peer fixed-term loans read from events: each loan's collateral, credit and terms traceable",
     subPages: [{ segment: "book", label: "Loan book", tab: "Loan book" }],
@@ -979,9 +1098,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 8453,
     slug: "seamless",
     brand: 354,
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "An Aave V3 fork on Base, frozen since April 2025: every position read whole from the contracts, and none of them can grow",
-    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Market overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Sky Savings (sUSDS on Ethereum). Sky rebranded MakerDAO, and a saver is
@@ -995,6 +1118,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "sky-savings",
     brand: 324,
+    type: "savings",
     tags: ["Savings"],
     desc: "Every sUSDS holder on Ethereum: the balance, its worth in USDS and the interest earned, from the token's logs and checked against the contract",
     subPages: [{ segment: "rates", label: "Savings Rate history", tab: "Rate" }],
@@ -1015,6 +1139,7 @@ const SPECS: ProtocolSpec[] = [
     // #F996EE, hue 331); the zone draws the hue at the site's fixed lightness
     // and chroma per theme.
     brand: 309,
+    type: "trading",
     tags: ["Trades"],
     desc: "Every trade a wallet settled through CoW Protocol, read from the settlement contract's logs and chosen by token",
     positionListing: false,
@@ -1027,9 +1152,13 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "spark",
     brand: 69,
+    type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "SparkLend, an Aave V3 fork, replayed from events: each reserve's principal traceable and valued at the Pool's oracle",
-    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Market overview", tab: "Markets" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // Uniswap V3 and V4 on Ethereum (rails-ops ui-jobs 556): two versions,
@@ -1045,6 +1174,7 @@ const SPECS: ProtocolSpec[] = [
     // DRAFT: hue 1.5 (427's spread), from Uniswap's pink #FF007A (4) in oklch, the space this
     // field takes (its HSL hue is 331).
     brand: 1.5,
+    type: "dex",
     tags: ["Liquidity"],
     desc: "Concentrated liquidity on Ethereum: a position's range, fees and pool over the last 30 days, read from the pool at two blocks",
     positionListing: false,
@@ -1058,6 +1188,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "uniswap-v4",
     brand: 1.5,
+    type: "dex",
     tags: ["Liquidity"],
     desc: "Uniswap's singleton pools on Ethereum, hooks included: a position's range, fees and pool over the last 30 days",
     positionListing: false,
@@ -1075,6 +1206,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 8453,
     slug: "uniswap-v3",
     protocolKey: "uniswap-v3",
+    type: "dex",
     tags: ["Liquidity"],
     desc: "Uniswap V3 on Base: a position's range, fees and pool over the last 30 days",
     positionListing: false,
@@ -1089,6 +1221,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 42161,
     slug: "uniswap-v3",
     protocolKey: "uniswap-v3",
+    type: "dex",
     tags: ["Liquidity"],
     desc: "Uniswap V3 on Arbitrum: a position's range, fees and pool over the last 30 days",
     positionListing: false,
@@ -1103,6 +1236,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 42161,
     slug: "uniswap-v4",
     protocolKey: "uniswap-v4",
+    type: "dex",
     tags: ["Liquidity"],
     desc: "Uniswap's singleton pools on Arbitrum, hooks included: a position's range, fees and pool over the last 30 days",
     positionListing: false,
@@ -1120,6 +1254,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 10,
     slug: "uniswap-v3",
     protocolKey: "uniswap-v3",
+    type: "dex",
     tags: ["Liquidity"],
     desc: "Uniswap V3 on Optimism: a position's range, fees and pool over the last 30 days",
     positionListing: false,
@@ -1134,6 +1269,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 10,
     slug: "uniswap-v4",
     protocolKey: "uniswap-v4",
+    type: "dex",
     tags: ["Liquidity"],
     desc: "Uniswap's singleton pools on Optimism, hooks included: a position's range, fees and pool over the last 30 days",
     positionListing: false,
@@ -1155,6 +1291,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "yearn",
     brand: 249,
+    type: "vaults",
     tags: ["Vaults", "Yield"],
     desc: "Every vault the V3 factories made, endorsed or not, each one's totals, share price and endorsement read from chain at one block",
     // No position listing, for the reason Aave's vault layer has none: a
@@ -1162,7 +1299,10 @@ const SPECS: ProtocolSpec[] = [
     // (rails-ops decision 0027 call 2), so the rail's first tab is this
     // sub-page and `/ethereum/yearn` opens on it.
     positionListing: false,
-    subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
+    subPages: [
+      { segment: "vaults", label: "Vaults overview", tab: "Vaults" },
+      { segment: "assets", label: "Assets", tab: "Assets" },
+    ],
   },
   {
     // The second vault-native roster subject, in the Yearn shape (rails-ops
@@ -1175,8 +1315,39 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "ipor-fusion",
     brand: 286,
+    type: "vaults",
     tags: ["Vaults", "Yield"],
     desc: "Every vault the IPOR Fusion factory made, each one's totals, share price, fees, roles and fuses read from chain at one block",
+    positionListing: false,
+    unlaunched: true,
+    subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
+  },
+  {
+    // IPOR Fusion on Arbitrum: the Ethereum entry's shape, with a census per chain (TO-DO-ipor-scoping §6.3 phase C).
+    id: "ipor-fusion-arbitrum",
+    session: "ipor-fusion-arbitrum",
+    label: "IPOR Fusion",
+    chainId: 42161,
+    slug: "ipor-fusion",
+    brand: 286,
+    type: "vaults",
+    tags: ["Vaults", "Yield"],
+    desc: "Every vault the IPOR Fusion factory made on Arbitrum, each one's totals, share price, fees and fuses read from chain at one block",
+    positionListing: false,
+    unlaunched: true,
+    subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
+  },
+  {
+    // IPOR Fusion on Base: the Ethereum entry's shape, with a census per chain (TO-DO-ipor-scoping §6.3 phase C).
+    id: "ipor-fusion-base",
+    session: "ipor-fusion-base",
+    label: "IPOR Fusion",
+    chainId: 8453,
+    slug: "ipor-fusion",
+    brand: 286,
+    type: "vaults",
+    tags: ["Vaults", "Yield"],
+    desc: "Every vault the IPOR Fusion factory made on Base, each one's totals, share price, fees and fuses read from chain at one block",
     positionListing: false,
     unlaunched: true,
     subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
@@ -1349,6 +1520,8 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   // way: the explorer draws no position tab and lists no positions.
   yearn: "Holding",
   "ipor-fusion": "Holding",
+  "ipor-fusion-arbitrum": "Holding",
+  "ipor-fusion-base": "Holding",
   seamless: "Position",
   makerdao: "Vault",
   maple: "Position",
@@ -1425,6 +1598,31 @@ export function positionNounOne(session: SessionProtocol): string {
 export function positionNounPlural(session: SessionProtocol): string {
   const noun = POSITION_NOUN[session];
   return noun.endsWith("s") ? noun : `${noun}s`;
+}
+
+/** One of an explorer's sections, as its menu (H5) and its /protocols line
+ *  name them (ui-jobs 786). */
+export interface ExplorerSection {
+  kind: "overview" | "listing" | "subPage" | "info";
+  href: string;
+  name: string;
+  /** The sub-page, on a "subPage" section. */
+  sub?: SubPageEntry;
+}
+
+/** An explorer's sections in menu order: a front-door explorer's front door
+ *  ("Overview"; the Arbitrum position-first ones), the position listing named
+ *  by the positions' noun (none on a vault-native explorer, decision 0027 call
+ *  2), each roster sub-page, then About. The one list H5 and /protocols read. */
+export function explorerSections(entry: ProtocolEntry): ExplorerSection[] {
+  return [
+    ...(entry.frontDoor ? [{ kind: "overview" as const, href: entry.href, name: "Overview" }] : []),
+    ...(entry.positionListing !== false
+      ? [{ kind: "listing" as const, href: entry.listingHref, name: positionNounPlural(entry.session) }]
+      : []),
+    ...entry.subPages.map((sub) => ({ kind: "subPage" as const, href: sub.href, name: sub.tab, sub })),
+    { kind: "info" as const, href: entry.infoHref, name: "About" },
+  ];
 }
 
 /** The explorer's name for a TEXT-ONLY surface — a tab title, an aria-label,
@@ -1521,6 +1719,9 @@ export function subPageForPathname(entry: ProtocolEntry, pathname: string | null
  *  Lowercasing is load-bearing, not cosmetic: `parseAaveV4Search`'s address regex
  *  is `[a-f0-9]` only, so a checksummed address silently matches nothing. */
 export function listingHrefForWallet(session: SessionProtocol, wallet: string, takenOn?: string): string | null {
+  // A family whose listings send a wallet search to the wallet page links
+  // there directly (ui-jobs 738).
+  if (WALLET_SEARCH_FAMILIES.has(session)) return walletProtocolHref(wallet, session);
   const entry = protocolForSession(session);
   if (!entry) return null;
   let listing = entry.listingHref;

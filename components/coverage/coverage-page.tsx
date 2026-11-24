@@ -170,9 +170,6 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
         <div className="mt-6 flex justify-center">
           <ChainToggleLinks chainId={chainId} basePath="/coverage" />
         </div>
-        <p className="text-base md:text-lg font-normal leading-relaxed text-rb-500 max-w-2xl mx-auto mt-5">
-          Details of the protocols we cover and the depth in which we cover them.
-        </p>
       </section>
 
       {/* ── Per-explorer depth matrix (desktop). Client: each row opens its
@@ -180,8 +177,8 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
       <DepthMatrix comingSoon={COMING_SOON} chainId={chainId} />
 
       {/* ── Per-explorer depth (mobile): one stacked card per explorer. On
-            desktop each capability's definition lives in the matrix's own
-            column-header popovers (DepthMatrix above); the card stack never
+            desktop each capability's definition opens from its column
+            heading (DepthMatrix above); the card stack never
             shows a capability's `detail` inline, so on mobile it lives one
             tap away instead — CapabilityPill (below) turns each included-
             capability pill into a bottom-sheet trigger for its own

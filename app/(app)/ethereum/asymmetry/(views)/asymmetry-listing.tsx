@@ -1,18 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { formerHoldFor } from "@/lib/liquity-fork/former-holders";
-
 // Asymmetry Trove listing — client half. One row per Trove (across 5 collateral branches),
 // replayed straight from the Asymmetry TroveUpdated events — chain-direct values only
 // (branch collateral + USDaf debt, user-set interest rate, status). There is no
 // collateral ratio, no USD (interpreted layers, off by default). Holds the
 // presentation config + the in-memory strategy and hands them to the shared
 // ChainTruthListingPage driver with the SSR first-paint data from page.tsx.
+// The count names the Status choice ("open Troves"); the in-memory tier draws
+// the listing's noun, so the noun follows the filters (ui-jobs 805).
 
+import { useState } from "react";
 import type { AsymmetryTroveSummary } from "@/lib/sources/api/asymmetry-troves";
 import { fetchAsymmetryTroves } from "@/lib/api/fetch-asymmetry-troves";
 import { ChainTruthListingPage, memoryStrategy } from "@/components/shared/chain-truth-listing-page";
+import { decodeListFilters } from "@/lib/shared/list-filter";
+import { troveCountLine } from "@/lib/liquity-v2/listing-visibility";
 import { AsymmetryPositionCard, viewFromSummary } from "@/components/protocol/asymmetry/asymmetry-position-card";
 import {
   asymmetryListDimensions,
@@ -30,21 +32,27 @@ export interface AsymmetryListingProps {
 }
 
 export function AsymmetryListing({ initialItems, initialTotal, initialKey, initialSearch }: AsymmetryListingProps) {
-  // The search, so a Trove the searched wallet passed on reads "moved to"
-  // (lib/liquity-fork/former-holders.ts).
-  const [q, setQ] = useState(() => new URLSearchParams(initialSearch ?? "").get("q") ?? "");
+  const [noun, setNoun] = useState(
+    () =>
+      troveCountLine(
+        decodeListFilters(
+          asymmetryListDimensions([]),
+          new URLSearchParams(initialSearch ?? ""),
+          ASYMMETRY_LIST_DEFAULTS,
+        ),
+      ).noun,
+  );
   return (
     <ChainTruthListingPage<AsymmetryTroveSummary, AsymmetryListFilters>
       title="Asymmetry Troves"
-      noun="Troves"
+      noun={noun}
+      onFilters={(f) => setNoun(troveCountLine(f).noun)}
       basePath="/ethereum/asymmetry"
       defaults={ASYMMETRY_LIST_DEFAULTS}
       sortOptions={ASYMMETRY_SORT_OPTIONS}
       searchPlaceholder="Search trove id or collateral"
-      renderCard={(t) => (
-        <AsymmetryPositionCard v={{ ...viewFromSummary(t), formerHold: formerHoldFor(t, q) }} compact />
-      )}
-      onFilters={(filters) => setQ(filters.q ?? "")}
+      renderCard={(t) => <AsymmetryPositionCard v={viewFromSummary(t)} compact />}
+      walletSearch="asymmetry"
       hrefFor={(t) => `/ethereum/asymmetry/${t.collateralType}/${t.id}`}
       keyFor={(t) => `${t.collateralType}-${t.id}`}
       strategy={memoryStrategy<AsymmetryTroveSummary, AsymmetryListFilters>({

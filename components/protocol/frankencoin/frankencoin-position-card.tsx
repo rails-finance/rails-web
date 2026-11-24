@@ -69,6 +69,7 @@ import { AmountText } from "@/components/shared/amount-text";
 import { formatDate } from "@/lib/date";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { serverReadOf, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
+import { positionLink } from "@/lib/shared/position-link";
 
 export interface FrankencoinPositionView {
   /** Lowercased Position contract address — the identity. */
@@ -183,31 +184,16 @@ function PositionAddress({ v }: { v: FrankencoinPositionView }) {
   );
 }
 
-/** The position-grain identity: the contract address + which hub + lineage,
- *  each explained on hover or tap. */
-function PositionIdentity({
-  v,
-  cloneParent,
-  listing = false,
-}: {
-  v: FrankencoinPositionView;
-  cloneParent?: string | null;
-  /** A listing row: the address goes to the card's right-end `tag`, so only
-   *  the hub and lineage are drawn here. */
-  listing?: boolean;
-}) {
+/** The position-grain identity after the tag: which hub + lineage, each
+ *  explained on hover or tap. The contract address stands in the card's
+ *  `tag` (ui-jobs 807). */
+function PositionIdentity({ v, cloneParent }: { v: FrankencoinPositionView; cloneParent?: string | null }) {
   const hubTip =
     v.hub === "v1"
       ? "Minting Hub V1 (2023), the first of Frankencoin's two hubs. It opened this position and runs its challenges."
       : "Minting Hub V2 (2024), the current hub. It opened this position and runs its challenges and, after expiry, the sale of its collateral.";
   return (
     <span className="text-xs text-rb-500 tabular-nums">
-      {!listing && (
-        <>
-          <PositionAddress v={v} />
-          <span className="mx-1 text-rb-400">·</span>
-        </>
-      )}
       <RevealTip tip={hubTip} label={hubTip} focusable className="focus-ring rounded-sm">
         {v.hub === "v1" ? "Hub V1" : "Hub V2"}
       </RevealTip>
@@ -308,7 +294,7 @@ function FrankencoinMenuRows({ position }: { position: string }) {
         icon={icon("link", <Link2 size={16} className="-rotate-45" />)}
         title="Link to this position"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
-        onClick={() => copy("link", `${window.location.origin}/ethereum/frankencoin/${position}`)}
+        onClick={() => copy("link", positionLink(`/ethereum/frankencoin/${position}`))}
       />
     </>
   );
@@ -340,8 +326,6 @@ export interface FrankencoinPositionCardProps {
   challengeTally?: number | null;
   /** The (i) pane's prose. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The ⋮'s export shapes; `null` leaves the position's rows and the
    *  provenance row. */
   exports?: PositionCardExports | null;
@@ -358,7 +342,6 @@ export function useFrankencoinCardSlots({
   live,
   challengeTally = null,
   explanation,
-  viewHref,
   exports,
 }: FrankencoinPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
@@ -371,10 +354,10 @@ export function useFrankencoinCardSlots({
   ) : (
     <span className="flex flex-wrap items-center gap-2">
       {v.owner && <WalletPill wallet={v.owner} ensName={null} filterProtocol="frankencoin" bookmark />}
-      <PositionIdentity v={v} cloneParent={cloneParent} listing />
+      <PositionIdentity v={v} cloneParent={cloneParent} />
     </span>
   );
-  const tag = detail ? undefined : <ListingTag id={<PositionAddress v={v} />} />;
+  const tag = <ListingTag id={<PositionAddress v={v} />} />;
 
   const counters: PositionCardCounters = {
     lastActivityAt: v.lastActivityAt,
@@ -511,8 +494,8 @@ export function useFrankencoinCardSlots({
 
   // The position's name: its contract (lib/shared/position-name.ts).
   const name = positionName({ noun: POSITION_NOUN.frankencoin, id: v.position });
-  const common = { status, heads, identity, notice, counters, outcome, name };
-  if (!detail) return { ...common, surface: "listing", menu: null, tag };
+  const common = { status, heads, identity, tag, notice, counters, outcome, name };
+  if (!detail) return { ...common, surface: "listing", menu: null };
 
   const menu: PositionCardMenu = {
     leading: () => <FrankencoinMenuRows position={v.position} />,
@@ -521,7 +504,7 @@ export function useFrankencoinCardSlots({
   const detailCommon = {
     ...common,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: frankencoinPositionModal({
       status: v.status,
       forcedSale: ended ? ending?.forcedAt != null : undefined,

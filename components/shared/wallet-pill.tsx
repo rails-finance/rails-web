@@ -14,12 +14,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { Facehash } from "@/components/shared/facehash";
 import { Icon } from "@/components/icons/icon";
-import { BookmarkToggle } from "@/components/shared/bookmark-toggle";
+import { BookmarkMark, BookmarkToggle } from "@/components/shared/bookmark-toggle";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { listingHrefForWallet, protocolForPathname, protocolForSession } from "@/lib/shared/protocols";
 import { HolderLabelTag } from "@/components/shared/holder-label";
 import type { ChainId } from "@/lib/shared/chains";
-import { PositionCardEdgeContext } from "@/components/shared/position-card-edge";
+import { ListingRowContext, PositionCardEdgeContext } from "@/components/shared/position-card-edge";
 import { WALLET_HEADING_NAME } from "@/lib/shared/ui-grammar";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 
@@ -87,6 +87,7 @@ function WalletPillInner({
     (filterProtocol ? protocolForSession(filterProtocol)?.chainId : undefined) ??
     protocolForPathname(pathname)?.chainId;
   const [copied, setCopied] = useState(false);
+  const listingRow = useContext(ListingRowContext);
   const href = vault
     ? vault.href
     : (hrefOverride ?? (filterProtocol ? listingHrefForWallet(filterProtocol, wallet) : null));
@@ -151,7 +152,14 @@ function WalletPillInner({
         router.push(href);
       }}
       aria-label={
-        vault ? `Open vault ${label}` : hrefOverride && hrefLabel ? hrefLabel : `Filter positions by wallet ${label}`
+        vault
+          ? `Open vault ${label}`
+          : hrefOverride && hrefLabel
+            ? hrefLabel
+            : // A link to the wallet page (ui-jobs 738): the Liquity V2 family's pills.
+              href?.startsWith("/wallet/")
+              ? `Open wallet ${label}`
+              : `Filter positions by wallet ${label}`
       }
       // Structural hook for the identity itself, so a check can find the
       // label and ask whether it resolved without keying on the typeface
@@ -189,27 +197,34 @@ function WalletPillInner({
         ) : (
           tipped
         )}
-        <RevealTip tip={copied ? "Copied!" : "Copy"}>
-          <button
-            type="button"
-            onClick={(e) => {
-              // Stop the parent link/click handler from firing when the copy
-              // button is the actual target — this lets the pill live inside a
-              // listing-card <Link> without navigating on every copy. The RevealTip
-              // around it stops the click's propagation.
-              e.preventDefault();
-              copy();
-            }}
-            aria-label={copied ? "Copied address" : "Copy address"}
-            className="text-rb-500 hover:text-foreground cursor-pointer"
-          >
-            <Icon name={copied ? "check" : "copy"} size={heading ? 14 : 12} />
-          </button>
-        </RevealTip>
-        {bookmark && <BookmarkToggle wallet={wallet} ensName={name} size={heading ? 14 : 12} />}
+        {listingRow ? null : (
+          <RevealTip tip={copied ? "Copied!" : "Copy"}>
+            <button
+              type="button"
+              onClick={(e) => {
+                // Stop the parent link/click handler from firing when the copy
+                // button is the actual target — this lets the pill live inside a
+                // listing-card <Link> without navigating on every copy. The RevealTip
+                // around it stops the click's propagation.
+                e.preventDefault();
+                copy();
+              }}
+              aria-label={copied ? "Copied address" : "Copy address"}
+              className="text-rb-500 hover:text-foreground cursor-pointer"
+            >
+              <Icon name={copied ? "check" : "copy"} size={heading ? 14 : 12} />
+            </button>
+          </RevealTip>
+        )}
+        {bookmark &&
+          (listingRow ? (
+            <BookmarkMark wallet={wallet} size={12} />
+          ) : (
+            <BookmarkToggle wallet={wallet} ensName={name} size={heading ? 14 : 12} />
+          ))}
       </span>
       {/* The position heading draws it beside the address kind. */}
-      {!heading && <HolderLabelTag wallet={wallet} chainId={chainId} />}
+      {!heading && <HolderLabelTag wallet={wallet} chainId={chainId} inCard />}
     </span>
   );
 }

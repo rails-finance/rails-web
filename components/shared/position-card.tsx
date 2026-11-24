@@ -48,10 +48,14 @@ import { useContext, useId, useLayoutEffect, useRef, useState, type CSSPropertie
 import Link from "next/link";
 import { PositionCardStripSlot } from "@/components/shared/position-card-strip";
 import { PositionReadStamp } from "@/components/shared/position-read";
-import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
+import { BreakdownOverlay, assetsWords } from "@/components/shared/stat-breakdown";
+import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import { withoutFirst, type AssetMark } from "@/lib/shared/asset-mark";
+import { PeakLine, type PeakHeadFigure } from "@/components/shared/closed-peak";
 import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
 import {
+  ListingRowContext,
   PositionCardEdgeContext,
   usePositionCardIdentity,
   type PositionCardIdentity,
@@ -59,12 +63,7 @@ import {
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { formatUsdValue } from "@/lib/utils/format";
-import {
-  OVERLAY_HEADING,
-  POSITION_CARD_FRAME,
-  POSITION_CARD_FRAME_BOX,
-  POSITION_CARD_PAD,
-} from "@/lib/shared/ui-grammar";
+import { POSITION_CARD_FRAME, POSITION_CARD_FRAME_BOX, POSITION_CARD_PAD } from "@/lib/shared/ui-grammar";
 import {
   Prov,
   ProvInert,
@@ -165,9 +164,61 @@ export interface PositionCardHead {
    *  the icon cluster opens their breakdown in a popover (a bottom sheet on
    *  a phone), one side at a time (`asset-donut.tsx`). */
   breakdown?: AssetBreakdown;
+  /** A side stated by its assets (a closed account's peaks): on a detail
+   *  card the figure and its small line are the C19 button that opens
+   *  `panel`, the assets one line each, in the same dropdown, headed `label`
+   *  (the peak label). A listing card draws them with no button. Built by
+   *  `assetsHead`. */
+  list?: { label: string; count: number; panel: ReactNode };
+  /** A small line under the figure, inside the C19 button where there is one:
+   *  a closed account's other assets at 16 px (`assetsHead`). */
+  below?: ReactNode;
+  /** Words the C19 button's name carries where there is no total: a closed
+   *  side's figure and why its asset leads. */
+  state?: string;
+  /** A closed account side's one-day peak value (components/shared/closed-
+   *  peak.tsx), on a detail card: its dropdown states it under the heading
+   *  (`PeakLine`); the face does not. */
+  peak?: PeakHeadFigure;
   /** The side's USD total and its receipt: the breakdown's heading states it
    *  exact, and carries the receipt the headline (inside the button) cannot. */
   total?: { usd: number; info: Provenance };
+}
+
+/** A head stated by its assets (`PositionCardHead.list`), opening `panel`
+ *  under `label`. The caller passes a mark for every asset the panel lists,
+ *  a reserve whose decimals did not load included, so the icons and "+N" add
+ *  up to the lines.
+ *
+ *  Without `figure`, the icons are the figure. With it (a closed account's
+ *  main asset, components/shared/closed-peak.tsx) the figure leads with its
+ *  icon and a small line under it reads `also` ("Also supplied", "Also
+ *  collateral", "Also borrowed") with the other assets at 16 px, `main`
+ *  left out once (`withoutFirst`). */
+export function assetsHead(
+  label: string,
+  assets: AssetMark[],
+  panel: ReactNode,
+  figure?: { figure: ReactNode; main: AssetMark; state?: string; also?: string },
+): Pick<PositionCardHead, "value" | "list" | "below" | "state"> {
+  const list = { label, count: assets.length, panel };
+  if (!figure) return { value: <InlineAssetCluster assets={assets} />, list };
+  const rest = withoutFirst(assets, figure.main);
+  return {
+    value: figure.figure,
+    ...(rest.length > 0
+      ? {
+          below: (
+            <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5" data-card-below="">
+              {figure.also}
+              <InlineAssetCluster assets={rest} size={16} overlap={5} />
+            </span>
+          ),
+        }
+      : {}),
+    ...(figure.state ? { state: figure.state } : {}),
+    list,
+  };
 }
 
 /** The (i) Explanation at the foot of a detail card, drawn through the
@@ -221,6 +272,12 @@ interface PositionCardSlotsCommon {
    *  the right end of the heading row; listing after the pill, as Liquity
    *  V2's listing draws its owner. */
   identity?: ReactNode;
+  /** The position's market and ID (`ListingTag`), after the status pill on
+   *  both surfaces (ui-jobs 807). */
+  tag?: ReactNode;
+  /** `false` on a card with no open/closed life (a vault, a holding, an
+   *  account, a redeemer): no lifecycle pill, so a live card draws no OPEN. */
+  lifecycle?: false;
   /** A line above the headlines that stays in view: a deprecation banner, a
    *  running challenge, a refused reason. */
   notice?: ReactNode;
@@ -285,9 +342,6 @@ export interface PositionCardListingSlots extends PositionCardSlotsCommon {
    *  one link and its position's actions live in the page's ⋮ (Miles,
    *  17 Oct 2026). A menu here must stop a press from reaching the <Link>. */
   menu: ReactNode | null;
-  /** The position's market and ID, at the right end of the heading row (where
-   *  a detail card draws its identity); `identity` keeps the holder on the left. */
-  tag?: ReactNode;
   /** Present on a closed position. */
   outcome?: PositionCardOutcome;
   /** What stands where the lifecycle pill does, on a row that is not a
@@ -467,27 +521,23 @@ function PositionCardRow({
   );
 }
 
-/** The small tag at the left of a detail card's heading row, with its "?". */
-function StatusTag({ status }: { status: PositionCardStatus }) {
+/** A detail card's lifecycle pill, the listing's (ui-jobs 807), with the
+ *  status's "?" beside it. */
+function DetailPill({ status }: { status: PositionCardStatus | null }) {
   return (
     <span className="inline-flex items-center">
-      <span
-        className={`rounded-xs px-1.5 py-0.5 text-[11px] font-semibold ${POSITION_TAG_TONE[status.tone]}`}
-        data-anatomy={status.anatomy ? `C6 ${status.anatomy}` : "C6"}
-      >
-        {status.prov ? <Prov info={status.prov}>{status.word}</Prov> : status.word}
-      </span>
-      {status.tip && <RowHelp tip={status.tip} name={status.word} />}
+      <StatusPill status={status} />
+      {status?.tip && <RowHelp tip={status.tip} name={status.word} />}
     </span>
   );
 }
 
 const OPEN_PILL = "bg-positive/20 text-positive";
 
-/** The listing's lifecycle pill: OPEN for a live position, else the status
- *  word in capitals. On the wallet view an open position draws none, AT RISK
- *  excepted (`PositionCardEdge`). */
-function ListingPill({ status }: { status: PositionCardStatus | null }) {
+/** The lifecycle pill on both surfaces: OPEN for a live position, else the
+ *  status word in capitals. On the wallet view an open position draws none,
+ *  AT RISK excepted (`PositionCardEdge`). */
+function StatusPill({ status }: { status: PositionCardStatus | null }) {
   const edge = useContext(PositionCardEdgeContext);
   if (!status && edge?.atRisk)
     return (
@@ -517,7 +567,11 @@ function ListingPill({ status }: { status: PositionCardStatus | null }) {
 
 /** A head's resolved tier (`PositionCardHead.tier`). */
 const tierOf = (h: PositionCardHead): "amount" | "measure" =>
-  h.tier ?? (h.assets != null || h.usd !== undefined || h.breakdown != null ? "amount" : "measure");
+  h.tier ?? (h.assets != null || h.usd !== undefined || h.breakdown != null || h.list != null ? "amount" : "measure");
+
+/** The small line under a figure (`PositionCardHead.below`): the `sub`
+ *  line's size and colour inside the figure's type. */
+const BELOW_TYPE = "mt-0.5 text-xs font-normal text-rb-500";
 
 /** A measure's figure: a step under the headline size, in a line box of the
  *  headline's height and dropped to its baseline. */
@@ -556,19 +610,26 @@ function HeadBody({
       aria-expanded={toggle.open}
       aria-controls={toggle.open ? toggle.panelId : undefined}
       aria-label={[
-        head.total ? `${head.label} ${formatUsdValue(head.total.usd)}` : head.label,
-        head.breakdown ? `${head.breakdown.assets.length} assets` : null,
+        // A closed side's name leads with its face label ("Peak supplied").
+        head.list ? head.label : head.total ? `${head.label} ${formatUsdValue(head.total.usd)}` : head.label,
+        head.list && !head.total ? (head.state ?? null) : null,
+        head.list ? assetsWords(head.list.count) : head.breakdown ? `${head.breakdown.assets.length} assets` : null,
         "show breakdown",
       ]
         .filter(Boolean)
         .join(", ")}
-      className={`-mx-1.5 -my-1 flex cursor-pointer flex-wrap items-center gap-x-1.5 rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-rb-200/70 focus-ring dark:hover:bg-rb-700/60 ${toggle.open ? "bg-rb-200/70 dark:bg-rb-700/60" : ""}`}
+      className={`-mx-1.5 -my-1 flex cursor-pointer rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-rb-200/70 focus-ring dark:hover:bg-rb-700/60 ${head.below != null ? "flex-col items-start" : "flex-wrap items-center gap-x-1.5"} ${toggle.open ? "bg-rb-200/70 dark:bg-rb-700/60" : ""}`}
       data-card-assets-toggle={head.id}
       data-anatomy="C19"
     >
       <QuietTipsContext.Provider value={true}>
         <ProvInert>{head.value}</ProvInert>
-        <span className="inline-flex shrink-0 items-center">{head.assets}</span>
+        {head.assets != null && <span className="inline-flex shrink-0 items-center">{head.assets}</span>}
+        {head.below != null && (
+          <span className={BELOW_TYPE}>
+            <ProvInert>{head.below}</ProvInert>
+          </span>
+        )}
       </QuietTipsContext.Provider>
     </button>
   );
@@ -596,6 +657,11 @@ function HeadBody({
               {/* shrink-0: a long figure must never squeeze the icon away. */}
               <span className="inline-flex shrink-0 items-center">{head.assets}</span>
             </span>
+          ) : head.below != null ? (
+            <span className="flex flex-col items-start">
+              {head.value}
+              <span className={BELOW_TYPE}>{head.below}</span>
+            </span>
           ) : (
             head.value
           )}
@@ -615,15 +681,16 @@ function HeadBody({
   );
 }
 
-function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolean }) {
-  // The breakdowns: the donut button opens its side's in a popover anchored
-  // to it (a bottom sheet on a phone), one side at a time; the card keeps
-  // its shape.
+/** The headlines' C19 buttons: one side open at a time, its dropdown anchored
+ *  to its button (a bottom sheet on a phone); the card keeps its shape. A side
+ *  opens where it has a breakdown of two or more assets or a list, on a
+ *  detail card. */
+function useHeadPanels(heads: PositionCardHead[], detail: boolean) {
   const [open, setOpen] = useState<string | null>(null);
   const buttons = useRef<Record<string, HTMLButtonElement | null>>({});
   const panelId = useId();
-  const sideOf = (h: PositionCardHead) => (h.id === "debt" ? "debt" : "collateral");
-  const has = (h: PositionCardHead) => detail && !!h.breakdown && h.breakdown.assets.length > 1;
+  const has = (h: PositionCardHead) =>
+    detail && ((!!h.breakdown && h.breakdown.assets.length > 1) || (!!h.list && h.list.count > 0));
   const toggleOf = (h: PositionCardHead) =>
     has(h)
       ? {
@@ -636,13 +703,41 @@ function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolea
         }
       : undefined;
   const openHead = heads.find((h) => h.id === open && has(h));
-  const close = (refocus: boolean) => {
+  const close = () => {
     const id = open;
     setOpen(null);
-    if (refocus && id) buttons.current[id]?.focus();
+    if (id) buttons.current[id]?.focus();
   };
-  const exact = formatUsdValue;
-  const title = openHead ? (openHead.total ? `${openHead.label} ${exact(openHead.total.usd)}` : openHead.label) : "";
+  const sideOf = (h: PositionCardHead) => (h.id === "debt" ? "debt" : "collateral");
+  const panel = openHead && (
+    <BreakdownOverlay
+      id={`${panelId}-${openHead.id}`}
+      label={openHead.list?.label ?? openHead.label}
+      total={openHead.total}
+      anchor={() => buttons.current[openHead.id] ?? null}
+      onClose={close}
+    >
+      {openHead.list ? (
+        <>
+          {openHead.peak && <PeakLine peak={openHead.peak} />}
+          {openHead.list.panel}
+        </>
+      ) : openHead.breakdown ? (
+        <AssetBreakdownPanel
+          key={openHead.id}
+          id={`${panelId}-${openHead.id}-body`}
+          name={openHead.label}
+          side={sideOf(openHead)}
+          breakdown={openHead.breakdown}
+        />
+      ) : null}
+    </BreakdownOverlay>
+  );
+  return { toggleOf, panel };
+}
+
+function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolean }) {
+  const { toggleOf, panel } = useHeadPanels(heads, detail);
   // Tiers apply only where the card holds an amount to stand over its measures.
   const tiered = heads.some((h) => tierOf(h) === "amount");
   return (
@@ -662,42 +757,7 @@ function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolea
           </PositionCardRow>
         ))}
       </div>
-      {openHead?.breakdown && (
-        // The overlay renders in a portal, but its events still pass through
-        // the card's React handlers: this stops them here.
-        <span className="contents" onClick={(e) => e.stopPropagation()}>
-          <AnchoredPanel
-            id={`${panelId}-${openHead.id}`}
-            label={title}
-            anchor={() => buttons.current[openHead.id] ?? null}
-            onClose={() => close(true)}
-            fit={420}
-            drop
-            name="breakdown-panel"
-            // The slices grade toward the overlay's ground.
-            surface="overlay"
-            className="[--donut-ground:var(--surface-overlay)] max-sm:[--donut-ground:var(--surface-raised)] dark:[--donut-ground:var(--color-rb-900)]"
-          >
-            <p className="mb-3 flex items-baseline gap-2 pr-8 sm:pr-0" data-breakdown-heading="">
-              <span className={OVERLAY_HEADING}>{openHead.label}</span>
-              {openHead.total && (
-                <Prov info={openHead.total.info} echo>
-                  <span className="text-sm font-semibold tabular-nums text-foreground">
-                    {exact(openHead.total.usd)}
-                  </span>
-                </Prov>
-              )}
-            </p>
-            <AssetBreakdownPanel
-              key={openHead.id}
-              id={`${panelId}-${openHead.id}-body`}
-              name={openHead.label}
-              side={sideOf(openHead)}
-              breakdown={openHead.breakdown}
-            />
-          </AnchoredPanel>
-        </span>
-      )}
+      {panel}
     </>
   );
 }
@@ -716,45 +776,49 @@ function ClosedGrid({
   detail: boolean;
 }) {
   const peaks = heads.slice(0, 2);
+  const { toggleOf, panel } = useHeadPanels(peaks, detail);
   return (
-    <div className={CLOSED_GRID} data-anatomy="C10">
-      {peaks.map((h, i) => (
+    <>
+      <div className={CLOSED_GRID} data-anatomy="C10">
+        {peaks.map((h, i) => (
+          <PositionCardRow
+            key={h.id}
+            index={i}
+            head={h.id}
+            label={h.label}
+            labelTip={detail || h.labelTipOnListing ? h.labelTip : undefined}
+            headerIcon={h.labelIcon}
+            explain={detail}
+          >
+            <HeadBody head={h} toggle={toggleOf(h)} />
+          </PositionCardRow>
+        ))}
+        {peaks.length < 2 && <div className="hidden sm:block" />}
         <PositionCardRow
-          key={h.id}
-          index={i}
-          head={h.id}
-          label={h.label}
-          labelTip={detail || h.labelTipOnListing ? h.labelTip : undefined}
-          headerIcon={h.labelIcon}
+          index={2}
+          head="outcome"
+          label="Outcome"
+          help={detail ? outcome.tip : undefined}
           explain={detail}
         >
-          <HeadBody head={h} />
+          <div className={`text-lg font-bold mt-2 ${OUTCOME_TONE[tone]}`}>{outcome.word}</div>
+          {outcome.dates?.map((d, i) => (
+            <div key={d.label ?? i} className="text-xs text-rb-500 mt-0.5">
+              {d.label ? `${d.label} ${formatDate(d.at)}` : formatDate(d.at)}
+            </div>
+          ))}
+          {outcome.footnote}
         </PositionCardRow>
-      ))}
-      {peaks.length < 2 && <div className="hidden sm:block" />}
-      <PositionCardRow
-        index={2}
-        head="outcome"
-        label="Outcome"
-        help={detail ? outcome.tip : undefined}
-        explain={detail}
-      >
-        <div className={`text-lg font-bold mt-2 ${OUTCOME_TONE[tone]}`}>{outcome.word}</div>
-        {outcome.dates?.map((d, i) => (
-          <div key={d.label ?? i} className="text-xs text-rb-500 mt-0.5">
-            {d.label ? `${d.label} ${formatDate(d.at)}` : formatDate(d.at)}
-          </div>
-        ))}
-        {outcome.footnote}
-      </PositionCardRow>
-      {outcome.extra ? (
-        <PositionCardRow index={3} head="extra" label={outcome.extra.label}>
-          {outcome.extra.value}
-        </PositionCardRow>
-      ) : (
-        <div className="hidden sm:block" />
-      )}
-    </div>
+        {outcome.extra ? (
+          <PositionCardRow index={3} head="extra" label={outcome.extra.label}>
+            {outcome.extra.value}
+          </PositionCardRow>
+        ) : (
+          <div className="hidden sm:block" />
+        )}
+      </div>
+      {panel}
+    </>
   );
 }
 
@@ -933,24 +997,26 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             aligned (ui-jobs 430). */}
         <span className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 ${wallet ? "[&>:empty]:hidden" : ""}`}>
           {protocolMark}
+          {/* One order on both surfaces (ui-jobs 807): the pill, the market
+              and ID, then the identity. */}
           {detail ? (
             <>
+              {/* A card with no lifecycle draws no OPEN; a status word stands. */}
+              {(slots.status || slots.lifecycle !== false) && <DetailPill status={slots.status} />}
               {/* `contents`: the wrapper names the identity for a saved
                   position's default name without taking part in the row. */}
               <span className="contents" data-card-identity="">
+                {slots.tag}
                 {slots.identity}
               </span>
-              {slots.status && <StatusTag status={slots.status} />}
               {/* The block and time of the read behind the figures (ui-jobs 512). */}
               <PositionReadStamp />
             </>
           ) : (
             <>
-              {slots.lead ?? <ListingPill status={slots.status} />}
+              {slots.lead ?? <StatusPill status={slots.status} />}
+              {slots.tag && <QuietTipsContext.Provider value={true}>{slots.tag}</QuietTipsContext.Provider>}
               {slots.identity}
-              {/* The wallet view draws the market and ID at the left, the
-                  read's stamp at the right. */}
-              {wallet && slots.tag && <QuietTipsContext.Provider value={true}>{slots.tag}</QuietTipsContext.Provider>}
             </>
           )}
         </span>
@@ -977,11 +1043,11 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             {chainPill && <span className={`${slots.stamp ? "" : "max-md:ml-auto "}${narrowOnly}`}>{chainPill}</span>}
           </span>
         ) : (
-          ((!wallet && slots.tag) || (wallet && edge?.stamp) || chainPill) && (
+          ((wallet && edge?.stamp) || chainPill) && (
             // Quiet like the figures: the listing card is one link.
             <QuietTipsContext.Provider value={true}>
               <span className="ml-auto flex items-center gap-2">
-                {wallet ? edge?.stamp && <span className="-my-1.5 flex items-center">{edge.stamp}</span> : slots.tag}
+                {wallet && edge?.stamp && <span className="-my-1.5 flex items-center">{edge.stamp}</span>}
                 {chainPill}
               </span>
             </QuietTipsContext.Provider>
@@ -996,7 +1062,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
 
   const body = (
     <div {...(closed ? { "data-anatomy": "C11" } : {})}>
-      {header}
+      {detail ? header : <ListingRowContext.Provider value={true}>{header}</ListingRowContext.Provider>}
       {/* A listing card is one link: its figures and labels open no tips
           (the position page keeps them). */}
       <QuietTipsContext.Provider value={!detail}>

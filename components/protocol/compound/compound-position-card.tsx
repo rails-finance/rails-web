@@ -37,6 +37,7 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
+  assetsHead,
 } from "@/components/shared/position-card";
 import type { PositionCardMetaProps } from "@/components/shared/position-card-meta";
 import { AssetAmount } from "@/components/shared/asset-amount";
@@ -51,6 +52,9 @@ import { WalletPill } from "@/components/shared/wallet-pill";
 import { useDustLines } from "@/components/shared/dust-reserves";
 import { ExactSpan } from "@/components/shared/amount-text";
 import { formatUnitsExact, formatExactDecimal, formatUsdValue } from "@/lib/utils/format";
+import { compoundPeakSupplyHead } from "@/lib/compound/peak-supply-head";
+import { mainAssetFigure } from "@/components/shared/closed-peak";
+import { pickMainAsset } from "@/lib/shared/main-asset";
 import { peakBaseProv, peakCollateralProv, type CompoundCoords } from "@/lib/compound/event-provenance";
 import { COMPOUND_INDEXED_VOCABULARY, type CompoundTowerVocabulary } from "@/lib/compound/economics";
 import { compoundPositionModal, type CompoundPositionDeployment } from "@/lib/compound/event-templates";
@@ -65,6 +69,7 @@ import type {
   CompoundCurrentBase,
 } from "@/lib/sources/api/compound-positions";
 import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
+import { positionLink } from "@/lib/shared/position-link";
 
 /** Highest-recorded amounts over a position's life (closed/liquidated cards). */
 interface CompoundPeak {
@@ -261,6 +266,7 @@ function TracedAmount({
   amount,
   address,
   unreadAddress,
+  iconSize,
 }: {
   info: Provenance;
   symbol: string;
@@ -268,6 +274,8 @@ function TracedAmount({
   address?: string;
   /** Set to the token's address when its decimals did not load. */
   unreadAddress?: string;
+  /** The icon's size: a headline's default, 16 in an overlay. */
+  iconSize?: number;
 }) {
   return (
     <div>
@@ -275,7 +283,7 @@ function TracedAmount({
         {unreadAddress ? (
           <TokenAmountNotLoaded address={unreadAddress} label={symbol} />
         ) : (
-          <AssetAmount value={amount} symbol={symbol} address={address} />
+          <AssetAmount value={amount} symbol={symbol} address={address} iconSize={iconSize} />
         )}
       </Prov>
     </div>
@@ -292,35 +300,6 @@ function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
   );
 }
 
-/** Identity cluster (owner + market label). The pill links to the session's
- *  wallet-filtered listing only where the session HAS a listing — the Base
- *  explorer opens on a wallet and has no list to filter. */
-function CompoundIdentity({
-  v,
-  session,
-  wallet = true,
-  listing = false,
-}: {
-  v: CompoundPositionView;
-  session: SessionProtocol;
-  /** False on the detail page, whose wallet row above the card names the
-   *  owner (ui-jobs 228). */
-  wallet?: boolean;
-  listing?: boolean;
-}) {
-  const market = <span className="text-xs font-semibold text-rb-500">{v.marketLabel}</span>;
-  // The listing keeps the wallet on the left and the market in the card's `tag`.
-  if (listing) {
-    return <WalletPill wallet={v.account} ensName={null} filterProtocol={session} bookmark />;
-  }
-  return (
-    <span className="flex items-center gap-2">
-      {wallet && <WalletPill wallet={v.account} ensName={null} filterProtocol={session} bookmark />}
-      {market}
-    </span>
-  );
-}
-
 /** The position's row at the head of the card's ⋮: a link to its page. A
  *  Comet position has no ID or NFT of its own; it is (market, wallet). */
 function CompoundMenuRows({ pagePath }: { pagePath: string }) {
@@ -331,7 +310,7 @@ function CompoundMenuRows({ pagePath }: { pagePath: string }) {
       title="Link to this account"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() => {
-        void navigator.clipboard.writeText(`${window.location.origin}${pagePath}`).then(() => {
+        void navigator.clipboard.writeText(positionLink(pagePath)).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         });
@@ -375,8 +354,6 @@ export interface CompoundPositionCardProps {
   peaks?: boolean;
   /** The (i) pane's prose. */
   explanation?: ReactNode;
-  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** The position page's path, for the ⋮'s link row. */
   pagePath?: string;
   /** The ⋮'s export shapes; `null` leaves the link and provenance rows. */
@@ -393,7 +370,6 @@ export function useCompoundCardSlots({
   lane = {},
   peaks = true,
   explanation,
-  viewHref,
   pagePath,
   exports,
 }: CompoundPositionCardProps): PositionCardSlots {
@@ -418,7 +394,12 @@ export function useCompoundCardSlots({
         : v.status === "unread"
           ? { word: "Not loaded", tone: "muted" }
           : null;
-  const identity = <CompoundIdentity v={v} session={session} wallet={!detail} listing={!detail} />;
+  // The market as the tag on both surfaces (ui-jobs 807); the listing names
+  // the wallet after it, the detail page's wallet row above the card does
+  // (ui-jobs 228).
+  const identity = detail ? undefined : (
+    <WalletPill wallet={v.account} ensName={null} filterProtocol={session} bookmark />
+  );
   const tag = <ListingTag market={v.marketLabel} />;
   const counters: PositionCardMetaProps = {
     lastActivityAt: v.lastActivityAt,
@@ -444,64 +425,140 @@ export function useCompoundCardSlots({
     // On the Base sweep the peak is the base's replayed PRINCIPAL; on Ethereum
     // each row is the chain's balance, interest included.
     const principalNote = vocab.baseAtLastEvent ? undefined : "principal only: accrued interest not included";
-    // A wallet that only ever lent the base posted no collateral: its peak is
-    // "supply" (the Aave V4 spoke-card grammar).
-    const supplyOnly = v.peak.collateral.length === 0 && v.peak.lentBase > 0;
-    const lentLine =
-      v.peak.lentBase > 0 ? (
-        <TracedAmount
-          key="lent-base"
-          info={peakBaseProv(v.base.symbol, "lend", { ...peakCoords, asset: v.base.address })}
-          symbol={v.base.symbol}
-          amount={v.peak.lentBase}
-          address={v.base.address}
-        />
-      ) : null;
-    const supplyLines: ReactNode[] = [];
-    if (supplyOnly && lentLine) supplyLines.push(lentLine);
-    for (const c of v.peak.collateral) {
-      supplyLines.push(
-        <TracedAmount
-          key={c.address}
-          info={peakCollateralProv(c.symbol, { ...peakCoords, asset: c.address })}
-          symbol={c.symbol}
-          amount={c.amount}
-          address={c.address}
-          unreadAddress={c.decimalsUnread ? c.address : undefined}
-        />,
-      );
-    }
-    // The lent base is not collateral: under its own caption.
-    if (!supplyOnly && lentLine) {
-      supplyLines.push(
-        <div key="lent-caption" className="mt-1 text-xs font-normal text-rb-500">
-          Highest supplied {v.base.symbol} (earns interest)
-        </div>,
-        lentLine,
-      );
-    }
+    // Every closed head is "Peak <side>" (CARD_VOCAB), its face the shared
+    // closed face (components/shared/closed-peak.tsx): "Peak collateral"
+    // leads with the collateral asset picked by value (two or more) or the
+    // one asset, "Peak supplied" with the lent base where no collateral was
+    // posted, "Peak debt" with the borrowed base. The lent base on a
+    // borrower's card is a captioned line in the collateral dropdown.
+    const plan = compoundPeakSupplyHead(v.peak.collateral.length, v.peak.lentBase);
+    const baseMark = { symbol: v.base.symbol, address: v.base.address };
+    const lendProv = peakBaseProv(v.base.symbol, "lend", { ...peakCoords, asset: v.base.address });
+    const collProv = (c: (typeof v.peak.collateral)[number]) =>
+      peakCollateralProv(c.symbol, { ...peakCoords, asset: c.address });
+    const pick =
+      plan.lead?.kind === "pick"
+        ? pickMainAsset(
+            v.peak.collateral.map((c) => ({ ...c, key: c.address })),
+            v.priceByAddress,
+          )
+        : null;
+    const one = plan.lead?.kind === "collateral" ? v.peak.collateral[plan.lead.index] : null;
+    const supplyFigure = pick
+      ? mainAssetFigure({
+          main: { ...pick.main, exact: formatUnitsExact(pick.main.amountRaw, pick.main.decimals) },
+          receipt: collProv(pick.main),
+          block: v.priceBlock,
+          skipped: pick.skipped,
+          side: "collateral",
+        })
+      : one && !one.decimalsUnread
+        ? mainAssetFigure({
+            main: { ...one, exact: formatUnitsExact(one.amountRaw, one.decimals) },
+            receipt: collProv(one),
+            block: v.priceBlock,
+            skipped: 0,
+            side: "collateral",
+            ranked: false,
+          })
+        : plan.lead?.kind === "base"
+          ? mainAssetFigure({
+              main: { ...baseMark, amount: v.peak.lentBase },
+              receipt: lendProv,
+              block: v.priceBlock,
+              skipped: 0,
+              side: "supply",
+              ranked: false,
+            })
+          : undefined;
+    // The asset the face leads with carries its figure's receipt in the
+    // dropdown too.
+    const leadAddress = pick?.main.address ?? one?.address ?? null;
+    const supplyLinesOf = (iconSize?: number): ReactNode[] =>
+      plan.lines.map((line) => {
+        if (line.kind === "caption")
+          return (
+            <div key="lent-caption" className="mt-1 text-xs font-normal text-rb-500">
+              Highest supplied {v.base.symbol} (earns interest)
+            </div>
+          );
+        if (line.kind === "base")
+          return (
+            <TracedAmount
+              key="lent-base"
+              info={plan.lead?.kind === "base" && supplyFigure ? supplyFigure.info : lendProv}
+              symbol={v.base.symbol}
+              amount={v.peak.lentBase}
+              address={v.base.address}
+              iconSize={iconSize}
+            />
+          );
+        const c = v.peak.collateral[line.index];
+        return (
+          <TracedAmount
+            key={c.address}
+            info={supplyFigure && c.address === leadAddress ? supplyFigure.info : collProv(c)}
+            symbol={c.symbol}
+            amount={c.amount}
+            address={c.address}
+            unreadAddress={c.decimalsUnread ? c.address : undefined}
+            iconSize={iconSize}
+          />
+        );
+      });
     heads = [
       {
         id: "peak-collateral",
-        label: supplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
-        value: supplyLines.length > 0 ? <div className="flex flex-col gap-1">{supplyLines}</div> : null,
+        label: plan.label === "supplied" ? CARD_VOCAB.headSupplied : CARD_VOCAB.headCollateral,
+        value: null,
         sub: noPeaksNote,
+        ...(peaks && plan.lines.length > 0
+          ? assetsHead(
+              plan.label === "supplied" ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
+              plan.label === "supplied"
+                ? [baseMark]
+                : v.peak.collateral.map((c) => ({ symbol: c.symbol, address: c.address })),
+              <div className="flex flex-col gap-1 text-sm font-semibold tabular-nums text-foreground">
+                {supplyLinesOf(16)}
+              </div>,
+              supplyFigure,
+            )
+          : {}),
       },
     ];
-    if (!peaks || v.peak.borrowedBase > 0)
+    if (!peaks || v.peak.borrowedBase > 0) {
+      const debtProv = peakBaseProv(v.base.symbol, "borrow", { ...peakCoords, asset: v.base.address });
+      const debtFigure = mainAssetFigure({
+        main: { ...baseMark, amount: v.peak.borrowedBase },
+        receipt: debtProv,
+        block: v.priceBlock,
+        skipped: 0,
+        side: "debt",
+        ranked: false,
+      });
       heads.push({
         id: "peak-debt",
-        label: PEAK_BORROW_BALANCE,
-        value: peaks ? (
-          <TracedAmount
-            info={peakBaseProv(v.base.symbol, "borrow", { ...peakCoords, asset: v.base.address })}
-            symbol={v.base.symbol}
-            amount={v.peak.borrowedBase}
-            address={v.base.address}
-          />
-        ) : null,
+        label: CARD_VOCAB.headDebt,
+        value: null,
         sub: noPeaksNote ?? principalNote,
+        ...(peaks
+          ? assetsHead(
+              PEAK_BORROW_BALANCE,
+              [baseMark],
+              <div className="text-sm font-semibold tabular-nums text-foreground">
+                <TracedAmount
+                  info={debtFigure.info}
+                  symbol={v.base.symbol}
+                  amount={v.peak.borrowedBase}
+                  address={v.base.address}
+                  iconSize={16}
+                />
+              </div>,
+              debtFigure,
+            )
+          : {}),
       });
+    }
     outcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: outcomeDates(v) ?? (v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined),
@@ -677,8 +734,8 @@ export function useCompoundCardSlots({
       : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
   // The position's name (ui-jobs 703): the market and the account.
   const name = positionName({ market: v.marketLabel, noun: POSITION_NOUN[session], id: v.account });
-  const common = { status, heads: detail ? heads.map(tipped) : heads, identity, counters, outcome, name };
-  if (!detail) return { ...common, surface: "listing", menu: null, tag };
+  const common = { status, heads: detail ? heads.map(tipped) : heads, identity, tag, counters, outcome, name };
+  if (!detail) return { ...common, surface: "listing", menu: null };
 
   const menu: PositionCardMenu = {
     leading: pagePath ? () => <CompoundMenuRows pagePath={pagePath} /> : undefined,
@@ -688,7 +745,7 @@ export function useCompoundCardSlots({
   const detailCommon = {
     ...common,
     surface: "detail" as const,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: compoundPositionModal({ status: v.status, deployment, side: ended ? undefined : eff.side }),
     menu,
   };

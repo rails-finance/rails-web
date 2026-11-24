@@ -5,7 +5,7 @@
 // wallet heading (`components/shared/wallet-positions-menu.tsx`) reads it. Client-safe: the
 // read is `readWalletCounts` in lib/wallet/read-wallet.ts.
 
-export type WalletCountsChain = "ethereum" | "base" | "arbitrum";
+export type WalletCountsChain = "ethereum" | "base" | "arbitrum" | "arc" | "sepolia";
 
 /** One position as the wallet view lists it: its chain, family, id, status and
  *  page. An Arbitrum Compound V3 row is one position per Comet held, as on
@@ -16,7 +16,8 @@ export interface WalletCountsPosition {
   positionId: string;
   /** `moved`: a position the wallet held and passed on (ui-jobs 705). */
   status: "open" | "closed" | "liquidated" | "redeemed" | "moved";
-  href: string;
+  /** Null on a position with no page. */
+  href: string | null;
 }
 
 export interface WalletCountsFamily {
@@ -44,6 +45,9 @@ export interface WalletCounts {
   readAt: number;
   ms: number;
   error?: string;
+  /** The listing reads that did not answer, by what they read: the counts
+   *  are part of the wallet and are not kept. */
+  partial?: string[];
 }
 
 /** A page path for comparison: decoded, lowercase, no trailing slash, and an
@@ -68,7 +72,8 @@ function pagePath(path: string): string {
  *  must match the page's, which defaults to `core` as the page does; a page
  *  under the href (Morpho Blue Arbitrum's per-market page under the
  *  wallet's one row) is that position's. */
-export function rowIsPage(href: string, pathname: string, search: string): boolean {
+export function rowIsPage(href: string | null, pathname: string, search: string): boolean {
+  if (!href) return false;
   const [rawPath, rawQuery = ""] = href.split("?");
   const row = pagePath(rawPath);
   const page = pagePath(pathname);
@@ -134,7 +139,9 @@ export function walletProtocolMenu<P extends WalletCountsPosition>(
   const groups = new Map<string, { protocol: MenuProtocol | undefined; positions: P[] }>();
   for (const p of positions) {
     const key = `${p.chain}:${p.family}`;
-    const g = groups.get(key) ?? { protocol: protocolOf(p), positions: [] };
+    const g = groups.get(key) ?? { protocol: undefined, positions: [] };
+    // The group takes its name from any row that resolves.
+    g.protocol ??= protocolOf(p);
     g.positions.push(p);
     groups.set(key, g);
   }
@@ -158,7 +165,7 @@ export function walletProtocolMenu<P extends WalletCountsPosition>(
       closed,
       moved,
       counts: parts.filter(Boolean).join(" · "),
-      href: one ? g.positions[0].href : (g.protocol?.listing ?? dashboard),
+      href: (one ? g.positions[0].href : null) ?? g.protocol?.listing ?? dashboard,
       page: onPage,
       current: one && onPage,
     };

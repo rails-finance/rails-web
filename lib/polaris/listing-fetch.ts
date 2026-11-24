@@ -24,7 +24,22 @@ export async function fetchPolarisListingPage(
   signal?: AbortSignal,
   headers?: HeadersInit,
 ): Promise<{ data: PolarisPositionSummary[]; total: number; passedOn: number }> {
-  const params = polarisFiltersToFetchParams(filters, page);
+  return askPolaris(polarisFiltersToFetchParams(filters, page), filters, baseUrl, signal, headers);
+}
+
+/** A selection's total, one row asked (the editors' "Show N", ui-jobs 805). */
+export async function countPolarisListing(filters: PolarisListFilters): Promise<number> {
+  const params = { ...polarisFiltersToFetchParams(filters, 1), limit: 1, offset: 0 };
+  return (await askPolaris(params, filters)).total;
+}
+
+async function askPolaris(
+  params: ReturnType<typeof polarisFiltersToFetchParams>,
+  filters: PolarisListFilters,
+  baseUrl?: string,
+  signal?: AbortSignal,
+  headers?: HeadersInit,
+): Promise<{ data: PolarisPositionSummary[]; total: number; passedOn: number }> {
   const { ownerEns } = parsePolarisSearch(filters.q);
   if (ownerEns) {
     const address = await resolveEnsViaApi(ownerEns, baseUrl, signal);

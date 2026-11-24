@@ -191,6 +191,20 @@ const EULER_MARK: Glyph = {
 };
 
 const GLYPHS: Record<string, Glyph> = {
+  // sBOLD (ui-jobs 781; Miles's sBOLD-monochrome.svg): the disc with its "s"
+  // and "b" knocked out, as one evenodd path (the circle, the b with its
+  // counter, the s), so the letters show the ground and the b's counter fills
+  // again. The vault's token icon (public/icons/tokens/sbold.png) stays in
+  // colour on token surfaces.
+  sbold: {
+    viewBox: "0 0 540 540",
+    paths: [
+      {
+        fillRule: "evenodd",
+        d: "M 70 270 A 200 200 0 1 0 470 270 A 200 200 0 1 0 70 270 Z M 249.645 151.673 L 211.319 151.673 L 211.319 381.627 L 287.97 381.627 L 287.97 372.429 C 299.477 378.318 312.515 381.64 326.33 381.64 C 372.897 381.64 410.646 343.891 410.646 297.324 C 410.646 250.757 372.897 213.007 326.33 213.007 C 312.515 213.007 299.477 216.33 287.97 222.219 L 287.97 161.66 L 287.97 151.673 L 249.645 151.673 Z M 287.97 222.219 C 260.688 236.181 242.013 264.572 242.013 297.324 C 242.013 330.076 260.688 358.467 287.97 372.429 L 287.97 222.219 Z M 98.223 298.816 L 129.864 297.16 C 130.548 301.455 131.945 304.726 134.049 306.976 C 137.474 310.617 142.368 312.436 148.732 312.436 C 153.478 312.436 157.137 311.507 159.706 309.645 C 162.274 307.786 163.56 305.628 163.56 303.172 C 163.56 300.841 162.336 298.755 159.89 296.914 C 157.442 295.074 151.765 293.336 142.858 291.7 C 128.273 288.959 117.873 285.318 111.657 280.778 C 105.392 276.239 102.261 270.451 102.261 263.416 C 102.261 258.795 103.863 254.427 107.069 250.316 C 110.274 246.206 115.095 242.975 121.531 240.623 C 127.967 238.271 136.788 237.095 147.997 237.095 C 161.748 237.095 172.234 239.233 179.454 243.507 C 186.672 247.781 190.967 254.58 192.339 263.906 L 160.991 265.44 C 160.158 261.39 158.408 258.445 155.743 256.604 C 153.074 254.765 149.391 253.845 144.694 253.845 C 140.826 253.845 137.914 254.531 135.957 255.899 C 133.999 257.271 133.02 258.938 133.02 260.9 C 133.02 262.332 133.829 263.62 135.443 264.765 C 137.009 265.952 140.728 267.056 146.602 268.078 C 161.137 270.696 171.55 273.345 177.839 276.024 C 184.127 278.704 188.703 282.027 191.566 285.993 C 194.43 289.961 195.862 294.399 195.862 299.307 C 195.862 305.075 193.953 310.392 190.136 315.26 C 186.319 320.128 180.983 323.819 174.132 326.334 C 167.279 328.85 158.641 330.107 148.217 330.107 C 129.912 330.107 117.236 327.162 110.189 321.272 C 103.141 315.381 99.152 307.896 98.223 298.816 Z",
+      },
+    ],
+  },
   // viewBox inferred from path extents — source was pasted without the <svg>
   // wrapper. Compound is a centred mark, so a tight bounding box frames it well.
   compound: COMPOUND_MARK,
@@ -1058,6 +1072,8 @@ for (const id of ["pancakeswap-v3-base", "pancakeswap-v3-arbitrum"]) GLYPHS[id] 
 GLYPHS["fluid-base"] = GLYPHS.fluid;
 // Balancer V3's other chains draw its mark.
 GLYPHS["balancer-v3-arbitrum"] = GLYPHS["balancer-v3"];
+GLYPHS["ipor-fusion-arbitrum"] = GLYPHS["ipor-fusion"];
+GLYPHS["ipor-fusion-base"] = GLYPHS["ipor-fusion"];
 
 export function hasProtocolGlyph(id: string): boolean {
   return id in GLYPHS;

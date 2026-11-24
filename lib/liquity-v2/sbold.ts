@@ -2,7 +2,7 @@
 // BOLD into Liquity V2's three Stability Pools. Decision 0014 parks
 // third-party vaults; this one is Miles's exception.
 
-import { LIQUITY_V2_SP_PATH } from "./sp-routes";
+import { walletProtocolHref } from "@/lib/wallet/wallet-filters";
 import { getKnownInfrastructure } from "@/lib/shared/known-infrastructure";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
@@ -30,5 +30,5 @@ export const sboldDepositorVault = (depositor: string): { name: string; href: st
   return entry ? { name: entry.name, href: SBOLD_PAGE_PATH, kind: "an ERC-4626 vault" } : null;
 };
 
-/** The vault's deposits in the Stability Pool listing, one row per branch. */
-export const SBOLD_DEPOSITS_HREF = `${LIQUITY_V2_SP_PATH}?q=${SBOLD_VAULT}`;
+/** The vault's deposits on its wallet page, Liquity V2 chosen (ui-jobs 738). */
+export const SBOLD_DEPOSITS_HREF = walletProtocolHref(SBOLD_VAULT, "liquity-v2");

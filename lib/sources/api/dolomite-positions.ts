@@ -137,6 +137,11 @@ export interface RawDolomitePeakRow {
   decimals: number | null;
   peakSupplyParRaw: string;
   peakBorrowParRaw: string;
+  /** The highest balance the market reached in tokens: par × the market's
+   *  index at each row's block (rails-server, 23 Nov 2026). Absent on an older
+   *  route, or where an index was not recorded. */
+  peakSupplyTokenRaw?: string | null;
+  peakBorrowTokenRaw?: string | null;
 }
 
 /** One account's page-slice row from the rails route (pre-presentation). */
@@ -234,9 +239,9 @@ export async function buildDolomitePositionRows(raw: RawDolomiteAccountRow[]): P
       else borrows.push(leg);
     }
 
-    // Non-open rows: the highest recorded par per market lane — the unwound
-    // card's headline (every current par is back at zero). PAR amounts,
-    // labeled so where they render.
+    // Non-open rows: each market lane's peak — the unwound card's headline
+    // (every current par is back at zero). In tokens where the route states
+    // them, else the highest recorded par, labeled so where it renders.
     const peakSupplies: DolomitePeakAmount[] = [];
     const peakBorrows: DolomitePeakAmount[] = [];
     for (const p of a.peakMarkets ?? []) {
@@ -244,28 +249,30 @@ export async function buildDolomitePositionRows(raw: RawDolomiteAccountRow[]): P
       const st = state.get(marketId);
       const symbol = p.symbol ?? st?.symbol ?? `market #${marketId}`;
       const decimals = p.decimals ?? st?.decimals ?? 18;
-      const sup = bigintOf(p.peakSupplyParRaw);
-      const dbt = bigintOf(p.peakBorrowParRaw);
-      const dbtMag = dbt < ZERO ? -dbt : dbt;
       const unread = p.decimals == null && st?.decimals == null ? { decimalsUnread: true as const } : {};
-      if (sup > ZERO)
-        peakSupplies.push({
-          marketId,
-          symbol,
-          decimals,
-          amount: scale(sup, decimals),
-          amountRaw: sup.toString(),
-          ...unread,
-        });
-      if (dbtMag > ZERO)
-        peakBorrows.push({
-          marketId,
-          symbol,
-          decimals,
-          amount: scale(dbtMag, decimals),
-          amountRaw: dbtMag.toString(),
-          ...unread,
-        });
+      const peakOf = (parRaw: string, tokenRaw: string | null | undefined) => {
+        const tokens = tokenRaw != null && tokenRaw !== "" ? bigintOf(tokenRaw) : null;
+        const par = bigintOf(parRaw);
+        const v = tokens != null && tokens !== ZERO ? tokens : par;
+        return { mag: v < ZERO ? -v : v, tokens: tokens != null && tokens !== ZERO };
+      };
+      const sup = peakOf(p.peakSupplyParRaw, p.peakSupplyTokenRaw);
+      const dbt = peakOf(p.peakBorrowParRaw, p.peakBorrowTokenRaw);
+      for (const [side, out] of [
+        [sup, peakSupplies],
+        [dbt, peakBorrows],
+      ] as const) {
+        if (side.mag > ZERO)
+          out.push({
+            marketId,
+            symbol,
+            decimals,
+            amount: scale(side.mag, decimals),
+            amountRaw: side.mag.toString(),
+            ...unread,
+            ...(side.tokens && !unread.decimalsUnread ? { tokens: true as const } : {}),
+          });
+      }
     }
 
     return {

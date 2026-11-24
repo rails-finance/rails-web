@@ -14,6 +14,7 @@ import {
 } from "@/lib/vaults/routes";
 import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
 import { DEPLOYED_AT, LEGAL_LAST_UPDATED } from "@/lib/shared/site-dates";
+import { ASSETS_SEGMENT } from "@/lib/shared/assets-by-protocol";
 import { articles } from "@/app/(site)/blog/data/articles";
 
 // UNLAUNCHED EXPLORERS ARE NOT HERE. An explorer flagged `unlaunched` on the
@@ -172,13 +173,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Each explorer's protocol-level sub-pages (branch roster, market roster,
     // system state, …) — derived the same way, off each sub-page's `href`
     // rather than a hand-joined path, so it moves when the roster entry moves.
+    // The Assets pages stay out while they are noindex (decision 0069; their
+    // indexing is decided with stage 2 of ui-jobs 786).
     ...LAUNCHED_PROTOCOLS.flatMap((entry) =>
-      entry.subPages.map((sub) => ({
-        url: `${SITE_URL}${sub.href}`,
-        lastModified: DEPLOYED_AT,
-        changeFrequency: "daily" as const,
-        priority: 0.7,
-      })),
+      entry.subPages
+        .filter((sub) => sub.segment !== ASSETS_SEGMENT)
+        .map((sub) => ({
+          url: `${SITE_URL}${sub.href}`,
+          lastModified: DEPLOYED_AT,
+          changeFrequency: "daily" as const,
+          priority: 0.7,
+        })),
     ),
     // A front-door explorer's position listing, which sits under its route
     // (`listingHref`); every other explorer's listing is its route, above.

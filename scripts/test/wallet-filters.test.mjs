@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { kindOfRow, walletHref, parseKinds } = await import("../../lib/wallet/wallet-filters.ts");
+const { kindOfRow, walletHref, parseKinds, walletSearchHref } = await import("../../lib/wallet/wallet-filters.ts");
 
 const row = (family, extra = {}) => ({
   family,
@@ -47,4 +47,15 @@ test("the link keeps a kind only where the protocol holds more than one", () => 
   assert.equal(walletHref(a, undefined, ["loans", "vaults"]), "/wallet/0xabc?kind=loans,vaults");
   assert.equal(walletHref(a, "nope"), "/wallet/0xabc");
   assert.deepEqual(parseKinds("loans,bogus,loans"), ["loans"]);
+});
+
+test("a listing search by a wallet opens the wallet page on the Liquity V2 family alone", () => {
+  const A = "0x0C8C5F4E163B5637F26B56D31AC672F7751E4A56";
+  assert.equal(walletSearchHref("liquity-v2", A), `/wallet/${A.toLowerCase()}?protocol=liquity-v2`);
+  assert.equal(walletSearchHref("ebisu", " vitalik.eth "), "/wallet/vitalik.eth?protocol=ebisu");
+  // A Trove id, partial text, another family or no family stays on the listing.
+  assert.equal(walletSearchHref("liquity-v2", "1234567"), null);
+  assert.equal(walletSearchHref("liquity-v2", "0x0c8c5f"), null);
+  assert.equal(walletSearchHref("aave-v3", A), null);
+  assert.equal(walletSearchHref(undefined, A), null);
 });

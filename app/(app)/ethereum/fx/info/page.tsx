@@ -185,6 +185,7 @@ export default function InfoPage() {
       views={[
         {
           heading: "Listing",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>A summary at the top gives each pool&apos;s number of open positions, collateral and fxUSD debt.</li>
@@ -201,6 +202,7 @@ export default function InfoPage() {
         },
         {
           heading: "Position page",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>
@@ -221,6 +223,7 @@ export default function InfoPage() {
         },
         {
           heading: "Pools",
+          section: "pools",
           body: (
             <ul className={UL}>
               <li>

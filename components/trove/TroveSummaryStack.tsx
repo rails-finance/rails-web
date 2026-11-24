@@ -34,7 +34,6 @@ export function TroveSummaryStack({
   debtInFrontLoading,
   priceFailed = false,
   loadingStatus,
-  viewHref,
   surplus,
   exports,
   shutdown,
@@ -58,10 +57,6 @@ export function TroveSummaryStack({
    *  slots that need it. */
   priceFailed?: boolean;
   loadingStatus: { message: string | null; snapshotDate?: number };
-  /** Copy-this-view control, forwarded straight through to `LiquityPositionCard`
-   *  — the trove page's `useTimelineEvents().viewHref`. Absent on the home
-   *  hero's server-fed embed, which draws no timeline at all. */
-  viewHref?: () => string;
   /** A liquidated trove's collateral surplus, read at the head. */
   surplus?: LiquityTroveSurplus | null;
   /** The card ⋮'s export shapes (TO-DO-position-card 270). The home hero
@@ -171,7 +166,6 @@ export function TroveSummaryStack({
       v={view}
       live={live}
       explanation={items.length > 0 || lead != null ? <ProseExplainer paragraph={lead} items={items} /> : undefined}
-      viewHref={viewHref}
       surplus={surplus}
       panel={panel}
       exports={exports}

@@ -42,6 +42,7 @@ export function RevealTip({
   focusable,
   align = "start",
   wrap,
+  interactive = false,
 }: {
   tip: ReactNode;
   children: ReactNode;
@@ -56,6 +57,10 @@ export function RevealTip({
   /** A sentence-length tip: the bubble wraps at 20rem instead of running on
    *  one line. */
   wrap?: boolean;
+  /** The bubble holds a control (the holder label's "Open the vault page"): it
+   *  takes pointer events, a click inside it is the control's, and focus
+   *  moving into it keeps it open. */
+  interactive?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const quiet = useContext(QuietTipsContext);
@@ -122,7 +127,14 @@ export function RevealTip({
       tabIndex={focusable ? 0 : undefined}
       role={focusable ? "button" : undefined}
       aria-expanded={focusable ? open : undefined}
-      onBlur={focusable ? () => setOpen(false) : undefined}
+      onBlur={
+        focusable
+          ? (e) => {
+              if (interactive && ref.current?.contains(e.relatedTarget as Node | null)) return;
+              setOpen(false);
+            }
+          : undefined
+      }
       onKeyDown={
         focusable
           ? (e) => {
@@ -135,6 +147,8 @@ export function RevealTip({
           : undefined
       }
       onClick={(e) => {
+        // A click on the bubble's own control is the control's.
+        if (interactive && bubbleRef.current?.contains(e.target as Node)) return;
         // Inside a value the inspector can pick, the click traces it.
         if (tipYieldsToTrace(ref.current, provInspector.getArmed())) return;
         e.preventDefault();
@@ -163,7 +177,7 @@ export function RevealTip({
           ref={bubbleRef}
           role="tooltip"
           data-prov-hidden=""
-          className={`pointer-events-none absolute bottom-full ${align === "end" ? "right-0" : "left-0"} z-[var(--z-dropdown)] mb-2.5 ${wrap ? "w-max max-w-[min(20rem,calc(100vw-1.5rem))] whitespace-normal break-words" : "whitespace-nowrap"} rounded-2xl border p-3 text-xs font-medium tabular-nums text-foreground shadow-lg`}
+          className={`${interactive ? "pointer-events-auto" : "pointer-events-none"} absolute bottom-full ${align === "end" ? "right-0" : "left-0"} z-[var(--z-dropdown)] mb-2.5 ${wrap ? "w-max max-w-[min(20rem,calc(100vw-1.5rem))] whitespace-normal break-words" : "whitespace-nowrap"} rounded-2xl border p-3 text-xs font-medium tabular-nums text-foreground shadow-lg`}
           style={{
             background: "var(--rb-tooltip-bg)",
             borderColor: "var(--rb-tooltip-border)",

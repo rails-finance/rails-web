@@ -1,12 +1,13 @@
-// The Liquity V2 Stability Pool listing beside the Troves: server-driven, as
+// The Liquity V2 Stability Pool listing beside the Troves, and each fork's
+// (lib/liquity-v2/sp-deployment.ts): server-driven, as
 // the Trove listing is. The selection maps onto /api/liquity-v2/stability-pool
 // params and rails-server filters, sorts and pages. Polaris's deposit listing
 // (lib/polaris/sp-loan-listing.ts) is the shape.
 //
 // The search box reads a depositor: an address, or an ENS name resolved here
 // first (lib/liquity-v2/search.ts parses it; a Trove id names no deposit).
-// Naming one relaxes the resting Status default (Open) to every status, the
-// Trove listing's middle path. The Collateral sort appears once a branch is
+// Status is Open / Closed / All (ui-jobs 805, sp-visibility.ts): naming a
+// depositor rests it on All. The Collateral sort appears once a branch is
 // chosen: the three branches pay different tokens. Deposit and Yield are BOLD
 // on every branch.
 
@@ -15,8 +16,11 @@ import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filt
 import type { BaseListFilters, SerializableDimension } from "@/lib/shared/list-filter";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import { resolveEnsViaApi } from "@/lib/shared/listing-search";
+import { setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 import { parseTroveSearch } from "./search";
-import { normalizeSpBranch, SP_BRANCHES } from "./sp-routes";
+import { defaultStatusChoice, statusChoice, statusParam } from "./sp-visibility";
+import { SP_BRANCHES } from "./sp-routes";
+import { LIQUITY_V2_SP, spPool, type SpDeployment } from "./sp-deployment";
 import {
   readLiquityV2Sp,
   type LiquityV2DepositListResponse,
@@ -28,6 +32,7 @@ export const SP_ITEMS_PER_PAGE = 20;
 
 export interface SpListFilters extends BaseListFilters {
   branch: string[];
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
   tx: string[];
 }
@@ -41,26 +46,6 @@ export const SP_LIST_DEFAULTS: SpListFilters = {
   tx: [],
 };
 
-const STATUSES = ["open", "closed"] as const;
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-];
-
-/** True when the query names a depositor (an address or an ENS name). */
-export function namesDepositor(q: string | undefined): boolean {
-  const { ownerAddress, ownerEns } = parseTroveSearch(q ?? "");
-  return Boolean(ownerAddress ?? ownerEns);
-}
-
-/** Open while browsing, every status once the search names a depositor. */
-const defaultStatuses = (f: { q?: string }): string[] => (namesDepositor(f.q) ? [...STATUSES] : ["open"]);
-const canonical = (v: string[]) => STATUSES.filter((s) => v.includes(s));
-const effectiveStatuses = (f: { q?: string; status: string[] }): string[] => {
-  const sel = canonical(f.status);
-  return sel.length > 0 ? sel : defaultStatuses(f);
-};
-
 export const SP_BRANCH_OPTIONS: FilterOptionDef[] = SP_BRANCHES.map((b) => ({ value: b, label: b }));
 
 export function spListDimensions(
@@ -71,19 +56,14 @@ export function spListDimensions(
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUSES.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: [...STATUSES] }),
-      set: (f, v) => {
-        const sel = canonical(v);
-        const def = defaultStatuses(f);
-        const same = sel.length === def.length && sel.every((s) => def.includes(s));
-        return { ...f, status: sel.length === 0 || same ? [] : sel };
-      },
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses (ui-jobs 805).
+      set: (f, v) => ({ ...f, status: setStatusChoice(v, defaultStatusChoice(f), []).status }),
     },
     {
       id: "branch",
@@ -99,13 +79,15 @@ export function spListDimensions(
   ];
 }
 
-export function spSortOptions(f: SpListFilters): SortOption[] {
+/** The sorts; `dep` (Liquity V2 by default) decides whether the branch the
+ *  selection names is one of its own. */
+export function spSortOptions(f: SpListFilters, dep: SpDeployment = LIQUITY_V2_SP): SortOption[] {
   const base: SortOption[] = [
     { value: "recent", label: RECENT_ACTIVITY_LABEL },
     { value: "deposit", label: "Deposit" },
     { value: "yield", label: "Yield" },
   ];
-  if (normalizeSpBranch(f.branch[0])) base.push({ value: "coll", label: "Collateral" });
+  if (spPool(dep, f.branch[0])) base.push({ value: "coll", label: "Collateral" });
   base.push({ value: "tx", label: "Transactions" });
   return base;
 }
@@ -114,6 +96,8 @@ interface Hop {
   baseUrl?: string;
   signal?: AbortSignal;
   headers?: HeadersInit;
+  /** Rows asked for; a page's worth by default (one for a draft's count). */
+  limit?: number;
 }
 
 /** The depositor the search names, as an address: an ENS name resolves first.
@@ -131,35 +115,38 @@ export function spListParams(
   f: SpListFilters,
   page: number,
   wallet: string | undefined,
+  dep: SpDeployment = LIQUITY_V2_SP,
+  limit: number = SP_ITEMS_PER_PAGE,
 ): Record<string, string | undefined> {
-  const branch = normalizeSpBranch(f.branch[0]) ?? undefined;
-  const sortBy = spSortOptions(f).some((o) => o.value === f.sortBy) ? f.sortBy : "recent";
-  const statuses = effectiveStatuses(f);
+  const branch = spPool(dep, f.branch[0])?.symbol;
+  const sortBy = spSortOptions(f, dep).some((o) => o.value === f.sortBy) ? f.sortBy : "recent";
   const { minTx, maxTx } = transactionBounds(f.tx);
   return {
     collateralType: branch,
     wallet,
-    status: statuses.length === STATUSES.length ? undefined : statuses.join(","),
+    status: statusParam(f),
     minTx: minTx?.toString(),
     maxTx: maxTx?.toString(),
     sortBy,
     sortOrder: f.sortOrder,
-    limit: String(SP_ITEMS_PER_PAGE),
-    offset: String((page - 1) * SP_ITEMS_PER_PAGE),
+    limit: String(limit),
+    offset: String((page - 1) * limit),
   };
 }
 
-export async function fetchSpPage(
+/** One page of the deployment's deposits (Liquity V2's by default). */
+export async function fetchSpPage<B extends string = LiquityV2DepositRow["collateral_type"]>(
   filters: SpListFilters,
   page: number,
   hop: Hop = {},
-): Promise<{ data: LiquityV2DepositRow[]; total: number }> {
+  dep: SpDeployment = LIQUITY_V2_SP,
+): Promise<{ data: LiquityV2DepositRow<B>[]; total: number }> {
   const wallet = await depositorOf(filters.q, hop);
   if (wallet === null) return { data: [], total: 0 };
-  const r = await readLiquityV2Sp<LiquityV2DepositListResponse>("stability-pool", spListParams(filters, page, wallet), {
-    baseUrl: hop.baseUrl,
-    headers: hop.headers,
-    signal: hop.signal,
-  });
+  const r = await readLiquityV2Sp<LiquityV2DepositListResponse<B>>(
+    "stability-pool",
+    spListParams(filters, page, wallet, dep, hop.limit),
+    { baseUrl: hop.baseUrl, headers: hop.headers, signal: hop.signal, api: dep.api },
+  );
   return { data: r.rows, total: r.pagination.total };
 }

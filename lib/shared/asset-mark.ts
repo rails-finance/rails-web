@@ -16,3 +16,11 @@ export interface AssetMark {
  *  surface the address has not reached yet; the chip resolves it through the
  *  house symbol table (lib/shared/token-addresses.ts) or draws the glyph. */
 export const symbolOnly = (symbol: string): AssetMark => ({ symbol, address: null });
+
+/** `assets` without the first mark equal to `main` (symbol and address): a
+ *  closed side's small line leaves out the asset its figure is in once, so a
+ *  second market sharing that mark (cWBTC and cWBTC2) keeps its icon. */
+export function withoutFirst<T extends AssetMark>(assets: readonly T[], main: AssetMark | undefined): T[] {
+  const at = main ? assets.findIndex((a) => a.symbol === main.symbol && a.address === main.address) : -1;
+  return assets.filter((_, i) => i !== at);
+}

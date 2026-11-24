@@ -38,7 +38,7 @@ import { loadSboldVault } from "@/lib/sources/chain/sbold-vault";
 import { SBOLD_ASSET, SBOLD_CREATED_BLOCK } from "@/lib/liquity-v2/sbold";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { serverReadAt } from "@/lib/shared/server-head-read";
-import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import { aaveVaultAttestation } from "@/lib/aave-vaults/vault-catalog";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
@@ -48,13 +48,19 @@ import {
   morphoBaseVaultSummaries,
   sboldVaultPageSummary,
   yearnVaultSummaries,
+  iporFusionVaultSummaries,
   withAssetScale,
   type VaultSummary,
 } from "@/lib/vaults/summary";
 import { loadAssetScales } from "@/lib/vaults/asset-scale";
 import { loadVaultYields } from "@/lib/vaults/yield-read";
 import type { VaultYield } from "@/lib/vaults/yield";
-import { vaultIndexKey, type VaultIndexRoster } from "@/lib/vaults/index-rosters";
+import { VAULT_INDEX_LISTED, vaultIndexKey, type VaultIndexRoster } from "@/lib/vaults/index-rosters";
+import {
+  loadIporFusionVaultDirectory,
+  type IporFusionVaultDirectoryResponse,
+} from "@/lib/sources/chain/ipor-fusion-vault-directory";
+import type { IporFusionChainId } from "@/lib/ipor-fusion/vault-roster";
 import type { VaultCensusFamily } from "@/lib/vaults/families";
 import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
@@ -131,6 +137,7 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
     ethCensusRead,
     ethMorphoCensusRead,
     yearnCensusRead,
+    iporReads,
   ] = await Promise.all([
     loadMetaMorphoVaultDirectory(BASE_CHAIN_ID).catch(
       unread<MorphoBaseVaultDirectoryResponse | null>("Morpho's vault directory (Base)", null),
@@ -154,6 +161,17 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
     loadCensus(MAINNET_CHAIN_ID),
     loadCensus(MAINNET_CHAIN_ID, "morpho"),
     loadCensus(MAINNET_CHAIN_ID, "yearn-v3"),
+    // IPOR Fusion's rosters on the chains where its page is launched; none
+    // while it is unlaunched (VAULT_INDEX_LISTED).
+    Promise.all(
+      VAULT_INDEX_LISTED()
+        .filter((r) => r.protocol === "ipor-fusion")
+        .map((r) =>
+          loadIporFusionVaultDirectory(r.chainId as IporFusionChainId).catch(
+            unread<IporFusionVaultDirectoryResponse | null>(`IPOR Fusion's vault directory (chain ${r.chainId})`, null),
+          ),
+        ),
+    ),
   ]);
 
   const baseCensus = baseCensusRead ?? [];
@@ -214,16 +232,29 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
         },
       ];
 
+  const iporVaults = iporReads.flatMap((d) => (d ? iporFusionVaultSummaries(d) : []));
+  const iporOn = (chainId: number) => iporVaults.filter((v) => v.chainId === chainId);
+
   // The "decimals disagree" standing: one read per chain over the assets.
-  const [baseScales, ethScales] = await Promise.all([
+  // IPOR Fusion's rows join their chain's read; Arbitrum's is made only when
+  // the index lists a roster there.
+  const [baseScales, ethScales, arbScales] = await Promise.all([
     loadAssetScales(
       BASE_CHAIN_ID,
-      morphoVaults.map((v) => v.asset.address),
+      [...morphoVaults, ...iporOn(BASE_CHAIN_ID)].map((v) => v.asset.address),
     ),
     loadAssetScales(
       MAINNET_CHAIN_ID,
-      [...morphoEthVaults, ...aaveVaults, ...yearnVaults, ...mapleVaults].map((v) => v.asset.address),
+      [...morphoEthVaults, ...aaveVaults, ...yearnVaults, ...mapleVaults, ...iporOn(MAINNET_CHAIN_ID)].map(
+        (v) => v.asset.address,
+      ),
     ),
+    iporOn(ARBITRUM_CHAIN_ID).length > 0
+      ? loadAssetScales(
+          ARBITRUM_CHAIN_ID,
+          iporOn(ARBITRUM_CHAIN_ID).map((v) => v.asset.address),
+        )
+      : Promise.resolve({} as Awaited<ReturnType<typeof loadAssetScales>>),
   ]);
   const scaled = (vs: VaultSummary[], scales: typeof baseScales) => vs.map((v) => withAssetScale(v, scales));
 
@@ -245,7 +276,7 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
     if (ethYields[v.address]) yields[vaultIndexKey(v)] = ethYields[v.address];
   // The store keeps no Maple series (decision 0047, "Out of scope"), so it is
   // not asked; the rows say so.
-  for (const v of [...mapleVaults, ...sboldVaults]) yields[vaultIndexKey(v)] = { none: "no-series" };
+  for (const v of [...mapleVaults, ...sboldVaults, ...iporVaults]) yields[vaultIndexKey(v)] = { none: "no-series" };
 
   const ethCensusBlock = ethCensus.length > 0 ? Math.max(...ethCensus.map((c) => c.censusBlock)) : null;
   return {
@@ -253,6 +284,9 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
       ...scaled(morphoVaults, baseScales),
       ...scaled([...morphoEthVaults, ...aaveVaults, ...yearnVaults, ...mapleVaults], ethScales),
       ...sboldVaults,
+      ...scaled(iporOn(BASE_CHAIN_ID), baseScales),
+      ...scaled(iporOn(MAINNET_CHAIN_ID), ethScales),
+      ...scaled(iporOn(ARBITRUM_CHAIN_ID), arbScales),
     ],
     yields,
     indexDown:
@@ -267,7 +301,9 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
         yearnCensusRead,
         baseYieldsRead,
         ethYieldsRead,
-      ].some((r) => r == null) || sbold.chainStale,
+      ].some((r) => r == null) ||
+      iporReads.some((r) => r == null) ||
+      sbold.chainStale,
     rosters: [
       {
         protocol: "morpho",
@@ -334,6 +370,22 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
         count: sboldVaults.length,
         catalog: { catalogSize: 1 },
       },
+      ...iporReads.flatMap((d) =>
+        d
+          ? [
+              {
+                protocol: "ipor-fusion" as const,
+                chainId: d.chainId as ChainId,
+                blockNumber: d.blockNumber,
+                readBy: serverReadAt(d.head, d.blockNumber || null),
+                chainStale: d.chainStale,
+                readAt: d.readAt,
+                count: d.rows.length,
+                catalog: { catalogSize: d.catalogSize, censusBlock: d.censusBlock },
+              },
+            ]
+          : [],
+      ),
     ],
   };
 }

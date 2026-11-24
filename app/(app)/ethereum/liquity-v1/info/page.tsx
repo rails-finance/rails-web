@@ -8,6 +8,8 @@ import { GlossaryLink, ProtocolInfoPage } from "@/components/shared/protocol-inf
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { liquityV1Glossary } from "@/lib/liquity-v1/event-templates";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { LIQUITY_V1_SP_PATH } from "@/lib/liquity-v1/sp-routes";
+import { LIQUITY_V1_STAKING_PATH } from "@/lib/liquity-v1/staking-routes";
 
 export const metadata = infoMetadata("liquity-v1");
 
@@ -24,10 +26,18 @@ export default function InfoPage() {
           <Link href="/ethereum/liquity-v1/system" className={INLINE_LINK}>
             system as a whole
           </Link>
-          : its total collateral ratio, its Stability Pool and the queue of Troves that redemptions reach first.
+          : its total collateral ratio, its Stability Pool and the queue of Troves that redemptions reach first. And it
+          shows every{" "}
+          <Link href={LIQUITY_V1_SP_PATH} className={INLINE_LINK}>
+            Stability Pool deposit
+          </Link>{" "}
+          and every{" "}
+          <Link href={LIQUITY_V1_STAKING_PATH} className={INLINE_LINK}>
+            LQTY stake
+          </Link>{" "}
+          with its history.
         </>
       }
-      notCovered="Stability Pool deposits and staking of LQTY, Liquity's token, aren't covered here."
       glossary={liquityV1Glossary()}
       howItWorks={[
         <>
@@ -60,6 +70,7 @@ export default function InfoPage() {
       views={[
         {
           heading: "Listing",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>The listing has one card per Trove, showing its ETH collateral, its LUSD debt and its status.</li>
@@ -69,6 +80,7 @@ export default function InfoPage() {
         },
         {
           heading: "Trove page",
+          section: "positions",
           body: (
             <ul className={UL}>
               <li>The top card shows the collateral, the debt and the collateral ratio, read from the chain now.</li>
@@ -78,6 +90,7 @@ export default function InfoPage() {
         },
         {
           heading: "System page",
+          section: "system",
           body: (
             <p>
               The system page shows the total collateral ratio against the 150% line, the Stability Pool against the
@@ -88,6 +101,57 @@ export default function InfoPage() {
               </Link>
               .
             </p>
+          ),
+        },
+        {
+          heading: "Stability Pool deposits",
+          section: "stability-pool",
+          body: (
+            <ul className={UL}>
+              <li>
+                The Stability Pool holds LUSD that repays the debt of liquidated Troves. A deposit is one address&apos;s
+                LUSD in the pool. Each liquidation burns a share of every deposit and pays ETH in its place, and the
+                protocol issues LQTY to depositors.
+              </li>
+              <li>
+                The pool writes what changed only when the depositor touches the deposit, and every touch pays out the
+                ETH and LQTY gained since the last one. A deposit opened through a front end shares its LQTY with that
+                front end.
+              </li>
+              <li>
+                The listing has one card per deposit; open deposits show by default. A deposit&apos;s page shows the
+                deposit now and the ETH and LQTY the next touch would pay, read from the chain now, and a timeline of
+                its touches.{" "}
+                <Link href={LIQUITY_V1_SP_PATH} className={INLINE_LINK}>
+                  See the deposits
+                </Link>
+                .
+              </li>
+            </ul>
+          ),
+        },
+        {
+          heading: "LQTY stakes",
+          section: "staking",
+          body: (
+            <ul className={UL}>
+              <li>
+                LQTY, Liquity&apos;s token, can be staked in LQTYStaking. A stake earns a share of the protocol&apos;s
+                fees in proportion to its size: the borrowing fees in LUSD and the redemption fees in ETH.
+              </li>
+              <li>
+                A stake moves only when the staker stakes or unstakes, and every touch pays out the fees paid in since
+                the last one. Unstaking 0 claims the fees and moves no LQTY.
+              </li>
+              <li>
+                The listing has one card per stake; open stakes show by default. A stake&apos;s page shows the stake and
+                the fees the next touch would pay, read from the chain now, and a timeline of its touches.{" "}
+                <Link href={LIQUITY_V1_STAKING_PATH} className={INLINE_LINK}>
+                  See the stakes
+                </Link>
+                .
+              </li>
+            </ul>
           ),
         },
       ]}

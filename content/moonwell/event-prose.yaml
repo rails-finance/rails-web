@@ -295,15 +295,15 @@ position_words:
     History
   # ── An open account ──
   lead_shortfall: |-
-    The Comptroller reports a shortfall, so the account can be liquidated now:
+    The Comptroller reports a shortfall, so the account can be liquidated now.
   lead_debt: |-
-    The account borrows against its supplied collateral, with {credit} of its credit limit remaining:
+    The account borrows against its supplied collateral, with {credit} of its credit limit remaining.
   lead_debt_unread: |-
-    The account borrows against its supplied collateral:
+    The account borrows against its supplied collateral.
   lead_supply: |-
-    The account supplies collateral to Moonwell and owes nothing:
+    The account supplies collateral to Moonwell and owes nothing.
   lead_earn: |-
-    The account supplies to Moonwell to earn, with nothing entered as collateral:
+    The account supplies to Moonwell to earn, with nothing entered as collateral.
   totals_both: |-
     The supplied markets are worth {supplied_usd} and the borrowed markets {borrowed_usd}.
   totals_supplied: |-
@@ -328,7 +328,7 @@ position_words:
     {lead}{external} {were} executed by an address other than the owner's.
   # ── A closed account ──
   closed_lead: |-
-    This account ran its course and closed, with nothing left supplied or borrowed:
+    This account ran its course and closed, with nothing left supplied or borrowed.
   peaks_both: |-
     At its height it held {peak_supply} supplied and owed {peak_debt}.
   peaks_supply: |-
@@ -926,7 +926,7 @@ L5:
     title: |-
       About this position
     intro: |-
-      This account has repaid all its debt and withdrawn its supply. The panel above shows the highest supply and debt each market reached.
+      This account has repaid all its debt and withdrawn its supply. The panel above lists the markets it held; a press on them opens the highest supply and debt each market reached.
     detailsHeading: |-
       Key concepts:
     details:
@@ -950,7 +950,7 @@ L5:
     title: |-
       About this position
     intro: |-
-      This account was liquidated at least once and has since closed, with nothing left supplied or borrowed. The panel above shows the highest supply and debt each market reached.
+      This account was liquidated at least once and has since closed, with nothing left supplied or borrowed. The panel above lists the markets it held; a press on them opens the highest supply and debt each market reached.
     detailsHeading: |-
       Key concepts:
     details:

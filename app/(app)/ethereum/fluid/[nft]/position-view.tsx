@@ -524,7 +524,6 @@ export default function FluidPositionView({
               <FluidPositionCard
                 v={view}
                 surface="detail"
-                viewHref={tl.viewHref}
                 // The borrow rate, the room to the borrow limit and the Position
                 // ratio come from the live read, inside the card's receipts scope.
                 chain={chain}

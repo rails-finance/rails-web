@@ -40,20 +40,25 @@ export type DepthKey =
   | "forensics"
   | "views";
 
-export const CAPABILITIES: { key: DepthKey; label: string; detail: string }[] = [
+/** `label` is the capability's full name (the mobile pills, the tip's title);
+ *  `word` is the matrix's one-word column heading (ui-jobs 796). */
+export const CAPABILITIES: { key: DepthKey; label: string; word: string; detail: string }[] = [
   {
     key: "dashboard",
     label: "Live dashboard",
+    word: "Dashboard",
     detail: "health factor, collateral ratio, rates read live from the protocol's contracts",
   },
   {
     key: "oracleUsd",
     label: "Oracle USD",
+    word: "USD",
     detail: "USD from the protocol's oracle, the prices it liquidates with",
   },
   {
     key: "atBlockPrices",
     label: "Prices at the block",
+    word: "Prices",
     // Orthogonal to `oracleUsd`, which is USD at HEAD: this is the protocol's
     // own oracle read back at each event's block and stored, so a card values
     // the event as the protocol did when it happened. Morpho is `{ why }` on
@@ -63,6 +68,7 @@ export const CAPABILITIES: { key: DepthKey; label: string; detail: string }[] = 
   {
     key: "verification",
     label: "Chain verification",
+    word: "Verified",
     // Two narrowings, 2026-07-20. The claim used to read "the position
     // re-derived … and checked against the index", which a reader could only
     // take as a check running behind the page they were looking at. It isn't:
@@ -77,22 +83,26 @@ export const CAPABILITIES: { key: DepthKey; label: string; detail: string }[] = 
   {
     key: "llm",
     label: "Copy for LLM",
+    word: "LLM",
     detail: "export the position as Markdown or CSV, ready to paste into an LLM or agent context",
   },
   {
     key: "explainers",
     label: "Event explainers",
+    word: "Explainers",
     detail: "a plain-language explainer on every event card",
   },
   {
     key: "forensics",
     label: "Liquidation forensics",
+    word: "Forensics",
     detail:
       "what was seized, the premium paid, health at the moment it fired. Every explorer flags and links liquidations on the timeline",
   },
   {
     key: "views",
     label: "Protocol views",
+    word: "Views",
     detail:
       "protocol-level pages that read the whole system's state live at head: market rosters, branch comparisons, redemption queues, balance sheets. What each explorer's view shows opens from its row of the matrix",
   },
@@ -905,6 +915,18 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // the page names. USD is open: each vault names a price oracle middleware
   // the factsheet does not read yet. No holder pages (decision 0014).
   "ipor-fusion": explorerDepth({
+    views: true,
+    forensics: {
+      why: "nobody in a vault holds a loan: there is no threshold to breach and nothing to seize, so there is no liquidation to trace",
+    },
+  }),
+  "ipor-fusion-arbitrum": explorerDepth({
+    views: true,
+    forensics: {
+      why: "nobody in a vault holds a loan: there is no threshold to breach and nothing to seize, so there is no liquidation to trace",
+    },
+  }),
+  "ipor-fusion-base": explorerDepth({
     views: true,
     forensics: {
       why: "nobody in a vault holds a loan: there is no threshold to breach and nothing to seize, so there is no liquidation to trace",
@@ -1751,6 +1773,9 @@ export function coverageRows(comingSoon: ComingSoonEntry[], chainId: ChainId): C
  * block above; do not invent capabilities a view doesn't offer.
  *
  * Invariant: an entry exists here iff that protocol's `views` cell is `true`.
+ * Liquity V1's and V2's also name their other kinds of position page (the
+ * Stability Pool deposit on both, the LQTY stake on V1) and the menu entry
+ * that reaches each.
  * The three Arbitrum explorers' markets sub-pages (2026-10-20) are the
  * newest.
  */
@@ -1758,11 +1783,15 @@ export const VIEW_NOTES: Record<string, string> = {
   frankencoin:
     "The oracle-free system's balance sheet: ZCHF supply, the reserve's two accounts read as the contract's identity, the Leadrate, and the challenge-auction enforcement record.",
   liquity:
-    "The branches side by side: the span of rates borrowers set on each, and redemption exposure as debt-in-front.",
+    "The branches side by side: the span of rates borrowers set on each, and redemption exposure as debt-in-front. One more kind of position has pages: Stability Pool deposits (Stability Pool).",
   "aave-v4": "The hubs compared side by side.",
   "aave-v4-base": "The Equities hub, read live: the Mag7 spoke's eight reserves, sizes, caps and oracle prices.",
   "ipor-fusion":
     "Every vault the IPOR Fusion factory made, with its totals and share price read from the contracts at one block the page names, and a factsheet per vault: fees, supply cap, the roles over it and the fuses it acts through.",
+  "ipor-fusion-arbitrum":
+    "Every vault the IPOR Fusion factory made, with its totals and share price read from the contracts at one block the page names, and a factsheet per vault: fees, supply cap and the fuses it acts through.",
+  "ipor-fusion-base":
+    "Every vault the IPOR Fusion factory made, with its totals and share price read from the contracts at one block the page names, and a factsheet per vault: fees, supply cap and the fuses it acts through.",
   yearn:
     "Every vault the five V3 factories made, endorsed or not, grouped by the token each takes, with its totals, share price and endorsement read from the contracts at one block the page names.",
   "aave-vaults":
@@ -1817,13 +1846,13 @@ export const VIEW_NOTES: Record<string, string> = {
   dolomite:
     "Every market's margin ladder: a multiplicative premium over the 117.65% base, including the LST/ETH override.",
   "liquity-v1":
-    "The system's state: TCR against the recovery line, the Stability Pool's depth against system debt, the shared base rate, and how deep the redemption queue is. The queue is the Trove listing sorted by ratio, and the view links there.",
+    "The system's state: TCR against the recovery line, the Stability Pool's depth against system debt, the shared base rate, and how deep the redemption queue is. The queue is the Trove listing sorted by ratio, and the view links there. Two more kinds of position have pages: Stability Pool deposits (Stability Pool) and LQTY stakes (Staking).",
   ebisu:
-    "The branches side by side: each one's oracle price, size, TCR and rate span, and a link per branch into the listing sorted by rate, which is that branch's redemption queue.",
+    "The branches side by side: each one's oracle price, size, TCR and rate span, and a link per branch into the listing sorted by rate, which is that branch's redemption queue. One more kind of position has pages: Stability Pool deposits (Stability Pool).",
   asymmetry:
-    "The same branch surface as Ebisu's: each branch's price, size, TCR and rate span, and the same per-branch link into the listing sorted by rate.",
+    "The same branch surface as Ebisu's: each branch's price, size, TCR and rate span, and the same per-branch link into the listing sorted by rate. One more kind of position has pages: Stability Pool deposits (Stability Pool).",
   basedollar:
-    "The same branch surface as Ebisu's, read on Base: each branch's price, size, TCR and rate span, and the same per-branch link into the listing sorted by rate.",
+    "The same branch surface as Ebisu's, read on Base: each branch's price, size, TCR and rate span, and the same per-branch link into the listing sorted by rate. One more kind of position has pages: Stability Pool deposits (Stability Pool).",
 };
 
 /**
@@ -1850,6 +1879,10 @@ export const COVERAGE_NOTES: Record<string, string> = {
     "Each vault position's timeline replays that wallet's whole share-transfer history live from the vault's logs on every request, and checks it wei-exact against the vault's balance before drawing anything: a mismatch means no rows. The roster of holders comes from a daily sweep of every vault's whole history (Aave's enumerators for its vaults, the two MetaMorpho factories for those), proven complete against each vault's total supply; a sweep that can't prove complete isn't published. The page shows the flows and share prices as they happened, with no USD, APY or yield figure.",
   "ipor-fusion":
     "An IPOR Fusion vault takes one token and its curator moves it into other protocols through fuses; nobody in it borrows, so there is no threshold to breach and no liquidation to trace. The roster is every vault the factory made, found from its creation events and censused at a block the page names. It is a floor: a vault deployed by hand or by an earlier factory emits no creation event and appears on no list. Every figure stays in its vault's asset, with no USD. A vault's roles are found in its access manager's grant logs and each holder is confirmed at the page's block; a vault's positions in the protocols Rails covers are those explorers' rows, under the vault's address.",
+  "ipor-fusion-arbitrum":
+    "An IPOR Fusion vault takes one token and its curator moves it into other protocols through fuses; nobody in it borrows, so there is no threshold to breach and no liquidation to trace. The roster is every vault the factory made, found from its creation events and censused at a block the page names. It is a floor: a vault deployed by hand or by an earlier factory emits no creation event and appears on no list. Every figure stays in its vault's asset, with no USD. A vault's roles are found in its access manager's grant logs and each holder is confirmed at the page's block; on Arbitrum and Base roles are not yet read; a vault's positions in the protocols Rails covers are those explorers' rows, under the vault's address.",
+  "ipor-fusion-base":
+    "An IPOR Fusion vault takes one token and its curator moves it into other protocols through fuses; nobody in it borrows, so there is no threshold to breach and no liquidation to trace. The roster is every vault the factory made, found from its creation events and censused at a block the page names. It is a floor: a vault deployed by hand or by an earlier factory emits no creation event and appears on no list. Every figure stays in its vault's asset, with no USD. A vault's roles are found in its access manager's grant logs and each holder is confirmed at the page's block; on Arbitrum and Base roles are not yet read; a vault's positions in the protocols Rails covers are those explorers' rows, under the vault's address.",
   yearn:
     "A Yearn V3 vault takes one token and issues shares against it; nobody in it borrows, so there is no threshold to breach and no liquidation to trace. The roster is every vault the five V3 factories made, found from each factory's creation logs and censused at a block the page names. It is a floor: a vault deployed by hand, without a factory, emits no creation log and appears on no list. At the census block those vaults take 72 different tokens, with no per-asset feed to value them against, so every figure stays in its vault's asset and no two tokens are ever added together. A holder's timeline replays every share transfer the vault emitted about that address, swept from the vault's logs on every request, and checks it wei-exact against the balance the vault reports before drawing anything: a mismatch means no rows. The page shows the flows and share prices as they happened, with no USD, APY or yield figure.",
   "aave-v3-base":

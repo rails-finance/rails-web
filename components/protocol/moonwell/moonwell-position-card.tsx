@@ -20,6 +20,8 @@
 // detail page's live Comptroller read — the listing card still asserts no
 // health column (the listing snapshot carries none).
 
+import { mainAssetFigure, useClosedPeaks, withPeaks, type ClosedPeakFlows } from "@/components/shared/closed-peak";
+import { pickMainAsset } from "@/lib/shared/main-asset";
 import { positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { isEnteredIn, linesUsd, suppliedUsd } from "@/lib/moonwell/supply-totals";
@@ -34,13 +36,14 @@ import {
   type PositionCardSlots,
   type PositionCardStatus,
   type PositionPanelRow,
+  assetsHead,
 } from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
 import { moonwellPositionModal } from "@/lib/moonwell/event-templates";
 import type { MoonwellCardCaptions } from "@/lib/moonwell/economics";
@@ -167,17 +170,30 @@ function AmountStack({ children }: { children: ReactNode }) {
 /** Per-market PEAK amounts (highest recorded), each traced to the lane's
  *  maximum (the supply balance at a row on supply, emitted accountBorrows on
  *  debt); no USD, the token amount only. */
-function PeakLines({ lines, side }: { lines: MoonwellPeakAmount[]; side: "supply" | "debt" }) {
+function PeakLines({
+  lines,
+  side,
+  receiptFor,
+}: {
+  lines: MoonwellPeakAmount[];
+  side: "supply" | "debt";
+  /** A line whose receipt differs (the face's main market, with its ranking). */
+  receiptFor?: (r: MoonwellPeakAmount) => Provenance | undefined;
+}) {
   const dep = useMoonwellDeployment();
   return (
     <AmountStack>
       {lines.map((r) => (
-        <Prov key={r.address} info={side === "supply" ? dep.card.peakSupply(r.symbol) : dep.card.peakDebt(r.symbol)}>
+        <Prov
+          key={r.address}
+          info={receiptFor?.(r) ?? (side === "supply" ? dep.card.peakSupply(r.symbol) : dep.card.peakDebt(r.symbol))}
+        >
           <AssetAmount
             value={r.amount}
             symbol={r.symbol}
             address={r.address}
             exact={formatUnitsExact(r.amountRaw, r.decimals)}
+            iconSize={16}
           />
         </Prov>
       ))}
@@ -268,14 +284,15 @@ export interface MoonwellPositionCardProps {
   peaks?: boolean;
   /** The card's Explanation section (narration describing the position NOW). */
   explanation?: ReactNode;
-  /** Copy-this-view control, the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
   /** Detail-page stat captions (accrued interest, borrow rate) — computed from
    *  the event stream + the per-market chain read (computeMoonwellCardCaptions).
    *  Listing cards omit them. */
   captions?: MoonwellCardCaptions;
   /** The ⋮'s export shapes (`moonwellExports`). */
   exports?: PositionCardExports | null;
+  /** The page's Lifetime flows timeline and its read: a closed card's peak
+   *  value per side (components/shared/closed-peak.tsx). */
+  flows?: ClosedPeakFlows;
 }
 
 /** Moonwell's slots for the shared position card: the headlines, the panel,
@@ -287,15 +304,19 @@ export function useMoonwellCardSlots({
   chain = null,
   peaks = true,
   explanation,
-  viewHref,
   captions,
   exports,
+  flows,
 }: MoonwellPositionCardProps): PositionCardSlots {
   const dep = useMoonwellDeployment();
   const session = dep.session;
   const marketBy = marketReadBy(v);
   const { supplyProv, borrowProv, mSymbolOf } = useLineReceipts(serverReadOf(chain), marketBy);
   const detail = surface === "detail";
+  const peakOf = useClosedPeaks(flows, v.status !== "open", {
+    collateral: v.peakSupplies.map((r) => ({ symbol: r.symbol, key: r.market })),
+    debt: v.peakBorrows.map((r) => ({ symbol: r.symbol, key: r.market })),
+  });
 
   // The collateral column holds the entered markets; a supply the account
   // never entered is shown apart ("Supplied, not collateral").
@@ -347,24 +368,62 @@ export function useMoonwellCardSlots({
   let heads: PositionCardHead[];
   let outcome: PositionCardOutcome | undefined;
   if (ended) {
-    // Closed / liquidated: the wallet holds no open markets, so the headline is
-    // what each asset held at its height — highest recorded per-market supply +
-    // debt (replayed MAX over the wallet's life, per asset; no USD).
+    // Closed / liquidated: the wallet holds no open markets, so each side
+    // states the assets it held, and the highest recorded per-market supply
+    // and debt (replayed MAX over the wallet's life, per asset; no USD) open
+    // behind the press under the peak label (C19).
     const noPeaksNote = !peaks ? notRecordedNote("position") : undefined;
-    heads = [
-      {
-        id: "peak-collateral",
-        label: CARD_VOCAB.peakCollateral,
-        value: peaks && v.peakSupplies.length > 0 ? <PeakLines lines={v.peakSupplies} side="supply" /> : null,
-        sub: noPeaksNote,
-      },
-      {
-        id: "peak-debt",
-        label: CARD_VOCAB.peakDebt,
-        value: peaks && v.peakBorrows.length > 0 ? <PeakLines lines={v.peakBorrows} side="debt" /> : null,
-        sub: noPeaksNote,
-      },
-    ];
+    // Each side leads with its main market at its highest recorded balance,
+    // the same on the listing row and the position page (both read the
+    // listing's prices, keyed by the underlying token, `pickMainAsset`, at
+    // the market read's block).
+    const held = (lines: MoonwellPeakAmount[], side: "supply" | "debt") => {
+      if (!peaks || lines.length === 0) return {};
+      const pick = pickMainAsset(
+        lines.map((r) => ({ ...r, key: r.address })),
+        v.priceByAddress,
+      );
+      const figure = pick
+        ? mainAssetFigure({
+            main: { ...pick.main, exact: formatUnitsExact(pick.main.amountRaw, pick.main.decimals) },
+            receipt: side === "supply" ? dep.card.peakSupply(pick.main.symbol) : dep.card.peakDebt(pick.main.symbol),
+            block: v.marketRead?.blockNumber ?? null,
+            skipped: pick.skipped,
+            side,
+          })
+        : undefined;
+      // The main market's line carries the ranking row its figure carries.
+      const receiptFor = (r: MoonwellPeakAmount) =>
+        figure && pick && r.market === pick.main.market ? figure.info : undefined;
+      return assetsHead(
+        side === "supply" ? CARD_VOCAB.peakSupplied : CARD_VOCAB.peakDebt,
+        lines.map((r) => ({ symbol: r.symbol, address: r.address })),
+        <span className="text-sm font-semibold tabular-nums text-foreground">
+          <PeakLines lines={lines} side={side} receiptFor={receiptFor} />
+        </span>,
+        figure,
+      );
+    };
+    heads = withPeaks(
+      [
+        {
+          id: "peak-collateral",
+          label: CARD_VOCAB.headSupplied,
+          value: null,
+          sub: noPeaksNote,
+          ...held(v.peakSupplies, "supply"),
+        },
+        {
+          id: "peak-debt",
+          label: CARD_VOCAB.headDebt,
+          value: null,
+          sub: noPeaksNote,
+          ...held(v.peakBorrows, "debt"),
+        },
+      ],
+      peakOf,
+      detail,
+    );
     outcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: outcomeDates(v) ?? (v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined),
@@ -502,7 +561,7 @@ export function useMoonwellCardSlots({
     ...common,
     surface: "detail" as const,
     heads,
-    explainer: { body: explanation ?? null, viewHref },
+    explainer: { body: explanation ?? null },
     learnMore: ended ? moonwellPositionModal(v.status) : moonwellPositionModal(v.status, v.borrows.length > 0),
     menu,
   };

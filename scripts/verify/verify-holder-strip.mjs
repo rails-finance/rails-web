@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // The holder strip — a wallet search states the wallet's positions at a glance
-// above its own cards (Polaris + Liquity V2).
+// above its own cards (Polaris), and the Liquity V2 band on the wallet page a
+// Liquity V2 wallet search opens (ui-jobs 738).
 // ---------------------------------------------------------------------------
 // One section per explorer, each asserting the same seven things in that
 // explorer's own units:
@@ -45,6 +46,11 @@ import { chromium } from "playwright";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { openListingSearch } from "./lib/listing-toolbar.mjs";
+
+// The listing's own search: the wallet panel in the header draws a search
+// input of its own, hidden until opened.
+const LISTING_TOOLBAR = '[data-skel-section="listing-toolbar"]';
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -156,13 +162,15 @@ async function readStrip(page) {
   });
 }
 
-/** Open a listing URL and wait for its rows + its one price side-fetch. */
+/** Open a listing URL and wait for its rows + its one price side-fetch; a
+ *  Liquity V2 wallet search redirects to the wallet page (ui-jobs 738), whose
+ *  view is waited for in their place. */
 async function openListing(context, url, { route } = {}) {
   const page = await context.newPage();
   if (route) await page.route(route.url, route.handler);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page
-    .locator('[data-skel-section="listing-row"]')
+    .locator('[data-skel-section="listing-row"], [data-wallet-view]')
     .first()
     .waitFor({ state: "visible", timeout: 120000 })
     .catch(() => {});
@@ -176,8 +184,9 @@ async function openListing(context, url, { route } = {}) {
  *  wallet URL opened cold is answered by SSR, which no page.route can reach).
  *  That is what lets the truncation case rewrite `pagination.total` on the
  *  wire. */
-async function searchWallet(page, placeholder, wallet) {
-  const box = page.getByPlaceholder(placeholder);
+async function searchWallet(page, wallet) {
+  // The search rests as an icon until pressed (N1.1, ui-jobs 801).
+  const box = await openListingSearch(page, page.locator(LISTING_TOOLBAR));
   await box.click();
   await box.fill(wallet);
   // 300ms debounce, then the fetch, then the re-render.
@@ -262,14 +271,17 @@ info(
   if (!check("P2. the wallet view draws the strip", strip != null, JSON.stringify(strip))) {
     await page.close();
   } else {
-    // The counts sentence's OWN numbers, against the API's statuses.
+    // The counts sentence's OWN numbers, against the API's statuses: the CDP
+    // sentence only, the first, since the other kinds' sentence follows it
+    // ("It has closed 1 Stability Pool deposit", §1b).
+    const cdpSaid = strip.counts.split(/\.(?:\s|$)/)[0];
     const said = {
       open: Number(
-        /holds ([\d,]+) open positions?/.exec(strip.counts)?.[1]?.replace(/,/g, "") ??
-          (/holds no open positions/.test(strip.counts) ? 0 : NaN),
+        /holds ([\d,]+) open positions?/.exec(cdpSaid)?.[1]?.replace(/,/g, "") ??
+          (/holds no open positions/.test(cdpSaid) ? 0 : NaN),
       ),
-      closed: Number(/has closed ([\d,]+)/.exec(strip.counts)?.[1]?.replace(/,/g, "") ?? 0),
-      liquidated: Number(/([\d,]+) (?:was|were) liquidated/.exec(strip.counts)?.[1]?.replace(/,/g, "") ?? 0),
+      closed: Number(/has closed ([\d,]+)/.exec(cdpSaid)?.[1]?.replace(/,/g, "") ?? 0),
+      liquidated: Number(/([\d,]+) (?:was|were) liquidated/.exec(cdpSaid)?.[1]?.replace(/,/g, "") ?? 0),
     };
     check(
       "P3a. the counts line states the API's own statuses",
@@ -346,14 +358,14 @@ info(
   const page = await openListing(context, `${BASE}/sepolia/polaris`, {
     route: inflateTotal("**/api/polaris/positions**", 21),
   });
-  await searchWallet(page, "Address, ENS, or position number", POLARIS_WALLET);
+  await searchWallet(page, POLARIS_WALLET);
   const strip = await readStrip(page);
   check(
     "P8. a wallet stated as holding 21 positions states the count only — no legs, and says why",
     strip != null &&
       Object.keys(strip.legs).length === 0 &&
       /21/.test(strip.counts) &&
-      /up to 20 positions; this one holds 21/.test(strip.note ?? ""),
+      /up to 20 positions; this wallet holds 21 positions/.test(strip.note ?? ""),
     JSON.stringify(strip),
   );
   await page.close();
@@ -416,34 +428,44 @@ info(
 }
 
 // ── c + d ──────────────────────────────────────────────────────────────────
+// A wallet search on the listing opens the wallet page with Liquity V2 chosen
+// (ui-jobs 738): the band is the Liquity V2 section's (W3), built from every
+// row the wallet read carries, with no counts sentence; its counts are the
+// strip's data attributes.
+const V2_BAND = '[data-wallet-section="liquity-v2"] [data-holder-strip]';
 {
   const page = await openListing(context, `${BASE}/ethereum/liquity-v2?q=${V2_WALLET}`);
+  const landed = new URL(page.url());
+  check(
+    "V2a. a wallet search on the listing lands on /wallet/<wallet>?protocol=liquity-v2",
+    landed.pathname === `/wallet/${V2_WALLET}` && landed.searchParams.get("protocol") === "liquity-v2",
+    page.url(),
+  );
+  await page
+    .locator(V2_BAND)
+    .first()
+    .waitFor({ state: "visible", timeout: 60000 })
+    .catch(() => {});
   const strip = await readStrip(page);
   const oracleAfter = (await api("/api/oracle/liquity-v2")).data;
 
-  if (!check("V2. the wallet view draws the strip", strip != null, JSON.stringify(strip))) {
+  if (!check("V2b. the wallet page's Liquity V2 section draws the band", strip != null, JSON.stringify(strip))) {
     await page.close();
   } else {
-    const said = {
-      open: Number(/holds ([\d,]+) open troves?/.exec(strip.counts)?.[1]?.replace(/,/g, "") ?? NaN),
-      closed: Number(/has closed ([\d,]+)/.exec(strip.counts)?.[1]?.replace(/,/g, "") ?? 0),
-      liquidated: Number(/([\d,]+) (?:was|were) liquidated/.exec(strip.counts)?.[1]?.replace(/,/g, "") ?? 0),
-    };
     check(
-      "V3. the counts line states the API's own statuses",
-      said.open === vCounts.open && said.closed === vCounts.closed && said.liquidated === vCounts.liquidated,
-      `"${strip.counts}" vs API ${vCounts.open}/${vCounts.closed}/${vCounts.liquidated}`,
+      "V3. the band's counts are the API's own statuses",
+      strip.attrs.open === vCounts.open &&
+        strip.attrs.closed === vCounts.closed &&
+        strip.attrs.liquidated === vCounts.liquidated,
+      `${JSON.stringify(strip.attrs)} vs API ${vCounts.open}/${vCounts.closed}/${vCounts.liquidated}`,
     );
 
-    // The debt: one token on every branch, marked ≈ because each row is its
-    // last touch's figure.
     check(
       "V4. the total debt is the restated Σ debt over the open troves, with no ≈",
       strip.legs.debt?.exact === `${fmtNum(vDebt)} BOLD` && !/≈/.test(strip.legs.debt?.value ?? ""),
       `shown "${strip.legs.debt?.exact}" vs restated "${fmtNum(vDebt)} BOLD"`,
     );
 
-    // The collateral: three tokens, so a valuation — marked ≈.
     const collShown = parseNum(strip.legs.collateral?.exact);
     check(
       "V5a. the total collateral is the restated Σ branch × its price, within $1, with no ≈",
@@ -458,7 +480,7 @@ info(
       `"${strip.legs.collateral?.footnote}" wanted ${wantBranches.join(" + ")}`,
     );
 
-    await page.locator('[data-figure="holder-collateral"] [data-holder-value]').first().click();
+    await page.locator(`${V2_BAND} [data-figure="holder-collateral"] [data-holder-value]`).first().click();
     await page.waitForTimeout(500);
     const tip = await page
       .locator('[role="tooltip"]')
@@ -474,81 +496,74 @@ info(
   }
 }
 
-/** Rewrite a wallet response's rows on the wire with `edit(rows)`, the total
- *  following them: the wallet shapes ui-jobs 737 reads (one trove; one open
- *  and one closed) without needing such a wallet to exist. */
-const rewriteRows = (matcher, edit) => ({
-  url: matcher,
-  handler: async (route) => {
-    const res = await route.fetch();
-    const json = await res.json().catch(() => null);
-    if (!json?.pagination || !Array.isArray(json.data)) return route.fulfill({ response: res });
-    json.data = edit(json.data);
-    json.pagination.total = json.data.length;
-    return route.fulfill({ response: res, body: JSON.stringify(json) });
-  },
-});
-const linkOf = (page) =>
-  page
-    .locator("[data-holder-strip] [data-holder-wallet-link]")
+// ── ui-jobs 737 on the wallet page: one Trove, one open plus one closed ─────
+// The wallet page reads its rows server-side, so no page.route reaches them:
+// the shapes are wallets the index holds, picked at run time, each with no
+// Stability Pool deposit (a deposit counts in the band).
+async function pickV2Shape(want) {
+  const open = await api("/api/troves?status=active&limit=100");
+  const owners = [...new Set((open.data ?? []).map((t) => t.owner).filter(Boolean))];
+  for (const owner of owners) {
+    const held = (await api(`/api/troves?ownerAddress=${owner}&limit=5`)).data ?? [];
+    if (!want(held)) continue;
+    const deposits = await api(`/api/liquity-v2/stability-pool?wallet=${owner}&limit=1`).catch(() => null);
+    if ((deposits?.pagination?.total ?? 1) === 0) return owner;
+  }
+  return null;
+}
+const walletBand = async (wallet) => {
+  const page = await openListing(context, `${BASE}/wallet/${wallet}?protocol=liquity-v2`);
+  await page
+    .locator('[data-wallet-section="liquity-v2"]')
     .first()
-    .getAttribute("href")
-    .catch(() => null);
-
-// ── ui-jobs 737: from two positions, totals from two open, the wallet link ──
-{
-  const page = await openListing(context, `${BASE}/ethereum/liquity-v2`, {
-    route: rewriteRows("**/api/troves**", (rows) => rows.filter((t) => t.status === "open").slice(0, 1)),
-  });
-  await searchWallet(page, "Address, ENS, or ID", V2_WALLET);
-  check("V10. a wallet holding one trove draws no band (its card says it all)", (await readStrip(page)) === null);
+    .waitFor({ timeout: 60000 })
+    .catch(() => {});
+  const strip = await readStrip(page);
+  const link = await page.locator("[data-holder-strip] [data-holder-wallet-link]").count();
   await page.close();
+  return { strip, link };
+};
+{
+  const one = await pickV2Shape((rows) => rows.length === 1 && rows[0].status === "open");
+  if (!one) info("V10", "no wallet on the first page of open Troves holds one Trove and nothing else");
+  else {
+    const { strip } = await walletBand(one);
+    check("V10. a wallet holding one Trove draws no band (its card says it all)", strip === null, one);
+  }
 }
 {
-  const page = await openListing(context, `${BASE}/ethereum/liquity-v2`, {
-    route: rewriteRows("**/api/troves**", (rows) => {
-      const open = rows.filter((t) => t.status === "open");
-      return [
-        open[0],
-        {
-          ...open[1],
-          status: "closed",
-          collateral: { ...open[1].collateral, amount: 0 },
-          debt: { ...open[1].debt, current: 0 },
-        },
-      ];
-    }),
-  });
-  await searchWallet(page, "Address, ENS, or ID", V2_WALLET);
-  const strip = await readStrip(page);
-  check(
-    "V11. one open trove and one closed: the counts and the link, no totals",
-    strip != null && Object.keys(strip.legs).length === 0 && /1 open trove and has closed 1/.test(strip.counts),
-    JSON.stringify(strip),
+  const pair = await pickV2Shape(
+    (rows) =>
+      rows.length === 2 &&
+      rows.filter((t) => t.status === "open").length === 1 &&
+      rows.some((t) => t.status === "closed"),
   );
-  const href = await linkOf(page);
-  check(
-    'V12. the band links the wallet page as the search names it, "Everything this wallet holds"',
-    href === `/wallet/${V2_WALLET}`,
-    String(href),
-  );
-  await page.close();
+  if (!pair) info("V11", "no wallet on the first page of open Troves holds one open and one closed Trove alone");
+  else {
+    // Totals need two open positions; the section's heading and cards state
+    // the counts, so a band with neither draws nothing.
+    const { strip, link } = await walletBand(pair);
+    check(
+      "V11. one open Trove and one closed: no totals, so no band on the wallet page",
+      strip === null,
+      `${pair} ${JSON.stringify(strip)}`,
+    );
+    check("V12. …and no wallet link: the page is the wallet's (N7.2)", link === 0, `${link} link(s)`);
+  }
 }
 
-// ── e + f ──────────────────────────────────────────────────────────────────
+// ── typed search, and a wallet holding nothing ─────────────────────────────
 {
-  const page = await openListing(context, `${BASE}/ethereum/liquity-v2`, {
-    route: inflateTotal("**/api/troves**", 21),
-  });
-  await searchWallet(page, "Address, ENS, or ID", V2_WALLET);
-  const strip = await readStrip(page);
+  const page = await openListing(context, `${BASE}/ethereum/liquity-v2`);
+  const box = await openListingSearch(page, page.locator(LISTING_TOOLBAR));
+  await box.click();
+  await box.fill(V2_WALLET);
+  await page.waitForURL((u) => u.pathname.startsWith("/wallet/"), { timeout: 60000 }).catch(() => {});
+  const landed = new URL(page.url());
   check(
-    "V8. a wallet stated as holding 21 troves states the count only — no legs, and says why",
-    strip != null &&
-      Object.keys(strip.legs).length === 0 &&
-      /21/.test(strip.counts) &&
-      /up to 20 positions; this one holds 21/.test(strip.note ?? ""),
-    JSON.stringify(strip),
+    "V8. a wallet typed into the listing's search opens the wallet page, Liquity V2 chosen",
+    landed.pathname === `/wallet/${V2_WALLET}` && landed.searchParams.get("protocol") === "liquity-v2",
+    page.url(),
   );
   await page.close();
 }
@@ -612,8 +627,9 @@ const board = {
   ],
 };
 const pRows = [row("usdp", "1", "open", 10, 30000), row("goldp", "2", "open", 2, 5), row("usdp", "3", "closed", 0, 0)];
-const polaris = polarisHolderStrip(pRows, 3, board, 20);
-const polarisTruncated = polarisHolderStrip(pRows, 21, board, 20);
+// The wallet the search names is an argument (lib/polaris/holder-strip.ts).
+const polaris = polarisHolderStrip(pRows, 3, board, 20, 0, "0x1");
+const polarisTruncated = polarisHolderStrip(pRows, 21, board, 20, 0, "0x1");
 
 const trove = (id, ct, coll, debt) => ({
   id, collateralType: ct, status: "open", isZombie: false,
@@ -625,7 +641,7 @@ const trove = (id, ct, coll, debt) => ({
   owner: "0x1", lastOwner: null, ownerEns: null,
 });
 const prices = { weth: 2000, wsteth: 2400, reth: 2200 };
-const v2 = liquityV2HolderStrip([trove("0xaaaabbbbcccc", "WETH", 100, 100000), trove("0xddddeeeeffff", "rETH", 50, 50000)], 2, prices, 20);
+const v2 = liquityV2HolderStrip([trove("0xaaaabbbbcccc", "WETH", 100, 100000), trove("0xddddeeeeffff", "rETH", 50, 50000)], 2, prices, 20, 0, "0x1");
 
 const shape = (s) => ({
   countsLine: s.countsLine, counts: s.counts, truncated: s.truncated, note: s.note ?? null,
@@ -724,7 +740,7 @@ if (!probeLine) {
         "rETH amount × price=$110,000.00",
         "sum=$310,000.00",
       ].every((r) => leg(got.v2, "collateral").inputs.includes(r)) &&
-      /states no block/.test(leg(got.v2, "collateral").summary),
+      /names no block/.test(leg(got.v2, "collateral").summary),
     JSON.stringify(leg(got.v2, "collateral")).slice(0, 260),
   );
   check(

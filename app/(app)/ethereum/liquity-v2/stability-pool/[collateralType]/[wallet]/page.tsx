@@ -2,7 +2,8 @@
 // /ethereum/liquity-v2/stability-pool/<branch>/<depositor> (rails-ops
 // TO-DO-stability-pool-deposits.md §3). The server reads the deposit's
 // position row and its newest timeline rows from the index; the pool's
-// getters at head stay a client read (deposit-view.tsx). A pair the index has
+// getters at head stay a client read
+// (components/protocol/liquity/sp-deposit-page.tsx). A pair the index has
 // no row for is a 404.
 
 import type { Metadata } from "next";
@@ -20,7 +21,8 @@ import { assetKey } from "@/lib/shared/asset-family";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
-import DepositView from "./deposit-view";
+import { SpDepositPage } from "@/components/protocol/liquity/sp-deposit-page";
+import { LIQUITY_V2_SP } from "@/lib/liquity-v2/sp-deployment";
 
 interface Props {
   params: Promise<{ collateralType: string; wallet: string }>;
@@ -58,7 +60,13 @@ export default async function LiquityV2DepositPage({ params }: Props) {
   ];
   return (
     <AimGate keys={keys} chain={MAINNET_CHAIN_ID} what="This Liquity V2 deposit">
-      <DepositView key={`${branch}:${depositor}`} branch={branch} depositor={depositor} initial={initial} />
+      <SpDepositPage
+        key={`${branch}:${depositor}`}
+        dep={LIQUITY_V2_SP}
+        branch={branch}
+        depositor={depositor}
+        initial={initial}
+      />
     </AimGate>
   );
 }

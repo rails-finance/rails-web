@@ -24,9 +24,13 @@ import { chromium } from "playwright";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 
-// The peak-debt column label, from lib/shared/card-vocab.ts (`peakDebt`). One
-// constant, so the presence and the absence below cannot drift apart.
-const PEAK_DEBT = "Highest recorded borrow balance";
+// The closed card's head labels, from lib/shared/card-vocab.ts (ui-jobs 803):
+// `headDebt`, `headSupplied` (a pure lender) and `headCollateral` (one
+// collateral asset or many), each leading its C19 button's name. One
+// constant per name, so the presence and the absence below cannot drift apart.
+const PEAK_DEBT = "Peak debt";
+const PEAK_SUPPLY = "Peak supplied";
+const HEAD_COLLATERAL = "Peak collateral";
 
 // Pure lender: supplied 3 WETH, withdrew the full balance + interest. Its peak
 // borrow is the interest tail — a phantom, not a borrow.
@@ -47,8 +51,8 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 1400 } });
 console.log(`\n${LENDER} — pure lender, cWETHv3`);
 await page.goto(`${BASE}/ethereum/compound-v3?q=${LENDER}`, { waitUntil: "networkidle", timeout: 240_000 });
 
-// The closed card is the only one carrying a "Highest recorded" stat grid.
-const grid = page.locator("div.grid").filter({ hasText: "Highest recorded" });
+// The closed card is the only one carrying a "Peak supplied" stat grid.
+const grid = page.locator("div.grid").filter({ hasText: PEAK_SUPPLY });
 assert((await grid.count()) === 1, "exactly one closed-position stat grid on the page");
 const rawText = await grid.innerText();
 const cardText = rawText.replace(/\s+/g, " ");
@@ -58,9 +62,9 @@ const bodyText = await page.locator("body").innerText();
 // the identity flip (wallet leads the cluster) — allow it, keep the
 // same-header-cluster claim tight (≤60 chars of pill between them).
 assert(/CLOSED[\s\S]{0,60}?cWETHv3/.test(bodyText), "the closed card is the cWETHv3 one");
-assert(cardText.includes("Highest recorded supply"), "collateral column labelled 'Highest recorded supply'");
-assert(!cardText.includes("Highest recorded collateral"), "no 'Highest recorded collateral' on a supply-only card");
-assert(/Highest recorded supply\s*3\b/.test(rawText), "supply value reads 3");
+assert(cardText.includes(PEAK_SUPPLY), `collateral column labelled '${PEAK_SUPPLY}'`);
+assert(!cardText.includes(HEAD_COLLATERAL), `no '${HEAD_COLLATERAL}' on a supply-only card`);
+assert(new RegExp(`${PEAK_SUPPLY}\\s*3\\b`).test(rawText), "supply value reads 3");
 
 assert(!/8\.94\d*e-7/.test(bodyText), "no 8.94e-7 phantom anywhere on the page");
 assert(!/e-\d/.test(bodyText), "no exponential tiny-amount rendering at all");
@@ -89,7 +93,7 @@ assert(labels[2] === "Outcome", `Outcome sits in the third column (got ${JSON.st
 console.log(`\n${BORROWER} — genuine closed WETH borrow (control)`);
 await page.goto(`${BASE}/ethereum/compound-v3?q=${BORROWER}`, { waitUntil: "networkidle", timeout: 240_000 });
 // This wallet has since closed a second, collateral-only position, so the page
-// carries more than one "Highest recorded" grid and `.first()` is no longer the
+// carries more than one closed grid and `.first()` is no longer the
 // borrow. Pick the card by the thing that makes it the control — it is the one
 // with a peak debt — and assert exactly one such card exists, so a page that
 // renders none cannot read as a card that renders correctly.
@@ -105,7 +109,24 @@ assert(
   new RegExp(`${PEAK_DEBT}\\s*0\\.10?\\b`).test(bRaw),
   "genuine borrow still reads 0.1 (0.10 since the compact figures)",
 );
-assert(bText.includes("Highest recorded collateral"), "a borrower's supply column stays 'collateral'");
+// The collateral head, one asset or many, reads "Peak collateral" (ui-jobs
+// 803). Where it is a C19 button its name leads with that label; a listing
+// row, and a single collateral whose decimals did not load, draw no button.
+const bHead = bGrid.locator('[data-card-head="peak-collateral"]');
+const bHeadLabel = (
+  (await bHead
+    .first()
+    .innerText()
+    .catch(() => "")) ?? ""
+)
+  .split("\n")[0]
+  .trim();
+assert(bHeadLabel === HEAD_COLLATERAL, `the collateral head reads '${HEAD_COLLATERAL}' (got '${bHeadLabel}')`);
+const bToggle = bGrid.locator('[data-card-assets-toggle="peak-collateral"]');
+if ((await bToggle.count()) > 0) {
+  const bName = (await bToggle.first().getAttribute("aria-label")) ?? "";
+  assert(bName.startsWith(`${HEAD_COLLATERAL}, `), `its button is named '${HEAD_COLLATERAL}, …'`);
+}
 // On Ethereum each row is the chain's balance, interest included, so the
 // principal-only footnote (the Base sweep's caveat) is not drawn here.
 assert(

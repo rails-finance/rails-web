@@ -284,10 +284,16 @@ export function maplePoolsHref(): string {
   return sub.href;
 }
 
-/** The cross-protocol vault index (ui-jobs 39; decision 0028 point 8): every
- *  vault the rosters above list, each row linking to its page under its
- *  protocol. It spans chains, so it sits under no chain. */
+/** The vault overview (ui-jobs 776; decision 0028 point 8): what a vault is,
+ *  how Rails shows one, and a card per family and chain linking its roster.
+ *  It spans chains, so it sits under no chain. */
 export const VAULT_INDEX_HREF = "/vaults";
+
+/** The vault fronts page (ui-jobs 774), the /vaults menu's Fronts. */
+export const FRONTS_HREF = `${VAULT_INDEX_HREF}/fronts`;
+
+/** The vault products page (ui-jobs 773), the /vaults menu's Products: how each family works. */
+export const PRODUCTS_HREF = `${VAULT_INDEX_HREF}/products`;
 
 /** One Maple pool's page, `/ethereum/maple/pools/<key>`: `pool` is the
  *  catalogue key ("syrupusdc") or the pool's address. */

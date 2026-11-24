@@ -24,14 +24,11 @@
 // chain-lane view here takes).
 
 import { MaplePoolsView } from "@/components/protocol/maple/maple-pools-view";
-import { SubPageHeader } from "@/components/shared/sub-page-header";
+import { RailHeader } from "@/components/shared/rail-header";
 import { resolveMaplePoolState, type MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import Link from "next/link";
-import { FOOT_LINK } from "@/lib/shared/ui-grammar";
-import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 
 // ISR, ten minutes. This is a protocol aggregate, not a wallet's page: the
 // same render serves every visitor, so re-reading the contracts per request
@@ -60,19 +57,11 @@ export default async function MaplePoolsPage() {
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader protocol={PROTOCOL} title="Pools & what lenders can reach" />
-
-        {/* The pools are rows on the cross-protocol vault index (ui-jobs 39). */}
-        <p className="-mt-3 mb-4 text-[13px]">
-          <Link
-            href={VAULT_INDEX_HREF}
-            className={`text-xs font-semibold ${FOOT_LINK}`}
-            prefetch={false}
-            data-link="vault-index"
-          >
-            All vaults
-          </Link>
-        </p>
+        {/* The rail alone, as on IPOR Fusion's roster (ui-jobs 771); the h1 is for screen readers. */}
+        <header className="mb-5" data-skel-section="page-header">
+          <RailHeader session={PROTOCOL.session} venue="subPage" />
+          <h1 className="sr-only">Maple pools and what lenders can reach</h1>
+        </header>
         <div data-skel-section="page-table">
           <MaplePoolsView pools={pools} />
         </div>

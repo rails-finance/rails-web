@@ -132,7 +132,7 @@ const pill = (f, name) =>
     f,
   );
 
-test("an unset pill is dashed and names its filter", () => {
+test("an unset group has no value and names its filter", () => {
   const p = pill(base, "Market");
   assert.equal(p.state, "unset");
   assert.equal(p.locked, false);
@@ -204,6 +204,36 @@ test("a default that narrows nothing is an unset pill", () => {
   assert.deepEqual([widened.state, widened.locked, widened.value], ["set", true, "Every vault"]);
   const lifted = pillFor({ name: "Shown", dims: [shown("all")] }, { show: ["all"] });
   assert.deepEqual([lifted.state, lifted.locked, lifted.spoken], ["unset", false, "Add Shown filter"]);
+});
+
+test("a single choice resting on its every option draws no pill (ui-jobs 805)", () => {
+  // Status as Open / Closed / All: Open at rest, All once the search names a holder.
+  const choice = (rest) => ({
+    id: "status",
+    label: "Status",
+    group: "Status",
+    cardinality: "single",
+    segmented: true,
+    options: [
+      { value: "open", label: "Open" },
+      { value: "closed", label: "Closed" },
+      { value: "all", label: "All", every: true },
+    ],
+    get: (f) => [f.status[0] ?? rest],
+    set: (f, v) => ({ ...f, status: v[0] === rest ? [] : v }),
+    defaultValues: () => [rest],
+  });
+  const at = (rest, status) => pillFor({ name: "Status", dims: [choice(rest)] }, { status });
+  const open = at("open", []);
+  assert.deepEqual([open.state, open.locked, open.value], ["default", true, "Open"]);
+  const all = at("all", []);
+  assert.deepEqual([all.state, all.locked, all.spoken], ["unset", false, "Add Status filter"]);
+  const picked = at("all", ["closed"]);
+  assert.deepEqual([picked.state, picked.locked, picked.value], ["set", false, "Closed"]);
+  assert.deepEqual(resetGroup({ name: "Status", dims: [choice("all")] }, { status: ["open"] }).status, []);
+  // An option worth "all" that is not marked every stays a constraint at rest.
+  const unmarked = { ...choice("all"), options: choice("all").options.map(({ every, ...o }) => o) };
+  assert.equal(pillFor({ name: "Status", dims: [unmarked] }, { status: [] }).locked, true);
 });
 
 test("removing a filter puts its group back to the default", () => {

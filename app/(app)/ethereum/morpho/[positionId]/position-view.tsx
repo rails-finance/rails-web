@@ -505,7 +505,6 @@ export default function MorphoPositionView({
                   historyWindow.state === "whole" && liquidationCount > 0 ? { ...liveView, liquidationCount } : liveView
                 }
                 surface="detail"
-                viewHref={tl.viewHref}
                 // The LTV, the rate and the room left to borrow come from the
                 // live market read.
                 live={chain}

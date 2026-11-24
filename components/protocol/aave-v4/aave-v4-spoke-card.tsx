@@ -39,6 +39,7 @@ import { type HubTier, hubChipLabel } from "@/components/protocol/aave-v4/aave-v
 import { type AaveSpokeCardInfo, liquidationBuffer, rateSymbolLabel, yearlyDebtCost } from "@/lib/aave-v4/spoke-cards";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { WalletPill } from "@/components/shared/wallet-pill";
+import { ListingTag } from "@/components/shared/listing-tag";
 import type { ClosedCollateralFactors } from "@/lib/aave-v4/use-closed-collateral-factors";
 import { fmtUsd, hfLabelV4, fmtLiqPrice } from "@/lib/aave-v4/format";
 import { formatCompact } from "@/lib/shared/format-compact";
@@ -74,6 +75,7 @@ import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { v4Apy } from "@/lib/aave-v4/rates";
+import { positionLink } from "@/lib/shared/position-link";
 
 export type { AaveSpokeCardInfo };
 
@@ -159,12 +161,12 @@ function PeakUsd({ usd, info }: { usd: number; info: Provenance }) {
   );
 }
 
-/** The spoke and its hubs, at the right end of the heading row. */
-function SpokeIdentity({ name, hub, debtHubs }: { name: string; hub: HubTier; debtHubs: HubTier[] }) {
+/** The spoke's hubs, after the tag in the heading row; the spoke stands in
+ *  the tag (ui-jobs 807). */
+function HubIdentity({ hub, debtHubs }: { hub: HubTier; debtHubs: HubTier[] }) {
   return (
-    <span className="flex items-center gap-1.5 leading-none text-foreground">
-      <span className="text-xs font-semibold">{name}</span>
-      <span className="text-xs font-bold uppercase tracking-wide">{hubChipLabel(hub, debtHubs)}</span>
+    <span className="text-xs font-bold uppercase tracking-wide leading-none text-foreground">
+      {hubChipLabel(hub, debtHubs)}
     </span>
   );
 }
@@ -179,7 +181,7 @@ function AaveV4MenuRows({ pagePath }: { pagePath: string }) {
       title="Link to this position"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() =>
-        void navigator.clipboard.writeText(`${window.location.origin}${pagePath}`).then(() => {
+        void navigator.clipboard.writeText(positionLink(pagePath)).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         })
@@ -304,8 +306,6 @@ export interface AaveV4SpokeCardProps {
   pagePath?: string;
   /** The ⋮'s export shapes (`aaveV4Exports`). */
   exports?: PositionCardExports | null;
-  /** The (i) pane's copy-this-view link. */
-  viewHref?: () => string;
   /** A foot line (Base: the oracle prices and the reserves' pause state). */
   foot?: ReactNode;
 }
@@ -322,7 +322,6 @@ export function useAaveV4SpokeCardSlots({
   riskPremium,
   pagePath,
   exports,
-  viewHref,
   foot,
 }: AaveV4SpokeCardProps): PositionCardSlots {
   const { session } = useAaveV4Deployment();
@@ -336,9 +335,11 @@ export function useAaveV4SpokeCardSlots({
   const identity = (
     <span className="flex items-center gap-2">
       {wallet && <WalletPill wallet={wallet} ensName={ensName ?? null} filterProtocol={session} bookmark />}
-      <SpokeIdentity name={spoke.name} hub={spoke.hub} debtHubs={spoke.debtHubs} />
+      <HubIdentity hub={spoke.hub} debtHubs={spoke.debtHubs} />
     </span>
   );
+  // The spoke (the market) as the tag, as the listing names it.
+  const tag = <ListingTag market={spoke.name} />;
   // The position's name: the spoke and the wallet (lib/shared/position-name.ts).
   const name = owner ? positionName({ market: spoke.name, noun: POSITION_NOUN[session], id: owner }) : undefined;
   // The owner transaction count, the liquidation triangle, then the time
@@ -359,7 +360,6 @@ export function useAaveV4SpokeCardSlots({
         <AaveV4PositionExplanation spoke={spoke} embedded externalActivity={externalActivity} />
       )
     ) : null,
-    viewHref,
   };
   const learnMore = showInfo ? aaveV4PositionModal(spoke.name, spoke.wasLiquidated) : null;
   const menu = {
@@ -396,6 +396,7 @@ export function useAaveV4SpokeCardSlots({
       status,
       heads,
       identity,
+      tag,
       counters,
       name,
       explainer,
@@ -570,6 +571,7 @@ export function useAaveV4SpokeCardSlots({
     status: null,
     heads,
     identity,
+    tag,
     counters,
     name,
     explainer,
@@ -607,7 +609,6 @@ export function AaveV4SpokeCardSelector({
   riskPremium,
   exports,
   pagePath,
-  viewHref,
   foot,
   ...rest
 }: AaveV4SpokeCardSelectorProps) {
@@ -647,7 +648,6 @@ export function AaveV4SpokeCardSelector({
               riskPremium={mine ? riskPremium : undefined}
               exports={mine ? exports : undefined}
               pagePath={mine ? pagePath : undefined}
-              viewHref={mine ? viewHref : undefined}
               foot={mine ? foot : undefined}
             />
           </div>

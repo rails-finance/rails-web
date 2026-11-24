@@ -6,7 +6,7 @@
 // `matches` predicate — the backend is the filter.
 //
 // Facets that ship LIVE (backend + proxy honor the params):
-//   • Status — open / closed (lifecycle), over mv_maple_wallets. There is no
+//   • Status — Open / Closed / All (ui-jobs 805), over mv_maple_wallets. There is no
 //     liquidated state: a Maple lender has no liquidation surface (default
 //     risk socializes through the pool's exit rate).
 //   • Queue  — In withdrawal queue (inQueue), from the escrow lane.
@@ -26,13 +26,8 @@ import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filt
 import type { FetchMaplePositionsParams } from "@/lib/api/fetch-maple-positions";
 import type { MaplePositionSort } from "@/lib/sources/api/maple-positions";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
-import {
-  canonicalStatuses,
-  defaultStatuses,
-  effectiveStatuses,
-  isAllStatuses,
-  sameStatusSet,
-} from "@/lib/maple/listing-visibility";
+import { defaultStatusChoice, mapleStatusBuckets, statusChoice } from "@/lib/maple/listing-visibility";
+import { setStatusChoice, STATUS_CHOICE_OPTIONS } from "@/lib/shared/status-choice";
 
 /** The Transactions slider's top: the round number above the busiest listed
  *  wallet (21,838 transactions, 20 Oct 2026). */
@@ -45,7 +40,7 @@ const MAPLE_SIZE_NOTE = "The deposited principal at the latest indexed price, as
 export const MAPLE_ITEMS_PER_PAGE = 20;
 
 export interface MapleListFilters extends BaseListFilters {
-  /** open / closed — multi (OR). Lifecycle over mv_maple_wallets. */
+  /** One of open / closed / all, or [] for the resting choice (ui-jobs 805). */
   status: string[];
   /** "" | "queued" — positions currently waiting in the withdrawal queue. */
   queue: string[];
@@ -60,9 +55,7 @@ export interface MapleListFilters extends BaseListFilters {
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
 // listing-visibility.ts resolves it per context — the open wallets on the bare directory,
-// every status once the search names an identity. Because the default is contextual rather
-// than a selection it draws no chip and no Reset link, and a cleared selection resolves back
-// to what the context rests on.
+// every status once the search names an identity.
 export const MAPLE_LIST_DEFAULTS: MapleListFilters = {
   q: "",
   sortBy: "recent",
@@ -83,11 +76,6 @@ export const MAPLE_SORT_OPTIONS: SortOption[] = [
   { value: "coll", label: "Deposited" },
 ];
 
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-];
-
 const QUEUE_OPTIONS: FilterOptionDef[] = [{ value: "queued", label: "In withdrawal queue" }];
 
 // One chip per pool (the whole two-pool catalog).
@@ -99,17 +87,14 @@ export function mapleListDimensions(): SerializableDimension<MapleListFilters>[]
       id: "status",
       label: "Status",
       group: "Status",
-      cardinality: "multi",
+      cardinality: "single",
       param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => effectiveStatuses(f),
-      defaultValues: (f) => defaultStatuses(f),
-      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
-      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
-      set: (f, v) => {
-        const sel = canonicalStatuses(v);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
-      },
+      options: STATUS_CHOICE_OPTIONS,
+      segmented: true,
+      get: (f) => [statusChoice(f)],
+      defaultValues: (f) => [defaultStatusChoice(f)],
+      // Takes the choice, or an old link's list of statuses (ui-jobs 805).
+      set: (f, v) => ({ ...f, status: setStatusChoice(v, defaultStatusChoice(f), []).status }),
     },
     {
       id: "queue",
@@ -155,8 +140,8 @@ export function mapleFiltersToFetchParams(filters: MapleListFilters, page: numbe
   const wallet = filters.q.trim();
   return {
     wallet: wallet ? wallet : undefined,
-    // The full set maps to no status filter; a real subset is sent verbatim.
-    status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    // All maps to no status filter.
+    status: mapleStatusBuckets(filters),
     inQueue: filters.queue.includes("queued") ? true : undefined,
     pools: filters.pools.length > 0 ? filters.pools : undefined,
     minCollUsd: usdBounds({ debt: [], coll: filters.coll }).minCollUsd,

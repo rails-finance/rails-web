@@ -31,11 +31,7 @@ import type { AlchemixV2PositionSummary } from "@/types/api/alchemix";
 import { NotLoaded } from "@/components/shared/not-loaded";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
-import {
-  AlchemixListingIdentity,
-  AlchemixTag,
-  alchemixChip,
-} from "@/components/protocol/alchemix/alchemix-position-card";
+import { AlchemixIdentity, AlchemixTag, alchemixChip } from "@/components/protocol/alchemix/alchemix-position-card";
 import { V2_WORDS } from "@/lib/alchemix/transmuter-words";
 
 /** alUSD and alETH are 18 decimals each, read from the tokens. */
@@ -181,9 +177,7 @@ export function v2ListingSlots(p: AlchemixV2PositionSummary, session: SessionPro
     surface: "listing",
     status: V2_STATUS,
     tag: <AlchemixTag market={p.syntheticSymbol} id={alchemixV2AccountLabel(p.account)} />,
-    identity: (
-      <AlchemixListingIdentity chain={p.chainName ?? `chain ${p.chainId}`} wallet={p.account} session={session} />
-    ),
+    identity: <AlchemixIdentity chain={p.chainName ?? `chain ${p.chainId}`} wallet={p.account} session={session} />,
     heads: [v2DebtHead(p), v2CollateralHead(p)],
     outcome: v2Outcome(p),
     counters: null,

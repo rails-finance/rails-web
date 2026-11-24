@@ -30,7 +30,7 @@ import { SAVED_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
 import { TAB_ACTIVE, TAB_IDLE } from "@/components/shared/rail-header";
-import { COUNT_BADGE, FOOT_LINK, INLINE_LINK, PROFILE_CLEARANCE, START_CTA } from "@/lib/shared/ui-grammar";
+import { COUNT_BADGE, FOOT_LINK, PROFILE_CLEARANCE, START_CTA } from "@/lib/shared/ui-grammar";
 
 type Tab = "overview" | "focus" | "listings" | "wallets" | "positions";
 type Kind = Exclude<Tab, "overview">;
@@ -305,13 +305,7 @@ export function BookmarksPage() {
                   "focus",
                   "Focus",
                   "focus",
-                  <>
-                    Focus keeps Rails to the assets and chains you choose. Start one here, or open{" "}
-                    <Link href="/assets" className={INLINE_LINK} data-saved-card-assets="">
-                      Assets
-                    </Link>{" "}
-                    and choose <Term>Add to focus</Term> in an asset row&apos;s ⋮ menu.
-                  </>,
+                  <>Focus keeps Rails to the assets and chains you choose. Start one here.</>,
                 )}
                 {kindCard(
                   "listings",

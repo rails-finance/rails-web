@@ -47,7 +47,7 @@ import { PriceUnitMark } from "@/components/assets/price-unit-mark";
 import { fmtChange, PriceSparkline } from "@/components/assets/price-sparkline";
 import { asOfMark, asOfWords, fmtRowPrice } from "@/components/assets/asset-price-row";
 import { loadAssetPrices } from "@/lib/api/fetch-asset-prices";
-import { rowFor, type AssetPriceRow } from "@/lib/shared/asset-prices";
+import { rowFor, type AssetPriceList, type AssetPriceRow } from "@/lib/shared/asset-prices";
 import { PRICELESS_WHY } from "@/lib/shared/asset-explorer";
 import { assetHref, NATIVE } from "@/lib/shared/asset-roster";
 import { usesWords, viaName, withVia } from "@/lib/shared/asset-via";
@@ -229,6 +229,13 @@ function PendleMarketLine({ chain, contract }: { chain: ChainId; contract: strin
   );
 }
 
+/** Whether an explorer has a page for the token under it (decision 0069,
+ *  ui-jobs 786): the list's `paged`; an answer without it allows the link,
+ *  which the resolver sends back where no page exists. */
+function hasPage(list: AssetPriceList, chain: number, token: string): boolean {
+  return !list.paged || list.paged.includes(`${chain}:${token.toLowerCase()}`);
+}
+
 /** The asset's page, with the reader's `via` kept, once the Prices list is
  *  read: a priced asset's page, or the page of a token with a page and no
  *  stored price; null where the asset has none (the Prices dropdown's rows,
@@ -249,7 +256,11 @@ export function useAssetPageHref(symbol: string, address?: string): string | nul
       const row = rowFor(list, pageChain, contract, value);
       const unpriced = list.unpriced?.includes(`${pageChain}:${contract.toLowerCase()}`);
       const token = row ? row.token : unpriced ? contract.toLowerCase() : null;
-      setHref(token ? withVia(assetHref(pageChain, token), value, `${pathname}${search}`) : null);
+      setHref(
+        token && hasPage(list, pageChain, token)
+          ? withVia(assetHref(pageChain, token), value, `${pathname}${search}`)
+          : null,
+      );
     });
     return () => {
       live = false;
@@ -270,6 +281,9 @@ function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: s
   const [row, setRow] = useState<ReturnType<typeof rowFor>>(null);
   const [unpriced, setUnpriced] = useState(false);
   const [listed, setListed] = useState(false);
+  // Whether an explorer has a page for the token (decision 0069); true until
+  // the list says otherwise.
+  const [paged, setPaged] = useState(true);
   // BOLD on Ethereum states its Curve BOLD/USDC price (ui-jobs 746b).
   const bold = chain === MAINNET_CHAIN_ID && contract.toLowerCase() === TOKEN_ADDRESSES.BOLD;
   // Read only once the list says the token has no stored price.
@@ -281,6 +295,7 @@ function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: s
       setListed(true);
       setRow(list ? rowFor(list, chain, contract, value) : null);
       setUnpriced(Boolean(list?.unpriced?.includes(`${chain}:${contract.toLowerCase()}`)));
+      setPaged(!list || hasPage(list, chain, contract));
     });
     return () => {
       live = false;
@@ -300,9 +315,11 @@ function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: s
             {PRICELESS_WHY}
           </p>
         )}
-        <Link href={open} className={`self-start font-medium ${FOOT_LINK}`} data-asset-popover-open={open}>
-          {WORDS.open(symbol)}
-        </Link>
+        {paged && (
+          <Link href={open} className={`self-start font-medium ${FOOT_LINK}`} data-asset-popover-open={open}>
+            {WORDS.open(symbol)}
+          </Link>
+        )}
       </div>
     );
   }
@@ -347,9 +364,11 @@ function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: s
           {row.asOf ? `, its stored rounds to block ${row.asOf.block.toLocaleString("en-US")}` : ""}, last 30 days
         </p>
       )}
-      <Link href={open} className={`self-start font-medium ${FOOT_LINK}`} data-asset-popover-open={open}>
-        {WORDS.open(row.symbol)}
-      </Link>
+      {paged && (
+        <Link href={open} className={`self-start font-medium ${FOOT_LINK}`} data-asset-popover-open={open}>
+          {WORDS.open(row.symbol)}
+        </Link>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-// One timeline row of a Liquity V2 stability-pool deposit, on the shared
+// One timeline row of a Liquity V2 (or fork) stability-pool deposit, on the shared
 // event-card shell (components/shared/event-card.tsx), as Polaris's deposit
 // row draws it: T1 the label with the moved amounts on the spine, T2 the
 // balance sheet (sp-sheet.ts) and the price row (the depositor's gas), T3 the
@@ -13,12 +13,12 @@ import type { SpineTokenRow } from "@/components/shared/spine-column";
 import type { EventGas } from "@/components/shared/event-price-row";
 import { BlockRef } from "@/components/shared/block-ref";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatCompact } from "@/lib/shared/format-compact";
-import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
-import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
+import { LIQUITY_V2_SP, spPoolOf, type SpDeployment } from "@/lib/liquity-v2/sp-deployment";
+import type { SessionProtocol } from "@/lib/shared/sessions";
 import { big, exactUnits, units } from "@/lib/liquity-v2/sp-math";
-import { spCompoundProv, spLiqProv, spTouchProv } from "@/lib/liquity-v2/sp-provenance";
+import { spCompoundProv, spLiqProvFor, spTouchProv } from "@/lib/liquity-v2/sp-provenance";
 import type { ChainTruthDelta } from "@/components/shared/chain-truth-event";
 import { DEPOSIT_TOUCH_TIP } from "@/lib/liquity-v2/touch-words";
 import { spEventLabel, spEventSentences, spSenderSentence } from "@/lib/liquity-v2/sp-event-prose";
@@ -43,7 +43,7 @@ const collText = (raw: bigint): string => {
 };
 const short = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
 
-function txCell(txHash: string, block: string, info: Provenance): EventCellSpec {
+function txCell(txHash: string, block: string, info: Provenance, chainId: ChainId): EventCellSpec {
   return {
     kind: "stat",
     key: "tx",
@@ -53,7 +53,7 @@ function txCell(txHash: string, block: string, info: Provenance): EventCellSpec 
       lines: [
         <a
           key="tx"
-          href={explorerUrl(MAINNET_CHAIN_ID, "tx", txHash)}
+          href={explorerUrl(chainId, "tx", txHash)}
           target="_blank"
           rel="noopener"
           className="link-muted font-mono text-xs"
@@ -63,7 +63,7 @@ function txCell(txHash: string, block: string, info: Provenance): EventCellSpec 
         <span key="block" className="text-xs text-rb-500">
           Block{" "}
           <Prov info={info} value={block}>
-            <BlockRef block={Number(block)} chainId={MAINNET_CHAIN_ID} size={12} />
+            <BlockRef block={Number(block)} chainId={chainId} size={12} />
           </Prov>
         </span>,
       ],
@@ -95,7 +95,7 @@ function amountCell(
 
 /** The transaction's gas, where the depositor sent it: the receipt's gas used
  *  times its effective gas price, in ETH (the rows carry no ETH price). */
-function depositorGas(r: LiquityV2DepositEventRow): EventGas | undefined {
+function depositorGas(r: LiquityV2DepositEventRow<string>): EventGas | undefined {
   if (!r.tx_from || r.tx_from.toLowerCase() !== r.depositor.toLowerCase()) return undefined;
   if (!r.gas_used || !r.effective_gas_price) return undefined;
   const eth = units(big(r.gas_used) * big(r.effective_gas_price));
@@ -104,24 +104,27 @@ function depositorGas(r: LiquityV2DepositEventRow): EventGas | undefined {
 
 /** The row's sentences, the sender's linked to its wallet page, or to its
  *  redeemer page where the transaction holds a redemption it sent, then the
- *  Troves its transaction acted on (ui-jobs 751). */
-function Bullets({ row, coll }: { row: LiquityV2DepositEventRow; coll: string }) {
+ *  Troves its transaction acted on (ui-jobs 751). The redeemer pages and the
+ *  transaction's Troves are Liquity V2's; a fork's row states its sentences. */
+function Bullets({ row, coll, dep }: { row: LiquityV2DepositEventRow<string>; coll: string; dep: SpDeployment }) {
   const sender = row.tx_from ? spSenderSentence(row.tx_from) : null;
-  const txTroves = useTxTroves(row.tx_hash);
+  const v2 = dep.id === "liquity-v2";
+  const txTroves = useTxTroves(v2 ? row.tx_hash : "");
   const redeemerHref =
     row.tx_from && txTroves && sentRedemption(txTroves.rows, row.tx_from) ? liquityV2RedeemerHref(row.tx_from) : null;
   return (
     <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
-      {spEventSentences(row, coll).map((l) =>
+      {spEventSentences(row, coll, dep.stable.symbol).map((l) =>
         l === sender && row.tx_from ? (
           <li key={l}>
-            <LinkedAddress address={row.tx_from} holderOf="liquity-v2" href={redeemerHref} /> sent the transaction.
+            <LinkedAddress address={row.tx_from} holderOf={dep.session as SessionProtocol} href={redeemerHref} /> sent
+            the transaction.
           </li>
         ) : (
           <li key={l}>{l}</li>
         ),
       )}
-      <SpTxTroves txHash={row.tx_hash} />
+      {v2 && <SpTxTroves txHash={row.tx_hash} />}
     </ul>
   );
 }
@@ -130,15 +133,20 @@ export function LiquityV2DepositEventCard({
   row,
   isLast,
   eventNumber,
+  dep = LIQUITY_V2_SP,
 }: {
-  row: LiquityV2DepositEventRow;
+  row: LiquityV2DepositEventRow<string>;
+  /** The deployment: Liquity V2, or a fork (lib/liquity-v2/sp-deployment.ts). */
+  dep?: SpDeployment;
   isLast: boolean;
   /** The timeline's number: the pill links the event's page (P4). */
   eventNumber?: number;
 }) {
-  const branch = LIQUITY_V2_BRANCHES[row.collateral_type.toLowerCase()];
+  const branch = spPoolOf(dep, row.collateral_type);
   const c = branch.symbol;
-  const coord = (summary: string) => spTouchProv(summary, row.tx_hash, row.block_number, row.collateral_type);
+  const S = dep.stable.symbol;
+  const SA = dep.stable.address;
+  const coord = (summary: string) => spTouchProv(summary, row.tx_hash, row.block_number, row.collateral_type, dep);
   const change = big(row.top_up_or_withdrawal);
   const collClaimed = big(row.coll_gain_claimed);
   const yieldClaimed = big(row.yield_gain_claimed);
@@ -146,8 +154,8 @@ export function LiquityV2DepositEventCard({
   const tokens: SpineTokenRow[] = [];
   if (change !== ZERO)
     tokens.push({
-      symbol: "BOLD",
-      address: TOKEN_ADDRESSES.BOLD,
+      symbol: S,
+      address: SA,
       direction: change > ZERO ? "right" : "left",
       popover: true,
       value: units(change > ZERO ? change : -change),
@@ -164,8 +172,8 @@ export function LiquityV2DepositEventCard({
     });
   if (yieldClaimed > ZERO)
     tokens.push({
-      symbol: "BOLD",
-      address: TOKEN_ADDRESSES.BOLD,
+      symbol: S,
+      address: SA,
       direction: "left",
       popover: true,
       value: units(yieldClaimed),
@@ -190,8 +198,8 @@ export function LiquityV2DepositEventCard({
     if (bold !== ZERO) {
       const mag = bold < ZERO ? -bold : bold;
       tokens.push({
-        symbol: "BOLD",
-        address: TOKEN_ADDRESSES.BOLD,
+        symbol: S,
+        address: SA,
         // A fall points out of the deposit, so the arrow reads with the "−".
         direction: bold < ZERO ? "left" : "right",
         popover: true,
@@ -201,12 +209,12 @@ export function LiquityV2DepositEventCard({
       });
       deltas.push({
         value: units(bold),
-        symbol: "BOLD",
-        address: TOKEN_ADDRESSES.BOLD,
+        symbol: S,
+        address: SA,
         exact: exactUnits(bold),
         display: keptText(mag),
         prov: lossToo
-          ? spLiqProv.depositChange(
+          ? spLiqProvFor(dep).depositChange(
               row.collateral_type,
               row.tx_hash,
               row.block_number,
@@ -219,6 +227,7 @@ export function LiquityV2DepositEventCard({
               row.block_number,
               row.collateral_type,
               sinceAndClaimed(row.yield_gain_since, row.yield_gain_claimed),
+              dep,
             ),
       });
     }
@@ -245,20 +254,21 @@ export function LiquityV2DepositEventCard({
           row.block_number,
           row.collateral_type,
           sinceAndClaimed(row.coll_gain_since, row.coll_gain_claimed),
+          dep,
         ),
       });
     }
   }
-  if (tokens.length === 0) tokens.push({ symbol: "BOLD", address: TOKEN_ADDRESSES.BOLD });
+  if (tokens.length === 0) tokens.push({ symbol: S, address: SA });
 
   const cells: EventCellSpec[] = [
-    amountCell("deposit-after", "Deposit after", big(row.deposit_after), "BOLD", TOKEN_ADDRESSES.BOLD, {
+    amountCell("deposit-after", "Deposit after", big(row.deposit_after), S, SA, {
       kind: "derived",
       pclass: "indexed",
       summary:
         "Deposit after — the deposit after this operation, replayed from the operations: the deposit before it, less the loss, plus the change and the yield, less the yield claimed.",
       formula: DEPOSIT_AFTER_FORMULA,
-      via: "GET /api/liquity-v2/stability-pool/timeline",
+      via: `GET ${dep.api}/stability-pool/timeline`,
     }),
     ...(big(row.coll_gain_since) > ZERO
       ? [
@@ -275,13 +285,13 @@ export function LiquityV2DepositEventCard({
           },
         ]
       : []),
-    txCell(row.tx_hash, row.block_number, coord("Block — the block this DepositOperation was logged in.")),
+    txCell(row.tx_hash, row.block_number, coord("Block — the block this DepositOperation was logged in."), dep.chainId),
   ];
 
   const slots: EventCardSlots = {
     event: {
       id: row.event_key,
-      family: "liquity-v2-sp",
+      family: `${dep.id}-sp`,
       txHash: row.tx_hash,
       blockNumber: Number(row.block_number),
       timestamp: Number(row.block_timestamp),
@@ -291,10 +301,10 @@ export function LiquityV2DepositEventCard({
     head: { label, labelTip: label === "Touched" ? DEPOSIT_TOUCH_TIP : undefined, deltas },
     caption: label,
     cells,
-    sheet: spDepositSheet(row),
+    sheet: spDepositSheet(row, dep),
     ledgers: { none: "A deposit's balance is the Deposit side's total." },
     price: { gas: depositorGas(row), prices: [] },
-    explainer: { body: <Bullets row={row} coll={c} /> },
+    explainer: { body: <Bullets row={row} coll={c} dep={dep} /> },
     learnMore: null,
   };
   return <EventCard slots={slots} avatar={null} />;

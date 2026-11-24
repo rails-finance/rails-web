@@ -46,6 +46,7 @@ import {
 import type { VaultEarned } from "@/lib/vaults/earned";
 import type { HoldingWorthLine, HoldingWorthPoint, PlainHoldingHistory } from "@/lib/vaults/holding-worth";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
+import { positionLink } from "@/lib/shared/position-link";
 
 const ZERO = BigInt(0);
 const units = (raw: string, decimals: number) => Number(raw) / 10 ** decimals;
@@ -112,7 +113,7 @@ function MenuRows({ href }: { href: string }) {
       title="Link to this holding"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() =>
-        void navigator.clipboard.writeText(`${window.location.origin}${href}`).then(() => {
+        void navigator.clipboard.writeText(positionLink(href)).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         })
@@ -496,6 +497,7 @@ function plainSlots(p: VaultHoldingPlainCardProps): PositionCardSlots {
     surface: "detail",
     heading: "Holding summary",
     status: null,
+    lifecycle: false,
     identity,
     heads: p.never ? [worthNow] : [side("in"), side("out"), worthNow, profit],
     counters: null,

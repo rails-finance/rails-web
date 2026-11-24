@@ -222,8 +222,9 @@ check(
 const chainButtons = page.locator(`${CHOOSER} [data-switcher-tabs] [role="tab"]:not([data-switcher-robinhood])`);
 const chainCount = await chainButtons.count();
 check("S the chain row renders multiple chains", chainCount >= 2, `chains: ${chainCount}`);
-// Every chain's count equals its explorer rows with every explorer shown, and
-// the most used number eight at most.
+// Every chain's count equals its explorers: the rows shown where they are all,
+// else the "View all <n> explorers" link's n (the link opens /protocols on that
+// chain, ui-jobs 781); the most used number eight at most.
 let badgesMatch = chainCount >= 2;
 for (let i = 0; i < chainCount; i++) {
   const btn = chainButtons.nth(i);
@@ -231,8 +232,9 @@ for (let i = 0; i < chainCount; i++) {
   const badge = Number(await btn.getAttribute("data-chain-count"));
   const shown = await page.locator(`${CHOOSER} a[data-switcher-explorer]`).count();
   const viewAll = page.locator(`${CHOOSER} [data-chooser-view-all]`);
-  if (await viewAll.count()) await viewAll.click();
-  const rows = await page.locator(`${CHOOSER} a[data-switcher-explorer]`).count();
+  const rows = (await viewAll.count())
+    ? Number((await viewAll.textContent())?.match(/View all (\d+) explorers/)?.[1] ?? NaN)
+    : shown;
   if (!(Number.isFinite(badge) && badge > 0 && badge === rows && shown <= 8)) {
     badgesMatch = false;
     check(`S chain ${i} count (${badge}) matches its rows (${rows}), ${shown} shown first`, false);
@@ -251,9 +253,15 @@ check(
   "S active explorer row carries aria-current",
   (await currentRow.count()) === 1 && (await currentRow.getAttribute("href")) === "/ethereum/dolomite",
 );
-// "View all" reaches the long tail, and a row there navigates to its listing.
+// "View all" opens /protocols on Ethereum (ui-jobs 781), where the long tail's
+// row navigates to its listing.
+check(
+  "S View all opens /protocols on the chosen chain",
+  (await page.locator(`${CHOOSER} [data-chooser-view-all]`).getAttribute("href")) === "/protocols?chain=1",
+);
 await page.locator(`${CHOOSER} [data-chooser-view-all]`).click();
-await page.locator(`${CHOOSER} a[href="/ethereum/llamalend"]`).click();
+await page.waitForURL(/\/protocols\?chain=1$/, { timeout: 30_000 }).catch(() => {});
+await page.locator('[data-protocol-row="llamalend"] a[data-protocol-hub]').click();
 const navigated = await page
   .waitForURL(/\/ethereum\/llamalend/, { timeout: 8000 })
   .then(() => true)

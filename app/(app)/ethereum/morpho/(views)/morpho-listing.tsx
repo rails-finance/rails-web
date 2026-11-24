@@ -21,6 +21,7 @@
 // roster is fetched, and the URL it keeps in sync is that page's own
 // (lib/morpho/list-filter-dimensions.tsx, "fixed to one market").
 
+import { morphoCountLine } from "@/lib/morpho/listing-visibility";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Lock } from "lucide-react";
 import { OPEN_SCOPE_PANEL, useAssetScope } from "@/lib/shared/asset-scope";
@@ -242,6 +243,7 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
         ) : undefined
       }
       noun="positions"
+      countLine={morphoCountLine}
       basePath={market ? market.path : "/ethereum/morpho"}
       defaults={MORPHO_LIST_DEFAULTS}
       sortOptions={MORPHO_SORT_OPTIONS}
@@ -278,6 +280,12 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
           // matches nothing): no figure to set the shown count against.
           if (aimRef.current) setUnscoped(whole ? whole.pagination.total : null);
           return r ? { data: r.data, total: r.pagination.total } : { data: [], total: 0 };
+        },
+        // The same selection's total, one row asked, leaving the AIM cut and
+        // the unscoped figure to the applied page.
+        countDraft: async (f) => {
+          const params = market ? morphoMarketFetchParams(f, 1, market.id) : (await aimParams(f, 1)).params;
+          return params ? (await fetchMorphoPositions({ ...params, limit: 1, offset: 0 })).pagination.total : 0;
         },
       })}
       onFilters={setFilters}

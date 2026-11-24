@@ -1,18 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { formerHoldFor } from "@/lib/liquity-fork/former-holders";
-
 // Ebisu Trove listing — client half. One row per Trove (across 5 collateral branches),
 // replayed straight from the Ebisu TroveUpdated events — chain-direct values only
 // (branch collateral + ebUSD debt, user-set interest rate, status). There is no
 // collateral ratio, no USD (interpreted layers, off by default). Holds the
 // presentation config + the in-memory strategy and hands them to the shared
 // ChainTruthListingPage driver with the SSR first-paint data from page.tsx.
+// The count names the Status choice ("open Troves"); the in-memory tier draws
+// the listing's noun, so the noun follows the filters (ui-jobs 805).
 
+import { useState } from "react";
 import type { EbisuTroveSummary } from "@/lib/sources/api/ebisu-troves";
 import { fetchEbisuTroves } from "@/lib/api/fetch-ebisu-troves";
 import { ChainTruthListingPage, memoryStrategy } from "@/components/shared/chain-truth-listing-page";
+import { decodeListFilters } from "@/lib/shared/list-filter";
+import { troveCountLine } from "@/lib/liquity-v2/listing-visibility";
 import { EbisuPositionCard, viewFromSummary } from "@/components/protocol/ebisu/ebisu-position-card";
 import {
   ebisuListDimensions,
@@ -30,19 +32,23 @@ export interface EbisuListingProps {
 }
 
 export function EbisuListing({ initialItems, initialTotal, initialKey, initialSearch }: EbisuListingProps) {
-  // The search, so a Trove the searched wallet passed on reads "moved to"
-  // (lib/liquity-fork/former-holders.ts).
-  const [q, setQ] = useState(() => new URLSearchParams(initialSearch ?? "").get("q") ?? "");
+  const [noun, setNoun] = useState(
+    () =>
+      troveCountLine(
+        decodeListFilters(ebisuListDimensions([]), new URLSearchParams(initialSearch ?? ""), EBISU_LIST_DEFAULTS),
+      ).noun,
+  );
   return (
     <ChainTruthListingPage<EbisuTroveSummary, EbisuListFilters>
       title="Ebisu Troves"
-      noun="Troves"
+      noun={noun}
+      onFilters={(f) => setNoun(troveCountLine(f).noun)}
       basePath="/ethereum/ebisu"
       defaults={EBISU_LIST_DEFAULTS}
       sortOptions={EBISU_SORT_OPTIONS}
       searchPlaceholder="Search trove id or collateral"
-      renderCard={(t) => <EbisuPositionCard v={{ ...viewFromSummary(t), formerHold: formerHoldFor(t, q) }} compact />}
-      onFilters={(filters) => setQ(filters.q ?? "")}
+      renderCard={(t) => <EbisuPositionCard v={viewFromSummary(t)} compact />}
+      walletSearch="ebisu"
       hrefFor={(t) => `/ethereum/ebisu/${t.collateralType}/${t.id}`}
       keyFor={(t) => `${t.collateralType}-${t.id}`}
       strategy={memoryStrategy<EbisuTroveSummary, EbisuListFilters>({

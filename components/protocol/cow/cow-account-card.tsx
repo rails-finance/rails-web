@@ -54,6 +54,7 @@ export function CowAccountCard({
   const slots: PositionCardSlots = {
     surface: "detail",
     status: null,
+    lifecycle: false,
     identity: <span className="text-xs font-semibold text-foreground">{COW_TERMS.identity}</span>,
     heads: [
       {

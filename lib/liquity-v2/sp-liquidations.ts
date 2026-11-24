@@ -1,4 +1,4 @@
-// A Liquity V2 stability-pool deposit's liquidations between its touches, as
+// A Liquity V2 (or fork) stability-pool deposit's liquidations between its touches, as
 // the timeline places them (rails-ops decision 0022 §3–§4; the read is
 // rails-server's /stability-pool/liquidations). Each closed stretch with a
 // liquidation is one market note anchored on the touch that closed it, so it
@@ -9,7 +9,7 @@
 
 import type { MarketNotePoint, SpLiquidationsNote } from "@/lib/shared/market-note";
 import type { LiquityV2DepositLiquidationsResponse, LiquityV2DepositStretch } from "@/lib/sources/api/liquity-v2-sp";
-import type { SpBranch } from "./sp-routes";
+import type { SpDeployment } from "./sp-deployment";
 
 const end = (e: {
   event_key: string;
@@ -28,7 +28,7 @@ const end = (e: {
 });
 
 /** The branch's replay check, as counts; null where the route states none. */
-export function spBranchCheck(read: LiquityV2DepositLiquidationsResponse): SpLiquidationsNote["branchCheck"] {
+export function spBranchCheck(read: LiquityV2DepositLiquidationsResponse<string>): SpLiquidationsNote["branchCheck"] {
   const c = read.branch_check;
   if (!c) return null;
   return { unreconciled: Number(c.unreconciled), closedStretches: Number(c.closed_stretches) };
@@ -39,9 +39,13 @@ export function spBranchCheck(read: LiquityV2DepositLiquidationsResponse): SpLiq
  *  branch's StabilityPool (LIQUITY_V2_SP_POOLS). Each note anchors on its
  *  closing touch by event key (`anchorTo`). */
 export function spLiquidationNotes(
-  branch: SpBranch,
+  branch: string,
   pool: string,
-  read: LiquityV2DepositLiquidationsResponse,
+  read: LiquityV2DepositLiquidationsResponse<string>,
+  /** The deployment, where it is not Liquity V2: its id and stablecoin. */
+  dep?: Pick<SpDeployment, "id" | "stable">,
+  /** The withdrawal block the page states (`statedWithdrawalBlock`). */
+  withdrawnAt?: number,
 ): SpLiquidationsNote[] {
   const branchCheck = spBranchCheck(read);
   return read.stretches
@@ -54,8 +58,10 @@ export function spLiquidationNotes(
       id: `sp-liquidations:${branch}:${s.from.block_number}-${s.to.block_number}`,
       marketSymbol: branch,
       marketAddress: pool,
-      unitLabel: "BOLD",
+      unitLabel: dep?.stable.symbol ?? "BOLD",
       protocol: "liquity-v2",
+      ...(dep && dep.id !== "liquity-v2" ? { deployment: dep.id } : {}),
+      ...(withdrawnAt != null ? { collWithdrawnAtBlock: withdrawnAt } : {}),
       from: end(s.from),
       to: end(s.to),
       anchorTo: s.to.event_key,
@@ -83,20 +89,42 @@ export function spResidualClause(
   residual: { bold_lost: string; coll_gained: string },
   coll: string,
   fmt: { bold: (v: bigint) => string; coll: (v: bigint) => string },
+  /** The pool's stablecoin. */
+  stable = "BOLD",
 ): string | null {
   const zero = BigInt(0);
   const rb = BigInt(residual.bold_lost);
   const rc = BigInt(residual.coll_gained);
   const mag = (v: bigint) => (v < zero ? -v : v);
-  const bold = `${fmt.bold(mag(rb))} BOLD`;
+  const bold = `${fmt.bold(mag(rb))} ${stable}`;
   const col = `${fmt.coll(mag(rc))} ${coll}`;
   if (rb === zero && rc === zero) return null;
   if (rb > zero && rc < zero)
     return `account for all but ${bold} of the burn, and exceed the ${coll} paid in by ${fmt.coll(mag(rc))}`;
   if (rb < zero && rc > zero)
-    return `account for all but ${col} of the ${coll} paid in, and exceed the burn by ${fmt.bold(mag(rb))} BOLD`;
+    return `account for all but ${col} of the ${coll} paid in, and exceed the burn by ${fmt.bold(mag(rb))} ${stable}`;
   const items = [...(rb !== zero ? [bold] : []), ...(rc !== zero ? [col] : [])].join(" and ");
   return rb > zero || rc > zero ? `account for all but ${items}` : `exceed it by ${items}`;
+}
+
+/** The block of the admin's withdrawal of the pool's collateral that the page
+ *  states (Ebisu): the answer's `coll_withdrawn_at_block` where the catalog's
+ *  record names the same block, the record being where the line's date and
+ *  receipt come from. Else undefined: the page states no withdrawal, and so
+ *  hides nothing on its account. */
+export function statedWithdrawalBlock(
+  answerBlock: string | null | undefined,
+  recordBlock: number | null | undefined,
+): number | undefined {
+  if (answerBlock == null || recordBlock == null) return undefined;
+  return Number(answerBlock) === recordBlock ? recordBlock : undefined;
+}
+
+/** A stretch closed at or after the withdrawal block (the withdrawal sits in
+ *  that block): its touch wrote no collateral the liquidations had paid, so
+ *  it does not reconcile by the withdrawal's doing. */
+export function closedAfterWithdrawal(note: Pick<SpLiquidationsNote, "collWithdrawnAtBlock" | "to">): boolean {
+  return note.collWithdrawnAtBlock != null && note.to.block >= note.collWithdrawnAtBlock;
 }
 
 export const isSpLiquidationsNote = (x: unknown): x is SpLiquidationsNote =>

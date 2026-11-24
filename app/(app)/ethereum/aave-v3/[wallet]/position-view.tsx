@@ -58,7 +58,7 @@ import { IndexNotice } from "@/components/shared/index-notice";
 import { AAVE_V3_FOLDER_REGISTER, AAVE_V3_TIMELINE_RUNS } from "@/lib/aave-v3/timeline-runs";
 import { fetchAaveV3GroupedTimeline, type AaveV3GroupedTimelineResponse } from "@/lib/api/fetch-aave-v3-timeline";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
-import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { aaveV3FlowSeriesTimeline, aaveV3FocusEvents, lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
 import { AAVE_V3_HEALTH_SOURCE } from "@/lib/aave-v3/flows-health";
@@ -115,7 +115,7 @@ import {
 } from "@/lib/aave-v3/market-notes";
 import { loadAaveFamilyReserveRates, type ReserveRateLookup } from "@/lib/api/fetch-aave-family-reserve-rates";
 import type { MarketNote } from "@/lib/shared/market-note";
-import { v3ViewWithLiveRead } from "@/lib/aave-v3/chain-position-view";
+import { v3IndexLag, v3PageView } from "@/lib/aave-v3/chain-position-view";
 
 type AaveV3Event = BaseActivityEvent & { context: { protocol: "aave-v3"; data: AaveV3Context } };
 
@@ -695,9 +695,16 @@ export default function AaveV3PositionDetail({
   // account empty while the index still has it open (the index trails the
   // chain by its refresh), the page shows it closed: see v3ViewWithLiveRead.
   // Everything below that states what the account holds now reads `liveView`.
+  //
+  // The index's balances stand at the row's newest event, refreshed about
+  // hourly; the event tail is at the head. When the tail has an event after
+  // the row's block, the indexed balances are out of date (ui-jobs 806): the
+  // page holds them back until the read answers, takes the read's balances
+  // when it does, and names both blocks when it does not (v3PageView).
+  const lag = useMemo(() => v3IndexLag(view, aaveEvents, servedFolders), [view, aaveEvents, servedFolders]);
   const liveView = useMemo<AaveV3PositionView | null>(
-    () => (view && chain ? v3ViewWithLiveRead(view, chain) : view),
-    [view, chain],
+    () => v3PageView(view, chain, chainSettled, lag),
+    [view, chain, chainSettled, lag],
   );
 
   // The card's prices: the market's oracle at the card's block (the Pool
@@ -710,10 +717,12 @@ export default function AaveV3PositionDetail({
     block: number | null;
   } | null>(null);
   const heldKey = useMemo(() => {
-    if (!view || view.status !== "open" || !chainSettled) return null;
-    const held = [...new Set([...view.supplies, ...view.borrows].map((r) => r.address.toLowerCase()))].sort();
+    // The merged view's reserves: a read that replaced the index's balances
+    // may hold a reserve the index did not.
+    if (!liveView || liveView.status !== "open" || !chainSettled) return null;
+    const held = [...new Set([...liveView.supplies, ...liveView.borrows].map((r) => r.address.toLowerCase()))].sort();
     return held.length > 0 ? `${wallet}:${market}:${chain?.blockNumber ?? "head"}:${held.join(",")}` : null;
-  }, [view, chain, chainSettled, wallet, market]);
+  }, [liveView, chain, chainSettled, wallet, market]);
   useEffect(() => {
     if (!heldKey) return;
     let cancelled = false;
@@ -786,6 +795,16 @@ export default function AaveV3PositionDetail({
     emode: switches?.emode ?? null,
   });
   const flowFocus = useFlowFocusValue(focusRoot, flowTimeline);
+  // A closed card's peak value per side reads the same day rows, through the
+  // flow-focus value's model, so the page builds it once for both.
+  const peakFlows = useMemo(
+    () => ({
+      read: (flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading") as FlowsRead,
+      timeline: flowTimeline,
+      model: flowFocus.model,
+    }),
+    [flowSeries, flowSeriesFailed, flowTimeline, flowFocus.model],
+  );
   // The card's count counts transactions; its tip gives the events too.
   const cardView = useMemo(
     () => (pricedView && flowSeries ? { ...pricedView, eventTotal: flowSeries.totalEvents } : pricedView),
@@ -871,7 +890,6 @@ export default function AaveV3PositionDetail({
                 <AaveV3PositionCard
                   v={cardView}
                   receipts
-                  viewHref={tl.viewHref}
                   captions={captions ?? undefined}
                   // The Pool read's room to borrow and eMode go in the panel,
                   // inside the card's receipts scope; the health factor pulses
@@ -881,6 +899,7 @@ export default function AaveV3PositionDetail({
                   pricesPending={heldKey == null ? !chainSettled : !cardPriced}
                   notCollateral={notCollateral}
                   exports={exports}
+                  flows={peakFlows}
                   // The Explanation is now pure layman prose about those same face
                   // figures — no secondary figure-strips. The LTV strip is absorbed
                   // into the risk slot above; the reserve rates live on the market

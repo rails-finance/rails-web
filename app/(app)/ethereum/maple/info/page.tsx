@@ -7,6 +7,8 @@ import Link from "next/link";
 import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { MAPLE_POOLS_SHOWS } from "@/lib/vaults/family-leads";
+import { MAPLE_LENDER_DOCS } from "@/lib/vaults/family-docs";
 
 export const metadata = infoMetadata("maple");
 
@@ -72,6 +74,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "Listing",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>Each row is one wallet&apos;s stake in one pool.</li>
@@ -83,6 +86,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Wallet page",
+    section: "positions",
     body: (
       <ul className={UL}>
         <li>The top card shows the wallet&apos;s shares, what they pay out now and the interest they have earned.</li>
@@ -93,14 +97,14 @@ const views: readonly [InfoView, ...InfoView[]] = [
   },
   {
     heading: "Pools page",
+    section: "pools",
     body: (
       <p>
-        The pools page shows each pool&apos;s cash available to pay exits, its fixed-term and open-term loans, and its
-        exit rate.{" "}
+        The{" "}
         <Link href="/ethereum/maple/pools" className={INLINE_LINK}>
-          Open the pools page
+          pools page
         </Link>{" "}
-        to see them.
+        {MAPLE_POOLS_SHOWS}
       </p>
     ),
   },
@@ -150,7 +154,7 @@ export default function InfoPage() {
       ]}
       views={views}
       search="You can search by wallet address. The listing filters by Status (Open or Closed), Queue (In withdrawal queue), Pool (syrupUSDC or syrupUSDT), Deposited (an amount in the pool's token) and Transactions (a count). It sorts by Recent activity or Deposited."
-      docs={{ label: "Maple documentation", href: `${DOCS}/maple-institutional-for-lenders/introduction` }}
+      docs={MAPLE_LENDER_DOCS}
     />
   );
 }

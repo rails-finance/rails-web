@@ -15,8 +15,8 @@
 //
 // It renders through the shared position card (components/shared/position-card.tsx,
 // rails-ops TO-DO-position-card 322 and 324): the detail card's heads, the
-// lifecycle pill (OPEN, CLOSED, LIQUIDATED), the wallet and spoke as the
-// identity, the counters at the right of the heading row, and no panel. A
+// lifecycle pill (OPEN, CLOSED, LIQUIDATED), the spoke as the tag, the
+// wallet and hubs as the identity, the counters at the right of the heading row, and no panel. A
 // health factor below 1 says so under the figure, since the listing's pill is
 // the lifecycle one.
 
@@ -187,8 +187,8 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   const collateralValue = sideValue(collR);
   const debtValue = sideValue(debtR);
 
-  // The wallet and its hubs after the lifecycle pill; the spoke (the market) at
-  // the right end.
+  // The spoke (the market) as the tag after the lifecycle pill, then the
+  // wallet and its hubs.
   const identity = (
     <>
       <WalletPill wallet={row.wallet} ensName={row.ensName} filterProtocol={session} bookmark />

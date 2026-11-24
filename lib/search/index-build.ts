@@ -3,13 +3,18 @@
 // data only. SERVER-ONLY: reads RAILS_API_URL and the bearer token.
 //
 // - Explorers: the protocol registry (lib/shared/protocols.ts).
-// - Morpho on Base and Yearn V3 on Ethereum: the rosters the box writes, over
-//   the baked catalogues (lib/morpho-base/vault-roster.ts, lib/yearn/vault-roster.ts).
+// - MetaMorpho on Base and on Ethereum, and Yearn V3 on Ethereum: the rosters
+//   the box writes, over the baked catalogues (lib/metamorpho/vault-roster.ts,
+//   lib/yearn/vault-roster.ts).
 // - Aave's vaults on Ethereum: the box's vault census (sGHO, the stata tokens,
 //   the Umbrella stake tokens), with the five the address book names as the
 //   floor when the census does not answer.
 // - Maple: the two syrup pools in lib/maple/asset-catalog.ts.
 // - sBOLD (lib/liquity-v2/sbold.ts): one vault, opening its page under /ethereum/vaults.
+// - IPOR Fusion: each chain's baked census (lib/ipor-fusion/vault-roster.ts),
+//   on the chains the vault index lists (VAULT_INDEX_LISTED: from launch).
+// - The vault fronts (lib/vaults/fronts.ts): each app's products and their
+//   vaults, matched by the app's name.
 //
 // The vaults go out in the order of their total assets at the census block,
 // in USD at the census's oracle price, where the census holds them (Morpho and
@@ -20,18 +25,25 @@ import "server-only";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { LAUNCHED_PROTOCOLS } from "@/lib/shared/protocols";
 import { BASE_CHAIN_ID, CHAINS, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
-import { loadMorphoBaseVaultRoster } from "@/lib/morpho-base/vault-roster";
+import { loadMetaMorphoVaultRoster } from "@/lib/metamorpho/vault-roster";
+import { iporFusionRoster, type IporFusionChainId } from "@/lib/ipor-fusion/vault-roster";
+import { VAULT_INDEX_LISTED } from "@/lib/vaults/index-rosters";
 import { loadYearnVaultRoster } from "@/lib/yearn/vault-roster";
 import { AAVE_ETHEREUM_BOOK_VAULTS } from "@/lib/aave-vaults/vault-catalog";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import {
   baseVaultRosterHref,
   ethereumVaultRosterHref,
+  iporFusionVaultRosterHref,
   maplePoolsHref,
+  metaMorphoVaultRosterHref,
   yearnVaultRosterHref,
 } from "@/lib/vaults/routes";
 import { SBOLD_PAGE_PATH, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
-import type { SearchIndexWire, WireRoster, WireVault } from "@/lib/search/suggest";
+import { frontHref } from "@/lib/vaults/fronts";
+import { readFronts } from "@/lib/vaults/fronts-read";
+import { shortAddress } from "@/lib/shared/vault-amount-text";
+import type { SearchFront, SearchIndexWire, WireRoster, WireVault } from "@/lib/search/suggest";
 
 const chainName = (id: number) => CHAINS[id as ChainId]?.name ?? String(id);
 
@@ -49,13 +61,15 @@ interface CensusRow {
   oraclePriceE8: string | null;
 }
 
-/** One chain's census header from the box, or [] when it does not answer. */
-async function loadCensus(chainId: number): Promise<CensusRow[]> {
+/** One chain's census header from the box, or [] when it does not answer.
+ *  `families` scopes it: chain 1's default is Aave's three families, and
+ *  MetaMorpho's is `morpho`. */
+async function loadCensus(chainId: number, families?: "morpho"): Promise<CensusRow[]> {
   const base = process.env.RAILS_API_URL;
   if (!base) return [];
   try {
     const res = await fetch(
-      `${base}/api/vaults/positions?chain=${chainId}&limit=1`,
+      `${base}/api/vaults/positions?chain=${chainId}&limit=1${families ? `&families=${families}` : ""}`,
       createAuthFetchOptions({ next: { revalidate: 3600 }, signal: AbortSignal.timeout(8000) }),
     );
     if (!res.ok) return [];
@@ -85,11 +99,13 @@ function censusSize(c: CensusRow | undefined): number {
 }
 
 export async function buildSearchIndex(): Promise<SearchIndexWire> {
-  const [morpho, yearn, baseCensus, ethCensus] = await Promise.all([
-    loadMorphoBaseVaultRoster(),
+  const [morpho, morphoEth, yearn, baseCensus, ethCensus, ethMorphoCensus] = await Promise.all([
+    loadMetaMorphoVaultRoster(BASE_CHAIN_ID),
+    loadMetaMorphoVaultRoster(MAINNET_CHAIN_ID),
     loadYearnVaultRoster(),
     loadCensus(BASE_CHAIN_ID),
     loadCensus(MAINNET_CHAIN_ID),
+    loadCensus(MAINNET_CHAIN_ID, "morpho"),
   ]);
   const base = chainName(BASE_CHAIN_ID);
   const eth = chainName(MAINNET_CHAIN_ID);
@@ -101,8 +117,9 @@ export async function buildSearchIndex(): Promise<SearchIndexWire> {
     ["Maple", eth, maplePoolsHref(), 0],
     // sBOLD is no explorer's product (ui-jobs 765): its row says what it is.
     ["ERC-4626 vault", eth, SBOLD_PAGE_PATH, 0],
+    ["Morpho", eth, `${metaMorphoVaultRosterHref(MAINNET_CHAIN_ID)}/`, 1],
   ];
-  const [MORPHO, AAVE, YEARN, MAPLE, SBOLD] = [0, 1, 2, 3, 4];
+  const [MORPHO, AAVE, YEARN, MAPLE, SBOLD, MORPHO_ETH] = [0, 1, 2, 3, 4, 5];
   const row = (name: string, symbol: string, asset: string, roster: number, address: string): WireVault => [
     name,
     symbol === name ? "" : symbol,
@@ -117,6 +134,11 @@ export async function buildSearchIndex(): Promise<SearchIndexWire> {
   for (const v of morpho.vaults) {
     const c = baseByVault.get(v.address);
     sized.push({ row: row(v.name, v.symbol, c?.assetSymbol ?? "", MORPHO, v.address), size: censusSize(c) });
+  }
+  const ethMorphoByVault = new Map(ethMorphoCensus.map((c) => [c.vault.toLowerCase(), c]));
+  for (const v of morphoEth.vaults) {
+    const c = ethMorphoByVault.get(v.address);
+    sized.push({ row: row(v.name, v.symbol, c?.assetSymbol ?? "", MORPHO_ETH, v.address), size: censusSize(c) });
   }
 
   const aaveSeen = new Set<string>();
@@ -136,6 +158,19 @@ export async function buildSearchIndex(): Promise<SearchIndexWire> {
 
   sized.push({ row: row("sBOLD", "sBOLD", "BOLD", SBOLD, SBOLD_VAULT), size: 0 });
 
+  // IPOR Fusion on each chain the index lists; none before its launch. A
+  // vault the census read as holding nothing goes with the empty ones.
+  for (const r of VAULT_INDEX_LISTED()) {
+    const href = r.protocol === "ipor-fusion" ? iporFusionVaultRosterHref(r.chainId) : null;
+    if (!href) continue;
+    const at = rosters.push(["IPOR Fusion", chainName(r.chainId), `${href}/`, 1]) - 1;
+    for (const v of iporFusionRoster(r.chainId as IporFusionChainId).vaults)
+      sized.push({
+        row: row(v.name ?? "", v.symbol ?? "", v.asset.symbol, at, v.address),
+        size: v.totalAssets === "0" ? -1 : 0,
+      });
+  }
+
   // A stable sort: the unsized keep their roster order behind the sized, and
   // the vaults the census shows empty (size -1) go last.
   sized.sort((a, b) => b.size - a.size);
@@ -145,8 +180,19 @@ export async function buildSearchIndex(): Promise<SearchIndexWire> {
   const tokenCounts = new Map<string, number>();
   for (const v of vaults) if (v[2]) tokenCounts.set(v[2], (tokenCounts.get(v[2]) ?? 0) + 1);
 
+  // The fronts (ui-jobs 774): a row opens its vault's page where Rails reads
+  // it (lib/vaults/fronts-read.ts), else the front's group on /vaults/fronts.
+  const fronts: SearchFront[] = (await readFronts()).map((f) => [
+    f.front,
+    f.product,
+    f.vault ? shortAddress(f.vault) : f.family,
+    f.chainId == null ? "" : f.chainLabel,
+    f.read.kind === "read" ? f.read.href : frontHref(f.slug),
+  ]);
+
   return {
     v: 2,
+    fronts,
     at: new Date().toISOString(),
     explorers: LAUNCHED_PROTOCOLS.map((p) => [p.label, chainName(p.chainId), p.href]),
     rosters,

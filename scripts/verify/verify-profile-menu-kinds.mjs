@@ -256,13 +256,13 @@ for (const c of CASES) {
     const c = document.querySelector('[data-saved-card="focus"]');
     return {
       foot: c.querySelector("[data-saved-card-new]")?.textContent.trim(),
-      assets: c.querySelector("p [data-saved-card-assets]")?.getAttribute("href"),
+      assets: c.querySelectorAll("[data-saved-card-assets]").length,
       newView: !!c.querySelector("[data-focus-view-new]"),
     };
   });
   check(
-    "B4: with no focus, the Focus card's one foot link is New focus, Assets a link in its prose",
-    card.foot === "New focus" && card.assets === "/assets" && !card.newView,
+    "B4: with no focus, the Focus card's one foot link is New focus, and its prose links no /assets (retired, decision 0069)",
+    card.foot === "New focus" && card.assets === 0 && !card.newView,
     JSON.stringify(card),
   );
   await page.locator("[data-saved-card-new]").click();
@@ -356,7 +356,8 @@ for (const c of CASES) {
     JSON.stringify(miss),
   );
 
-  // "Add from all assets": not in the row; still in the panel a row's Edit opens.
+  // "Add from all assets": in neither the row nor the panel (/assets is
+  // retired, decision 0069); the panel's chooser adds an asset.
   check(
     "B2.2: the new row has no Add from all assets",
     (await page.locator(`${EDITOR} [data-asset-scope-manage]`).count()) === 0,
@@ -366,8 +367,8 @@ for (const c of CASES) {
   await page.locator('[data-row-menu-list] [role="menuitem"]', { hasText: "Edit" }).first().click();
   await page.waitForSelector("[data-asset-scope-dialog]", { timeout: 10000 }).catch(() => {});
   check(
-    "B2.2: the panel a row's Edit opens keeps Add from all assets",
-    (await page.locator("[data-asset-scope-dialog] [data-asset-scope-manage]").count()) === 1,
+    "B2.2: the panel a row's Edit opens has no Add from all assets",
+    (await page.locator("[data-asset-scope-dialog] [data-asset-scope-manage]").count()) === 0,
   );
   await page.keyboard.press("Escape");
 

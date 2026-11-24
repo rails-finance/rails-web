@@ -105,7 +105,11 @@ const Z2_HEADINGS = [
 ];
 const Z1_HEADINGS = ["Holdings", "Risk", "Rate", "History"];
 
-/** Liquity V2's position card explanation strings in trove_words (Z1). A lead ends in a colon. */
+/** A position card's status lead is recognised by its key, so it keeps the lead limits whatever its last character. */
+const Z1_LEAD_KEY =
+  /^(lead[a-z_0-9]*|liq_lead[a-z_0-9]*|closed_lead[a-z_0-9]*|open_lead[a-z_0-9]*|superseded_[a-z_0-9]*)$/;
+
+/** Liquity V2's position card explanation strings in trove_words (Z1). A lead ends in a period, and `Z1_LEAD_KEY` names it by key. */
 const Z1_IDS = [
   "liq_lead",
   "liq_lifecycle",
@@ -799,7 +803,7 @@ function checkStringsFile({ family, rel }) {
     }
     out.z1++;
     const w = { src, file: rel, id: `${sec}.${id}`, zone: "Z1", path: [sec, id] };
-    checkBullet(w, text, "Z1", { lead: text.trim().endsWith(":"), isFig: figNameZ1 });
+    checkBullet(w, text, "Z1", { lead: Z1_LEAD_KEY.test(id), isFig: figNameZ1 });
     checkBanned(w, text, "Z1");
   }
   for (const k of Object.keys((sec && d[sec]) ?? {}))
@@ -905,11 +909,16 @@ function otherFamilies() {
   for (const f of files) {
     const rel = relative(ROOT, f);
     const zone = /position-explanation/.test(rel) ? "Z1" : "Z2";
+    const srcLines = readFileSync(f, "utf8").split("\n");
     for (const u of extractCopyUnits(readFileSync(f, "utf8"))) {
       units++;
-      for (const seg of proseSegments(u.raw))
-        for (const s of sentencesOf(seg)) {
-          const lead = zone === "Z1" && /:$/.test(s);
+      // A status lead is read by position: a clause pushed on `status`, or one assigned to a `lead` name.
+      const isLeadUnit =
+        zone === "Z1" && /\bstatus\.push\(|\b(\w*_)?[Ll]ead(_\w+|[A-Z]\w*)?\s*=/.test(srcLines[u.line - 1] ?? "");
+      for (const seg of proseSegments(u.raw)) {
+        const sents = sentencesOf(seg);
+        for (const [si, s] of sents.entries()) {
+          const lead = isLeadUnit && si === sents.length - 1;
           const limit = lead ? PLAIN.Z1.lead : PLAIN[zone].bullet;
           const words = countWords(s);
           if (words > limit)
@@ -923,6 +932,7 @@ function otherFamilies() {
               text: s,
             });
         }
+      }
     }
   }
   return { files: files.length, units, found };
@@ -1069,7 +1079,7 @@ function selfTest() {
   run("words per bullet", () => checkBullet(where, words(21) + ".", "Z2", { isFig }), "words per bullet");
   run(
     "words per lead sentence",
-    () => checkBullet(where, words(26) + ":", "Z1", { lead: true, isFig }),
+    () => checkBullet(where, words(26) + ".", "Z1", { lead: true, isFig }),
     "words per lead sentence",
   );
   run(

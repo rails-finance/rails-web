@@ -1,10 +1,11 @@
-// A Liquity V2 WALLET's live share card — what `/ethereum/liquity-v2?q=<holder>`
-// unfurls as. Polaris's twin; the note in
+// A Liquity V2 WALLET's live share card — what `/wallet/<holder>?protocol=liquity-v2`
+// unfurls as (ui-jobs 738; the listing's `?q=<holder>` redirects there). Polaris's twin; the note in
 // `app/api/share/polaris-wallet/route.tsx` explains why the wallet view's card
 // is a route handler rather than an `opengraph-image.tsx`, and why it reads
 // the backend in process rather than through this deployment's own proxies.
 //
-// It reads the same WIRE the page reads, as the scraper: the wallet's first
+// It reads the same WIRE the page reads, as the scraper: the wallet's
+// Stability Pool deposits as the deposit listing reads them, the wallet's first
 // page through the /api/troves proxy's own backend read
 // (`readTrovesFromBackend`, the same params `fetchTroves` would have sent it),
 // and the one branch-price read the trove page's tail makes — both direct to
@@ -29,6 +30,9 @@ import {
   LIQUITY_V2_ITEMS_PER_PAGE,
 } from "@/lib/liquity-v2/list-filter-dimensions";
 import { shortSubject } from "@/lib/shared/page-metadata";
+import { routeBoxHop } from "@/lib/shared/proxy-answer";
+import { readLiquityV2Sp, type LiquityV2DepositListResponse } from "@/lib/sources/api/liquity-v2-sp";
+import { spListParams, SP_LIST_DEFAULTS } from "@/lib/liquity-v2/sp-listing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,11 +54,23 @@ export async function GET(req: Request) {
       // goes as the resolved address, never as the name.
       const params = liquityV2FiltersToFetchParams({ ...LIQUITY_V2_LIST_DEFAULTS, q }, 1);
       const query = trovesQuery({ ...params, ownerEns: undefined, ownerAddress: wallet });
-      const [troves, prices] = await Promise.all([
+      // The deposits as the deposit listing reads them for an address: every
+      // status, one page. A failed read answers the static card, held five
+      // minutes, as a failed price read does: a card drawn without them would
+      // be held six hours.
+      const [troves, prices, deposits] = await Promise.all([
         readTrovesFromBackend(query, readerIp),
         readLiquityV2OracleFromBackend(readerIp),
+        readLiquityV2Sp<LiquityV2DepositListResponse>(
+          "stability-pool",
+          spListParams({ ...SP_LIST_DEFAULTS, q: wallet }, 1, wallet),
+          routeBoxHop(process.env.RAILS_API_URL ?? "", readerIp),
+        ).then(
+          (r) => ({ rows: r.rows, total: r.pagination.total }),
+          () => null,
+        ),
       ]);
-      if (!troves.ok) return null;
+      if (!troves.ok || !deposits) return null;
       const rows = troves.data.data ?? [];
 
       return liquityV2HolderCardModel(
@@ -64,6 +80,7 @@ export async function GET(req: Request) {
         LIQUITY_V2_ITEMS_PER_PAGE,
         ownerEns ?? shortSubject(ownerAddress ?? ""),
         troves.data.pagination?.passedOn ?? 0,
+        deposits,
       );
     },
   });

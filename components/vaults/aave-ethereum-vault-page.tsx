@@ -39,7 +39,13 @@ import { aaveEthereumVaultPageSummary } from "@/lib/vaults/summary";
 import { vaultVenueProv, vaultVenueShareProv } from "@/lib/vaults/card-provenance";
 import { vaultAssetsExports } from "@/lib/vaults/card-export";
 import { ethereumAaveV3Market, reserveHref } from "@/lib/shared/aave-market-configs";
-import { aaveVaultAssetsContent, aaveVaultCardContent, SHARES_ISSUED_TIP, STEWARD_TIP } from "@/lib/vaults/card-words";
+import {
+  aaveVaultAssetsContent,
+  aaveVaultCardContent,
+  SGHO_WITHDRAW_CLAMP,
+  SHARES_ISSUED_TIP,
+  STEWARD_TIP,
+} from "@/lib/vaults/card-words";
 import { measuredYield, type VaultYield } from "@/lib/vaults/yield";
 import type { AaveVaultAttestation } from "@/lib/aave-vaults/vault-catalog";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
@@ -303,7 +309,7 @@ export function AaveEthereumVaultPage({
           {sharePriceBullet}
         </ExplainGroup>
         <ExplainGroup title="Risk">
-          <ExplainBullet>Withdrawals are clamped to the GHO the contract holds.</ExplainBullet>
+          <ExplainBullet>{SGHO_WITHDRAW_CLAMP}</ExplainBullet>
           {s.remainingCapacity && (
             <ExplainBullet>
               Deposits stop at the cap:{" "}

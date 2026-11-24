@@ -21,11 +21,12 @@
 //      as holding more than one page states its count and no totals;
 //   e  the same for Liquity V2, in its own units;
 //   f  the URL a reader ends up with carries the wallet and nothing else —
-//      `?q=<wallet>` on both explorers, where it used to carry a
+//      `?q=<wallet>` on Polaris and `/wallet/<wallet>?protocol=liquity-v2` on
+//      Liquity V2 (ui-jobs 738), where it used to carry a
 //      `status=open,closed,liquidated` that said what the absent param already
-//      said. The explorers that DON'T declare a contextual default are
-//      untouched: on /ethereum/spark clearing Status still writes an explicit
-//      `?status=`, and reloading that URL still shows every status.
+//      said. A choice someone makes is still written: on /ethereum/spark
+//      picking All in the Filters panel's Status row writes `?status=all`
+//      (ui-jobs 805), and reloading that URL still shows every status.
 //
 // THE EXPECTED VALUES ARE RESTATED HERE, never imported and never read off the
 // card: the sums and the counts all come from the wallet route and
@@ -52,6 +53,7 @@ import { chromium } from "playwright";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { openListingSearch, setFilterViaSheet } from "./lib/listing-toolbar.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -271,7 +273,10 @@ const v2StaticBytes = (await readImage(V2_STATIC)).bytes;
 info("V0. the explorer's static roster card", `${V2_STATIC}, ${v2StaticBytes.length} bytes`);
 
 const vShareUrl = `/api/share/liquity-v2-wallet?q=${V2_WALLET}`;
-const vMeta = await readMeta(`/ethereum/liquity-v2?q=${V2_WALLET}`);
+// A wallet search on the listing redirects to the wallet page with Liquity V2
+// chosen (ui-jobs 738); that page advertises the same card.
+const vWalletUrl = `/wallet/${V2_WALLET}?protocol=liquity-v2`;
+const vMeta = await readMeta(vWalletUrl);
 check(
   "A5. og:image and twitter:image on V2's wallet page are its own share route",
   rel(vMeta.ogImage) === vShareUrl && rel(vMeta.twitterImage) === vShareUrl,
@@ -280,9 +285,9 @@ check(
 {
   const c = new URL(vMeta.canonical ?? "https://x.invalid/");
   check(
-    "A6. …and the canonical is `/ethereum/liquity-v2?q=<wallet>` with no other param",
-    c.pathname === "/ethereum/liquity-v2" &&
-      c.searchParams.get("q") === V2_WALLET &&
+    "A6. …and the canonical is `/wallet/<wallet>?protocol=liquity-v2` with no other param",
+    c.pathname === `/wallet/${V2_WALLET}` &&
+      c.searchParams.get("protocol") === "liquity-v2" &&
       [...c.searchParams.keys()].length === 1,
     rel(vMeta.canonical),
   );
@@ -292,6 +297,14 @@ check(
   vMeta.ogTitle?.toLowerCase() === `Rails | Liquity V2 Troves held by ${short(V2_WALLET)}`.toLowerCase(),
   `"${vMeta.ogTitle}"`,
 );
+{
+  const res = await fetch(`${BASE}/ethereum/liquity-v2?q=${V2_WALLET}`, { redirect: "manual" });
+  check(
+    "A8. an old `/ethereum/liquity-v2?q=<wallet>` link redirects to that wallet page",
+    res.status >= 300 && res.status < 400 && rel(new URL(res.headers.get("location") ?? "", BASE).href) === vWalletUrl,
+    `${res.status} ${res.headers.get("location")}`,
+  );
+}
 const vImage = await readImage(vShareUrl);
 check(
   "B3. V2's wallet card renders — 200 image/png, not the static card, short edge cache",
@@ -302,11 +315,11 @@ check(
   `${vImage.status} ${vImage.contentType}, ${vImage.bytes.length} bytes, ${vImage.cacheControl}`,
 );
 {
-  const meta = await readMeta(`/ethereum/liquity-v2?q=${NONSENSE_ENS}`);
+  const img = await readImage(`/api/share/liquity-v2-wallet?q=${encodeURIComponent(NONSENSE_ENS)}`);
   check(
-    "C3. V2: an ENS that resolves to nothing keeps the static card",
-    rel(meta.ogImage) === V2_STATIC,
-    rel(meta.ogImage),
+    "C3. V2: the share route answers an ENS that resolves to nothing with the static card",
+    img.status === 200 && img.contentType === "image/png" && img.bytes.equals(v2StaticBytes),
+    `${img.status} ${img.contentType}, ${img.bytes.length} bytes`,
   );
 }
 
@@ -522,7 +535,8 @@ async function openListing(ctx, url) {
 /** Type into the listing's own search box and let the driver's 300 ms debounce
  *  push the URL — the path a reader takes to a wallet view. */
 async function searchWallet(page, wallet) {
-  const box = page.locator('[data-skel-section="listing-toolbar"] input').first();
+  // The search rests as an icon until pressed (N1.1, ui-jobs 801).
+  const box = await openListingSearch(page, page.locator('[data-skel-section="listing-toolbar"]'));
   await box.click();
   await box.fill(wallet);
   await page.waitForTimeout(4000);
@@ -531,7 +545,7 @@ async function searchWallet(page, wallet) {
 /** What the page says its result set is — the pagination strip's own total. */
 async function statedTotal(page) {
   return page.evaluate(() => {
-    const m = /Showing\s+[\d,]+-[\d,]+\s+of\s+([\d,]+)\s+/.exec(document.body.innerText ?? "");
+    const m = /Showing\s+[\d,]+[-–][\d,]+\s+of\s+([\d,]+)\s+/.exec(document.body.innerText ?? "");
     return m ? Number(m[1].replace(/,/g, "")) : null;
   });
 }
@@ -549,30 +563,37 @@ async function statedTotal(page) {
 }
 {
   const page = await openListing(context, `${BASE}/ethereum/liquity-v2`);
-  await searchWallet(page, V2_WALLET);
-  const search = await page.evaluate(() => location.search);
-  check("F2. Liquity V2: the same — ?q=<wallet> alone", search === `?q=${V2_WALLET}`, `"${search}"`);
+  // The search rests as an icon until pressed (N1.1, ui-jobs 801).
+  const box = await openListingSearch(page, page.locator('[data-skel-section="listing-toolbar"]'));
+  await box.click();
+  await box.fill(V2_WALLET);
+  await page.waitForURL((u) => u.pathname.startsWith("/wallet/"), { timeout: 60000 }).catch(() => {});
+  const at = await page.evaluate(() => location.pathname + location.search);
+  check(
+    "F2. Liquity V2: a wallet search opens /wallet/<wallet>?protocol=liquity-v2",
+    at === `/wallet/${V2_WALLET}?protocol=liquity-v2`,
+    `"${at}"`,
+  );
   await page.close();
 }
 
-// Spark rests on `status:["open"]` with NO contextual default, so the rule this
-// change added does not reach it: clearing Status must still write an explicit
-// param, because an absent one would snap back to "open". Since web `2a948029`
-// (16 Oct 2026) the resting default is the removable "Status: Open" chip, and
-// removing it widens to an explicit selection of every bucket
-// (lib/spark/list-filter-dimensions.tsx `clearDefault`).
-const SPARK_EVERY_STATUS = "?status=open,closed,liquidated";
+// Spark's bare directory rests on Open. Status is one choice of Open / Closed /
+// All (ui-jobs 805), drawn in the Filters panel as a segmented row: picking All
+// must write an explicit `?status=all`, because an absent param rests on Open.
+const SPARK_EVERY_STATUS = "?status=all";
 {
   const openTotal = (await api("/api/spark/positions?limit=1&status=open")).pagination?.total;
   const everyTotal = (await api("/api/spark/positions?limit=1")).pagination?.total;
   info("F3 fixtures (Spark)", `${openTotal} open of ${everyTotal} positions in all`);
 
   const page = await openListing(context, `${BASE}/ethereum/spark`);
-  await page.getByRole("button", { name: "Remove Status: Open" }).first().click();
+  // Status rests on Open, a locked pill with no ×: All is picked in the
+  // Filters panel's segmented Status row.
+  await setFilterViaSheet(page, "status", ["all"]);
   await page.waitForTimeout(3500);
   const cleared = await page.evaluate(() => location.search);
   check(
-    "F3. Spark: clearing Status still writes an explicit `?status=` — the open-only explorers are untouched",
+    "F3. Spark: picking All in the Filters panel's Status row writes `?status=all`",
     cleared === SPARK_EVERY_STATUS,
     `"${cleared}"`,
   );
@@ -589,9 +610,8 @@ const SPARK_EVERY_STATUS = "?status=open,closed,liquidated";
   await reloaded.close();
 }
 
-// Aave V4's status default is the full set outright — the same on the page as
-// in the page-level defaults — so its bare directory URL was clean before this
-// change and must still be.
+// Aave V4's bare directory rests on Open, which writes no param: its URL stays
+// clean.
 {
   const page = await openListing(context, `${BASE}/ethereum/aave-v4`);
   const search = await page.evaluate(() => location.search);

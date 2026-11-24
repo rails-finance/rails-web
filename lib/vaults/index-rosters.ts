@@ -2,31 +2,29 @@
 // the page and its rows name them. Client-safe: the read is lib/vaults/index-read.ts.
 
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
-import { isUnlaunchedPath } from "@/lib/shared/protocols";
+import { isUnlaunchedPath, protocolForPathname } from "@/lib/shared/protocols";
 import type { VaultSummary } from "@/lib/vaults/summary";
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import {
   metaMorphoVaultHref,
   metaMorphoVaultRosterHref,
-  metaMorphoVaultsListingHref,
   ethereumVaultHref,
   ethereumVaultRosterHref,
-  ethereumVaultsListingHref,
   maplePoolHref,
   maplePoolsHref,
   yearnVaultHref,
   yearnVaultRosterHref,
+  iporFusionVaultHref,
+  iporFusionVaultRosterHref,
 } from "@/lib/vaults/routes";
 import { SBOLD_PAGE_PATH } from "@/lib/liquity-v2/sbold";
 
 /** One protocol's roster: the Protocol facet's value and the row's protocol.
  *  `sbold` is the one vault no explorer deploys, its own roster of one
  *  (ui-jobs 765). */
-/** "ipor-fusion" joins `VAULT_INDEX_PROTOCOLS`, and the index, with its three
- *  chains (rails-ops TO-DO-ipor-scoping §6.3 phase C). */
+/** "ipor-fusion" joins the index with its three chains (rails-ops
+ *  TO-DO-ipor-scoping §6.3 phase C). */
 export type VaultIndexProtocol = "morpho" | "aave" | "yearn" | "maple" | "sbold" | "ipor-fusion";
-
-export const VAULT_INDEX_PROTOCOLS: readonly VaultIndexProtocol[] = ["morpho", "aave", "yearn", "maple", "sbold"];
 
 export const VAULT_INDEX_PROTOCOL_LABEL: Record<VaultIndexProtocol, string> = {
   morpho: "Morpho",
@@ -46,7 +44,29 @@ export const VAULT_INDEX_ROSTERS: readonly { protocol: VaultIndexProtocol; chain
   { protocol: "yearn", chainId: 1 },
   { protocol: "maple", chainId: 1 },
   { protocol: "sbold", chainId: 1 },
+  { protocol: "ipor-fusion", chainId: 1 },
+  { protocol: "ipor-fusion", chainId: 42161 },
+  { protocol: "ipor-fusion", chainId: 8453 },
 ];
+
+/** Protocols whose rosters join the index only once launched, and never hold
+ *  back its launch (rails-ops TO-DO-ipor-scoping §6.3 phase C): while a
+ *  roster of one is unlaunched the index neither reads nor lists its rows. */
+const LISTED_ONCE_LAUNCHED: readonly VaultIndexProtocol[] = ["ipor-fusion"];
+
+const gated = (r: { protocol: VaultIndexProtocol }) => LISTED_ONCE_LAUNCHED.includes(r.protocol);
+
+/** The rosters the index reads and lists, given which roster pages are
+ *  launched: every roster of an ungated protocol, and a gated one's where its
+ *  page is launched. */
+export function listedIndexRosters(
+  isLaunched: (rosterHref: string) => boolean,
+): readonly { protocol: VaultIndexProtocol; chainId: ChainId }[] {
+  return VAULT_INDEX_ROSTERS.filter((r) => !gated(r) || isLaunched(vaultIndexRosterHref(r.protocol, r.chainId)));
+}
+
+/** The rosters the index lists today. */
+export const VAULT_INDEX_LISTED = () => listedIndexRosters((href) => !isUnlaunchedPath(href));
 
 /** A roster's key: its protocol and chain. */
 export const vaultIndexRosterKey = (r: { protocol: VaultIndexProtocol; chainId: number }) =>
@@ -115,7 +135,30 @@ export function vaultIndexRosterHref(p: VaultIndexProtocol, chainId: number): st
         ? yearnVaultRosterHref()
         : p === "maple"
           ? maplePoolsHref()
-          : SBOLD_PAGE_PATH;
+          : p === "ipor-fusion"
+            ? (iporFusionVaultRosterHref(chainId) ?? SBOLD_PAGE_PATH)
+            : SBOLD_PAGE_PATH;
+}
+
+/** The page that says how a protocol's vaults on a chain are listed: a
+ *  roster's `/info` (its rail's About), Maple's explorer info page, which
+ *  holds its pools page's section; null for sBOLD, which has none
+ *  (/vaults/products, ui-jobs 773). */
+export function vaultIndexInfoHref(p: VaultIndexProtocol, chainId: number): string | null {
+  if (p === "sbold") return null;
+  if (p === "maple") return protocolForPathname(maplePoolsHref())?.infoHref ?? null;
+  return `${vaultIndexRosterHref(p, chainId)}/info`;
+}
+
+/** The rosters that read `?asset=` on arrival (VaultRoster); Maple's pools
+ *  page and sBOLD's vault page do not. */
+const TAKES_ASSET: readonly VaultIndexProtocol[] = ["morpho", "aave", "yearn", "ipor-fusion"];
+
+/** The roster's page, carrying `?asset=` where the roster reads it (the
+ *  /vaults overview's card under `?asset=`, ui-jobs 776). */
+export function rosterHrefWithAsset(p: VaultIndexProtocol, chainId: number, asset?: string): string {
+  const href = vaultIndexRosterHref(p, chainId);
+  return asset && TAKES_ASSET.includes(p) ? `${href}?asset=${encodeURIComponent(asset)}` : href;
 }
 
 /** The vault's page under its protocol (decision 0028 point 8); a Maple
@@ -130,22 +173,16 @@ export function vaultIndexHref(v: VaultSummary): string {
         ? yearnVaultHref(v.address)
         : p === "maple"
           ? maplePoolHref(v.address)
-          : SBOLD_PAGE_PATH;
-}
-
-/** The positions listing filtered to this vault, where its roster has one. */
-export function vaultIndexHoldersHref(v: VaultSummary): string | null {
-  const p = vaultIndexProtocol(v);
-  return p === "morpho"
-    ? metaMorphoVaultsListingHref(morphoChain(v.chainId), { vault: v.address })
-    : p === "aave"
-      ? ethereumVaultsListingHref({ vault: v.address })
-      : null;
+          : p === "ipor-fusion"
+            ? (iporFusionVaultHref(v.chainId, v.address) ?? SBOLD_PAGE_PATH)
+            : SBOLD_PAGE_PATH;
 }
 
 /** The index is offered (the site footer, the sitemap, indexing) once every
  *  roster it reads is: while one is flagged `unlaunched` the index serves at
  *  its URL and the rosters' heads link it, as an unlaunched roster does. */
 export function vaultIndexLaunched(): boolean {
-  return VAULT_INDEX_ROSTERS.every((r) => !isUnlaunchedPath(vaultIndexRosterHref(r.protocol, r.chainId)));
+  return VAULT_INDEX_ROSTERS.filter((r) => !gated(r)).every(
+    (r) => !isUnlaunchedPath(vaultIndexRosterHref(r.protocol, r.chainId)),
+  );
 }

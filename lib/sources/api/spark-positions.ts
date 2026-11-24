@@ -15,7 +15,11 @@
 // the position page.
 
 import { resolveErc20Meta, scaleRaw, decimalsUnreadFlag, type Erc20Meta } from "@/lib/sources/chain/erc20-meta";
-import { resolveAaveOraclePrices, aaveOraclePriceOf } from "@/lib/sources/chain/aave-oracle-prices";
+import {
+  resolveAaveOraclePrices,
+  aaveOraclePriceOf,
+  aaveOraclePriceBlockOf,
+} from "@/lib/sources/chain/aave-oracle-prices";
 import { sanityCheckAaveBalances } from "@/lib/sources/chain/aave-family-balances";
 import { SPARK_ADDRESSES } from "@/lib/spark/asset-catalog";
 import { readSparkNotCollateral } from "@/lib/sources/chain/spark-position";
@@ -68,6 +72,9 @@ export interface SparkPositionSummary {
    *  Resolved server-side in the positions route; omits any reserve the oracle
    *  didn't price. Feeds the card's USD footnotes and the valued economics tower. */
   priceByAddress: Record<string, number>;
+  /** The block SparkLend's oracle was read at for `priceByAddress`, where the
+   *  read names one. */
+  priceBlock?: number | null;
   /** True when the chain snapshot doesn't cover this wallet (never swept, or the
    *  sweep marked it stale). The row carries no health factor (0018). */
   chainHfStale: boolean;
@@ -287,6 +294,8 @@ export async function buildSparkPositionRows(raw: RawSparkWalletRow[]): Promise<
           .map((r) => [r.address.toLowerCase(), priceOf(r.address)] as const)
           .filter((e): e is readonly [string, number] => e[1] != null),
       ),
+      // The block the oracle was read at: the latest when the row was served.
+      priceBlock: aaveOraclePriceBlockOf(oraclePrices, SPARK_ADDRESSES.ORACLE) ?? null,
       // Coverage flag passed straight through; stale when uncovered.
       chainHfStale: w.chainHfStale ?? true,
       ...(notCollateral.has(w.wallet.toLowerCase())

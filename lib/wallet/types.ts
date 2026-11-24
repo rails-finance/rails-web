@@ -11,6 +11,7 @@
 // the block. A field a family cannot fill stays undefined.
 
 import type { ChainId } from "@/lib/shared/chains";
+import type { ProvClass } from "@/components/shared/provenance";
 import type { AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
 import type { CompoundPositionSummary } from "@/lib/sources/api/compound-positions";
 import type { MorphoPositionSummary } from "@/lib/sources/api/morpho-positions";
@@ -18,6 +19,14 @@ import type { SparkPositionSummary } from "@/lib/sources/api/spark-positions";
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
 import type { MakerVaultSummary } from "@/lib/sources/api/makerdao-vaults";
 import type { TroveSummary } from "@/types/api/trove";
+import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
+import type { LiquityV1DepositRow } from "@/lib/sources/api/liquity-v1-sp";
+import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
+import type { LiquityV1DepositChain } from "@/lib/api/fetch-liquity-v1-sp-chain";
+import type { LiquityV2DepositChain } from "@/lib/api/fetch-liquity-v2-sp-chain";
+import type { LiquityV1StakeChain } from "@/lib/api/fetch-liquity-v1-staking-chain";
+import type { LiquityV1StakeRow } from "@/lib/sources/api/liquity-v1-staking";
+import type { UsdPart } from "@/lib/wallet/deposit-claim";
 import type { EbisuTroveSummary } from "@/lib/sources/api/ebisu-troves";
 import type { AsymmetryTroveSummary } from "@/lib/sources/api/asymmetry-troves";
 import type { BasedollarTroveSummary } from "@/lib/sources/api/basedollar-troves";
@@ -25,6 +34,7 @@ import type { OraclePricesData } from "@/types/api/oracle";
 import type { ArbitrumReadRow } from "@/components/shared/arbitrum-positions-listing";
 import type { CometCard } from "@/lib/compound-arbitrum/comet-cards";
 import type { WalletKind } from "@/lib/wallet/wallet-filters";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 
 /** "redeemed" is in the type for the families that end a position by
  *  redemption; no store states it as an ending yet (a fully redeemed Liquity
@@ -47,9 +57,18 @@ export type WalletCard =
   | { kind: "fluid"; row: FluidPositionSummary }
   | { kind: "makerdao"; row: MakerVaultSummary }
   | { kind: "liquity-v2"; row: TroveSummary; prices: OraclePricesData | null }
+  /** `head`: the deposit's head read on the wallet page, which its card
+   *  shows in place of the last touch's figure. */
+  | { kind: "liquity-v2-deposit"; row: LiquityV2DepositRow; head?: LiquityV2DepositChain }
+  | { kind: "liquity-v1"; row: LiquityV1PositionSummary }
+  | { kind: "liquity-v1-deposit"; row: LiquityV1DepositRow; head?: LiquityV1DepositChain }
+  | { kind: "liquity-v1-stake"; row: LiquityV1StakeRow; head?: LiquityV1StakeChain }
   | { kind: "ebisu"; row: EbisuTroveSummary }
   | { kind: "asymmetry"; row: AsymmetryTroveSummary }
-  | { kind: "basedollar"; row: BasedollarTroveSummary };
+  | { kind: "basedollar"; row: BasedollarTroveSummary }
+  /** A Liquity V2 fork's Stability Pool deposit: its deposit listing's row,
+   *  as stored (no head read). */
+  | { kind: "fork-deposit"; fork: "ebisu" | "asymmetry" | "basedollar"; row: LiquityV2DepositRow<string> };
 
 /** A closed position's row in the History table: what the store states, each
  *  field absent where it states nothing. */
@@ -90,7 +109,8 @@ export interface WalletPosition {
    *  History table ("Core", "WETH"). */
   market?: string;
   positionId: string;
-  href: string;
+  /** Null on a position with no page. */
+  href: string | null;
   status: WalletPositionStatus;
   /** Trove, deposit, loan or vault, for the Kind pill (ui-jobs 738). */
   kind?: WalletKind;
@@ -107,6 +127,13 @@ export interface WalletPosition {
    *  negative past it; undefined where the family cannot state it. A sort
    *  key: it ranks the cards and is never displayed (decision 0041). */
   buffer?: number;
+  /** The class of the dollars' source on the receipts: the oracle unless set
+   *  (a deposit's compounded amount, read from the pool at $1 face, is
+   *  "state"). */
+  usdClass?: ProvClass;
+  /** The dollars' legs where they come from more than one source (a
+   *  deposit's $1 face and its gain at a price feed): each a receipt row. */
+  usdParts?: UsdPart[];
   /** The family's own risk figure, for the tile. */
   riskFigure?: { value: string; label: string };
   /** The family's own verdict that the position can be liquidated now
@@ -125,6 +152,13 @@ export interface WalletPosition {
   /** An Aave V3 Base account the chain has not been read for yet (open
    *  point 8): shown with a "not read" mark, outside the tiles and the sort. */
   notRead?: boolean;
+  /** A Liquity-family Trove's or Stability Pool deposit's branch shutdown
+   *  (ui-jobs 802): the catalog's record with the live read, from a Trove's
+   *  head read or a deposit's shaping (lib/wallet/families/branch-shutdown.ts).
+   *  Null where the branch reads live or unknown; absent where that read did
+   *  not run (a Trove head that failed or timed out), and the card takes the
+   *  catalog's record alone (`walletBranchState`). */
+  shutdown?: BranchShutdownState | null;
   headRead: HeadRead;
   readAtBlock?: number;
   /** Unix seconds. */
@@ -146,6 +180,11 @@ export interface WalletFamilyRead {
   /** Chain reads made for its open positions (multicalls or reader calls). */
   reads: number;
   error?: string;
+  /** A listing read that did not answer (read-wallet.ts, readListingRows):
+   *  the protocol's slug and what it would have read ("Liquity V1 Troves"). */
+  /** `total: false` where the read cannot hold a position the wallet total
+   *  needs: a fork's deposit read for a wallet holding nothing on that fork. */
+  unanswered?: { family: string; what: string; total?: false };
 }
 
 /** The answer of /api/chain/wallet/<address>. */
@@ -168,4 +207,7 @@ export interface WalletRead {
   /** Every protocol the summary rows name, with its row count, for the
    *  Protocol pill: a narrowed read still offers the others. */
   held: { slug: string; name: string; positions: number }[];
+  /** The listing reads that did not answer, by what they read: the answer
+   *  is part of the wallet, states no wallet total and is not kept. */
+  partial?: string[];
 }

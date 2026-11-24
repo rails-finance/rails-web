@@ -10,18 +10,13 @@ import type { ServerRead } from "@/lib/shared/server-head-read";
 import type { ChainId } from "@/lib/shared/chains";
 import { ProvSection } from "@/components/shared/section-menu";
 import { ROSTER_SCOPE, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
-import { CompareBar } from "@/components/vaults/compare-selection";
 import { iporFusionVaultHref } from "@/lib/vaults/routes";
 import { iporEmptyCountProv, type IporFusionCoords } from "@/lib/ipor-fusion/vault-provenance";
 import { releaseLabel } from "@/lib/vaults/families";
 import type { VaultSummary } from "@/lib/vaults/summary";
 import { iporFusionRowReceipts } from "@/lib/vaults/row-receipts";
 
-export const IPOR_FUSION_DOCS = {
-  title: "IPOR's documentation",
-  subtitle: "ipor.io/docs: What is a fuse",
-  href: "https://ipor.io/docs/build-on-fusion/architecture-overview/what-is-a-fuse",
-};
+export { IPOR_FUSION_DOCS } from "@/lib/vaults/family-docs";
 
 const FACETS: VaultRosterFacet[] = [
   {
@@ -71,17 +66,9 @@ export function IporFusionVaultDirectoryView({
           emptyCountProv={(count) => iporEmptyCountProv(coords, count, catalogSize)}
           // Miles, 19 Nov 2026: the roster carries its read stamp and nothing
           // else above the rows; what the list is lives on the about page.
-          head={{
-            censusFigure: "roster-census",
-            census: null,
-            listingHref: null,
-            drawer: null,
-            infoHref: null,
-            indexHref: null,
-          }}
+          head={{ drawer: null }}
         />
       </ProvSection>
-      <CompareBar />
     </>
   );
 }

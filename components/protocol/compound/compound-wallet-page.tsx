@@ -376,7 +376,6 @@ function MarketSection({
             <CompoundPositionCard
               v={view}
               surface="detail"
-              viewHref={tl.viewHref}
               vocab={vocab}
               session={d.session}
               lane={d.lane ? { ...d.lane, source: captureSource } : undefined}

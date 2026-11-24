@@ -15,13 +15,14 @@
 // for its asset universe): the dimension registry is a function of it, and
 // `reconcile` prunes a selection the roster does not carry.
 
+import { makerCountLine } from "@/lib/makerdao/listing-visibility";
 import { useEffect, useState } from "react";
 
 import type { MakerVaultSummary } from "@/lib/sources/api/makerdao-vaults";
 import { fetchMakerIlkRoster } from "@/lib/api/fetch-makerdao-ilk-roster";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import { MakerVaultCard, viewFromSummary } from "@/components/protocol/makerdao/makerdao-vault-card";
-import { fetchMakerVaultPage } from "@/lib/makerdao/list-fetch";
+import { fetchMakerVaultPage, countMakerVaults } from "@/lib/makerdao/list-fetch";
 import { useMakerIlkTerms } from "@/lib/makerdao/use-chain-history";
 import {
   makerListDimensions,
@@ -115,6 +116,7 @@ export function MakerDAOListing({ initialItems, initialTotal, initialKey, initia
         ) : undefined
       }
       noun="vaults"
+      countLine={makerCountLine}
       basePath="/ethereum/makerdao"
       defaults={MAKER_LIST_DEFAULTS}
       sortOptions={MAKER_SORT_OPTIONS}
@@ -131,6 +133,7 @@ export function MakerDAOListing({ initialItems, initialTotal, initialKey, initia
         // maps onto `ilks` through it, and asking early would ask a different
         // question than the chips show.
         fetchPage: async (f, page) => fetchMakerVaultPage(f, page, await ensureRoster()),
+        countDraft: async (f) => countMakerVaults(f, await ensureRoster()),
       })}
       onFilters={setFilters}
       initialItems={initialItems}

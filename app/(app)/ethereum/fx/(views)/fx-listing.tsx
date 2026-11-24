@@ -5,6 +5,7 @@
 // page.tsx. The driver owns the toolbar, pagination, debounced search and the
 // fetch lifecycle; this file is just the f(x)-specific config.
 
+import { fxCountLine } from "@/lib/fx/listing-visibility";
 import type { FxPositionSummary } from "@/lib/sources/api/fx-positions";
 import type { FxPoolStatsSummary } from "@/lib/sources/api/fx-stats";
 import { fetchFxPositions } from "@/lib/api/fetch-fx-positions";
@@ -58,6 +59,7 @@ export function FxListing({ initialItems, initialTotal, initialKey, initialSearc
     <ChainTruthListingPage<FxPositionSummary, FxListFilters>
       title="f(x) Protocol Positions"
       noun="positions"
+      countLine={fxCountLine}
       basePath="/ethereum/fx"
       defaults={FX_LIST_DEFAULTS}
       sortOptions={FX_SORT_OPTIONS}
@@ -76,6 +78,11 @@ export function FxListing({ initialItems, initialTotal, initialKey, initialSearc
             data: r.data,
             total: r.pagination.total,
           })),
+        // A draft's total, one row asked (the editors' "Show N", ui-jobs 805).
+        countDraft: (filters) =>
+          fetchFxPositions({ ...fxFiltersToFetchParams(filters, 1), limit: 1, offset: 0 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

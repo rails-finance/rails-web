@@ -49,6 +49,8 @@
 // History lead), a rounded tile inset in its cell: `DataTableLeadHeader` and
 // `DataTableLeadCell`.
 
+import { HeadingFilter, type HeadingFilterProps } from "@/components/shared/data-table/heading-filter";
+import { HeadingSearch, type HeadingSearchProps } from "@/components/shared/data-table/heading-search";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { Check, ChevronRight, EllipsisVertical } from "lucide-react";
@@ -217,6 +219,8 @@ export function DataTableSortButton({
  *  `ariaSort` then states the sort. */
 export function DataTableHeader({
   label,
+  filter,
+  search,
   sort,
   after,
   align = "left",
@@ -227,6 +231,12 @@ export function DataTableHeader({
   ...rest
 }: {
   label?: ReactNode;
+  /** A roster's column filter in the heading (D9, decision 0070), in the
+   *  label's place. */
+  filter?: HeadingFilterProps;
+  /** A roster's search in its name column's heading (D10, decision 0070),
+   *  in the label's place. */
+  search?: HeadingSearchProps;
   sort?: { dir: DataTableDir | null; onSort: () => void; ariaLabel?: string; describedBy?: string };
   after?: ReactNode;
   align?: Align;
@@ -260,6 +270,10 @@ export function DataTableHeader({
               ariaLabel={sort.ariaLabel}
               describedBy={sort.describedBy}
             />
+          ) : filter ? (
+            <HeadingFilter {...filter} />
+          ) : search ? (
+            <HeadingSearch {...search} />
           ) : (
             label
           )}
@@ -290,15 +304,20 @@ export function DataTableRow({
   ...rest
 }: HTMLAttributes<HTMLTableRowElement> & { href?: string; drawer?: boolean; child?: boolean }) {
   const stacked = useContext(Stacked);
+  // A row's code joins D4 rather than replacing it: D4 is what draws the
+  // linked row's hover border (globals.css), so a page that names its row
+  // (A5.4, E8.1) keeps the house hover (ui-jobs 781).
+  const { "data-anatomy": own, ...others } = rest as typeof rest & { "data-anatomy"?: string };
+  const anatomy = [href ? "D4" : null, own].filter(Boolean).join(" ") || undefined;
   return (
     <RowHref.Provider value={href ?? null}>
       <tr
         role={stacked ? "row" : undefined}
         className={`group/dt-row ${href ? LINKED_ROW : ""} ${className}`}
-        data-anatomy={href ? "D4" : undefined}
+        data-anatomy={anatomy}
         data-dt-drawer={drawer ? "" : undefined}
         data-dt-child={child ? "" : undefined}
-        {...rest}
+        {...others}
       >
         {children}
       </tr>
@@ -433,13 +452,16 @@ export function DataTableLeadHeader({ sticky = "", plain }: { sticky?: string; p
  *  protocol's and the chain's names for a screen reader. `plain` on a row that
  *  is not a position (the vault index, /about/figures, /coverage): the mark and
  *  the glyph in grey, no tint, which marks a position (C20); below the stacking
- *  width the cell is not drawn and `DataTableLeadMark` carries both. */
+ *  width the cell is not drawn and `DataTableLeadMark` carries both.
+ *  `chainless` with `plain`, on a page that is one chain (/coverage): no chain
+ *  glyph, the mark drawn at 28px. */
 export function DataTableLeadCell({
   protocol,
   protocolName,
   chain,
   sticky = "",
   plain,
+  chainless,
 }: {
   /** The `protocols.ts` id: the tint and the mark. */
   protocol: string;
@@ -447,6 +469,7 @@ export function DataTableLeadCell({
   chain: ChainId;
   sticky?: string;
   plain?: boolean;
+  chainless?: boolean;
 }) {
   if (plain)
     return (
@@ -466,8 +489,13 @@ export function DataTableLeadCell({
         </span>
         <span className="flex items-center gap-2.5 text-rb-500" aria-hidden>
           {/* An empty id is a vault no explorer deploys (sBOLD, ui-jobs 765): no mark. */}
-          {protocol && <ProtocolIcon id={protocol} className="h-[18px] w-[18px] shrink-0 [&:is(img)]:grayscale" />}
-          <ChainGlyph id={chain} className="h-[18px] w-[18px] shrink-0" />
+          {protocol && (
+            <ProtocolIcon
+              id={protocol}
+              className={`${chainless ? "h-7 w-7" : "h-[18px] w-[18px]"} shrink-0 [&:is(img)]:grayscale`}
+            />
+          )}
+          {!chainless && <ChainGlyph id={chain} className="h-[18px] w-[18px] shrink-0" />}
         </span>
       </DataTableCell>
     );

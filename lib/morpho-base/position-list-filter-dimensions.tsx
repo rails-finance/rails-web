@@ -24,9 +24,9 @@
 // vaults have never had a single `Transfer`, so their census row states zero
 // participants; offering them as filter options would be 268 choices that
 // always answer an empty page (memory `moonwell-base-asset-facets`: a facet
-// offers only what the WHERE matches). They are not dropped in silence — the
-// roster drawer beside this listing states each of them as "no holder yet",
-// which is a chain reading rather than an omission.
+// offers only what the WHERE matches). They are not dropped in silence: the
+// vaults info page states how many have never been held, and the roster lists
+// each one, which is a chain reading rather than an omission.
 
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import { joinOptionLabels } from "@/components/shared/filter-bar/types";

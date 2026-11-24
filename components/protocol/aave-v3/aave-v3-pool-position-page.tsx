@@ -732,7 +732,6 @@ export function AaveV3PoolPositionView({
                   <AaveV3PositionCard
                     v={view}
                     receipts
-                    viewHref={tl.viewHref}
                     deployment={d.card}
                     pricesPending={!pricesSettled}
                     captions={captions ?? undefined}
@@ -741,6 +740,11 @@ export function AaveV3PoolPositionView({
                     chain={data}
                     exports={exports}
                     notCollateral={notCollateral}
+                    // A closed card's peak value per side reads the panel's timeline.
+                    flows={{
+                      read: timelineState === "failed" || timelineState === "unavailable" ? "failed" : flows.read,
+                      timeline: flows.timeline,
+                    }}
                     // The Explanation is layman prose about the face figures,
                     // plus the two facts about THIS Pool that change how they
                     // read — eMode and a supply that backs nothing — which the

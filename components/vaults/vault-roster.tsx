@@ -2,9 +2,7 @@
 
 // One vault roster (rails-ops ui-jobs 407): the rows of one family's vaults
 // under one set of controls, drawn as the house table (vault-index-table.tsx,
-// V6; ui-jobs 605). The cross-protocol index (ui-jobs 39) is the same roster
-// over the union, with the protocol lead column (`leadOf`) and one read stamp
-// for the oldest roster.
+// V6; ui-jobs 605).
 // ----------------------------------------------------------------------------
 // Every roster draws the same thing: the listings' toolbar (search, the Asset
 // facet and the family's own facets, the preset; below sm the table's sort),
@@ -18,7 +16,7 @@
 // with a census when it counts 100+ current holders, a Yearn vault the census
 // has no row for when the Registry endorses it, any other vault always
 // (Maple's pools). A removable
-// default chip; `?show=all` lifts it, and a link whose facets it would empty
+// default chip; `?show=all` lifts it, and an `?asset=` link it would empty
 // opens without it. A roster with neither signal has no preset.
 //
 // THREE RULES THE LAYOUT KEEPS:
@@ -33,12 +31,12 @@
 //     vaults are shown.
 
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { assetParamNames, vaultHasAsset } from "@/lib/vaults/asset-param";
 import { assetKey } from "@/lib/shared/asset-family";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { isoSeconds, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import { InfoDisclosureTrigger } from "@/components/shared/info-disclosure";
-import { SectionMenu, type SectionMenuLink } from "@/components/shared/section-menu";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
@@ -48,8 +46,7 @@ import { VaultIndexTable, useVaultIndexSort } from "@/components/vaults/vault-in
 import type { ChainId } from "@/lib/shared/chains";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
-import { FOOT_LINK, INLINE_LINK, PAGE_LINK } from "@/lib/shared/ui-grammar";
-import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
+import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { vaultRosterShownProv } from "@/lib/vaults/roster-provenance";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
@@ -74,69 +71,17 @@ export interface VaultRosterFacet {
 
 type Filters = Record<string, string[]>;
 
-/** What the roster states above its rows: at most the read-at line and one
- *  census sentence (survey §6, "Words, by surface"); the rest is in the drawer. */
+/** What the roster states above its rows: the read stamp. A family roster
+ *  opens on its read stamp alone (ui-jobs 771): its words and counts are on
+ *  its vaults info page, which the rail's (i) reaches. */
 export interface VaultRosterHead {
-  /** The one sentence on what the list is, with its receipts; null draws none. */
-  census: ReactNode;
-  /** `data-figure` on the census sentence, which the roster verifiers read. */
-  censusFigure: string;
-  /** The positions listing, linked after the sentence; null where there is none. */
-  listingHref: string | null;
   /** The intro drawer's body (standards/explanation-copy-charter.md §8a);
-   *  null draws no (i) and no drawer, where the about page carries it all. */
+   *  null draws no (i) and no drawer. */
   drawer: ReactNode;
-  /** The vault layer's about page; null where there is none. */
-  infoHref: string | null;
-  /** In place of the one "Read at block N" line: the index's line per roster. */
-  readAt?: ReactNode;
-  /** The cross-protocol index, linked after the sentence; null on the index. */
-  indexHref?: string | null;
-  /** The roster's ⋮ at the right of the read-stamp row (`RosterMenu`): its
-   *  pages. Absent on the index. */
-  menu?: ReactNode;
 }
 
 /** The roster's name (`data-prov-scope`). */
 export const ROSTER_SCOPE = "vault-roster";
-
-/** The family roster's ⋮: every holder, the index and the about page on
- *  Rails, the protocol's docs. */
-export function RosterMenu({
-  listingHref,
-  infoHref,
-  docs,
-}: {
-  listingHref: string | null;
-  infoHref: string | null;
-  docs?: { title: string; subtitle: string; href: string };
-}) {
-  const links: SectionMenuLink[] = [
-    ...(listingHref
-      ? [
-          {
-            item: "every-holder",
-            title: "Every holder",
-            subtitle: "The positions in these vaults",
-            href: listingHref,
-            internal: true,
-          },
-        ]
-      : []),
-    {
-      item: "vault-index",
-      title: "All vaults",
-      subtitle: "Every protocol's vaults on one table",
-      href: VAULT_INDEX_HREF,
-      internal: true,
-    },
-    ...(infoHref
-      ? [{ item: "info", title: "How this is built", subtitle: "About these vaults", href: infoHref, internal: true }]
-      : []),
-    ...(docs ? [{ item: "docs", ...docs }] : []),
-  ];
-  return <SectionMenu scope={ROSTER_SCOPE} title="Vaults" links={links} />;
-}
 
 const rawOf = (v: VaultSummary) => BigInt(v.totalAssets?.raw ?? "0");
 
@@ -162,55 +107,49 @@ export function VaultRoster({
   holdersHrefOf,
   receiptsOf,
   hooksOf,
-  assetFacet,
   emptyCountProv,
   head,
-  initialFilters,
-  facetsInUrl = false,
   initialSearch = "",
   readTime,
-  leadOf = null,
   kindOf,
 }: {
   vaults: readonly VaultSummary[];
   /** Decision 0047's figure for a vault. */
   yieldOf: (v: VaultSummary) => VaultYield | undefined;
   chainId: ChainId;
-  /** The block every row was read at; 0 on the index, whose rosters each
-   *  name their own. */
+  /** The block every row was read at. */
   blockNumber: number;
   chainStale: boolean;
   /** The `data-skel-section` prefix the family's skeleton records. */
-  skel: "directory" | "roster" | "index";
+  skel: "directory" | "roster";
   facets: readonly VaultRosterFacet[];
   hrefOf: (v: VaultSummary) => string;
   holdersHrefOf: ((v: VaultSummary) => string | null) | null;
   receiptsOf: (v: VaultSummary) => VaultRowReceipts;
   hooksOf?: (v: VaultSummary) => Record<string, string>;
-  /** In place of the Asset facet (the index's Token, by symbol across chains). */
-  assetFacet?: VaultRosterFacet;
-  /** The empty count's receipt; absent on the index, which states none (ui-jobs 538). */
+  /** The empty count's receipt; absent, the count states none (ui-jobs 538). */
   emptyCountProv?: (count: number) => Provenance;
   head: VaultRosterHead;
-  /** The facets chosen on arrival (the index's `?asset=`, ui-jobs 482). */
-  initialFilters?: Filters;
-  /** The query string the page was served with: the preset and the sort on
-   *  first paint, before the roster reads the live URL. */
+  /** The query string the page was served with: the preset, the sort and
+   *  `?asset=` on first paint, before the roster reads the live URL. */
   initialSearch?: string;
   /** The read block's time, seconds (rails-server's stamp); else the loader's
    *  read time. */
   readTime?: number | null;
-  /** The table's protocol lead column (the index's); absent on a one-protocol
-   *  roster, which draws no lead column (ui-jobs 605). */
-  leadOf?: ((v: VaultSummary) => string | null) | null;
-  /** The Kind cell's words; absent, the family's kind (the index's). */
+  /** The Kind cell's words; absent, the family's kind. */
   kindOf?: (v: VaultSummary) => string;
-  /** Keep the facets in the URL, one param per facet id, comma-separated
-   *  (the index, ui-jobs 538), so a saved view or a copied link keeps them. */
-  facetsInUrl?: boolean;
 }) {
   const [introOpen, setIntroOpen] = useState(false);
-  const [filters, setFilters] = useState<Filters>(initialFilters ?? {});
+  // `?asset=` on arrival (ui-jobs 482, 776: the /vaults overview passes it
+  // on): the Asset facet's values of the vaults it names; a name with none is
+  // dropped.
+  const [arrivalFilters] = useState<Filters>((): Filters => {
+    const names = assetParamNames(new URLSearchParams(initialSearch).get("asset"));
+    if (names.size === 0) return {};
+    const values = [...new Set(allVaults.filter((v) => vaultHasAsset(v, names)).map((v) => v.asset.address))];
+    return values.length > 0 ? { asset: values } : {};
+  });
+  const [filters, setFilters] = useState<Filters>(arrivalFilters);
   const [emptyOpen, setEmptyOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -229,7 +168,7 @@ export function VaultRoster({
   // because another facet hid its rows.
   const all = useMemo<VaultRosterFacet[]>(
     () => [
-      assetFacet ?? {
+      {
         id: "asset",
         label: "Asset",
         valueOf: (v) => v.asset.address,
@@ -237,7 +176,7 @@ export function VaultRoster({
       },
       ...facets,
     ],
-    [vaults, facets, assetFacet],
+    [vaults, facets],
   );
 
   // ── the preset and the sort: what this roster has the signals for ──────────
@@ -250,10 +189,10 @@ export function VaultRoster({
   ];
   const presetLabel = presetParts.join(" · ");
   const hasPreset = presetParts.length > 0 && vaults.some(hasSignal);
-  // A link that arrives with facets chosen keeps the preset, unless the preset
-  // would leave one of the values it asked for with no funded vault.
+  // An `?asset=` link keeps the preset, unless the preset would leave one of
+  // the assets it asked for with no funded vault.
   const [arrivalShow] = useState<"used" | "all">(() => {
-    for (const [id, values] of Object.entries(initialFilters ?? {})) {
+    for (const [id, values] of Object.entries(arrivalFilters)) {
       const f = all.find((x) => x.id === id);
       if (!f) continue;
       for (const value of values) {
@@ -276,23 +215,18 @@ export function VaultRoster({
   // Below sm the table stacks as cards (D6) and its headers are hidden: the
   // toolbar draws its sort.
   const { mobileSort } = useVaultIndexSort(initialSearch);
-  /** The facets, written to the URL too where the roster keeps them there. */
-  const setFacets = useCallback(
-    (next: Filters) => {
-      setFilters(next);
-      if (!facetsInUrl) return;
-      const p = new URLSearchParams(window.location.search);
-      for (const f of all) {
-        const values = next[f.id] ?? [];
-        if (values.length > 0) p.set(f.id, values.join(","));
-        else p.delete(f.id);
-      }
-      const qs = p.toString().replace(/%2C/gi, ",");
-      window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
-      notifyUrlChanged();
-    },
-    [facetsInUrl, all],
-  );
+  /** The facets. The first change takes `?asset=` out of the URL, so a
+   *  reload, Back or a copied link does not bring back a filter the reader
+   *  removed. */
+  const setFacets = useCallback((next: Filters) => {
+    setFilters(next);
+    const p = new URLSearchParams(window.location.search);
+    if (!p.has("asset")) return;
+    p.delete("asset");
+    const qs = p.toString().replace(/%2C/gi, ",");
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+    notifyUrlChanged();
+  }, []);
 
   const writeShow = useCallback(
     (next: string) => {
@@ -418,7 +352,6 @@ export function VaultRoster({
       initialSearch={initialSearch}
       yieldOf={yieldOf}
       receiptsOf={receiptsOf}
-      leadOf={leadOf}
       kindOf={kindOf}
       hrefOf={hrefOf}
       holdersHrefOf={holdersHrefOf ?? (() => null)}
@@ -426,59 +359,38 @@ export function VaultRoster({
     />
   );
 
-  // On the index every roster has its own block, so a count says "at its block".
-  const atBlock = blockNumber > 0 ? "at this block" : "at its roster’s block";
-  const indexHref = head.indexHref === undefined ? VAULT_INDEX_HREF : head.indexHref;
+  const atBlock = "at this block";
 
   const intro = (
     <section className="mb-5" data-skel-section={`${skel}-denominator`}>
-      {head.readAt ? (
-        // The index's read line names each roster's block, the anchor its rows'
-        // receipts name.
-        <div className="flex items-center gap-1 text-[11px] text-rb-500" data-prov-exempt>
-          <InfoDisclosureTrigger
-            open={introOpen}
-            onToggle={() => setIntroOpen((o) => !o)}
-            label="about these vaults"
-            ariaControls="vault-roster-intro"
-          />
-          {/* The stamp stands at the right (ui-jobs 730). */}
+      {!chainStale && (
+        // The block is the anchor every receipt below names, so the line
+        // carries the coverage exemption the tripwire reads.
+        <div
+          className="flex items-center gap-1 text-[11px] text-rb-500"
+          data-directory-block={blockNumber}
+          data-prov-exempt
+        >
+          {head.drawer != null && (
+            <InfoDisclosureTrigger
+              open={introOpen}
+              onToggle={() => setIntroOpen((o) => !o)}
+              label="about these vaults"
+              ariaControls="vault-roster-intro"
+            />
+          )}
           <span className="ml-auto flex items-center gap-1">
-            {head.readAt}
-            {head.menu}
+            <RosterReadStamp
+              reads={[
+                {
+                  label: "this roster",
+                  block: blockNumber,
+                  at: readTime ?? isoSeconds(vaults.find((v) => v.readAt.block === blockNumber)?.readAt.timestamp),
+                },
+              ]}
+            />
           </span>
         </div>
-      ) : (
-        !chainStale && (
-          // The block is the anchor every receipt below names, so the line
-          // carries the coverage exemption the tripwire reads.
-          <div
-            className="flex items-center gap-1 text-[11px] text-rb-500"
-            data-directory-block={blockNumber}
-            data-prov-exempt
-          >
-            {head.drawer != null && (
-              <InfoDisclosureTrigger
-                open={introOpen}
-                onToggle={() => setIntroOpen((o) => !o)}
-                label="about these vaults"
-                ariaControls="vault-roster-intro"
-              />
-            )}
-            <span className="ml-auto flex items-center gap-1">
-              <RosterReadStamp
-                reads={[
-                  {
-                    label: "this roster",
-                    block: blockNumber,
-                    at: readTime ?? isoSeconds(vaults.find((v) => v.readAt.block === blockNumber)?.readAt.timestamp),
-                  },
-                ]}
-              />
-              {head.menu}
-            </span>
-          </div>
-        )
       )}
       {head.drawer != null && (
         <div
@@ -488,40 +400,7 @@ export function VaultRoster({
           className="mt-2 max-w-3xl space-y-2 rounded-xl bg-raised px-3 py-3 text-[12px] leading-relaxed text-rb-500"
         >
           {head.drawer}
-          {head.infoHref && (
-            <p>
-              <Link href={head.infoHref} className={`text-xs font-semibold ${FOOT_LINK}`} prefetch={false}>
-                How this is built
-              </Link>
-            </p>
-          )}
         </div>
-      )}
-      {head.census != null && (
-        <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure={head.censusFigure}>
-          {head.census}
-          {head.listingHref && (
-            <>
-              {" "}
-              <Link href={head.listingHref} className={INLINE_LINK} prefetch={false} data-link="every-holder">
-                Every holder
-              </Link>
-            </>
-          )}
-          {head.listingHref && indexHref && (
-            <span aria-hidden="true" className="px-1.5">
-              ·
-            </span>
-          )}
-          {indexHref && (
-            <>
-              {!head.listingHref && " "}
-              <Link href={indexHref} className={INLINE_LINK} prefetch={false} data-link="vault-index">
-                All vaults
-              </Link>
-            </>
-          )}
-        </p>
       )}
     </section>
   );
@@ -554,14 +433,11 @@ export function VaultRoster({
         sheetCount={{ total: fundedShown.length, noun: "funded vaults" }}
         countFor={(draft) => funded.filter(passesFor(draft)).length}
         mobileSort={mobileSort}
-        // The view menu (N1.7: save listing, copy its link) where the URL
-        // holds the whole view, facets included.
-        viewMenu={facetsInUrl}
         skel={`${skel}-facets`}
       />
 
       {/* ── the funded vaults, one flat table ───────────────────────────── */}
-      <div data-skel-section={`${skel}-groups`}>
+      <div data-skel-section={`${skel}-groups`} data-filters-results="">
         {fundedShown.length === 0 ? (
           <p className="mb-6 text-[13px] text-rb-500">
             {blockNumber > 0 ? `No funded vault matches at block ${n(blockNumber)}.` : "No funded vault matches."}
@@ -573,7 +449,7 @@ export function VaultRoster({
 
       {/* ── the vaults that hold nothing: a reading, behind one disclosure ── */}
       {emptyRows.length > 0 && (!presetOn || emptyShown.length > 0) && (
-        <section className="mb-6" data-skel-section={`${skel}-empty`} data-empty-group>
+        <section className="mb-6" data-skel-section={`${skel}-empty`} data-empty-group data-filters-results="">
           <button
             type="button"
             onClick={() => setEmptyOpen((o) => !o)}

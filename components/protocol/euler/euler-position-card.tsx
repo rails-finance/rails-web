@@ -10,12 +10,13 @@ import { positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
+import { ListingTag } from "@/components/shared/listing-tag";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { PoolReadStamp, Segs } from "@/components/protocol/uniswap/uniswap-readout";
 import { eulerPosition } from "@/lib/euler/position";
 import { cardProv, collateralProv, readContracts, vaultProv, type EulerReceiptContext } from "@/lib/euler/provenance";
 import { EULER_SESSION, type EulerPositionRead } from "@/lib/euler/types";
-import { CARD_WORDS, cardExplainer, healthText, inUnit, num, rate, short } from "@/lib/euler/words";
+import { CARD_WORDS, cardExplainer, healthText, inUnit, num, rate } from "@/lib/euler/words";
 
 /** Every figure's read stamp on an Euler page. */
 export function EulerReadStamp({ c, what }: { c: EulerReceiptContext; what: string }) {
@@ -192,11 +193,8 @@ function slots(r: EulerPositionRead): PositionCardSlots {
     surface: "detail",
     heading: CARD_WORDS.heading,
     status: null,
-    identity: (
-      <span className="text-xs text-rb-500">
-        {p.vaultSymbol} · <span className="font-mono">{short(p.account)}</span>
-      </span>
-    ),
+    // The vault (the market) and the account as the tag.
+    tag: <ListingTag market={p.vaultSymbol} id={p.account} />,
     heads,
     counters: null,
     // The position's name: the vault and the account (lib/shared/position-name.ts).

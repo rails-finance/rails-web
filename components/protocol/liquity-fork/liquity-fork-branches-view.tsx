@@ -58,6 +58,7 @@ import { shutdownDateProv, shutdownDay, withdrawalDateProv } from "@/lib/shared/
 import { allBranchesShutDown } from "@/lib/liquity-fork/shutdown";
 import { BranchCcrNotice } from "@/components/protocol/liquity/branch-ccr-notice";
 import type { LiquityV2BranchCcr } from "@/lib/liquity-v2/branch-ccr";
+import { OPEN_ACTIVE } from "@/lib/liquity-v2/listing-visibility";
 
 const ratePct = (x: number) => `${x.toFixed(2)}%`;
 const ratio = (x: number) => `${(x * 100).toFixed(1)}%`;
@@ -72,8 +73,9 @@ export interface LiquityForkUrlWiring {
   /** The listing's collateral facet param a branch card deep-links into.
    *  Forks: "branch". Liquity V2: "collateralTypes". */
   filterParam?: string;
-  /** The status option value meaning "still borrowing". Forks: "open".
-   *  Liquity V2: "active" — its wire value differs from its label. */
+  /** The `status` value for the open troves with Dormant left out: the
+   *  listings' link-only "active" (lib/liquity-v2/listing-visibility.ts), on
+   *  Liquity V2 and the forks alike. */
   openStatus?: string;
   /** The listing's sort value for the user-set annual interest rate — the
    *  queue's own order. Forks: "rate". Liquity V2: "interestRate". */
@@ -82,12 +84,13 @@ export interface LiquityForkUrlWiring {
 
 const DEFAULT_WIRING: Required<LiquityForkUrlWiring> = {
   filterParam: "branch",
-  openStatus: "open",
+  openStatus: OPEN_ACTIVE,
   rateSort: "rate",
 };
 
 /** The listing URL that IS this branch's redemption queue: the branch's troves
- *  in the sorted list, lowest rate first.
+ *  in the sorted list, lowest rate first. `status=active` keeps the Dormant
+ *  troves out.
  *
  *  ZOMBIES ARE DELIBERATELY EXCLUDED, and the first attempt included them —
  *  they are redeemed ahead of the sorted list, so it looked right. It isn't.
