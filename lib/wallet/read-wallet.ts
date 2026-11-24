@@ -223,6 +223,17 @@ export async function readListingRows(
 }
 
 /**
+ * The opt-in rails-server's wallet positions route needs to answer every
+ * family and chain; without it the route answers only the pairs production
+ * web draws. Later wallet branches reuse this constant.
+ */
+export const WALLET_API_SCOPE = "families=all&chains=ethereum,base,arbitrum,arc,sepolia";
+
+/** The summary route's URL for one page of an address's rows. */
+export const walletSummaryUrl = (base: string, address: string, limit: number, offset: number): string =>
+  `${base}/api/wallet/${address}/positions?limit=${limit}&offset=${offset}&former=${WALLET_FORMER_FAMILIES}&${WALLET_API_SCOPE}`;
+
+/**
  * The wallet's rows: rails-server's summary route, and beside it the listing
  * reads for the kinds the summary table does not hold (readListingRows).
  * Decision 0050 departure; ui-jobs 795 moves it into wallet_positions. Both
@@ -238,13 +249,10 @@ export async function readSummary(address: string, signal: AbortSignal, readerIp
   let first: WalletSummaryAnswer | null = null;
   const rows: WalletSummaryRow[] = [];
   for (let offset = 0; offset < MAX_ROWS; offset += PAGE) {
-    const res = await fetch(
-      `${base}/api/wallet/${address}/positions?limit=${PAGE}&offset=${offset}&former=${WALLET_FORMER_FAMILIES}`,
-      {
-        ...createAuthFetchOptions({ signal }, readerIp),
-        cache: "no-store",
-      },
-    );
+    const res = await fetch(walletSummaryUrl(base, address, PAGE, offset), {
+      ...createAuthFetchOptions({ signal }, readerIp),
+      cache: "no-store",
+    });
     if (!res.ok) throw new Error(`/api/wallet/${address}/positions answered ${res.status}`);
     const page = (await res.json()) as WalletSummaryAnswer;
     first ??= page;
