@@ -108,7 +108,8 @@ export function lineSpreads(main: SpreadLine, others: readonly SpreadLine[], cha
       // On the rounds both points are the day's close: one moment.
       const sameMoment = roundsFrom != null && p[0] >= roundsFrom;
       const timed = !sameMoment && !main.fixed && !o.fixed;
-      if (timed && (p[2] == null || q[2] == null || apart(p[2], q[2]) > READ_WINDOW_S)) {
+      if (timed && (p[2] == null || q[2] == null)) continue;
+      if (timed && apart(p[2]!, q[2]!) > READ_WINDOW_S) {
         apartDays.add(p[0]);
         continue;
       }
@@ -139,7 +140,7 @@ export function dashReason(spread: Pick<LineSpread, "apart"> | undefined, day: n
   return spread?.apart.has(day) ? "window" : "none";
 }
 
-/** The tooltip on a dash. A line with no data that day keeps the wording every dash had before. */
+/** The tooltip on a dash. A line with no data, or no read block, keeps the rounds wording. */
 export function dashTitle(reason: DashReason, mainName: string): string {
   return reason === "window"
     ? `Read more than ten minutes from ${mainName} on this day`

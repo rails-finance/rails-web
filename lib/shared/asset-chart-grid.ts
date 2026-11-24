@@ -265,8 +265,9 @@ export function needsRegrid(
 }
 
 /** Whether the range button for `span` seconds (null for All) matches the window
- *  shown. A window that takes in the whole of `bounds` (within 3 % of its span at
- *  either end, and so also padded past it) is All, whatever its width. */
+ *  shown. All is a window that starts by the first stored day (padding past it
+ *  included) and ends within 3 % of the span's end; a window opening at a later
+ *  first round is no preset, so no button presses. */
 export function rangeActive(
   shown: { from: number; to: number },
   bounds: { t0: number; t1: number },
@@ -274,6 +275,17 @@ export function rangeActive(
 ): boolean {
   const full = bounds.t1 - bounds.t0;
   const want = span ?? full;
-  if (span == null) return shown.from <= bounds.t0 + want * 0.03 && shown.to >= bounds.t1 - want * 0.03;
+  if (span == null) return shown.from <= bounds.t0 + DAY_S && shown.to >= bounds.t1 - want * 0.03;
   return Math.abs(shown.to - shown.from - want) <= want * 0.03 && Math.abs(shown.to - bounds.t1) <= want * 0.03;
+}
+
+/** Whether a range button shows pressed: only once a reader has chosen a range,
+ *  so the opening window presses none (Miles, 817a, 24 Nov 2026). */
+export function rangePressed(
+  shown: { from: number; to: number },
+  bounds: { t0: number; t1: number },
+  span: number | null,
+  chosen: boolean,
+): boolean {
+  return chosen && rangeActive(shown, bounds, span);
 }

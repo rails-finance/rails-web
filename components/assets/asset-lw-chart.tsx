@@ -44,7 +44,7 @@ import {
   inForce,
   lineTrack,
   needsRegrid,
-  rangeActive,
+  rangePressed,
   sampleSpread,
   sampleTrack,
   withDetail,
@@ -192,6 +192,8 @@ export function AssetLwChart({
   // The window shown, and the grid drawn under it.
   const view = useRef(home);
   const [shown, setShown] = useState(home);
+  // No range button presses until a reader chooses one.
+  const [rangeChosen, setRangeChosen] = useState(false);
   const [grid, setGrid] = useState<Grid | null>(null);
   const gridRef = useRef<Grid | null>(null);
   gridRef.current = grid;
@@ -664,7 +666,7 @@ export function AssetLwChart({
     },
     [show],
   );
-  const active = (span: number | null) => rangeActive(shown, bounds, span);
+  const active = (span: number | null) => rangePressed(shown, bounds, span, rangeChosen);
   /** A line's key: the main hue, or its slot's token and dash. */
   const keyOf = (id: string, isMain: boolean) => {
     const st = styleOf(id);
@@ -708,9 +710,10 @@ export function AssetLwChart({
               key={word}
               type="button"
               aria-pressed={active(span)}
-              onClick={() =>
-                show(span == null ? { from: bounds.t0, to: bounds.t1 } : { from: bounds.t1 - span, to: bounds.t1 })
-              }
+              onClick={() => {
+                setRangeChosen(true);
+                show(span == null ? { from: bounds.t0, to: bounds.t1 } : { from: bounds.t1 - span, to: bounds.t1 });
+              }}
               className={`rounded px-2 py-0.5 tabular-nums ${active(span) ? "bg-[var(--surface-sunken)] font-semibold text-foreground" : "text-rb-500 hover:text-foreground"}`}
               data-asset-range={word}
             >

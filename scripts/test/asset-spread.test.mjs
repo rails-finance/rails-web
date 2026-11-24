@@ -191,14 +191,20 @@ test("each kind of dash carries its reason", () => {
     points: [
       [100, 1.0, 1010],
       [101, 0.9691, 2196],
+      [102, 1.0, null],
     ],
   };
   const [s] = lineSpreads(main, [near], 1);
   assert.ok(s.apart.has(101) && !s.apart.has(100), "day 101 was read 39 minutes apart");
+  assert.ok(!s.apart.has(102) && !s.byDay.has(102), "day 102 has no read block: no gap and no window claim");
+  assert.equal(dashReason(s, 102, false), "none");
   assert.equal(dashReason(s, 101, false), "window");
   assert.equal(dashReason(s, 99, false), "none", "no price that day");
   assert.equal(dashReason(undefined, 101, false), "none");
   assert.equal(dashReason(s, 101, true), "rounds");
+  // The rounds/daily boundary: the same cell reads by which grid holds it.
+  assert.equal(dashReason(s, 100, true), "rounds", "on the rounds");
+  assert.equal(dashReason(s, 100, false), "none", "on the daily store, a day that compared");
   assert.equal(
     dashTitle("window", "Chainlink ETH / USD"),
     "Read more than ten minutes from Chainlink ETH / USD on this day",
