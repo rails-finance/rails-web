@@ -141,6 +141,7 @@ export function DetailTopRow({
   owner,
   tools = true,
   fallbackHref,
+  card = false,
   children,
 }: {
   /** The page's explorer; absent on a page no explorer owns (sBOLD's holder
@@ -167,6 +168,11 @@ export function DetailTopRow({
   tools?: boolean;
   /** Where Back lands on a fresh tab; see DetailBackButton. */
   fallbackHref?: string;
+  /** The page draws a detail card under the heading, or will once its read
+   *  lands: the heading leaves the strip to the card from the first frame,
+   *  so the server's paint does not stand it in the heading for the card to
+   *  take after hydration (below sm a line of the heading's height). */
+  card?: boolean;
   children?: ReactNode;
 }) {
   const eventPage = useParams<{ eventId?: string }>()?.eventId != null;
@@ -198,7 +204,7 @@ export function DetailTopRow({
     );
   const priced = prices(true);
   const stamped = showStamp && !closed && !eventPage;
-  const inCard = usePublishPositionCardStrip(
+  const claimed = usePublishPositionCardStrip(
     // In the card the stamp stands before the price, next to the ⋮.
     owner && (priced || stamped) ? (
       <>
@@ -207,6 +213,7 @@ export function DetailTopRow({
       </>
     ) : null,
   );
+  const inCard = claimed || card;
   return (
     // With the heading, the gap to the card (16px, in place of the page's
     // space-y-6 margin) is smaller than the gap above the heading (24px), so

@@ -35,12 +35,36 @@
 import { usePathname } from "next/navigation";
 import { protocolForPathname, subPageForPathname } from "@/lib/shared/protocols";
 import { RailHeader } from "@/components/shared/rail-header";
-import { SkeletonBar, SkeletonBlock } from "@/components/shared/skeleton-card";
+import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { ChainTruthListLoadingSkeleton } from "@/components/shared/chain-truth-list-loading-skeleton";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 
+/** A control's outline: a round button, or the resting Status pill. */
+const CONTROL = "skel-wait shrink-0 rounded-full border border-edge-raised";
+const ROUND = `${CONTROL} size-11 sm:size-10`;
+
+/** The toolbar (list-toolbar.tsx) as outlines where its controls stand: the
+ *  Filters button and the resting Status pill at the left, the search, sort
+ *  and ⋮ at the right. Its height is the row's, set in CSS: 40px from sm, and
+ *  below sm two 44px lines, the right-hand group wrapping under the pills. */
+function ToolbarPlaceholder() {
+  return (
+    <div aria-hidden data-skel-placeholder="" className="mb-6 flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2 max-sm:basis-full">
+        <span className={ROUND} />
+        <span className={`${CONTROL} h-11 w-[130px] sm:h-10`} />
+      </div>
+      <div className="ml-auto flex items-center gap-3">
+        <span className={ROUND} />
+        <span className={ROUND} />
+        <span className={ROUND} />
+      </div>
+    </div>
+  );
+}
+
 export function ListingRouteLoading() {
-  const { sizes, remembered } = useSkeletonSizes();
+  const { remembered } = useSkeletonSizes();
   // The rail header is derived from the route alone (roster data, no fetch),
   // so the REAL one renders here rather than a blank block — the title row
   // and its sections menu holding steady through a navigation instead of
@@ -67,19 +91,7 @@ export function ListingRouteLoading() {
         {remembered["listing-header-extra"] != null && (
           <SkeletonBlock height={remembered["listing-header-extra"]} className="mb-6" />
         )}
-        {/* The toolbar: a bare row of bars where its controls stand. */}
-        <SkeletonBlock
-          height={sizes["listing-toolbar"]}
-          frame={false}
-          className="mb-6"
-          bars={
-            <div className="flex h-full items-center gap-3">
-              <SkeletonBar width={180} wait={false} />
-              <SkeletonBar width={72} wait={false} />
-              <SkeletonBar width={72} wait={false} />
-            </div>
-          }
-        />
+        <ToolbarPlaceholder />
         <ChainTruthListLoadingSkeleton />
       </div>
     </div>
