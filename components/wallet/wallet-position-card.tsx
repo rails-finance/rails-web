@@ -372,6 +372,8 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
     chain: { id: p.chain, name: chain },
     atRisk: atRisk(p),
     // The Arbitrum cards carry their stored read's block in the card.
+    // One mark for an unread position: the stamp, with no lifecycle pill beside it.
+    ...(p.notRead ? { unread: true as const } : {}),
     stamp: p.notRead ? (
       // An Aave V3 Base account the chain has not been read for (open point 8),
       // or an f(x) position with no read stored.
