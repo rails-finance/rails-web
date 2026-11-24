@@ -12,7 +12,7 @@ import "server-only";
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { isReadCeiling } from "@/lib/shared/read-ceiling";
-import { apiSlot } from "@/lib/wallet/api-hop";
+import { apiSlot, isPastReadDeadline } from "@/lib/wallet/api-hop";
 import type { UniChainId, UniProtocol } from "@/lib/uniswap/deployments";
 import type { UniPairRead, UniPositionRead, UniPositionsRead, UniswapVersion } from "@/lib/uniswap/types";
 
@@ -42,7 +42,8 @@ export async function readAtBlock<T>(path: string, revalidate: number, who = "un
       return { kind: "ok", data: (await res.json()) as T };
     });
   } catch (error) {
-    console.error(`${who}: ${path} did not answer`, error);
+    if (isPastReadDeadline(error)) console.error(`${who}: ${path} is past the read's deadline`);
+    else console.error(`${who}: ${path} did not answer`, error);
     return { kind: "error" };
   }
 }

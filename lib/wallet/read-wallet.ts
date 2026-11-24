@@ -379,6 +379,8 @@ async function readFamily(
   if (f.head && readable.length > 0) {
     try {
       const remaining = deadline - Date.now();
+      // The 500 ms floor gives the chain reads time; an api request past the
+      // read's deadline is refused (api-hop.ts), and its row reads the chain.
       head = await withBudget(Math.max(500, remaining), (signal) =>
         f.head!(open, address, signal, walletApiWait(remaining), { rows, readerIp }),
       );
@@ -456,6 +458,8 @@ async function readWalletInScope(address: string, readerIp: string | undefined, 
   // The families read at visit start here, once the summary and the listing
   // reads have settled, beside the stored families' head reads.
   const visiting = WALLET_VISIT_FAMILIES.filter((m) => !opts.protocol || m.family === opts.protocol);
+  // The floor does not reach the api host: a visit family whose request is
+  // past the read's deadline fails, and the read is partial and uncached.
   const visits = readVisitFamilies(visiting, address, Math.max(500, deadline - Date.now()), readerIp);
   const groups = reading
     .map((f) => ({
