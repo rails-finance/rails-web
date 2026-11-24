@@ -233,8 +233,8 @@ export function AaveV4PositionListingCard({
   // ⇒ A LISTING ROW: the shell declares its <Prov> figures unscoped, so they
   // trace nothing, the contract of every listing render.
   if (!isOpen) {
-    // Closed / liquidated: the all-time high-water mark (Highest recorded
-    // supply or collateral, Highest recorded debt) as the detail card shows
+    // Closed / liquidated: the all-time high-water mark (Peak
+    // supply or collateral, Peak debt) as the detail card shows
     // it, with no debt head when the position never carried real debt. The
     // Outcome column's word and date say how it ended.
     const status: PositionCardStatus = closedByLiquidation

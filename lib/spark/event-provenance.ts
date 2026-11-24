@@ -309,7 +309,7 @@ export const positionDebtProv = (sym: string, atBlockNum?: number): Provenance =
 export const sparkPeakSupplyProv = (sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `The highest supplied ${sym} balance this position recorded — every captured flow (supplies, withdrawals, spToken transfers in and out, collateral a liquidation seized), each ÷ the reserve's liquidity index at its block (from SparkLend's own ReserveDataUpdated logs), summed as a running claim; the largest claim is valued × the index at the moment it stood. The balance the spToken's \`balanceOf\` showed at that event — interest to that moment included. The index kept accruing between events, so the true maximum can sit slightly above a figure recorded at event boundaries.`,
+  summary: `The peak supplied ${sym} balance this position recorded — every captured flow (supplies, withdrawals, spToken transfers in and out, collateral a liquidation seized), each ÷ the reserve's liquidity index at its block (from SparkLend's own ReserveDataUpdated logs), summed as a running claim; the largest claim is valued × the index at the moment it stood. The balance the spToken's \`balanceOf\` showed at that event — interest to that moment included. The index kept accruing between events, so the true maximum can sit slightly above a figure recorded at event boundaries.`,
   contract: SPARK,
   via: `${SPARK_VIA} · max running Σ scaled deltas (each flow ÷ index at its block; spToken transfers included) × index at the peak's block`,
 });

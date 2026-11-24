@@ -489,7 +489,7 @@ export const collateralRatioProv = (collUsdHuman: string, daiDebtHuman: string):
   ],
 });
 
-/** Peak collateral on a terminal card — the highest recorded ink over the
+/** Peak collateral on a terminal card — the peak ink over the
  *  vault's life. Exact at recorded events: ink is a Vat slot that only moves
  *  when a frob / grab / fork touches it, so the replayed maximum IS the peak. */
 export const peakInkProv = (collSym: string, coords?: MakerCoords): Provenance => ({

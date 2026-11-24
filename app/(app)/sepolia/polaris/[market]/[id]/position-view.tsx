@@ -70,7 +70,7 @@ import { polarisExplorer } from "@/lib/polaris/explorer";
 /** What the ETH/USD row is, and why it is in the menu. */
 const ETH_USD_LABEL = "ETH/USD: the protocol's medianiser";
 
-/** The card's "Highest recorded" peaks, with the liquidation's own state
+/** The card's "Peak" peaks, with the liquidation's own state
  *  counted: the index takes its peaks over each touch's resulting figures, and
  *  a liquidation's resulting figures are zero — the collateral and debt it
  *  seized and cleared, after the pending legs settled, are the CDP's last and

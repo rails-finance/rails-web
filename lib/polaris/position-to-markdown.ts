@@ -119,8 +119,8 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
   lines.push("");
 
   if (view.status !== "open") {
-    if (view.peakColl > 0) lines.push(`- **Highest recorded collateral:** ${amt(view.peakColl)} pETH`);
-    if (view.peakDebt > 0) lines.push(`- **Highest recorded debt:** ${amt(view.peakDebt)} ${stable}`);
+    if (view.peakColl > 0) lines.push(`- **Peak collateral:** ${amt(view.peakColl)} pETH`);
+    if (view.peakDebt > 0) lines.push(`- **Peak debt:** ${amt(view.peakDebt)} ${stable}`);
     if (view.peakColl > 0 || view.peakDebt > 0) lines.push("");
   } else {
     lines.push(`## Position now`);

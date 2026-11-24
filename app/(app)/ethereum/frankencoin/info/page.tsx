@@ -62,7 +62,7 @@ export default function InfoPage() {
                 the full amount minted. The wallet received less, because the reserve share and the interest for the
                 remaining term are taken when the ZCHF is minted.
               </li>
-              <li>A position that has ended shows its highest recorded collateral and debt, and how it ended.</li>
+              <li>A position that has ended shows its peak collateral and debt, and how it ended.</li>
               <li>
                 The listing shows open positions by default. Searching for an owner shows positions of every status.
               </li>

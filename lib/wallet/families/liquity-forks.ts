@@ -90,7 +90,7 @@ function forkModule<R, S extends ForkSummary>(spec: ForkSpec<R, S>): FamilyModul
           history: {
             ...historyBase(r),
             size: parts.length ? parts.join(" / ") : undefined,
-            sizeNote: parts.length ? "highest recorded" : undefined,
+            sizeNote: parts.length ? "peak" : undefined,
             result: s.redemptionCount > 0 ? plural(s.redemptionCount, "redemption") : undefined,
             // The route counts the owner's own transactions, redemptions and
             // liquidations left out.

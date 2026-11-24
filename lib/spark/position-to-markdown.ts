@@ -121,7 +121,7 @@ export function sparkPositionToMarkdown(args: SparkPositionMarkdownArgs): string
     terminal
       ? `> Snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
           `The position is ${view.status} — no open balances remain. Balances below are each reserve's ` +
-          `HIGHEST recorded balance (largest running scaled claim over every captured flow, spToken transfers ` +
+          `PEAK balance (largest running scaled claim over every captured flow, spToken transfers ` +
           `included, valued at the index of the moment it stood — interest to then included). Not financial advice.`
       : `> Point-in-time snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
           `Balances are the indexed scaled-balance reduction (equal to the spToken / variable-debt balanceOf), ` +
@@ -166,7 +166,7 @@ export function sparkPositionToMarkdown(args: SparkPositionMarkdownArgs): string
       lines.push(`- **Closed** — closed with no liquidation in the record.`);
     }
     lines.push("");
-    lines.push("## Highest recorded balances (per reserve)");
+    lines.push("## Peak balances (per reserve)");
     const peakLines = (label: string, reserves: SparkReserveAmount[]) => {
       if (reserves.length === 0) {
         lines.push(`- **${label}:** none recorded`);

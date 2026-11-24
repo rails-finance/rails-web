@@ -68,7 +68,7 @@ export function fluidPositionToMarkdown(args: FluidPositionMarkdownArgs): string
   lines.push("");
 
   if (view.status !== "open" && !live) {
-    lines.push(`- **Peak collateral:** ${amt(Number(view.peakCol))} ${colSym} (highest recorded)`);
+    lines.push(`- **Peak collateral:** ${amt(Number(view.peakCol))} ${colSym}`);
     lines.push(`- **Peak debt:** ${amt(Number(view.peakDebt))} ${debtSym}`);
     lines.push("");
   } else if (live) {

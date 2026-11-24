@@ -102,11 +102,9 @@ function FluidClosedPositionExplanation({
         )}
         {v.peakBasis === "chain" && <>, interest included</>}
         {peakFigures > 1 ? (
-          <>
-            . Each is its own highest point across the position&rsquo;s life, so the two can come from different dates.
-          </>
+          <>. Each is a peak across the position&rsquo;s life, so the two can come from different dates.</>
         ) : (
-          <> : its highest point across the position&rsquo;s life.</>
+          <> : its peak across the position&rsquo;s life.</>
         )}
       </>,
     );

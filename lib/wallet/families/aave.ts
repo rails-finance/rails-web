@@ -68,7 +68,7 @@ const sparkLegs = (legs: SparkReserveAmount[]) =>
 
 function sizeOf(supply: string | undefined, debt: string | undefined) {
   if (!supply && !debt) return {};
-  return { size: [supply ?? "nothing supplied", debt].filter(Boolean).join(" / "), sizeNote: "highest recorded" };
+  return { size: [supply ?? "nothing supplied", debt].filter(Boolean).join(" / "), sizeNote: "peak" };
 }
 
 const liquidations = (n: number | null | undefined) => (n != null && n > 0 ? plural(n, "liquidation") : undefined);

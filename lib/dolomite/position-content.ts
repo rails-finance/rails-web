@@ -19,11 +19,11 @@ export function dolomitePositionContent(opts: {
 }): LearnMoreContent {
   const peakConcept = opts.peaksInTokens
     ? {
-        bold: "Highest recorded",
+        bold: "Peak",
         text: "each market's largest balance just before or just after any event, in tokens with interest included. The panel above lists the markets the account held; a press on them opens these figures.",
       }
     : {
-        bold: "Highest recorded, in par",
+        bold: "Peak, in par",
         text: "each peak is the maximum of the running par balance, the figure the protocol stores and interest does not move: multiply it by the market's interest index for tokens.",
       };
 

@@ -29,7 +29,7 @@ export interface LiquityForkTroveViewLike {
   collateralType: string;
   collateral: number;
   debt: number;
-  /** Highest recorded balances over the life (display units) — the terminal
+  /** Peak balances over the life (display units) — the terminal
    *  snapshot's headline (a closed Trove reads 0/0). */
   peakCollateral: number;
   peakDebt: number;
@@ -138,7 +138,7 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
     }
     lines.push(`- No balances remain on this Trove.`);
     lines.push("");
-    lines.push(`## Highest recorded balances`);
+    lines.push(`## Peak balances`);
     lines.push("");
     lines.push(`- **Peak collateral:** ${amt(view.peakCollateral)} ${coll}`);
     lines.push(`- **Peak debt:** ${amt(view.peakDebt)} ${debtSymbol}`);
