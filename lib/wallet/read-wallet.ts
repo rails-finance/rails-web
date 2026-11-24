@@ -314,7 +314,10 @@ export async function readSummary(address: string, signal: AbortSignal, readerIp
         ...createAuthFetchOptions({ signal }, readerIp),
         cache: "no-store",
       });
-      if (!res.ok) throw new Error(`/api/wallet/${address}/positions answered ${res.status}`);
+      if (!res.ok) {
+        void res.body?.cancel().catch(() => undefined);
+        throw new Error(`/api/wallet/${address}/positions answered ${res.status}`);
+      }
       return (await res.json()) as WalletSummaryAnswer;
     }, signal);
   const firstPage = pageAt(0);

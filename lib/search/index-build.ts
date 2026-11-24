@@ -72,7 +72,10 @@ async function loadCensus(chainId: number, families?: "morpho"): Promise<CensusR
       `${base}/api/vaults/positions?chain=${chainId}&limit=1${families ? `&families=${families}` : ""}`,
       createAuthFetchOptions({ next: { revalidate: 3600 }, signal: AbortSignal.timeout(8000) }),
     );
-    if (!res.ok) return [];
+    if (!res.ok) {
+      void res.body?.cancel().catch(() => undefined);
+      return [];
+    }
     const j = (await res.json()) as { census?: CensusRow[] };
     return Array.isArray(j.census) ? j.census : [];
   } catch (error) {

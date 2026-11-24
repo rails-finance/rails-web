@@ -70,6 +70,7 @@ export async function fetchCensus(
   try {
     const res = await get(url);
     if (!res.ok) {
+      void res.body?.cancel().catch(() => undefined);
       console.error(`covered-positions: ${id} ${path} [census] -> ${res.status} ${res.statusText}`);
       return null;
     }

@@ -46,6 +46,7 @@ async function getJson<T>(path: string): Promise<T | null> {
       createAuthFetchOptions({ next: { revalidate: REVALIDATE_SECONDS } }),
     );
     if (!res.ok) {
+      void res.body?.cancel().catch(() => undefined);
       console.error(`live-example: ${path} -> ${res.status} ${res.statusText}`);
       return null;
     }

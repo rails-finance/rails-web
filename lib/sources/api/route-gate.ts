@@ -19,8 +19,15 @@
 // request to the api host shares (lib/wallet/api-hop.ts, ui-jobs 814),
 // released before the caller reads the chain.
 //
+// The wait counts from the ask, so a render's budget holds however long the
+// request queues for one of the keep-alive pool's connections
+// (lib/api/api-pool.ts). A wait that runs out while the request is still in
+// that queue (lib/api/pool-wait.ts) returns null and marks nothing down: the
+// api was not asked.
+//
 // SERVER-ONLY.
 
+import { withPoolWait, type PoolWait } from "@/lib/api/pool-wait";
 import { apiSlot, isPastReadDeadline } from "@/lib/wallet/api-hop";
 
 /** How long a client waits for the route before reading the chain. */
@@ -85,14 +92,18 @@ export function routeGate() {
       // caller goes to the chain at once.
       return await apiSlot(async (): Promise<{ body: T } | { status: number } | null> => {
         if (down()) return null;
+        const timeout = AbortSignal.timeout(opts.timeoutMs ?? ROUTE_WAIT_MS);
+        let wait: PoolWait = { state: "unsent" };
         try {
-          const timeout = AbortSignal.timeout(opts.timeoutMs ?? ROUTE_WAIT_MS);
           // No `cache` option: Next 15 caches no fetch by default, and an explicit
           // "no-store" throws its dynamic-usage error inside a static or ISR render,
           // which the catch below took for the route failing, so those pages read the chain.
-          const res = await fetch(url, {
-            ...init,
-            signal: opts.signal ? AbortSignal.any([timeout, opts.signal]) : timeout,
+          const res = await withPoolWait((w) => {
+            wait = w;
+            return fetch(url, {
+              ...init,
+              signal: opts.signal ? AbortSignal.any([timeout, opts.signal]) : timeout,
+            });
           });
           if (!res.ok) {
             void res.body?.cancel().catch(() => undefined);
@@ -104,6 +115,9 @@ export function routeGate() {
           // The caller's abort (the wallet page's budget) is not the route failing.
           if (opts.signal?.aborted) return null;
           if (err instanceof RouteDownAtBuild) throw err;
+          // The wait ran out in the pool's queue: the api was not asked. During
+          // the build the page still fails, as it does for any failure here.
+          if (timeout.aborted && wait.state === "queued" && !atBuild()) return null;
           return failed((err as Error)?.message ?? String(err));
         }
       }, opts.signal);
