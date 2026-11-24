@@ -26,6 +26,7 @@ import type {
   AlchemixStoredPositionSummary,
   AlchemixV2PositionSummary,
 } from "@/types/api/alchemix";
+import { holdsNothingSince } from "@/lib/wallet/holds-nothing";
 import type { FamilyModule, HeadResult } from "./module";
 
 /** The listing route's most rows in one answer. */
@@ -89,7 +90,7 @@ function module(dep: AlchemixDeployment, lane: "ethereum" | "base"): FamilyModul
       if (!read.ok) throw new Error(`/api/alchemix/positions answered ${read.status}`);
       const data = read.result.data;
       const listed = new Map(data.map((s) => [`${s.lineKey}:${s.tokenId}`, s]));
-      // A reading's block: the line's head reading, or the debt's own block
+      // A reading's block: the line's head reading, or the debt's block
       // where that reading is stale.
       const blockOf = (s: AlchemixPositionSummary): number | null =>
         (s.chainReading && !s.chainReading.stale ? s.chainReading.blockNumber : null) ??
@@ -119,8 +120,8 @@ function module(dep: AlchemixDeployment, lane: "ethereum" | "base"): FamilyModul
             };
           // The read answered without figures for it: the stored card stands.
           // Not listed in a whole answer, the wallet holds nothing there at
-          // the line's head block.
-          const head = !s && whole ? lineBlock.get(stored.lineKey) : undefined;
+          // the line's head block, where that is at or past the stored read.
+          const head = !s && whole ? holdsNothingSince(lineBlock.get(stored.lineKey), p.readAtBlock) : undefined;
           return { ...p, ...(head != null ? { closedSince: { block: head } } : {}), headRead: "stored" };
         }),
       };

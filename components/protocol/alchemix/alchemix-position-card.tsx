@@ -201,7 +201,7 @@ function stamp(block: number | null | undefined): ReactNode {
   ) : null;
 }
 
-/** A figure's receipt at its own block: a getCDP reading, or the position's
+/** A figure's receipt at its block: a getCDP reading, or the position's
  *  events replayed on a `derived` line. */
 function figureProv(
   p: AlchemixStoredPositionSummary,
