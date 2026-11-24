@@ -124,6 +124,11 @@ export function storedPricesNow(
   return { chain, block, timestamp, sameBlock: false, stub: true, prices };
 }
 
+/** Whether an answer may be shared from the cache (ui-jobs 829): one that
+ *  stands at a block. A 502's answer, or a stub where no line was read, has
+ *  none, and is served to its reader alone so the next reader tries again. */
+export const cachedPricesNow = (now: Pick<AssetPricesNow, "block">): boolean => now.block != null;
+
 /** The answer where the whole read failed (the route's 502): every line unread. */
 export function unreadPricesNow(chain: number, lines: readonly PageLine[], reason: string): AssetPricesNow {
   const prices: Record<string, LinePriceNow> = {};

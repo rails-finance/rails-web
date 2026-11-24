@@ -248,7 +248,7 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
   const own = view?.lineId != null;
   // The one price-now read, started here and not awaited: the header and the
   // table stream from it (ui-jobs 829).
-  const nowRead = fetchAssetPricesNow(chain, t, section.lines);
+  const nowRead = fetchAssetPricesNow(chain, t, section.lines, readerIp);
   // Each explorer's page for the token: this protocol's, and the others' from the chips.
   const hrefs: Record<string, string> = Object.fromEntries(
     line.also.flatMap((ch) => {
@@ -268,6 +268,9 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
       listedRows(alsoListed(line.line.chips, chain, e.id, { reads, rows: other }, pageOf), now),
     );
   };
+  // The header and the table are two boundaries and may land at different
+  // moments (this also waits on the head read), but both read `nowRead`, so
+  // their prices are one answer.
   const headRead = Promise.all([
     fetchAssetHeadServer(chain, t, via ? e.id : null, readerIp).catch(() => null),
     nowRead,

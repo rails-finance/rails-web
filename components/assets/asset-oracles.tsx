@@ -38,6 +38,8 @@ import {
   AS_OF_NOTE,
   asOfText,
   gapProv,
+  oracleRowHooks,
+  oracleTableHooks,
   priceProv,
   rowLabel,
   tableIntro,
@@ -125,7 +127,11 @@ export function OracleTable({
   now: AssetPricesNow;
   /** The price-now read is out: the rows' structure with a bar where each
    *  price and gap goes, the Gap column drawn (a same-block read is the usual
-   *  answer), the intro a bar over its line, and no hook a verifier reads. */
+   *  answer), the intro a bar over its line, and no hook a verifier reads
+   *  (`oracleRowHooks`). Where the answer is the stored fallback (`sameBlock`
+   *  false, only after the route times out or is not served), the settled
+   *  table drops the Gap column, the intro takes its shorter form and no
+   *  as-of line is drawn, so the content under them moves up on settle. */
   pending?: boolean;
 }) {
   if (rows.length === 0) return null;
@@ -134,13 +140,7 @@ export function OracleTable({
   const lineOf = (id: string) => lines.find((l) => l.id === id)!;
   const refPrice = now.prices[pageLine]?.price ?? null;
   return (
-    <section
-      className="mt-8"
-      data-asset-oracles={pending ? undefined : ""}
-      data-asset-oracles-pending={pending ? "" : undefined}
-      data-asset-gaps={pending ? undefined : gaps ? "on" : "off"}
-      data-anatomy="A2.4"
-    >
+    <section className="mt-8" {...oracleTableHooks(pending, gaps)} data-anatomy="A2.4">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         {pending ? (
           // The sentence's words wait on the read (same block or not); its
@@ -174,7 +174,8 @@ export function OracleTable({
           {rows.map((r) => {
             const line = r.lineId ? lineOf(r.lineId) : null;
             const listed = r.group === "listed";
-            const href = pending ? undefined : (r.protocol.href ?? undefined);
+            const hooks = oracleRowHooks(r, pending);
+            const href = hooks.href;
             const explorer = r.protocol.explorer ?? "";
             const nameText = (
               <span data-asset-used-by="">
@@ -183,14 +184,7 @@ export function OracleTable({
               </span>
             );
             return (
-              <DataTableRow
-                key={r.id}
-                href={href}
-                data-asset-oracle={pending ? undefined : r.id}
-                data-asset-oracle-group={pending ? undefined : r.group}
-                data-asset-oracle-href={pending ? undefined : (href ?? "")}
-                data-anatomy="A2.5"
-              >
+              <DataTableRow key={r.id} href={href} {...hooks.row} data-anatomy="A2.5">
                 <DataTableLeadCell
                   protocol={explorer}
                   protocolName={r.protocol.name}
@@ -241,7 +235,7 @@ export function OracleTable({
                   align="right"
                   valign="middle"
                   className="whitespace-nowrap tabular-nums sm:w-[130px]"
-                  data-asset-price-now={pending ? undefined : (r.price.value ?? "")}
+                  {...hooks.price}
                 >
                   {pending && line ? (
                     <SkeletonBar width={64} height={20} />
@@ -257,7 +251,7 @@ export function OracleTable({
                     align="right"
                     valign="middle"
                     className="whitespace-nowrap tabular-nums text-rb-500 sm:w-[110px]"
-                    data-asset-gap={pending ? undefined : (r.gap.value ?? "")}
+                    {...hooks.gap}
                   >
                     {listed ? (
                       "–"
