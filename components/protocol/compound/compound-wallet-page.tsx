@@ -67,7 +67,7 @@ import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { CompoundFlowsNote, compoundFlowsContent } from "@/components/protocol/compound/compound-flows-note";
 import { CompoundFlowReplayContext } from "@/components/protocol/compound/compound-ledger";
 import { useCompoundFlows } from "@/hooks/useCompoundFlows";
-import type { CompoundLive } from "@/lib/compound/flows";
+import { compoundFlowsSides, type CompoundLive } from "@/lib/compound/flows";
 import { scaleCompoundChainBalance } from "@/lib/api/fetch-compound-position";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
@@ -419,6 +419,7 @@ function MarketSection({
                 </div>
               }
               learnMore={compoundFlowsContent()}
+              skeleton={{ sides: compoundFlowsSides(view) }}
             />
           )}
 

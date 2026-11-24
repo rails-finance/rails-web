@@ -13,6 +13,7 @@
 // (decision 0041).
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { apiHop } from "@/lib/wallet/api-hop";
 import { toFxSummary, type FxPositionSummary, type RawFxPositionRow } from "@/lib/sources/api/fx-positions";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
@@ -31,12 +32,15 @@ async function readHolder(
   const base = process.env.RAILS_API_URL?.replace(/\/$/, "");
   if (!base) throw new Error("RAILS_API_URL is not set");
   const qs = new URLSearchParams({ owner: holder.toLowerCase(), limit: String(LIMIT), sortOrder: "desc" });
-  const res = await fetch(`${base}/api/fx/positions?${qs}`, {
-    ...createAuthFetchOptions({ signal }, readerIp),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`/api/fx/positions answered ${res.status}`);
-  return (await res.json()) as { positions: RawFxPositionRow[]; total: number };
+  // One slot of the wallet page's cap on the api host, retried once on a reset (lib/wallet/api-hop.ts).
+  return apiHop(async () => {
+    const res = await fetch(`${base}/api/fx/positions?${qs}`, {
+      ...createAuthFetchOptions({ signal }, readerIp),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`/api/fx/positions answered ${res.status}`);
+    return (await res.json()) as { positions: RawFxPositionRow[]; total: number };
+  }, signal);
 }
 
 const keyOf = (s: Pick<FxPositionSummary, "pool" | "positionId">) => `${s.pool}-${s.positionId}`;

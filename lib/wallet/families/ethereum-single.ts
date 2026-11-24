@@ -45,7 +45,7 @@ import type { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle"
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { morphoHasDebt } from "@/lib/morpho/position-legs";
 import { morphoCardAtHead, storedMorphoCard } from "./morpho-card";
-import { API_CONCURRENCY, createLimiter } from "@/lib/wallet/api-hop";
+import { apiHop, createLimiter, inChain } from "@/lib/wallet/api-hop";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, opt, plural, storeStamp } from "@/lib/wallet/summary-row";
 import { formerHoldOf, movedHistory } from "@/lib/wallet/moved-row";
@@ -78,8 +78,9 @@ async function eachOpen(
 ): Promise<HeadResult> {
   let reads = 0;
   const settled = await Promise.allSettled(
+    // Each row is a chain of its own in the api cap's lanes.
     open.map(async (p) => {
-      const out = await read(p);
+      const out = await inChain(() => read(p));
       if (out !== null) reads++;
       return out ?? p;
     }),
@@ -93,6 +94,9 @@ async function eachOpen(
 }
 
 // ── Morpho Blue ─────────────────────────────────────────────────────────────
+
+/** At most this many of one wallet's Morpho Ethereum chain reads at once. */
+const MORPHO_CHAIN_READS = 4;
 
 export const morphoEthereum: FamilyModule = {
   id: "morpho",
@@ -145,11 +149,12 @@ export const morphoEthereum: FamilyModule = {
     const atHead = new Map<string, RawMorphoPositionRow>();
     // The chain's block, read once and only when a position needs the chain.
     let block: Promise<bigint> | null = null;
-    // Every open row is read: at most API_CONCURRENCY at once, to the api
-    // route or, past it, the chain. Not apiHop: its slots are the api host's,
-    // and its retry would repeat a chain read.
-    const limit = createLimiter(API_CONCURRENCY);
-    const r = await eachOpen(open, (p) => limit(() => readOne(p), signal));
+    // Every open row is read at once: each route request takes a slot of the
+    // wallet page's cap on the api host inside route-gate.ts, released before
+    // its chain read, with no retry. The chain reads go at most
+    // MORPHO_CHAIN_READS at once.
+    const chainLimit = createLimiter(MORPHO_CHAIN_READS);
+    const r = await eachOpen(open, readOne);
     async function readOne(p: WalletPosition): Promise<WalletPosition> {
       const s = (p.card as { row: MorphoPositionSummary }).row;
       const served = await withServerHead(
@@ -163,10 +168,11 @@ export const morphoEthereum: FamilyModule = {
         { timeoutMs: apiMs, signal },
       ).catch(() => null);
       let live = served?.answer;
-      if (!live) {
-        block ??= chainClient(MAINNET_CHAIN_ID).getBlockNumber();
-        live = await loadMorphoPositionFromChain(s.marketId, address, undefined, await block);
-      }
+      if (!live)
+        live = await chainLimit(async () => {
+          block ??= chainClient(MAINNET_CHAIN_ID).getBlockNumber();
+          return loadMorphoPositionFromChain(s.marketId, address, undefined, await block);
+        }, signal);
       if (live.chainStale) return { ...p, headRead: "failed" };
       // A row stored owing nothing that the chain finds owing is behind the
       // chain: its card states no debt, so it is not a head read.
@@ -371,13 +377,16 @@ const priceOf = (type: string, p: OraclePricesData | null): number | undefined =
 async function liquityPrices(signal: AbortSignal): Promise<OraclePricesData | null> {
   const base = process.env.RAILS_API_URL?.replace(/\/$/, "");
   if (!base) throw new Error("RAILS_API_URL is not set");
-  const res = await fetch(`${base}/api/oracle/liquity-v2`, {
-    ...createAuthFetchOptions({ signal }),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`/api/oracle/liquity-v2 answered ${res.status}`);
-  const json = (await res.json()) as OraclePricesResponse;
-  return json.success && json.data ? json.data : null;
+  // One slot of the wallet page's cap on the api host, retried once on a reset (lib/wallet/api-hop.ts).
+  return apiHop(async () => {
+    const res = await fetch(`${base}/api/oracle/liquity-v2`, {
+      ...createAuthFetchOptions({ signal }),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`/api/oracle/liquity-v2 answered ${res.status}`);
+    const json = (await res.json()) as OraclePricesResponse;
+    return json.success && json.data ? json.data : null;
+  }, signal);
 }
 
 export const liquityV2: FamilyModule = {

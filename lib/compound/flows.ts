@@ -414,6 +414,19 @@ export function compoundRoles(replayed: CompoundReplayed[], baseToken: string): 
  *  only lent. */
 export const twoSided = (r: CompoundRoles) => r.collateral || r.debt;
 
+/** The Lifetime flows skeleton's bars before the rows are replayed (ui-jobs
+ *  591), from what the card already holds: two where the account holds or
+ *  held collateral or owes or owed the base, one where it only lent. */
+export function compoundFlowsSides(v: {
+  side: "lend" | "borrow" | "flat";
+  collateral: { amount: number }[];
+  peak: { collateral: unknown[]; borrowedBase: number };
+}): 1 | 2 {
+  const debt = v.side === "borrow" || v.peak.borrowedBase > 0;
+  const collateral = v.peak.collateral.length > 0 || v.collateral.some((c) => c.amount > 0);
+  return debt || collateral ? 2 : 1;
+}
+
 /** The buckets the position fills, in drawing order. */
 export function compoundFlowBuckets(roles: CompoundRoles, filled: Set<string>): FlowBucket[] {
   const mixed = roles.collateral && roles.supply;

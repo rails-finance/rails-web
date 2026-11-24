@@ -57,6 +57,9 @@ import type { UniProtocol } from "@/lib/uniswap/deployments";
 import type { AeroPositionRead } from "@/lib/aerodrome/types";
 import type { BalPositionRead } from "@/lib/balancer/types";
 import type { VaultPositionRow } from "@/lib/aave-vaults/vault-position";
+import type { OpPositionRead } from "@/lib/aave-v3-optimism/types";
+import type { OpcWalletRead } from "@/lib/compound-v3-optimism/types";
+import type { MorphoAtBlockWalletRead } from "@/lib/morpho-at-block/types";
 
 /** "redeemed" is in the type for the families that end a position by
  *  redemption; no store states it as an ending yet (a fully redeemed Liquity
@@ -161,7 +164,14 @@ export type WalletCard =
    *  listing's row. `lane`: "census" where the visit read the holder's census
    *  answer (its figures at the census block), "stored" where the card holds
    *  the stored row alone (the balance since the last transfer). */
-  | { kind: "vault"; row: VaultPositionRow; lane: "census" | "stored" };
+  | { kind: "vault"; row: VaultPositionRow; lane: "census" | "stored" }
+  /** A family read at visit with no store (lib/wallet/families/visit.ts): its
+   *  explorer's wallet read at the head block. An Aave V3 Optimism account; a
+   *  Compound V3 Optimism answer holding one Comet; a Morpho Blue answer on
+   *  Optimism or Arc holding one market. */
+  | { kind: "aave-v3-optimism"; read: OpPositionRead }
+  | { kind: "compound-v3-optimism"; read: OpcWalletRead }
+  | { kind: "morpho-at-block"; dep: "optimism" | "arc"; read: MorphoAtBlockWalletRead };
 
 /** A closed position's row in the History table: what the store states, each
  *  field absent where it states nothing. */
@@ -295,7 +305,8 @@ export interface WalletRead {
   address: string;
   positions: WalletPosition[];
   families: WalletFamilyRead[];
-  /** Rows the summary table holds for the address. */
+  /** Rows the summary table holds for the address, and the positions read
+   *  at visit. */
   total: number;
   /** Unix seconds the answer was assembled. */
   readAt: number;
@@ -307,7 +318,7 @@ export interface WalletRead {
   /** The protocol the read was narrowed to (`?protocol=`); unset for every
    *  protocol. */
   protocol?: string;
-  /** Every protocol the summary rows name, with its row count, for the
+  /** Every protocol the summary rows and the positions read at visit name, with its count, for the
    *  Protocol pill: a narrowed read still offers the others. */
   held: { slug: string; name: string; positions: number }[];
   /** The listing reads that did not answer, by what they read: the answer

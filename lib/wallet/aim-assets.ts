@@ -30,6 +30,9 @@
 //   liquity-v1-stake       LQTY, and LUSD and ETH (its fees)
 //   ebisu / asymmetry / basedollar   collateral symbol, and the fork's debt symbol
 //   the three Arbitrum kinds         nothing: AIM's universe has no Arbitrum token
+//   aave-v3-optimism       each reserve the account holds
+//   compound-v3-optimism   the Comet's base token and each collateral held
+//   morpho-at-block        the market's loan and collateral tokens
 //   uniswap, slipstream    the pool's two tokens (the native coin as AIM's native key)
 //   balancer               each of the pool's tokens
 //
@@ -145,6 +148,17 @@ export function walletPositionAssetKeys(p: WalletPosition): string[] {
     case "vault":
       addresses.push(c.row.asset?.address ?? c.row.value.asset);
       symbols.push(c.row.asset?.symbol ?? c.row.value.assetSymbol);
+      break;
+    case "aave-v3-optimism":
+      for (const r of c.read.reserves) if (r.scaledSupply !== "0" || r.scaledDebt !== "0") addresses.push(r.asset);
+      break;
+    case "compound-v3-optimism":
+      for (const a of c.read.comets) addresses.push(a.baseToken, ...a.collateral.map((x) => x.asset));
+      break;
+    case "morpho-at-block":
+      // An idle market's collateral is the zero address.
+      for (const m of c.read.positions)
+        addresses.push(m.loanToken, /^0x0+$/.test(m.collateralToken) ? null : m.collateralToken);
       break;
     default:
       break;

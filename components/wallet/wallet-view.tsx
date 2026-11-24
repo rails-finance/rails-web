@@ -344,6 +344,7 @@ export function WalletView({
   cow,
   liquidity,
   reads,
+  visits,
   back,
   kinds: initialKinds = [],
   status: initialStatus,
@@ -363,6 +364,9 @@ export function WalletView({
   status?: WalletStatus;
   /** The families the page reads, by chain (`walletFamiliesLine`). */
   reads: string;
+  /** The families with no store it reads at each visit, by chain
+   *  (`walletVisitLine`); empty while none is on. */
+  visits: string;
   /** The explorer the reader came from, for the empty state's link back. */
   back: { href: string; name: string } | null;
 }) {
@@ -481,7 +485,7 @@ export function WalletView({
           // decision 0050's step 3 is built from.
           read.families.map((r) => {
             const mine = open.filter(
-              (p) => `${p.family}:${p.chain}` === `${r.id.replace(/-(base|arbitrum|arc)$/, "")}:${r.chain}`,
+              (p) => `${p.family}:${p.chain}` === `${r.id.replace(/-(base|arbitrum|arc|optimism)$/, "")}:${r.chain}`,
             );
             return {
               id: r.id,
@@ -569,8 +573,8 @@ export function WalletView({
                     </p>
                   ) : (
                     <p className="text-sm text-foreground/80" data-wallet-reads="">
-                      Rails holds no stored position for this wallet. This page reads {reads}. At each visit it reads
-                      the liquidity positions on {walletLiquidityLine()}.
+                      Rails holds no stored position for this wallet. This page reads {reads}. At each visit it reads{" "}
+                      {visits && `${visits}, and `}the liquidity positions on {walletLiquidityLine()}.
                     </p>
                   )}
                   {back && (

@@ -11,6 +11,7 @@
 // does the head read. The listing states no dollars (decision 0041).
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { apiHop } from "@/lib/wallet/api-hop";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { SkyPosition, SkyPositionsPage } from "@/lib/sky-savings/types";
 import type { WalletPosition } from "@/lib/wallet/types";
@@ -29,12 +30,15 @@ async function readHolder(
   const base = process.env.RAILS_API_URL?.replace(/\/$/, "");
   if (!base) throw new Error("RAILS_API_URL is not set");
   const qs = new URLSearchParams({ status: "open", owner: holder.toLowerCase(), limit: "1" });
-  const res = await fetch(`${base}/api/sky-savings/positions?${qs}`, {
-    ...createAuthFetchOptions({ signal }, readerIp),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`/api/sky-savings/positions answered ${res.status}`);
-  return (await res.json()) as Pick<SkyPositionsPage, "data" | "asOf" | "gate">;
+  // One slot of the wallet page's cap on the api host, retried once on a reset (lib/wallet/api-hop.ts).
+  return apiHop(async () => {
+    const res = await fetch(`${base}/api/sky-savings/positions?${qs}`, {
+      ...createAuthFetchOptions({ signal }, readerIp),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`/api/sky-savings/positions answered ${res.status}`);
+    return (await res.json()) as Pick<SkyPositionsPage, "data" | "asOf" | "gate">;
+  }, signal);
 }
 
 export const skySavings: FamilyModule = {
