@@ -26,7 +26,14 @@ import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { moveFocus } from "@/components/shared/tools-menu";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
-import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, chainMeta, type ChainId } from "@/lib/shared/chains";
+import {
+  ARBITRUM_CHAIN_ID,
+  ARC_CHAIN_ID,
+  BASE_CHAIN_ID,
+  MAINNET_CHAIN_ID,
+  chainMeta,
+  type ChainId,
+} from "@/lib/shared/chains";
 import { PROTOCOLS, listingHrefForWallet, protocolForPathname } from "@/lib/shared/protocols";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import {
@@ -45,6 +52,7 @@ const CHAIN_ID: Record<WalletCountsChain, ChainId> = {
   ethereum: MAINNET_CHAIN_ID,
   base: BASE_CHAIN_ID,
   arbitrum: ARBITRUM_CHAIN_ID,
+  arc: ARC_CHAIN_ID,
 };
 
 // One read per address per page load; the route keeps its answer 60 s.

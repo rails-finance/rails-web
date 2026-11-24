@@ -51,6 +51,9 @@ export const WALLET_PROTOCOLS: WalletProtocol[] = [
   { slug: "alchemix", name: "Alchemix", kinds: ["loans", "deposits"] },
   { slug: "maple", name: "Maple", kinds: ["deposits"] },
   { slug: "fx", name: "f(x) Protocol", kinds: ["loans"] },
+  { slug: "frankencoin", name: "Frankencoin", kinds: ["loans"] },
+  { slug: "pwn", name: "PWN", kinds: ["loans", "deposits"] },
+  { slug: "polaris", name: "Polaris", kinds: ["loans", "deposits"] },
 ];
 
 export const walletProtocol = (slug: string | null | undefined): WalletProtocol | undefined =>
@@ -58,8 +61,7 @@ export const walletProtocol = (slug: string | null | undefined): WalletProtocol 
 
 /** The /wallet page for a wallet a listing search names, where that page
  *  reads the protocol (`WALLET_PROTOCOLS`); null where it does not, so a
- *  protocol it leaves out (Polaris on Sepolia, ui-jobs 691) draws no link
- *  to an empty page. */
+ *  protocol it leaves out draws no link to an empty page. */
 export const walletPageHref = (protocol: string | undefined, wallet: string | undefined): string | null =>
   wallet && walletProtocol(protocol) ? `/wallet/${encodeURIComponent(wallet)}` : null;
 
@@ -120,6 +122,14 @@ export function kindOfRow(row: WalletSummaryRow): WalletKind {
   if (kinds.length === 1) return kinds[0];
   // A Trove protocol's deposits carry their kind (listing-summary-rows.ts).
   if (kinds.includes("troves")) return "troves";
+  // A PWN row names its side of the loan: the borrower owes, the lender's
+  // credit is a deposit (mig 527). A Polaris row names its kind: a Stability
+  // Pool deposit owes nothing, a CDP or a reserve loan is a loan (mig 529).
+  const card = row.card as { role?: unknown; kind?: unknown } | null;
+  if (row.family === "pwn" && (card?.role === "borrower" || card?.role === "lender"))
+    return card.role === "borrower" ? "loans" : "deposits";
+  if (row.family === "polaris" && (card?.kind === "sp" || card?.kind === "cdp" || card?.kind === "loan"))
+    return card.kind === "sp" ? "deposits" : "loans";
   // An Euler V2 pair states no amount: its vault is the account's controller
   // where the account borrows from it. A controller can stay enabled with no
   // debt (about 1,800 stored pairs, mig 517), so the flag is the best signal

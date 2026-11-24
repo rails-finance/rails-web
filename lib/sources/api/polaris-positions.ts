@@ -111,7 +111,7 @@ export interface RawPolarisPositionRow {
   market: string;
   cdp_id: string;
   owner: string;
-  owner_at_open: string;
+  owner_at_open: string | null;
   status: string;
   liquidated: boolean;
   coll_raw: string;
@@ -201,7 +201,8 @@ export function buildPolarisPositionRows(raw: RawPolarisPositionRow[]): PolarisP
       stableSymbol: POLARIS_MARKET_CONFIG[market].stable.symbol,
       cdpId: String(r.cdp_id),
       owner: r.owner.toLowerCase(),
-      ownerAtOpen: r.owner_at_open.toLowerCase(),
+      // The wallet store's card can carry it null (mig 529).
+      ownerAtOpen: r.owner_at_open?.toLowerCase() ?? "",
       status: statusOf(r.status),
       liquidated: !!r.liquidated,
       coll: scale18(r.coll_raw),

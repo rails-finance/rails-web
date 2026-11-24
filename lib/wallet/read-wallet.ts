@@ -41,6 +41,9 @@ import { dolomite } from "@/lib/wallet/families/dolomite";
 import { alchemixBase, alchemixEthereum } from "@/lib/wallet/families/alchemix";
 import { maple } from "@/lib/wallet/families/maple";
 import { fx } from "@/lib/wallet/families/fx";
+import { frankencoin } from "@/lib/wallet/families/frankencoin";
+import { pwn } from "@/lib/wallet/families/pwn";
+import { polaris } from "@/lib/wallet/families/polaris";
 import { morphoBase } from "@/lib/wallet/families/morpho-base";
 import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/families/ethereum-single";
 import { aaveV3Arbitrum, compoundV3Arbitrum, morphoArbitrum } from "@/lib/wallet/families/arbitrum";
@@ -53,7 +56,7 @@ import {
   ebisuDeposits,
 } from "@/lib/wallet/families/liquity-forks";
 import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
-import { withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
+import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
@@ -104,6 +107,9 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   alchemixBase,
   maple,
   fx,
+  frankencoin,
+  pwn,
+  polaris,
 ];
 
 /** The families the page reads, by chain, in one sentence for the empty
@@ -121,6 +127,8 @@ export function walletFamiliesLine(): string {
     ethereum: "on Ethereum",
     base: "on Base",
     arbitrum: "on Arbitrum where Rails has read the wallet",
+    arc: "on Arc",
+    sepolia: "on Sepolia (testnet)",
   };
   return [...byChain].map(([chain, names]) => `${list(names)} ${where[chain]}`).join("; ");
 }
@@ -435,7 +443,10 @@ export async function readWalletUncached(
     address,
     positions,
     families,
-    total: opts.protocol ? groups.reduce((s, g) => s + g.rows.length, 0) : summary.total,
+    // A testnet's rows are not counted (WALLET_COUNTS_SCOPE).
+    total: opts.protocol
+      ? groups.reduce((s, g) => s + g.rows.filter(countedRow).length, 0)
+      : summary.total - summary.rows.filter((r) => !countedRow(r)).length,
     readAt: Math.floor(Date.now() / 1000),
     serverMs,
     ms: Date.now() - t0,
@@ -489,7 +500,7 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
     const positions: WalletCountsPosition[] = [];
     const taken = new Set<WalletSummaryRow>();
     for (const f of WALLET_FAMILIES) {
-      if (f.head) continue;
+      if (f.head || f.summaryChain === "sepolia") continue;
       const rows = summary.rows.filter((r) => takesRow(f, r));
       if (rows.length === 0) continue;
       try {
@@ -508,7 +519,8 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
       }
     }
     for (const r of summary.rows) {
-      if (!taken.has(r))
+      // A testnet's rows are not counted (WALLET_COUNTS_SCOPE).
+      if (!taken.has(r) && countedRow(r))
         positions.push({
           chain: r.chain,
           family: r.family,

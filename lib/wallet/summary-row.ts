@@ -6,7 +6,7 @@
 import type { WalletKind } from "./wallet-filters";
 
 export interface WalletSummaryRow {
-  chain: "ethereum" | "base" | "arbitrum";
+  chain: "ethereum" | "base" | "arbitrum" | "arc" | "sepolia";
   family: string;
   /** Set on a row the wallet read shapes from a protocol listing
    *  (lib/wallet/listing-summary-rows.ts): a deposit beside the protocol's
@@ -35,6 +35,17 @@ export interface WalletSummaryRow {
   card: unknown;
   writtenAt: string;
 }
+
+/** The summary rows' testnet chains: their positions are drawn, and no
+ *  wallet count or total takes them in (WALLET_COUNTS_SCOPE). */
+export type WalletTestnetChain = "sepolia";
+export const TESTNET_ROW_CHAINS: ReadonlySet<WalletSummaryRow["chain"]> = new Set<WalletTestnetChain>(["sepolia"]);
+
+/** A row on a mainnet, which the counts take in. */
+export const countedRow = (
+  r: WalletSummaryRow,
+): r is WalletSummaryRow & { chain: Exclude<WalletSummaryRow["chain"], WalletTestnetChain> } =>
+  !TESTNET_ROW_CHAINS.has(r.chain);
 
 export interface WalletSummaryAnswer {
   address: string;

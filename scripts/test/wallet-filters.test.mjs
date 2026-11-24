@@ -82,3 +82,19 @@ test("a listing search by a wallet opens the wallet page on the Liquity V2 famil
   assert.equal(walletSearchHref("aave-v3", A), null);
   assert.equal(walletSearchHref(undefined, A), null);
 });
+
+test("a PWN row's role and a Polaris row's kind name its kind", () => {
+  assert.equal(kindOfRow(row("pwn", { card: { role: "borrower", borrower: "0xab" } })), "loans");
+  // The lender's card names the borrower's address: no debt for all that.
+  assert.equal(kindOfRow(row("pwn", { card: { role: "lender", borrower: "0xab" } })), "deposits");
+  assert.equal(kindOfRow(row("polaris", { card: { kind: "sp", stable_gain_raw: "5" } })), "deposits");
+  assert.equal(kindOfRow(row("polaris", { card: { kind: "cdp", debt_raw: "0" } })), "loans");
+  assert.equal(kindOfRow(row("polaris", { card: { kind: "loan" } })), "loans");
+  assert.equal(kindOfRow(row("frankencoin")), "loans");
+});
+
+test("the counts take every chain's rows but a testnet's", async () => {
+  const { countedRow } = await import("../../lib/wallet/summary-row.ts");
+  assert.equal(countedRow({ chain: "sepolia" }), false);
+  for (const chain of ["ethereum", "base", "arbitrum", "arc"]) assert.equal(countedRow({ chain }), true, chain);
+});
