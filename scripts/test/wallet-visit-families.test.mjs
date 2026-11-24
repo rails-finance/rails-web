@@ -203,15 +203,14 @@ const AT_BLOCK = {
 let answers;
 const SESSIONS = ["aave-v3-optimism", "compound-v3-optimism", "morpho-optimism", "morpho-arc"];
 const OPTIMISM = SESSIONS.slice(0, 3);
-/** The sessions launched for a test; the others as protocols.ts has them. */
+/** The sessions launched for a test; the others are flagged off. */
 let launched = OPTIMISM;
 const reset = (opts = {}) => {
   launched = opts.launched ?? OPTIMISM;
   for (const s of SESSIONS) {
     const e = protocolForSession(s);
     if (launched.includes(s)) delete e.unlaunched;
-    else if (FLAGS[s]) e.unlaunched = true;
-    else delete e.unlaunched;
+    else e.unlaunched = true;
   }
   answers = { aave: AAVE, compound: COMPOUND, morpho: MORPHO, euler: 502 };
   summaryDelay = 0;
@@ -460,8 +459,14 @@ test("a wallet holding nothing on a family draws no section and names no failure
 
 // ── Each module behind its explorer's launch flag ────────────────────────
 
-test("with today's flags every module is off", () => {
-  for (const s of SESSIONS) assert.equal(FLAGS[s], true, `${s} is unlaunched in protocols.ts`);
+test("with today's flags the Optimism modules are on and Arc's is off", () => {
+  for (const s of OPTIMISM) assert.equal(FLAGS[s], false, `${s} is launched in protocols.ts`);
+  assert.equal(FLAGS["morpho-arc"], true, "morpho-arc is unlaunched in protocols.ts");
+  reset();
+  assert.deepEqual(
+    WALLET_VISIT_FAMILIES.map((m) => [m.id, m.on]),
+    SESSIONS.map((s) => [s, OPTIMISM.includes(s)]),
+  );
   reset({ launched: [] });
   assert.deepEqual(
     WALLET_VISIT_FAMILIES.map((m) => [m.id, m.on]),

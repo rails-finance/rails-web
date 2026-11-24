@@ -287,7 +287,7 @@ const SPECS: ProtocolSpec[] = [
   {
     // Morpho Blue on Optimism (rails-ops ui-jobs 578), Arc's pages on
     // Optimism's deployment, fed by rails-server's /api/at-block/morpho-optimism
-    // routes. Unlaunched while Miles reads it.
+    // routes.
     id: "morpho-optimism",
     session: "morpho-optimism",
     label: "Morpho Blue",
@@ -299,7 +299,6 @@ const SPECS: ProtocolSpec[] = [
     desc: "Morpho Blue on Optimism: a wallet's positions across every market, each with its collateral, debt and LTV against the market's line, and 30 days of interest",
     positionListing: false,
     history: "none",
-    unlaunched: true,
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
@@ -367,7 +366,7 @@ const SPECS: ProtocolSpec[] = [
     // chain when a page opens. A front door taking a wallet, its account at
     // `<route>/<wallet>`, and the market overview and reserve pages that
     // Ethereum, Base and Arbitrum draw, fed by rails-server's
-    // /api/at-block/aave-v3-optimism routes. Unlaunched while Miles reads it.
+    // /api/at-block/aave-v3-optimism routes.
     id: "aave-v3-optimism",
     session: "aave-v3-optimism",
     label: "Aave V3",
@@ -379,7 +378,6 @@ const SPECS: ProtocolSpec[] = [
     desc: "Aave V3 on Optimism: a wallet's account on the Pool, its balances in dollars at Aave's oracle, its health factor and 30 days of interest",
     positionListing: false,
     history: "none",
-    unlaunched: true,
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
@@ -584,7 +582,7 @@ const SPECS: ProtocolSpec[] = [
     // the chain when a page opens. A front door taking a wallet, its Comets at
     // `<route>/<wallet>`, one Comet's account at `<route>/<comet>/<wallet>`, and
     // the Markets pages Ethereum, Base and Arbitrum draw, fed by rails-server's
-    // /api/at-block/compound-v3-optimism routes. Unlaunched while Miles reads it.
+    // /api/at-block/compound-v3-optimism routes.
     id: "compound-v3-optimism",
     session: "compound-v3-optimism",
     label: "Compound V3",
@@ -596,7 +594,6 @@ const SPECS: ProtocolSpec[] = [
     desc: "Compound V3 on Optimism: a wallet's account in each of three Comets, its balances at each Comet's price feeds, its borrowing limit and 30 days of interest",
     positionListing: false,
     history: "none",
-    unlaunched: true,
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
@@ -605,7 +602,6 @@ const SPECS: ProtocolSpec[] = [
     // positions at `<route>/<wallet>`, each opening
     // `<route>/position/<deployment>/<id>` (ids overlap across the two position
     // managers). Reads come from rails-server's /api/at-block/velodrome routes.
-    // Unlaunched while Miles reads it.
     id: "velodrome",
     session: "velodrome",
     label: "Velodrome",
@@ -619,7 +615,6 @@ const SPECS: ProtocolSpec[] = [
     desc: "Concentrated liquidity on Optimism, staked or not: a position's range, fees or VELO and pool over the last 30 days",
     positionListing: false,
     history: "none",
-    unlaunched: true,
     subPages: [],
   },
   {
@@ -1246,8 +1241,7 @@ const SPECS: ProtocolSpec[] = [
   },
   {
     // Uniswap V3 and V4 on Optimism (rails-ops ui-jobs 578), on the same pages
-    // as Arbitrum's, read from the chain when a page opens. Unlaunched while
-    // Miles reads it.
+    // as Arbitrum's, read from the chain when a page opens.
     id: "uniswap-v3-optimism",
     session: "uniswap-v3-optimism",
     label: "Uniswap V3",
@@ -1258,7 +1252,6 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Uniswap V3 on Optimism: a position's range, fees and pool over the last 30 days",
     positionListing: false,
-    unlaunched: true,
     history: "none",
     subPages: [],
   },
@@ -1273,7 +1266,6 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Uniswap's singleton pools on Optimism, hooks included: a position's range, fees and pool over the last 30 days",
     positionListing: false,
-    unlaunched: true,
     history: "none",
     subPages: [],
   },
