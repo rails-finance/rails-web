@@ -147,8 +147,8 @@ function deadlineProv(state: RateCooldown, chainId: ChainId): Provenance {
   return {
     kind: "chain-derived",
     summary: batched
-      ? "End of the Trove's rate-change cooldown — the later of the Trove's and the batch's lastInterestRateAdjTime plus INTEREST_RATE_ADJ_COOLDOWN; leaving the batch at another rate before it costs an Upfront Borrowing Fee."
-      : "End of the Trove's rate-change cooldown — its lastInterestRateAdjTime plus INTEREST_RATE_ADJ_COOLDOWN; a rate change before it costs an Upfront Borrowing Fee.",
+      ? "End of the Trove's rate-change cooldown — the later of the Trove's and the batch's lastInterestRateAdjTime plus INTEREST_RATE_ADJ_COOLDOWN; leaving the batch at another rate before it costs an Upfront Borrowing Fee. Liquity's docs call it the premature adjustment fee."
+      : "End of the Trove's rate-change cooldown — its lastInterestRateAdjTime plus INTEREST_RATE_ADJ_COOLDOWN; a rate change before it costs an Upfront Borrowing Fee. Liquity's docs call it the premature adjustment fee.",
     formula: batched
       ? "max(Trove, batch lastInterestRateAdjTime) + INTEREST_RATE_ADJ_COOLDOWN"
       : "lastInterestRateAdjTime + INTEREST_RATE_ADJ_COOLDOWN",
