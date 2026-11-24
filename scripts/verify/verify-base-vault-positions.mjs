@@ -1668,7 +1668,7 @@ check(
   `${idOnPosition.rails} rail(s), ${idOnPosition.marks} section mark(s), ${idOnPosition.back} Back button(s)`,
 );
 
-// The explorer's four sections are one menu (components/shared/rail-header.tsx,
+// The explorer's five sections are one menu (components/shared/rail-header.tsx,
 // ui-jobs 680): the position listing, each sub-page in roster order, then About.
 // The links stand in the page while the menu is closed. A href is
 // read off the DOM and then FETCHED — a tab pointing at a 404 is the failure
@@ -1692,13 +1692,19 @@ for (const l of railLinks) {
   const r = await fetch(`${BASE}${l.href}`, { redirect: "manual" });
   railStatus.push(`${l.href} ${r.status}`);
 }
-const wantedTabs = ["/base/morpho", "/base/morpho/markets", "/base/morpho/vaults", "/base/morpho/info"];
+const wantedTabs = [
+  "/base/morpho",
+  "/base/morpho/markets",
+  "/base/morpho/vaults",
+  "/base/morpho/assets",
+  "/base/morpho/info",
+];
 const infoTab = railLinks.find((l) => l.text === "About");
 const litTabs = railLinks.filter((l) => l.current === "page");
 check(
-  "L14c the listing draws ONE sections menu whose four links each resolve, with About named, and VAULTS current",
+  "L14c the listing draws ONE sections menu whose five links each resolve, with About named, and VAULTS current",
   rail.length === 1 &&
-    railLinks.length === 4 &&
+    railLinks.length === wantedTabs.length &&
     wantedTabs.every((w) => railLinks.some((l) => l.href === w)) &&
     infoTab?.href === "/base/morpho/info" &&
     railStatus.every((st) => st.endsWith(" 200")) &&
