@@ -48,13 +48,11 @@ export function SeamlessListing({ initialItems, initialTotal, initialKey, initia
       defaults={SEAMLESS_LIST_DEFAULTS}
       sortOptions={SEAMLESS_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"
-      // No replay lane behind a listing row: a closed row's "highest recorded"
-      // says so rather than dashing as if nothing was ever held.
+      // A closed row's face reads its per-reserve peaks, as on Ethereum.
       renderCard={(p) => (
         <AaveV3PositionCard
           v={{ ...viewFromSummary(p), countRule: LISTING_COUNT_RULE, liquidationRule: LIQUIDATION_RULE }}
           deployment={SEAMLESS_CARD_DEPLOYMENT}
-          peaks={false}
           notCollateral={notCollateralOf(p)}
         />
       )}

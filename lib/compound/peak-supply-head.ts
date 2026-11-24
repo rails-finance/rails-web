@@ -9,7 +9,7 @@
 
 export type CompoundPeakSupplyLine =
   | { kind: "collateral"; index: number }
-  /** "Highest supplied X (earns interest)", over the lent base. */
+  /** "Peak supplied X (earns interest)", over the lent base. */
   | { kind: "caption" }
   | { kind: "base" };
 

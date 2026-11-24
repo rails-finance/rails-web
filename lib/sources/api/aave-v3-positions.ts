@@ -75,6 +75,10 @@ export interface RawV3WalletRow {
   reserves: RawV3Reserve[];
   /** Per-reserve peaks (present for closed / liquidated accounts). */
   peakReserves?: RawV3PeakReserve[];
+  /** Set where the server withheld a plumbing wallet's peaks; the
+   *  transaction cap, the read budget and a failed read arrive as empty peak
+   *  arrays. Either way the closed face reads "not recorded". */
+  peakWithheld?: string | boolean | null;
   lastActivityAt: number;
   lastBlockNumber: number;
   /** The newest block in aave_v3_events_served (the sealed tail and the live
@@ -315,6 +319,7 @@ export async function buildAaveV3PositionRows(
       chainReadAt: w.chainReadAt ?? null,
       reserves: cleanReserves,
       peakReserves: cleanPeakReserves,
+      peakWithheld: !!w.peakWithheld,
       // On-chain oracle USD keyed by lowercased reserve address (for the card /
       // economics, which look values up by address). Omits any reserve the oracle
       // didn't price, so the strict per-total guard degrades honestly. Peaks are

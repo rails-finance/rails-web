@@ -173,11 +173,16 @@ function statusOf(s: string): CompoundV2PositionStatus {
 }
 
 /** Assemble the listing rows from the rails route's raw page slice. Filtering,
- *  sorting and pagination already happened server-side — order is preserved. */
-export async function buildCompoundV2PositionRows(raw: RawCompoundV2WalletRow[]): Promise<CompoundV2PositionSummary[]> {
+ *  sorting and pagination already happened server-side — order is preserved.
+ *  `given`: a market state already read (the wallet page reads it once for its
+ *  open rows, and passes an empty map for rows that need none). */
+export async function buildCompoundV2PositionRows(
+  raw: RawCompoundV2WalletRow[],
+  given?: CompoundV2MarketStateMap,
+): Promise<CompoundV2PositionSummary[]> {
   // Batched multicalls for the twenty markets' exchange rates + oracle prices
   // (with feed config) + rates; empty map when RPC is down (amounts-only).
-  const state: CompoundV2MarketStateMap = raw.length > 0 ? await resolveCompoundV2MarketState() : new Map();
+  const state: CompoundV2MarketStateMap = given ?? (raw.length > 0 ? await resolveCompoundV2MarketState() : new Map());
 
   const priceByMarket: Record<string, number> = {};
   const priceFixedByMarket: Record<string, boolean> = {};

@@ -57,7 +57,7 @@ export interface AaveV3CardDeployment {
   liqPrice: (read: LiqRead, market?: string) => { prov: Provenance; liqPrice: number };
   /** "Liquidates on a drop of": 1 − 1 ÷ the health factor the Pool reports. */
   liqDrop: (market?: string) => Provenance;
-  /** A closed account's "highest recorded" figures — where the maximum came
+  /** A closed account's "peak" figures — where the maximum came
    *  from on this lane (the index's replay on Ethereum; the live sweep's
    *  principal replay on a Base lender). */
   peakSupply: (symbol: string) => Provenance;

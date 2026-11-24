@@ -15,7 +15,7 @@
 
 import Link from "next/link";
 import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
-import { PROTOCOLS } from "@/lib/shared/protocols";
+import { PROTOCOLS, protocolForPathname } from "@/lib/shared/protocols";
 import {
   AaveV3PositionCard,
   notCollateralOf,
@@ -46,7 +46,53 @@ import { stakeNowFromChain } from "@/lib/liquity-v1/staking-math";
 import { LiquityV2DepositCard } from "@/components/protocol/liquity/sp-deposit-card";
 import { depositNowFromChain as liquityV1DepositNow } from "@/lib/liquity-v1/sp-math";
 import { depositNowFromChain as liquityV2DepositNow } from "@/lib/liquity-v2/sp-math";
+import {
+  CompoundV2PositionCard,
+  viewFromSummary as compoundV2View,
+} from "@/components/protocol/compound-v2/compound-v2-position-card";
+import {
+  MoonwellPositionCard,
+  viewFromSummary as moonwellView,
+} from "@/components/protocol/moonwell/moonwell-position-card";
+import { MoonwellDeploymentProvider } from "@/lib/moonwell/deployment-context";
+import { MOONWELL_BASE_LISTED_IDENTITY } from "@/lib/moonwell-base/listed-identity";
+import { SEAMLESS_CARD_DEPLOYMENT } from "@/lib/seamless/position-provenance";
+import { makeListedMorphoReceipts } from "@/lib/morpho/listed-card-provenance";
+import { MORPHO_BASE_POSITIONS_ROUTE } from "@/lib/morpho-base/routes";
+import { EulerWalletCard } from "@/components/protocol/euler/euler-wallet-card";
+import { SkySavingsPositionCard } from "@/components/protocol/sky-savings/sky-savings-position-card";
+import {
+  LlamalendPositionCard,
+  viewFromSummary as llamalendView,
+} from "@/components/protocol/llamalend/llamalend-position-card";
+import { UniswapPositionCard } from "@/components/protocol/uniswap/uniswap-position-card";
+import { AerodromePositionCard } from "@/components/protocol/aerodrome/aerodrome-position-card";
+import { BalancerPositionCard } from "@/components/protocol/balancer/balancer-position-card";
+import {
+  DolomitePositionCard,
+  viewFromSummary as dolomiteView,
+} from "@/components/protocol/dolomite/dolomite-position-card";
+import { AlchemixPositionCard } from "@/components/protocol/alchemix/alchemix-position-card";
+import { AlchemixV2PositionCard } from "@/components/protocol/alchemix/v2-position-card";
+import { ALCHEMIX_BASE, ALCHEMIX_ETHEREUM } from "@/lib/alchemix/lines";
+import { MaplePositionCard, viewFromSummary as mapleView } from "@/components/protocol/maple/maple-position-card";
+import { FxPositionCard, viewFromSummary as fxView } from "@/components/protocol/fx/fx-position-card";
+import {
+  FrankencoinPositionCard,
+  viewFromSummary as frankencoinView,
+} from "@/components/protocol/frankencoin/frankencoin-position-card";
+import { PwnPositionCard, viewFromSummary as pwnView } from "@/components/protocol/pwn/pwn-position-card";
+import {
+  PolarisPositionCard,
+  viewFromSummary as polarisView,
+} from "@/components/protocol/polaris/polaris-position-card";
+import { PolarisLoanCard } from "@/components/protocol/polaris/polaris-loan-card";
+import { PolarisDepositCard } from "@/components/protocol/polaris/polaris-deposit-card";
+import { AaveV4PositionListingCard } from "@/components/aave-v4/AaveV4PositionListingCard";
+import { AaveV4ArcWalletCard } from "@/components/protocol/aave-v4-arc/aave-v4-arc-wallet-card";
+import { AaveV4DeploymentProvider, BASE_AAVE_V4 } from "@/lib/aave-v4/deployment";
 import { ArbitrumReadCard, CometReadCard } from "@/components/shared/arbitrum-positions-listing";
+import { VaultPositionCard } from "@/components/vaults/vault-position-card";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletCard, WalletPosition } from "@/lib/wallet/types";
@@ -54,6 +100,18 @@ import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 import { walletBranchState } from "@/lib/wallet/trove-shutdown";
 
 const BASE_LANE: CompoundCardLane = { chainId: BASE_CHAIN_ID, source: "sweep" };
+
+/** A Morpho Base card's receipts: the listing's for a stored row, the wallet
+ *  page's head read for an open one. */
+const MORPHO_BASE_RECEIPTS = {
+  listing: makeListedMorphoReceipts({ chainId: BASE_CHAIN_ID, positionsRoute: MORPHO_BASE_POSITIONS_ROUTE }),
+  wallet: makeListedMorphoReceipts({
+    chainId: BASE_CHAIN_ID,
+    positionsRoute: MORPHO_BASE_POSITIONS_ROUTE,
+    custody:
+      "read live from the Morpho singleton at the head block the card names, served by GET /api/chain/wallet/<address>",
+  }),
+};
 
 /** `state`: the position's branch shutdown as the card draws it
  *  (`walletBranchState`). */
@@ -72,6 +130,17 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
       );
     case "aave-v3-arbitrum":
       return <ArbitrumReadCard row={card.row} family="aave-v3" />;
+    case "aave-v4":
+      // The Base card files under Base's session, as its listing's layout
+      // provides; Ethereum's is the context's default.
+      if (card.lane === "arc") return <AaveV4ArcWalletCard read={card.read} />;
+      return card.lane === "base" ? (
+        <AaveV4DeploymentProvider value={BASE_AAVE_V4}>
+          <AaveV4PositionListingCard row={card.row} storedAtBlock={card.storedAtBlock} />
+        </AaveV4DeploymentProvider>
+      ) : (
+        <AaveV4PositionListingCard row={card.row} storedAtBlock={card.storedAtBlock} />
+      );
     case "compound-v3":
       return card.lane === "base" ? (
         <CompoundPositionCard
@@ -92,6 +161,82 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
       );
     case "morpho":
       return <MorphoPositionCard v={morphoView(card.row)} />;
+    case "morpho-base":
+      return (
+        <MorphoPositionCard
+          v={{ ...morphoView(card.row), vaultOwner: card.vaultOwner }}
+          session="morpho-base"
+          listedReceipts={MORPHO_BASE_RECEIPTS[card.read]}
+        />
+      );
+    case "compound-v2":
+      return <CompoundV2PositionCard v={compoundV2View(card.row)} surface="listing" />;
+    case "moonwell-base":
+      return (
+        <MoonwellDeploymentProvider value={MOONWELL_BASE_LISTED_IDENTITY}>
+          <MoonwellPositionCard v={moonwellView(card.row)} surface="listing" peaks={false} />
+        </MoonwellDeploymentProvider>
+      );
+    case "seamless":
+      return (
+        <AaveV3PositionCard
+          v={aaveView(card.row)}
+          deployment={SEAMLESS_CARD_DEPLOYMENT}
+          peaks={false}
+          notCollateral={notCollateralOf(card.row)}
+        />
+      );
+    case "moonwell":
+      return <MoonwellPositionCard v={moonwellView(card.row)} surface="listing" />;
+    case "euler-v2":
+      return <EulerWalletCard row={card.row} />;
+    case "sky-savings":
+      return <SkySavingsPositionCard p={card.row} asOf={card.asOf} surface="listing" />;
+    case "llamalend":
+      return <LlamalendPositionCard v={llamalendView(card.row)} surface="listing" />;
+    case "dolomite":
+      return <DolomitePositionCard v={dolomiteView(card.row)} surface="listing" />;
+    case "alchemix":
+      return (
+        <AlchemixPositionCard
+          p={card.row}
+          session={(card.lane === "base" ? ALCHEMIX_BASE : ALCHEMIX_ETHEREUM).session}
+          receipts
+        />
+      );
+    case "alchemix-v2":
+      return <AlchemixV2PositionCard p={card.row} session={ALCHEMIX_ETHEREUM.session} receipts />;
+    case "maple":
+      return <MaplePositionCard v={mapleView(card.row)} surface="listing" />;
+    case "fx":
+      return <FxPositionCard v={fxView(card.row)} surface="listing" noUsd />;
+    case "frankencoin":
+      return <FrankencoinPositionCard v={frankencoinView(card.row)} surface="listing" />;
+    case "pwn":
+      return <PwnPositionCard v={pwnView(card.row)} />;
+    case "polaris-cdp":
+      // The board gives the ratio; the wallet page states no Polaris dollars.
+      return (
+        <PolarisPositionCard
+          v={{ ...polarisView(card.row, card.markets, false), collUsd: null, debtUsd: null }}
+          surface="listing"
+        />
+      );
+    case "polaris-loan":
+      return (
+        <PolarisLoanCard
+          row={card.row}
+          surface="listing"
+          receipts={{
+            via: card.via,
+            debtAt: card.via === "listing" ? "index" : "touch",
+            collBlock: card.blocks.coll,
+            debtBlock: card.blocks.debt,
+          }}
+        />
+      );
+    case "polaris-deposit":
+      return <PolarisDepositCard row={card.row} surface="listing" receipts={{ via: card.via, block: card.block }} />;
     case "morpho-arbitrum":
       return <ArbitrumReadCard row={card.row} family="morpho" />;
     case "spark":
@@ -159,6 +304,15 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
       );
     case "fork-deposit":
       return forkDepositWalletCard(SP_DEPLOYMENTS[card.fork])(card.row, state);
+    // The Liquidity section's cards (W9): each explorer's card as a listing row.
+    case "uniswap":
+      return <UniswapPositionCard r={card.read} protocol={card.protocol} surface="listing" />;
+    case "slipstream":
+      return <AerodromePositionCard r={card.read} surface="listing" />;
+    case "balancer":
+      return <BalancerPositionCard r={card.read} surface="listing" />;
+    case "vault":
+      return <VaultPositionCard row={card.row} lane={card.lane} />;
   }
 }
 
@@ -191,12 +345,17 @@ const stateOf = (p: WalletPosition): BranchShutdownState | null => {
  *  family says it can be liquidated. */
 export const atRisk = (p: WalletPosition): boolean => (p.buffer != null && p.buffer < 0) || p.liquidatable === true;
 
-/** The roster id of a position's explorer, the glyph key. */
+/** The roster id of a position's explorer, the glyph key; a vault share's is
+ *  its holder page's explorer (Morpho Blue, Aave vaults, Yearn V3). */
 export const protocolId = (p: WalletPosition): string =>
-  PROTOCOLS.find((e) => e.chainId === p.chain && e.slug === p.family)?.id ?? p.family;
+  PROTOCOLS.find((e) => e.chainId === p.chain && e.slug === p.family)?.id ??
+  (p.href ? protocolForPathname(p.href.split("?")[0])?.id : undefined) ??
+  p.family;
 
 export function WalletPositionCard({ position: p }: { position: WalletPosition }) {
   const chain = chainMeta(p.chain).name;
+  // A vault share's figures are the holder census's.
+  const read = p.card.kind === "vault" ? "census" : "sweep";
   const edge: PositionCardEdge = {
     surface: "wallet",
     protocol: { id: protocolId(p), name: p.familyName },
@@ -204,16 +363,34 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
     atRisk: atRisk(p),
     // The Arbitrum cards carry their stored read's block in the card.
     stamp: p.notRead ? (
-      // An Aave V3 Base account the chain has not been read for (open point 8).
+      // An Aave V3 Base account the chain has not been read for (open point 8),
+      // or an f(x) position with no read stored.
       <span className="text-[11px] font-medium text-rb-500" data-wallet-not-read="">
         Not read
+      </span>
+    ) : p.closedSince ? (
+      <span
+        className="text-[11px] font-medium text-rb-500"
+        data-wallet-holds-nothing-since={p.closedSince.block}
+        title={`At block ${p.closedSince.block.toLocaleString("en-US")} the position holds nothing; the card shows ${read === "census" ? "its stored row, from the last transfer" : "the sweep's earlier read"}.`}
+      >
+        Holds nothing since the {read}
       </span>
     ) : (
       // A closed position's card states its ending; the read's age is an
       // open position's.
+      // A vault share's stored row states its last transfer, not a read.
       p.status === "open" &&
       !p.card.kind.endsWith("-arbitrum") &&
-      (p.readAtBlock != null || p.readAt != null) && <ReadStamp block={p.readAtBlock} at={p.readAt} inLink />
+      !(p.card.kind === "vault" && p.card.lane === "stored") &&
+      (p.readAtBlock != null || p.readAt != null) && (
+        <ReadStamp
+          block={p.readAtBlock}
+          at={p.readAt}
+          inLink
+          label={p.card.kind === "vault" && p.card.lane === "census" ? "Census" : undefined}
+        />
+      )
     ),
   };
   return (

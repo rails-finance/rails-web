@@ -54,6 +54,12 @@ export function morphoHasDebt(borrowSharesRaw: string | null | undefined): boole
   return morphoRawAbove(borrowSharesRaw, MORPHO_SHARE_DUST);
 }
 
+/** Whether a slot read holds a position: collateral, or borrow shares above
+ *  the dust line. The server's open rule (mig 515's `chain_open`). */
+export function morphoOpenRaw(collateralRaw: string | null | undefined, borrowSharesRaw: string | null | undefined) {
+  return morphoHasCollateralRaw(collateralRaw) || morphoHasDebt(borrowSharesRaw);
+}
+
 /** The verb on a liquidation run's debt leg. A liquidator repays the debt, so
  *  the run's header says who did, and "Repaid" is not read as the borrower's. */
 export const MORPHO_LIQUIDATION_REPAID_VERB = "Liquidators repaid";

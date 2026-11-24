@@ -47,11 +47,18 @@ import type {
   AlchemixCollateral,
   AlchemixLiveCollateral,
   AlchemixPositionStatus,
-  AlchemixPositionSummary,
+  AlchemixStoredPositionSummary,
 } from "@/types/api/alchemix";
 import { alchemixMarketWord } from "@/lib/alchemix/naming";
 import { BlockRef } from "@/components/shared/block-ref";
 import { formatCompactTitled } from "@/lib/shared/format-compact";
+import type { ChainId } from "@/lib/shared/chains";
+import {
+  liveFigureProv,
+  replayedFigureProv,
+  underlyingProv,
+  type AlchemixCoords,
+} from "@/lib/alchemix/event-provenance";
 
 /** A vault share price at the asset underneath's own precision, up to six
  *  places (1.000934 USDC), so the share count times it gives the value the
@@ -194,10 +201,50 @@ function stamp(block: number | null | undefined): ReactNode {
   ) : null;
 }
 
-export function alchemixListingSlots(p: AlchemixPositionSummary, session: SessionProtocol): PositionCardListingSlots {
+/** A figure's receipt at its block: a getCDP reading, or the position's
+ *  events replayed on a `derived` line. */
+function figureProv(
+  p: AlchemixStoredPositionSummary,
+  label: string,
+  symbol: string,
+  raw: string,
+  asOfBlock: number,
+): Provenance {
+  const coords: AlchemixCoords = { chainId: p.chainId as ChainId, lineKey: p.lineKey, tokenId: p.tokenId };
+  return p.figures.basis === "event-replay"
+    ? replayedFigureProv(label, symbol, raw, asOfBlock, coords)
+    : liveFigureProv(label, symbol, raw, asOfBlock, coords);
+}
+
+/** A listing row, or the wallet page's stored one (every listing row is one).
+ *  `receipts`: each figure carries its receipt at its block (the wallet page). */
+export function alchemixListingSlots(
+  p: AlchemixStoredPositionSummary,
+  session: SessionProtocol,
+  receipts = false,
+): PositionCardListingSlots {
   const sym = p.syntheticSymbol;
   const c = p.figures.collateral;
   const collSettled = c && c.asOfBlock != null ? c : null;
+  const coords: AlchemixCoords = { chainId: p.chainId as ChainId, lineKey: p.lineKey, tokenId: p.tokenId };
+  const u = collSettled?.underlying ?? null;
+  const collProv =
+    receipts && collSettled
+      ? {
+          shares: figureProv(p, "Deposit", collSettled.mytSymbol ?? "shares", collSettled.raw, collSettled.asOfBlock!),
+          underlying: u
+            ? underlyingProv(
+                u.symbol ?? "underlying",
+                u.raw,
+                u.decimals,
+                collSettled.asOfBlock,
+                u.sharePriceRaw,
+                u.sharePriceAsOfBlock,
+                coords,
+              )
+            : undefined,
+        }
+      : undefined;
   // The share count and the share price can be read at two blocks; the
   // listing stamps the share count with its own, and the price's after it.
   const priceBlock = collSettled?.underlying?.sharePriceAsOfBlock ?? null;
@@ -218,11 +265,17 @@ export function alchemixListingSlots(p: AlchemixPositionSummary, session: Sessio
     tag: <AlchemixTag market={alchemixMarketWord(sym)} id={p.tokenId} />,
     identity: <AlchemixIdentity chain={p.chainName ?? `chain ${p.chainId}`} wallet={p.owner} session={session} />,
     heads: [
-      depositedHead(collSettled, "shares", undefined, collStamp),
+      depositedHead(collSettled, "shares", collProv, collStamp),
       {
         id: "debt",
         label: "Debt",
-        value: debt ? alchemixAmountFigure(debt, sym) : NOT_SETTLED,
+        value: debt
+          ? alchemixAmountFigure(
+              debt,
+              sym,
+              receipts ? figureProv(p, "Debt", sym, debt.raw, debt.asOfBlock!) : undefined,
+            )
+          : NOT_SETTLED,
         assets: debt ? alchemixChip(sym) : undefined,
         sub: debt ? <BlockRef block={debt.asOfBlock!} size={12} /> : undefined,
       },
@@ -239,6 +292,15 @@ export function alchemixListingSlots(p: AlchemixPositionSummary, session: Sessio
   };
 }
 
-export function AlchemixPositionCard({ p, session }: { p: AlchemixPositionSummary; session: SessionProtocol }) {
-  return <PositionCard slots={alchemixListingSlots(p, session)} />;
+export function AlchemixPositionCard({
+  p,
+  session,
+  receipts = false,
+}: {
+  p: AlchemixStoredPositionSummary;
+  session: SessionProtocol;
+  /** Each figure carries its receipt (the wallet page). */
+  receipts?: boolean;
+}) {
+  return <PositionCard slots={alchemixListingSlots(p, session, receipts)} />;
 }

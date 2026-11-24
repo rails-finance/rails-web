@@ -301,13 +301,13 @@ const noDollar = (name, text) => {
     settlements === 5 && rowsExpanded === 19,
     `${settlements} "Auction settled" row(s), ${rowsExpanded} event rows once expanded`,
   );
-  // `5f9b4e1e` renamed the closed card's mint peak to "Highest recorded debt"
-  // as part of the roster's one card vocabulary. The FIGURES stay pinned here
+  // `5f9b4e1e` renamed the closed card's mint peak to the vocabulary's debt
+  // peak, "Peak debt" since ui-jobs 809. The FIGURES stay pinned here
   // because this record closed in Apr 2025: a finished position's peaks are
   // history and cannot move under the check the way an open position's can.
   check(
     "closed card peaks render (2 WETH peak collateral, dash for never-minted)",
-    /Highest recorded collateral\s*\n\s*2\b/.test(t) && /Highest recorded debt\s*\n\s*—/.test(t),
+    /Peak collateral\s*\n\s*2\b/.test(t) && /Peak debt\s*\n\s*—/.test(t),
   );
   noDollar("challenge detail", t);
 

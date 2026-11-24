@@ -931,7 +931,7 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Highest recorded
+          Peak
         text: |-
           each market's peak is the maximum of its running balance, replayed from the account's events.
       - bold: |-
@@ -955,7 +955,7 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Highest recorded
+          Peak
         text: |-
           each market's peak is the maximum of its running balance, replayed from the account's events.
       - bold: |-

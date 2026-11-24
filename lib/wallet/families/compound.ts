@@ -70,7 +70,7 @@ function lane(name: "ethereum" | "base"): FamilyModule {
             history: {
               ...historyBase(r),
               size: parts.length ? parts.join(" / ") : undefined,
-              sizeNote: parts.length ? "highest recorded" : undefined,
+              sizeNote: parts.length ? "peak" : undefined,
               result: (r.liquidationCount ?? 0) > 0 ? plural(r.liquidationCount!, "absorb") : undefined,
             },
           };

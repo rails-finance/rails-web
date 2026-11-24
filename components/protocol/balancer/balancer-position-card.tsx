@@ -6,6 +6,7 @@
 // pool's gauge, and when it first added. Every
 // figure in the pool's tokens, each with its receipt.
 
+import { ListingTag } from "@/components/shared/listing-tag";
 import { positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import Link from "next/link";
@@ -35,7 +36,7 @@ export function BalancerReadStamp({ c, what }: { c: BalReceiptContext; what: str
   );
 }
 
-function slots(r: BalPositionRead): PositionCardSlots {
+function slots(r: BalPositionRead, surface: "detail" | "listing"): PositionCardSlots {
   const p = balPosition(r);
   const c = { p, r };
   const open = p.now.shares > 0;
@@ -68,7 +69,8 @@ function slots(r: BalPositionRead): PositionCardSlots {
           {p.split && stakedReceipt && (
             <span className="block" data-figure="staked">
               <Prov info={stakedReceipt}>{CARD_WORDS.split(p.split.held, p.split.staked.shares)}</Prov>
-              {gaugeLinks}
+              {/* A listing card is one link: the gauges are linked on the detail card. */}
+              {surface === "detail" && gaugeLinks}
             </span>
           )}
         </span>
@@ -92,6 +94,28 @@ function slots(r: BalPositionRead): PositionCardSlots {
           </span>
         ) : undefined,
     },
+  ];
+  const status = !open ? { word: CARD_WORDS.closed, tone: "muted" as const, tip: CARD_WORDS.none } : null;
+  // The position's name: the pool and the wallet (lib/shared/position-name.ts).
+  const name = positionName({
+    market: p.symbol,
+    noun: POSITION_NOUN[balChain(r.chainId).session],
+    id: r.wallet.toLowerCase(),
+  });
+  // A listing row: the pool's symbol as the tag, the wallet being the page's.
+  if (surface === "listing")
+    return {
+      surface: "listing",
+      status,
+      heads,
+      counters: null,
+      name,
+      tag: p.symbol ? <ListingTag market={p.symbol} /> : undefined,
+      menu: null,
+    };
+  // The 30-day rate and the first add are the position page's reads, which the owner route does
+  // not make: the detail card alone states them.
+  heads.push(
     {
       id: "rate",
       label: CARD_WORDS.rate,
@@ -122,19 +146,14 @@ function slots(r: BalPositionRead): PositionCardSlots {
         </span>
       ),
     },
-  ];
+  );
   return {
     surface: "detail",
     heading: CARD_WORDS.heading,
-    status: !open ? { word: CARD_WORDS.closed, tone: "muted", tip: CARD_WORDS.none } : null,
+    status,
     heads,
     counters: null,
-    // The position's name: the pool and the wallet (lib/shared/position-name.ts).
-    name: positionName({
-      market: p.symbol,
-      noun: POSITION_NOUN[balChain(r.chainId).session],
-      id: r.wallet.toLowerCase(),
-    }),
+    name,
     menu: { exports: null },
     stamp: <BalancerReadStamp c={c} what="Every figure on this card" />,
     explainer: {
@@ -160,7 +179,14 @@ function slots(r: BalPositionRead): PositionCardSlots {
   };
 }
 
-export function BalancerPositionCard({ r }: { r: BalPositionRead }) {
+/** `surface: "listing"`: the card as a listing row, inside one link (the wallet page's Liquidity section). */
+export function BalancerPositionCard({
+  r,
+  surface = "detail",
+}: {
+  r: BalPositionRead;
+  surface?: "detail" | "listing";
+}) {
   return (
     <div
       data-anatomy="U4"
@@ -169,7 +195,7 @@ export function BalancerPositionCard({ r }: { r: BalPositionRead }) {
       data-balance-raw={r.balance}
       data-live-block={r.head.block}
     >
-      <PositionCard slots={slots(r)} />
+      <PositionCard slots={slots(r, surface)} />
     </div>
   );
 }

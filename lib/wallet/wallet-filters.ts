@@ -31,6 +31,7 @@ export interface WalletProtocol {
  *  whatever its chains. */
 export const WALLET_PROTOCOLS: WalletProtocol[] = [
   { slug: "aave-v3", name: "Aave V3", kinds: ["loans", "deposits"], arbitrum: true },
+  { slug: "aave-v4", name: "Aave V4", kinds: ["loans", "deposits"] },
   { slug: "compound-v3", name: "Compound V3", kinds: ["loans", "deposits"], arbitrum: true },
   { slug: "morpho", name: "Morpho Blue", kinds: ["loans", "deposits"], arbitrum: true },
   { slug: "liquity-v2", name: "Liquity V2", kinds: ["troves", "deposits"] },
@@ -41,6 +42,22 @@ export const WALLET_PROTOCOLS: WalletProtocol[] = [
   { slug: "ebisu", name: "Ebisu", kinds: ["troves", "deposits"] },
   { slug: "asymmetry", name: "Asymmetry", kinds: ["troves", "deposits"] },
   { slug: "basedollar", name: "Basedollar", kinds: ["troves", "deposits"] },
+  { slug: "compound-v2", name: "Compound V2", kinds: ["loans", "deposits"] },
+  { slug: "moonwell", name: "Moonwell", kinds: ["loans", "deposits"] },
+  { slug: "seamless", name: "Seamless", kinds: ["loans", "deposits"] },
+  { slug: "euler-v2", name: "Euler V2", kinds: ["loans", "deposits"] },
+  { slug: "sky-savings", name: "Sky Savings", kinds: ["deposits"] },
+  { slug: "llamalend", name: "LlamaLend", kinds: ["loans"] },
+  { slug: "dolomite", name: "Dolomite", kinds: ["loans", "deposits"] },
+  { slug: "alchemix", name: "Alchemix", kinds: ["loans", "deposits"] },
+  { slug: "maple", name: "Maple", kinds: ["deposits"] },
+  { slug: "fx", name: "f(x) Protocol", kinds: ["loans"] },
+  { slug: "frankencoin", name: "Frankencoin", kinds: ["loans"] },
+  { slug: "pwn", name: "PWN", kinds: ["loans", "deposits"] },
+  { slug: "polaris", name: "Polaris", kinds: ["loans", "deposits"] },
+  // MetaMorpho, Yearn V3 and Aave's vaults, from the holder census (ui-jobs
+  // 783): a share holding is a deposit.
+  { slug: "vaults", name: "Vault shares", kinds: ["deposits"] },
 ];
 
 export const walletProtocol = (slug: string | null | undefined): WalletProtocol | undefined =>
@@ -48,8 +65,7 @@ export const walletProtocol = (slug: string | null | undefined): WalletProtocol 
 
 /** The /wallet page for a wallet a listing search names, where that page
  *  reads the protocol (`WALLET_PROTOCOLS`); null where it does not, so a
- *  protocol it leaves out (Polaris on Sepolia, ui-jobs 691) draws no link
- *  to an empty page. */
+ *  protocol it leaves out draws no link to an empty page. */
 export const walletPageHref = (protocol: string | undefined, wallet: string | undefined): string | null =>
   wallet && walletProtocol(protocol) ? `/wallet/${encodeURIComponent(wallet)}` : null;
 
@@ -79,8 +95,9 @@ export function walletSearchHref(protocol: string | undefined, q: string | null 
   return WALLET_ADDRESS.test(v) || isWalletEnsName(v) ? walletProtocolHref(v, protocol) : null;
 }
 
-/** Fields that name a market's figures or a count, never the account's debt. */
-const NOT_THE_ACCOUNTS = /total|bad_?debt|rate|count|symbol|address|apy|index|share|cap/i;
+/** Fields that name a market's figures, a count or a block, never the
+ *  account's debt (Alchemix states each debt with its `asOfBlock`). */
+const NOT_THE_ACCOUNTS = /total|bad_?debt|rate|count|symbol|address|apy|index|share|cap|block/i;
 const DEBT_KEY = /debt|borr/i;
 const positive = (v: unknown) => (typeof v === "number" || typeof v === "string") && Number(v) > 0;
 
@@ -109,7 +126,29 @@ export function kindOfRow(row: WalletSummaryRow): WalletKind {
   if (kinds.length === 1) return kinds[0];
   // A Trove protocol's deposits carry their kind (listing-summary-rows.ts).
   if (kinds.includes("troves")) return "troves";
-  const owed = positive(row.debt?.amount) || positive(row.peakDebt) || positive(row.debtUsd) || owedIn(row.card);
+  // A PWN row names its side of the loan: the borrower owes, the lender's
+  // credit is a deposit (mig 527). A Polaris row names its kind: a Stability
+  // Pool deposit owes nothing, a CDP or a reserve loan is a loan (mig 529).
+  const card = row.card as { role?: unknown; kind?: unknown } | null;
+  if (row.family === "pwn" && (card?.role === "borrower" || card?.role === "lender"))
+    return card.role === "borrower" ? "loans" : "deposits";
+  if (row.family === "polaris" && (card?.kind === "sp" || card?.kind === "cdp" || card?.kind === "loan"))
+    return card.kind === "sp" ? "deposits" : "loans";
+  // An Euler V2 pair states no amount: its vault is the account's controller
+  // where the account borrows from it. A controller can stay enabled with no
+  // debt (about 1,800 stored pairs, mig 517), so the flag is the best signal
+  // the store gives and no proof of a loan.
+  const controller = (row.card as { controller?: unknown } | null)?.controller === true;
+  // A Dolomite account borrowing in several markets states no debt unit (mig
+  // 522): its borrow market count says it owes.
+  const borrowsIn = Number((row.card as { borrowMarketCount?: unknown } | null)?.borrowMarketCount ?? 0) > 0;
+  const owed =
+    positive(row.debt?.amount) ||
+    positive(row.peakDebt) ||
+    positive(row.debtUsd) ||
+    owedIn(row.card) ||
+    controller ||
+    borrowsIn;
   return owed ? "loans" : "deposits";
 }
 

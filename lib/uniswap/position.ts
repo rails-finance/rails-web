@@ -126,6 +126,22 @@ export function hookPermissions(hooks: string | null): HookFlag[] {
   return HOOK_FLAGS.filter((_, i) => ((bits >> BigInt(13 - i)) & BigInt(1)) === BigInt(1));
 }
 
+/** The pool's largest tick (TickMath.MAX_TICK). */
+const MAX_TICK = 887272;
+/** V3's tick spacing by fee tier, Uniswap's and PancakeSwap's: a V3 read names no spacing. */
+const V3_SPACING: Record<number, number> = { 100: 1, 500: 10, 2500: 50, 3000: 60, 10000: 200 };
+
+/** Whether a range covers every price: its ticks at or past the outermost ticks usable at the
+ *  pool's spacing (±887,272 rounded in to a multiple of it). With no spacing known, past ±887,000. */
+export function isFullRange(tickLower: number, tickUpper: number, spacing: number | null | undefined): boolean {
+  const edge = spacing && spacing > 0 ? Math.floor(MAX_TICK / spacing) * spacing : 887000;
+  return tickLower <= -edge && tickUpper >= edge;
+}
+
+/** A Uniswap-family position's spacing: V4's from its key, V3's from its fee tier. */
+const spacingOf = (r: { tickSpacing: number | null; fee: number }): number | null =>
+  r.tickSpacing ?? V3_SPACING[r.fee] ?? null;
+
 /** What a full-range position earned in fees between two fee-growth readings,
  *  as a share of its value at the price `sqrt`. */
 export function fullRangeShare(g0Now: string, g1Now: string, g0Then: string, g1Then: string, sqrt: number): number {
@@ -378,7 +394,7 @@ export function poolPosition(r: UniPositionRead, protocol: UniProtocol = "uniswa
     liquidity: r.liquidity,
     price,
     priceThen: past ? px.priceAt(null, sqrtFromX96(past.sqrtPriceX96)) : null,
-    range: { low, high, full: tl <= -887000 && tu >= 887000 },
+    range: { low, high, full: isFullRange(tl, tu, spacingOf(r)) },
     inRange,
     side: inRange ? "in" : price < low ? "below" : "above",
     holds: px.amounts(a0, a1),

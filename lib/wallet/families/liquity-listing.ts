@@ -88,7 +88,7 @@ export const liquityV1: FamilyModule = {
         history: {
           ...historyBase(r),
           size: parts.length ? parts.join(" / ") : undefined,
-          sizeNote: parts.length ? "highest recorded" : undefined,
+          sizeNote: parts.length ? "peak" : undefined,
           result: t.redemptionCount > 0 ? plural(t.redemptionCount, "redemption") : undefined,
         },
       };

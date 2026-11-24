@@ -42,7 +42,7 @@
 // answer, or a capped sweep) would otherwise put a two-thousand-row window's
 // arithmetic where a lifetime is read: a partial principal makes the tower's
 // accrued-interest segment nonsense, and a window's highest balance is not a
-// "highest recorded". The live Comet read is unaffected — it is a read at the
+// "peak". The live Comet read is unaffected — it is a read at the
 // head, not a replay — so `current` and the held collateral stand either way,
 // and with no principal beside it the card shows the one number it has and
 // labels it current.

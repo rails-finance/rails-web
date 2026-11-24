@@ -124,7 +124,7 @@ export function makeListedMorphoReceipts(id: ListedMorphoReceiptsArgs): ListedMo
     notRecorded: (what) => ({
       kind: "chain-derived",
       pclass: "state",
-      summary: `${what} is not recorded here — a listing row is a read of the position's slots at one block with no history behind it, so its highest recorded amounts and its principal are unknown on this row; the wallet page reads the whole history from the singleton's logs and states them.`,
+      summary: `${what} is not recorded here — a listing row is a read of the position's slots at one block with no history behind it, so its peak amounts and its principal are unknown on this row; the position page reads the whole history from the singleton's logs and states them.`,
       contract,
       via: custody,
     }),

@@ -35,7 +35,7 @@ import {
   chainMeta,
   type ChainId,
 } from "@/lib/shared/chains";
-import { menuProtocolOf, protocolEntryOf } from "@/lib/wallet/position-protocol";
+import { menuProtocolOf, protocolEntryOf, protocolLabelOf } from "@/lib/wallet/position-protocol";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import {
   MENU_TESTNETS,
@@ -83,7 +83,7 @@ const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-30
 /** The protocol's and the chain's icons, each named for screen readers and on hover. */
 function ProtocolIcons({ p }: { p: WalletCountsPosition }) {
   const entry = protocolEntryOf(p);
-  const protocol = entry?.label ?? p.family;
+  const protocol = protocolLabelOf(p);
   const chain = chainMeta(CHAIN_ID[p.chain]).name;
   return (
     <span className="flex shrink-0 items-center gap-1">

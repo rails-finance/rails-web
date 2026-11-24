@@ -187,15 +187,25 @@ function statusOf(s: string): DolomitePositionStatus {
   return s === "open" || s === "liquidated" ? s : "closed";
 }
 
+/** The market-state read the builder takes: every market's index, price and
+ *  rates at one head block. */
+export type DolomiteMarketRead = Awaited<ReturnType<typeof resolveDolomiteMarketState>>;
+
 /** Assemble the listing rows from the rails route's raw page slice. Filtering,
- *  sorting and pagination already happened server-side — order is preserved. */
-export async function buildDolomitePositionRows(raw: RawDolomiteAccountRow[]): Promise<DolomitePositionSummary[]> {
+ *  sorting and pagination already happened server-side — order is preserved.
+ *  `given`: a market read already in hand (the wallet page's head read), or an
+ *  empty one for rows built from the store with no chain read. */
+export async function buildDolomitePositionRows(
+  raw: RawDolomiteAccountRow[],
+  given?: DolomiteMarketRead,
+): Promise<DolomitePositionSummary[]> {
   // ONE O(markets) multicall covers every row: par is exact from the index,
   // and current wei needs only each market's index (+ price + rates).
   const market =
-    raw.length > 0
+    given ??
+    (raw.length > 0
       ? await resolveDolomiteMarketState()
-      : { state: new Map() as DolomiteMarketStateMap, blockNumber: 0, head: undefined };
+      : { state: new Map() as DolomiteMarketStateMap, blockNumber: 0, head: undefined });
   const { state } = market;
   const marketReadBy = serverReadAt(market.head, market.blockNumber || null);
 

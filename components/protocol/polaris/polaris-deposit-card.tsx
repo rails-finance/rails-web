@@ -32,7 +32,13 @@ import { positionName, shortPositionId } from "@/lib/shared/position-name";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { polarisDepositHref, polarisDepositNftUrl, POLARIS_SP_PATH } from "@/lib/polaris/routes";
 import { big, type DepositLifetime, type DepositNow } from "@/lib/polaris/sp-loan-math";
-import { spLiveProv, spPendingLossProv, spSumProv } from "@/lib/polaris/sp-loan-provenance";
+import {
+  spLiveProv,
+  spPendingLossProv,
+  spRowProv,
+  spSumProv,
+  type PolarisRowVia,
+} from "@/lib/polaris/sp-loan-provenance";
 import type { PolarisDepositRow } from "@/lib/sources/api/polaris-sp-loans";
 import { RawFigure, tokenIcon } from "./polaris-sp-loan-parts";
 import { positionLink } from "@/lib/shared/position-link";
@@ -48,6 +54,9 @@ export interface PolarisDepositCardProps {
   /** The chain read is in flight. */
   pending?: boolean;
   explanation?: ReactNode;
+  /** The wallet page: each listing figure carries its receipt, the row read
+   *  through `via`. */
+  receipts?: { via: PolarisRowVia; block?: number };
 }
 
 /** The vault-held tag (C22·polaris). */
@@ -102,6 +111,7 @@ export function polarisDepositSlots({
   now,
   pending = false,
   explanation,
+  receipts,
 }: PolarisDepositCardProps): PositionCardSlots {
   const detail = surface === "detail";
   const m = row.market;
@@ -122,25 +132,27 @@ export function polarisDepositSlots({
 
   if (!detail) {
     const recorded = big(row.deposit_raw);
+    const prov = (what: Parameters<typeof spRowProv>[0], figure: ReactNode) =>
+      receipts ? <Prov info={spRowProv(what, m, receipts.via, receipts.block)}>{figure}</Prov> : figure;
     const heads: PositionCardHead[] = [
       {
         id: "deposit",
         label: "Deposit",
         labelTip: "As of the deposit's last touch. Liquidations since then have not been taken out.",
         labelTipOnListing: true,
-        value: closed ? null : <RawFigure raw={recorded} symbol={s} approx />,
+        value: closed ? null : prov("recorded", <RawFigure raw={recorded} symbol={s} approx />),
         assets: closed ? undefined : tokenIcon(s, stable.address, recorded),
       },
       {
         id: "peth-paid",
         label: "pETH paid in",
-        value: <RawFigure raw={big(row.bc_gain_raw)} symbol={PETH.symbol} />,
+        value: prov("bcGain", <RawFigure raw={big(row.bc_gain_raw)} symbol={PETH.symbol} />),
         assets: tokenIcon(PETH.symbol, PETH.address, big(row.bc_gain_raw)),
       },
       {
         id: "stable-gain",
         label: `${s} gain`,
-        value: <RawFigure raw={big(row.stable_gain_raw)} symbol={s} />,
+        value: prov("stableGain", <RawFigure raw={big(row.stable_gain_raw)} symbol={s} />),
         assets: tokenIcon(s, stable.address, big(row.stable_gain_raw)),
       },
     ];

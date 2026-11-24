@@ -5,15 +5,17 @@
 // wallet read alone (lib/wallet/read-wallet.ts).
 //
 // A section's dollars count in the totals only where every open position in it
-// states its dollars at the protocol's oracle (decision 0050, open point 7);
-// a section that does not is named under the total. Liquity V1's and V2's
+// states its dollars at the protocol's oracle (decision 0050, open point 7).
+// The wallet total sums the sections that state both figures and names the
+// ones it leaves out under the row (Miles, 24 Nov 2026, "wallet total b";
+// rails-ops infra item 37). Liquity V1's and V2's
 // bands are their listings' (lib/liquity-v1/holder-strip.ts,
 // lib/liquity-v2/holder-strip.ts), from the Trove and deposit rows the wallet
 // read carries, a deposit its own total; every other protocol's sums its
 // cards' dollars. A deposit's dollars count with the collateral in the
 // section's figures. While a protocol's listing read did not answer
-// (read-wallet.ts, readListingRows), its section and the wallet state no
-// total.
+// (read-wallet.ts, readListingRows), its section states no total and the
+// wallet total leaves it out.
 //
 // An open Trove on a branch whose pool the admin emptied after its shutdown
 // (lib/wallet/trove-shutdown.ts; ui-jobs 802) states no collateral dollars, so
@@ -21,6 +23,12 @@
 // band carries its collateral as "Recorded collateral" in its token, and the
 // note names it once per branch. A Trove on a shut-down branch states no
 // buffer, so the risk sort and "Closest to liquidation" leave it out.
+//
+// A vault share's dollars are the holder census's at its census block (ui-jobs
+// 783), a stored figure: its card states them, and its section states them as
+// a dated subtotal outside the wallet total (`census`). So does a section
+// whose every open position is a stored read with dollars (`storedSubtotal`);
+// a section mixing stored and head figures states none (rule 743).
 
 import type { HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
@@ -36,6 +44,8 @@ import { formatUsdValue } from "@/lib/utils/format";
 import { walletProtocol } from "@/lib/wallet/wallet-filters";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { onEmptiedBranch, recordedCollateralLeg } from "@/lib/wallet/trove-shutdown";
+import { CHAINS } from "@/lib/shared/chains";
+import { formatDate } from "@/lib/date";
 import { SP_DEPLOYMENTS, spPool, type SpDeploymentId } from "@/lib/liquity-v2/sp-deployment";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
@@ -90,7 +100,50 @@ export interface WalletSection {
    *  no dollars at the protocol's oracle. */
   collateral?: SectionFigure;
   debt?: SectionFigure;
+  /** Every position on a testnet (Polaris on Sepolia): the section stands
+   *  outside the wallet's totals and its risk tile (WALLET_COUNTS_SCOPE). */
+  testnet: boolean;
+  /** Every open position is a vault share at its census block, read on this
+   *  visit: the section states a dated subtotal outside the wallet total
+   *  (`CENSUS_NOTE`), or no figure where a share states no dollars. */
+  census: boolean;
 }
+
+/** A vault share's figures are the holder census's, at its block. */
+const atCensus = (p: WalletPosition) => p.card.kind === "vault" && p.headRead === "stored";
+
+/** The band's note for a vault-share section: its subtotal stands outside
+ *  the wallet total, or, where a share states no dollars, it has none. */
+export const CENSUS_NOTE =
+  "Vault share values are the census's at each share's census block, so the wallet total leaves them out.";
+export const CENSUS_NO_TOTAL =
+  "Vault share values are the census's at each share's census block, so the section states no total.";
+
+/** A family's positions the read counted and did not draw, by status. */
+export interface UndrawnCounts {
+  open: number;
+  closed: number;
+}
+
+/** The positions not drawn that the Status pill counts. */
+export const undrawnCount = (u: UndrawnCounts, status?: "open" | "closed"): number =>
+  status === "open" ? u.open : status === "closed" ? u.closed : u.open + u.closed;
+
+/** The line under a section's cards naming what it does not draw on one
+ *  chain, for the Status pill: "1,180 more holdings on Base are not drawn
+ *  (80 open); the open ones with the largest census value come first." */
+export function undrawnLine(u: UndrawnCounts, chain: string, status?: "open" | "closed"): string {
+  const n = undrawnCount(u, status);
+  const num = n.toLocaleString("en-US");
+  const noun = `${status ? `${status} ` : ""}${n === 1 ? "holding" : "holdings"}`;
+  const head = `${num} more ${noun} on ${chain} ${n === 1 ? "is" : "are"} not drawn`;
+  if (status === "closed") return `${head}.`;
+  if (status === "open") return `${head}; the ones with the largest census value come first.`;
+  return `${head} (${u.open.toLocaleString("en-US")} open); the open ones with the largest census value come first.`;
+}
+
+/** A position on a testnet, which no wallet count or total takes in. */
+export const onTestnet = (p: Pick<WalletPosition, "chain">): boolean => CHAINS[p.chain]?.testnet === true;
 
 /** "A", "A and B", "A, B and C". */
 export const andList = (xs: string[]) =>
@@ -105,6 +158,27 @@ const closedAt = (p: WalletPosition) => p.history?.closedAt ?? 0;
  *  is summed with head-read ones (rule 743). */
 export const unreadAtHead = (p: WalletPosition) =>
   p.notRead === true || p.headRead === "failed" || p.headRead === "stored";
+
+/** A section's note where some of its open positions went unread at head:
+ *  all of them, some of them, or none (no note). `subtotal`: the band states
+ *  their stored figures, dated, outside the wallet total. */
+export function unreadNote(unread: number, open: number, subtotal = false): string | undefined {
+  if (unread <= 0 || open <= 0) return undefined;
+  const who =
+    unread < open
+      ? `${unread} of the ${open} open positions`
+      : open === 1
+        ? "The open position"
+        : `None of the ${open} open positions`;
+  const could = unread === open && open > 1 ? "could be read" : "could not be read";
+  return subtotal
+    ? `${who} ${could} at the chain head, so the wallet total leaves it out.`
+    : `${who} ${could} at the chain head, so the section states no total.`;
+}
+
+/** The Liquidity section's note (W9): its cards state the pools' tokens, no dollars, so it
+ *  states no total; in the wording of the wallet total's gap. */
+export const LIQUIDITY_NO_TOTAL = "No total: liquidity positions state no dollars.";
 
 /** A position's dollars in one field. A missing debt counts as none only on
  *  a deposit or a stake no head read contradicts: a head read states its debt, so one
@@ -134,14 +208,17 @@ function sumOfCards(
   name: string,
   held: WalletPosition[],
   field: "collateralUsd" | "debtUsd",
+  /** A vault share's value at the census's price: summed as its card
+   *  states it, under this word. */
+  census?: string,
 ): SectionFigure | undefined {
   if (held.length === 0) return undefined;
   // A deposit or stake no head read prices (a fork's deposit) owes nothing:
   // it leaves the debt sum, and a section of them alone owes none.
   const open = field === "debtUsd" ? held.filter((p) => !owesNothingUnread(p)) : held;
   if (open.length === 0) return zeroDebt(name);
-  if (!open.every((p) => stated(p, field))) return undefined;
-  const word = field === "collateralUsd" ? "collateral" : "debt";
+  if (!open.every((p) => (census ? dollarsOf(p, field) != null : stated(p, field)))) return undefined;
+  const word = census ?? (field === "collateralUsd" ? "collateral" : "debt");
   const deposits = field === "collateralUsd" && open.every((p) => p.kind === "deposits");
   // A position whose dollars come from more than one source (a deposit's
   // $1 face and its gain at a price feed) is one row per source.
@@ -202,6 +279,32 @@ const usdLeg = (id: string, label: string, f: SectionFigure): HolderLeg => ({
   prov: f.prov,
   figure: { tokens: [], usd: f.usd },
 });
+
+/** The band's legs where every open position is a stored read (a vault
+ *  share at its census block, a last-visit read): each figure the cards'
+ *  stored dollars, dated by the reads. None where a position states no
+ *  dollars or no read time, or a Trove is on an emptied branch (its
+ *  collateral states no dollars, as on the head path). */
+function storedSubtotal(name: string, open: WalletPosition[], census: boolean): HolderLeg[] | null {
+  if (open.some(onEmptiedBranch)) return null;
+  const times = open.map((p) => p.readAt);
+  if (open.length === 0 || times.some((t) => t == null)) return null;
+  const from = formatDate(Math.min(...(times as number[])));
+  const to = formatDate(Math.max(...(times as number[])));
+  const when = from === to ? `as read on ${from}` : `as read from ${from} to ${to}`;
+  const coll = sumOfCards(name, open, "collateralUsd", census ? "value" : undefined);
+  if (!coll) return null;
+  const debt = census ? undefined : sumOfCards(name, open, "debtUsd");
+  if (!census && !debt) return null;
+  const dated = (l: HolderLeg): HolderLeg => ({
+    ...l,
+    footnote: { text: when },
+  });
+  return [
+    dated(usdLeg("collateral", census ? "Subtotal" : "Collateral subtotal", coll)),
+    ...(debt && debt.usd > 0 ? [dated(usdLeg("debt", "Debt subtotal", debt))] : []),
+  ];
+}
 
 /** The band's deposit leg from the head read, where every open deposit has
  *  one, and on Liquity V1 its stake leg from LQTYStaking's stakes(staker);
@@ -396,6 +499,7 @@ export function walletSections(
     const open = [...ranked, ...dust, ...notRead];
     const closed = mine.filter((p) => p.status !== "open").sort((a, b) => closedAt(b) - closedAt(a));
     const unread = open.filter(unreadAtHead).length;
+    const census = open.length > 0 && open.every(atCensus);
     // An open Trove on an emptied branch leaves the collateral dollars: its
     // recorded collateral is the band's own leg (ui-jobs 802).
     const emptied = open.filter(onEmptiedBranch);
@@ -455,10 +559,13 @@ export function walletSections(
     } else if (unread > 0) {
       collateral = undefined;
       debt = undefined;
+      // A section of stored reads alone states them as a dated subtotal;
+      // stored and head figures are never summed together (rule 743).
+      const legs = unread === open.length && !open.some((p) => p.notRead) ? storedSubtotal(name, open, census) : null;
       band = {
         ...band,
-        legs: [],
-        note: `${unread === open.length ? (unread === 1 ? "The open position was" : `None of the ${open.length} open positions were`) : `${unread} of the ${open.length} open positions ${unread === 1 ? "was" : "were"}`} not read at the chain head, so the section states no total.`,
+        legs: legs ?? [],
+        note: census ? (legs ? CENSUS_NOTE : CENSUS_NO_TOTAL) : unreadNote(unread, open.length, legs != null),
       };
     } else if (open.length > 0 && (collateral == null) !== (debt == null)) {
       // One figure stands: the band says the other states none, so a lone
@@ -494,10 +601,14 @@ export function walletSections(
       band,
       collateral,
       debt,
+      testnet: mine.every(onTestnet),
+      census,
     });
   }
   const tier = (s: WalletSection) => (s.ranked.some((p) => p.buffer != null) ? 0 : s.open.length > 0 ? 1 : 2);
   return sections.sort((a, b) => {
+    // A testnet's sections follow every mainnet one.
+    if (a.testnet !== b.testnet) return Number(a.testnet) - Number(b.testnet);
     const t = tier(a) - tier(b);
     if (t !== 0) return t;
     if (tier(a) === 0) return byRisk(a.ranked[0], b.ranked[0]);
@@ -512,22 +623,26 @@ export function walletSections(
  *  one; undefined where no position states one. */
 export function closestToLiquidation(sections: WalletSection[]): WalletPosition | undefined {
   return sections
+    .filter((s) => !s.testnet)
     .flatMap((s) => s.ranked)
     .filter((p) => p.buffer != null && p.riskFigure)
     .sort(byRisk)[0];
 }
 
 /** One total over the sections: each section's figure as its band states it,
- *  summed to the cent. A wallet total covers every protocol the wallet holds
- *  open, or there is none (Miles, 18 Nov 2026): while any section states no
- *  figure, `gap` says which and why, and each section keeps its own. */
+ *  summed to the cent. The total covers every section that states both
+ *  figures and names the rest; each of those keeps its own band, a dated
+ *  subtotal where its figures are stored ones. */
 export interface WalletTotal {
-  /** Absent while any section holding an open position states no figure. */
+  /** Absent while no section holding an open position states both figures. */
   figure?: SectionFigure;
-  /** The sections holding an open position, all of them summed. */
+  /** The sections summed. */
   of: number;
-  /** "No wallet total: Morpho Blue states no dollars". */
+  /** Where nothing is summed: "No wallet total: Morpho Blue states no dollars". */
   gap?: string;
+  /** Beside a figure, what it leaves out: "Leaves out Morpho Blue and
+   *  Fluid (no dollars) and Vault shares (valued at the census blocks)." */
+  leaves?: string;
 }
 
 export function walletTotal(
@@ -536,23 +651,33 @@ export function walletTotal(
   /** What the listing reads that did not answer read ("Liquity V1 Troves"). */
   unanswered: string[] = [],
 ): WalletTotal | null {
-  const holding = sections.filter((s) => s.open.length > 0);
-  if (holding.length === 0 && unanswered.length === 0) return null;
-  // One rule for both figures: a section missing either leaves both, and
-  // Net, without a wallet total (Miles, 18 Nov 2026). A listing read that
-  // did not answer may hold an open position, so it leaves them too.
-  const missing = holding.filter((s) => s.collateral == null || s.debt == null);
-  if (missing.length > 0 || unanswered.length > 0) {
-    const unreadOrPriced = missing.filter((s) => !unanswered.some((u) => u.startsWith(`${s.name} `)));
-    const unread = unreadOrPriced.filter((s) => s.unread > 0).map((s) => s.name);
-    const priced = unreadOrPriced.filter((s) => s.unread === 0).map((s) => s.name);
+  const open = sections.filter((s) => s.open.length > 0 && !s.testnet);
+  if (open.length === 0 && unanswered.length === 0) return null;
+  // One rule for both figures: a section missing either is left out of
+  // both, so Net reads over the same sections (Miles, 18 Nov 2026). A
+  // listing read that did not answer may hold an open position: named too.
+  const missing = open.filter((s) => s.collateral == null || s.debt == null);
+  const holding = open.filter((s) => !missing.includes(s));
+  const named = missing.filter((s) => !unanswered.some((u) => u.startsWith(`${s.name} `)));
+  const census = named.filter((s) => s.census).map((s) => s.name);
+  const unread = named.filter((s) => !s.census && s.unread > 0).map((s) => s.name);
+  const priced = named.filter((s) => !s.census && s.unread === 0).map((s) => s.name);
+  if (holding.length === 0) {
     const why = [
       unanswered.length ? `${andList(unanswered)} could not be read` : null,
+      census.length ? "vault shares are valued at their census blocks" : null,
       priced.length ? `${andList(priced)} ${priced.length === 1 ? "states" : "state"} no dollars` : null,
       unread.length ? `${andList(unread)} ${unread.length === 1 ? "was" : "were"} not read at the chain head` : null,
     ].filter(Boolean);
-    return { of: holding.length, gap: `No wallet total: ${why.join(" and ")}` };
+    return { of: 0, gap: `No wallet total: ${why.join(" and ")}` };
   }
+  // One group per reason, each naming its sections once.
+  const left = [
+    unanswered.length ? `${andList(unanswered)} (could not be read)` : null,
+    census.length ? `${andList(census)} (valued at the census blocks)` : null,
+    priced.length ? `${andList(priced)} (no dollars)` : null,
+    unread.length ? `${andList(unread)} (not read at the chain head)` : null,
+  ].filter((x): x is string => x != null);
   const usd = cents(holding.reduce((s, x) => s + x[which]!.usd, 0));
   const many = holding.length > 1;
   const rows: ProvInput[] = holding.map((s) => ({
@@ -565,6 +690,7 @@ export function walletTotal(
   const oracle = holding.every((s) => s[which]!.prov.pclass === "oracle");
   return {
     of: holding.length,
+    ...(left.length ? { leaves: `Leaves out ${andList(left)}.` } : {}),
     figure: {
       usd,
       prov: {

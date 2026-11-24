@@ -68,13 +68,13 @@ function marketSection(view: CompoundPositionView, chain: CompoundMarketChainRes
     // Unwound: the headline is what the position held at its height (chain-state
     // token amounts only — the market's oracle prices the PRESENT, not history).
     if (view.peak.lentBase > 0) {
-      lines.push(`- **Highest recorded supplied base:** ${amt(view.peak.lentBase)} ${view.base.symbol}`);
+      lines.push(`- **Peak supplied base:** ${amt(view.peak.lentBase)} ${view.base.symbol}`);
     }
     for (const c of view.peak.collateral) {
-      lines.push(`- **Highest recorded collateral:** ${c.decimalsUnread ? "not loaded" : amt(c.amount)} ${c.symbol}`);
+      lines.push(`- **Peak collateral:** ${c.decimalsUnread ? "not loaded" : amt(c.amount)} ${c.symbol}`);
     }
     if (view.peak.borrowedBase > 0) {
-      lines.push(`- **Highest recorded borrow balance:** ${amt(view.peak.borrowedBase)} ${view.base.symbol}`);
+      lines.push(`- **Peak borrow balance:** ${amt(view.peak.borrowedBase)} ${view.base.symbol}`);
     }
     lines.push("");
     return lines;

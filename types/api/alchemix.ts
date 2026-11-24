@@ -183,6 +183,17 @@ export interface AlchemixPositionSummary {
   v2Predecessors?: AlchemixV2Link[];
 }
 
+/** A V3 position as rails-server's wallet_positions stores it (mig 523): the
+ *  listing's row with the reading at the position's last band edge, and no
+ *  reducer block, which moves on every backfill tick. Its collateral states no
+ *  dollars (`usd` null). Every listing row is one. */
+export type AlchemixStoredPositionSummary = Omit<AlchemixPositionSummary, "activity" | "figures"> & {
+  activity: Omit<AlchemixActivity, "reducedToBlock"> & { reducedToBlock: number | null };
+  figures: Omit<AlchemixFigures, "derivedLowerBound"> & {
+    derivedLowerBound: (Omit<AlchemixDerivedLowerBound, "reducedToBlock"> & { reducedToBlock: number | null }) | null;
+  };
+};
+
 /** One V2 account, by its key. */
 export interface AlchemixV2Link {
   lineKey: string;

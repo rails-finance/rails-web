@@ -63,11 +63,18 @@ interface ServerRead {
   reverted?: true;
 }
 
+/** A caller's abort and reader address, forwarded on each request. */
+interface BlockReadOpts {
+  signal?: AbortSignal;
+  readerIp?: string;
+}
+
 /** One request's blocks, or nothing where the server did not answer. */
 async function askServer(
   chainId: VaultBlockChain,
   blocks: readonly (bigint | number)[],
   vault?: { address: string; decimals: number },
+  opts: BlockReadOpts = {},
 ): Promise<ServerRead[]> {
   const base = process.env.RAILS_API_URL;
   if (!base) return [];
@@ -77,7 +84,10 @@ async function askServer(
     qs.set("decimals", String(vault.decimals));
   }
   try {
-    const response = await fetch(`${base}/api/at-block/vault/blocks?${qs.toString()}`, createAuthFetchOptions());
+    const response = await fetch(
+      `${base}/api/at-block/vault/blocks?${qs.toString()}`,
+      createAuthFetchOptions({ signal: opts.signal }, opts.readerIp),
+    );
     if (!response.ok) return [];
     const body = (await response.json()) as { reads?: ServerRead[] };
     return Array.isArray(body.reads) ? body.reads : [];
@@ -142,11 +152,12 @@ export const firstUnreadBlock = (blocks: number[], known: BlockReads): number =>
 export async function readBlockTimes(
   chainId: VaultBlockChain,
   blocks: readonly number[],
+  opts: BlockReadOpts = {},
 ): Promise<Map<number, number>> {
   const out = new Map<number, number>();
   const parts: number[][] = [];
   for (let i = 0; i < blocks.length; i += BLOCKS_PER_REQUEST) parts.push(blocks.slice(i, i + BLOCKS_PER_REQUEST));
-  const answers = await Promise.all(parts.map((part) => askServer(chainId, part)));
+  const answers = await Promise.all(parts.map((part) => askServer(chainId, part, undefined, opts)));
   for (const r of answers.flat()) if (r.timestamp != null) out.set(r.block, r.timestamp);
   return out;
 }

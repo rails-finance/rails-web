@@ -12,13 +12,13 @@ import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
-import { RangeBar } from "@/components/protocol/uniswap/uniswap-position-card";
+import { RangeBar, rangeHead } from "@/components/protocol/uniswap/uniswap-position-card";
 import { PoolReadStamp, Segs } from "@/components/protocol/uniswap/uniswap-readout";
 import { aeroPosition } from "@/lib/aerodrome/position";
 import { cardProv, readContracts, type AeroReceiptContext } from "@/lib/aerodrome/provenance";
 import type { AeroPositionRead } from "@/lib/aerodrome/types";
 import { aeroStatus, cardExplainer, cardWords } from "@/lib/aerodrome/words";
-import { num, short, shown } from "@/lib/uniswap/words";
+import { CARD_WORDS as UNI_WORDS, num, short, shown } from "@/lib/uniswap/words";
 
 /** Every figure's read stamp on an Aerodrome page. */
 export function AerodromeReadStamp({ c, what }: { c: AeroReceiptContext; what: string }) {
@@ -27,7 +27,7 @@ export function AerodromeReadStamp({ c, what }: { c: AeroReceiptContext; what: s
   );
 }
 
-function slots(r: AeroPositionRead): PositionCardSlots {
+function slots(r: AeroPositionRead, surface: "detail" | "listing"): PositionCardSlots {
   const p = aeroPosition(r);
   const c = { p, r };
   const B = p.base.symbol;
@@ -88,15 +88,6 @@ function slots(r: AeroPositionRead): PositionCardSlots {
           </span>
         ) : undefined,
     });
-    heads.push({
-      id: "owner",
-      label: CARD_WORDS.owner,
-      labelTip: CARD_WORDS.ownerTip,
-      value: (
-        <Prov info={cardProv("owner", c)}>{p.holder ? <span className="font-mono">{short(p.holder)}</span> : "—"}</Prov>
-      ),
-      sub: p.holder ? undefined : <span data-figure="owner-none">{CARD_WORDS.ownerNone}</span>,
-    });
   } else {
     heads.push({
       id: "uncollected",
@@ -115,16 +106,41 @@ function slots(r: AeroPositionRead): PositionCardSlots {
   const status = aeroStatus(p);
   // The position's name: the pair and the NFT id (lib/shared/position-name.ts).
   const name = positionName({ market: marketPair(B, Q), noun: POSITION_NOUN[p.site.id], id: p.id });
+  // The NFT id as the tag, the listing's form (ui-jobs 807).
+  const tag = <ListingTag id={p.id} />;
+  const identity = (
+    <span className="text-xs text-rb-500">{p.staked ? CARD_WORDS.stakedBadge : CARD_WORDS.unstakedBadge}</span>
+  );
+  // A listing card has no range bar: the range headline states the state and the prices.
+  if (surface === "listing")
+    return {
+      surface: "listing",
+      status: closed ? { word: UNI_WORDS.closed, tone: "muted", tip: UNI_WORDS.closedTip } : null,
+      name,
+      tag,
+      identity,
+      heads: closed ? heads : [...heads, rangeHead(p, cardProv("range", c))],
+      counters: null,
+      menu: null,
+    };
+  // Staked: the wallet that staked it. A listing row is read for that wallet, so only the detail card names it.
+  if (p.aero)
+    heads.push({
+      id: "owner",
+      label: CARD_WORDS.owner,
+      labelTip: CARD_WORDS.ownerTip,
+      value: (
+        <Prov info={cardProv("owner", c)}>{p.holder ? <span className="font-mono">{short(p.holder)}</span> : "—"}</Prov>
+      ),
+      sub: p.holder ? undefined : <span data-figure="owner-none">{CARD_WORDS.ownerNone}</span>,
+    });
   return {
     surface: "detail",
     heading: CARD_WORDS.heading,
     status: status ? { word: status.word, tone: "muted", tip: status.tip } : null,
     name,
-    // The NFT id as the tag, the listing's form (ui-jobs 807).
-    tag: <ListingTag id={p.id} />,
-    identity: (
-      <span className="text-xs text-rb-500">{p.staked ? CARD_WORDS.stakedBadge : CARD_WORDS.unstakedBadge}</span>
-    ),
+    tag,
+    identity,
     heads,
     counters: null,
     menu: { exports: null },
@@ -161,7 +177,14 @@ function slots(r: AeroPositionRead): PositionCardSlots {
   };
 }
 
-export function AerodromePositionCard({ r }: { r: AeroPositionRead }) {
+/** `surface: "listing"`: the card as a listing row, inside one link (the wallet page's Liquidity section). */
+export function AerodromePositionCard({
+  r,
+  surface = "detail",
+}: {
+  r: AeroPositionRead;
+  surface?: "detail" | "listing";
+}) {
   return (
     <div
       data-anatomy="U1"
@@ -171,7 +194,7 @@ export function AerodromePositionCard({ r }: { r: AeroPositionRead }) {
       data-liquidity-raw={r.liquidity}
       data-live-block={r.head.block}
     >
-      <PositionCard slots={slots(r)} />
+      <PositionCard slots={slots(r, surface)} />
     </div>
   );
 }

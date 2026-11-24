@@ -13,7 +13,7 @@ export const EULER_DOLLARS = true;
 
 /** Chains whose wallet reads take accounts 1–255's deposits from the position index, indexed from
  *  Euler's deployment (decision 0063; rails-server services/euler-index.ts, EULER_INDEXED). */
-export const EULER_INDEXED: Record<EulerChainId, boolean> = { 8453: false, 42161: true };
+export const EULER_INDEXED: Record<EulerChainId, boolean> = { 8453: true, 42161: true };
 
 /** The roster id of each chain's entry. */
 export const EULER_SESSION = { 8453: "euler-v2-base", 42161: "euler-v2-arbitrum" } as const;

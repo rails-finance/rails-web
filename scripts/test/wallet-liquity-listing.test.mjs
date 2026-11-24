@@ -207,19 +207,19 @@ test("a listing read that did not answer: no section total, no wallet total, sai
   // The Aave section keeps its own figure.
   assert.equal(sections.find((x) => x.slug === "aave-v3").collateral.usd, 50);
   const total = walletTotal(sections, "collateral", ["Liquity V2 Stability Pool deposits"]);
-  assert.equal(total.figure, undefined);
-  assert.equal(total.gap, "No wallet total: Liquity V2 Stability Pool deposits could not be read");
+  assert.equal(total.figure.usd, 50);
+  assert.equal(total.leaves, "Leaves out Liquity V2 Stability Pool deposits (could not be read).");
 });
 
-test("a failed read of a protocol with no section still leaves no wallet total", () => {
+test("a failed read of a protocol with no section is named beside the wallet total", () => {
   const sections = walletSections(
     [pos("aave-v3", { kind: "aave-v3", row: { status: "open" } }, { collateralUsd: 50, debtUsd: 10, buffer: 0.5 })],
     { bands: true, unanswered: [{ family: "liquity-v1", what: "Liquity V1 Troves" }] },
   );
   assert.equal(sections[0].collateral.usd, 50);
   const total = walletTotal(sections, "debt", ["Liquity V1 Troves"]);
-  assert.equal(total.figure, undefined);
-  assert.equal(total.gap, "No wallet total: Liquity V1 Troves could not be read");
+  assert.equal(total.figure.usd, 10);
+  assert.equal(total.leaves, "Leaves out Liquity V1 Troves (could not be read).");
 });
 
 test("receipts name each row's source: a deposit at $1 face is state, not oracle", () => {
@@ -315,7 +315,7 @@ test("a gain with no price states no claim: the head read fails (rule 743)", () 
     { bands: true },
   );
   assert.equal(s.collateral, undefined);
-  assert.match(s.band.note, /not read at the chain head/);
+  assert.match(s.band.note, /could not be read at the chain head/);
 });
 
 test("the section receipt carries each leg of a claim; the band's leg is the head deposit, no ≈", () => {

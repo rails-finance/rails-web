@@ -147,7 +147,7 @@ export function compoundShareCardModel(
     }
     if (position.peak.borrowedBase > 0) {
       stats.push({
-        label: "Highest recorded borrow balance",
+        label: "Peak borrow balance",
         value: `${formatCompact(position.peak.borrowedBase)} ${position.base.symbol}`,
       });
     }

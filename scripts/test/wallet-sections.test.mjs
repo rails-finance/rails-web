@@ -30,7 +30,7 @@ export async function resolve(specifier, context, next) {
 }`;
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
-const { walletSections, walletTotal, walletNet } = await import("../../lib/wallet/wallet-sections.ts");
+const { walletSections, walletTotal, walletNet, unreadNote } = await import("../../lib/wallet/wallet-sections.ts");
 
 let n = 0;
 const pos = (family, extra = {}) => ({
@@ -90,7 +90,7 @@ test("a total sums the section figures to the cent", () => {
   assert.equal(walletNet(coll, debt).usd, 120.82);
 });
 
-test("no wallet total while a held protocol states no dollars; its section keeps its own", () => {
+test("the wallet total sums what states dollars and names what it leaves out (wallet total b)", () => {
   const s = walletSections(
     [
       pos("aave-v3", { collateralUsd: 100, debtUsd: 10 }),
@@ -101,14 +101,20 @@ test("no wallet total while a held protocol states no dollars; its section keeps
   );
   const coll = walletTotal(s, "collateral");
   const debt = walletTotal(s, "debt");
-  assert.equal(coll.figure, undefined);
-  assert.equal(coll.gap, "No wallet total: Morpho Blue and Fluid state no dollars");
-  assert.equal(debt.figure, undefined);
-  assert.equal(walletNet(coll, debt), null);
-  assert.equal(s.find((x) => x.slug === "aave-v3").collateral.usd, 100);
+  assert.equal(coll.figure.usd, 100);
+  assert.equal(coll.of, 1);
+  assert.equal(coll.gap, undefined);
+  assert.equal(coll.leaves, "Leaves out Morpho Blue and Fluid (no dollars).");
+  assert.equal(debt.figure.usd, 10);
+  assert.equal(debt.leaves, coll.leaves);
+  assert.equal(walletNet(coll, debt).usd, 90);
+  // With nothing summed, there is no wallet total and the gap names why.
+  const none = walletSections([pos("morpho", { usdOwnOracle: false, collateralUsd: 7, debtUsd: 1 })], { bands: true });
+  assert.equal(walletTotal(none, "collateral").figure, undefined);
+  assert.equal(walletTotal(none, "collateral").gap, "No wallet total: Morpho Blue states no dollars");
 });
 
-test("a section with an open position not read at head states no figure, and the wallet none", () => {
+test("a section with an open position not read at head states no figure, and the wallet total leaves it out", () => {
   const s = walletSections(
     [
       pos("aave-v3", { collateralUsd: 3000, debtUsd: 100 }),
@@ -120,10 +126,14 @@ test("a section with an open position not read at head states no figure, and the
   const aave = s.find((x) => x.slug === "aave-v3");
   assert.equal(aave.collateral, undefined);
   assert.equal(aave.band.legs.length, 0);
-  assert.match(aave.band.note, /1 of the 2 open positions was not read at the chain head/);
+  assert.match(
+    aave.band.note,
+    /^1 of the 2 open positions could not be read at the chain head, so the section states no total\.$/,
+  );
   const coll = walletTotal(s, "collateral");
-  assert.equal(coll.of, 2);
-  assert.equal(coll.gap, "No wallet total: Aave V3 was not read at the chain head");
+  assert.equal(coll.of, 1);
+  assert.equal(coll.figure.usd, 50);
+  assert.equal(coll.leaves, "Leaves out Aave V3 (not read at the chain head).");
 });
 
 test("a deposit no head read contradicts owes nothing", () => {
@@ -158,20 +168,21 @@ test("a last-visit stored read stops its section's total", () => {
     { bands: true },
   );
   assert.equal(s[0].collateral, undefined);
+  assert.equal(s[0].band.legs.length, 0, "stored and head figures are never summed together");
   assert.equal(walletTotal(s, "collateral").gap, "No wallet total: Aave V3 was not read at the chain head");
 });
 
-test("a section missing either figure leaves both totals and Net without a figure", () => {
+test("a section missing either figure is left out of both totals and Net", () => {
   const s = walletSections([pos("aave-v3", { collateralUsd: 100, debtUsd: 10 }), pos("spark", { collateralUsd: 50 })], {
     bands: true,
   });
   const coll = walletTotal(s, "collateral");
   const debt = walletTotal(s, "debt");
-  assert.equal(coll.figure, undefined);
-  assert.equal(debt.figure, undefined);
-  assert.equal(coll.gap, "No wallet total: SparkLend states no dollars");
-  assert.equal(coll.gap, debt.gap);
-  assert.equal(walletNet(coll, debt), null);
+  assert.equal(coll.figure.usd, 100);
+  assert.equal(debt.figure.usd, 10);
+  assert.equal(coll.leaves, "Leaves out SparkLend (no dollars).");
+  assert.equal(coll.leaves, debt.leaves);
+  assert.equal(walletNet(coll, debt).usd, 90);
 });
 
 test("a section with collateral and no debt figure says so in its band", () => {
@@ -382,4 +393,181 @@ test("a live read alone shuts a branch with no record; its collateral dollars st
     s.band.legs.find((l) => l.label === "Recorded collateral"),
     undefined,
   );
+});
+
+test("the unread note reads for all, some and none of a section's open positions", () => {
+  const tail = " could not be read at the chain head, so the section states no total.";
+  assert.equal(
+    unreadNote(5, 5),
+    "None of the 5 open positions could be read at the chain head, so the section states no total.",
+  );
+  assert.equal(unreadNote(1, 1), `The open position${tail}`);
+  assert.equal(unreadNote(2, 5), `2 of the 5 open positions${tail}`);
+  assert.equal(unreadNote(1, 2), `1 of the 2 open positions${tail}`);
+  assert.equal(unreadNote(0, 5), undefined);
+  assert.equal(
+    unreadNote(1, 1, true),
+    "The open position could not be read at the chain head, so the wallet total leaves it out.",
+  );
+});
+
+test("a section of stored reads alone states a dated subtotal outside the wallet total", () => {
+  const day = 1_795_000_000; // 18 Nov 2026
+  const s = walletSections(
+    [pos("aave-v3", { chain: 42161, collateralUsd: 50, debtUsd: 5, headRead: "stored", readAt: day })],
+    { bands: true },
+  );
+  assert.equal(s[0].collateral, undefined);
+  assert.deepEqual(
+    s[0].band.legs.map((l) => [l.label, l.value, l.footnote.text]),
+    [
+      ["Collateral subtotal", "$50.00", "as read on 18 Nov 2026"],
+      ["Debt subtotal", "$5.00", "as read on 18 Nov 2026"],
+    ],
+  );
+  // No read time, no subtotal.
+  const [undated] = walletSections([pos("aave-v3", { collateralUsd: 50, debtUsd: 5, headRead: "stored" })], {
+    bands: true,
+  });
+  assert.deepEqual(undated.band.legs, []);
+  assert.equal(undated.band.note, unreadNote(1, 1));
+  // A head read that failed keeps the store's figures and its read stamp:
+  // dated as stored.
+  const [failed] = walletSections(
+    [pos("aave-v3", { collateralUsd: 80, debtUsd: 8, headRead: "failed", readAt: day })],
+    { bands: true },
+  );
+  assert.deepEqual(
+    failed.band.legs.map((l) => [l.label, l.value]),
+    [
+      ["Collateral subtotal", "$80.00"],
+      ["Debt subtotal", "$8.00"],
+    ],
+  );
+  assert.equal(failed.band.note, unreadNote(1, 1, true));
+  // Owing nothing: the collateral subtotal alone.
+  const [owing0] = walletSections(
+    [pos("aave-v3", { collateralUsd: 40, debtUsd: 0, headRead: "stored", readAt: day })],
+    { bands: true },
+  );
+  assert.deepEqual(
+    owing0.band.legs.map((l) => l.label),
+    ["Collateral subtotal"],
+  );
+});
+
+test("the leaves line names each reason once, its sections together", () => {
+  const s = walletSections(
+    [
+      pos("aave-v3", { collateralUsd: 100, debtUsd: 10 }),
+      pos("morpho", { usdOwnOracle: false, collateralUsd: 7, debtUsd: 1 }),
+      pos("fluid", { usdOwnOracle: false }),
+      pos("spark", { collateralUsd: 5, debtUsd: 1, headRead: "failed" }),
+    ],
+    { bands: true },
+  );
+  const coll = walletTotal(s, "collateral", ["Liquity V1 Troves"]);
+  assert.equal(coll.figure.usd, 100);
+  assert.equal(
+    coll.leaves,
+    "Leaves out Liquity V1 Troves (could not be read), Morpho Blue and Fluid (no dollars) and SparkLend (not read at the chain head).",
+  );
+});
+
+test("a testnet's section stands outside the wallet totals and the risk tile, after every mainnet one", async () => {
+  const { closestToLiquidation, onTestnet } = await import("../../lib/wallet/wallet-sections.ts");
+  const s = walletSections(
+    [
+      pos("polaris", { chain: 11155111, buffer: 0.01, riskFigure: { value: "101%" } }),
+      pos("aave-v3", { buffer: 0.5, collateralUsd: 100, debtUsd: 10, riskFigure: { value: "2.0" } }),
+    ],
+    { bands: true },
+  );
+  assert.deepEqual(
+    s.map((x) => [x.slug, x.testnet]),
+    [
+      ["aave-v3", false],
+      ["polaris", true],
+    ],
+  );
+  // Polaris states no dollars, yet the wallet total stands over Aave V3 alone.
+  const coll = walletTotal(s, "collateral");
+  assert.equal(coll.figure.usd, 100);
+  assert.equal(coll.of, 1);
+  assert.equal(closestToLiquidation(s).family, "aave-v3");
+  assert.equal(onTestnet({ chain: 11155111 }), true);
+  assert.equal(onTestnet({ chain: 1 }), false);
+  // A wallet holding Polaris alone has no wallet total.
+  assert.equal(walletTotal(walletSections([pos("polaris", { chain: 11155111 })], { bands: true }), "debt"), null);
+});
+
+test("a vault-share section states a dated subtotal outside the wallet total (ui-jobs 783)", async () => {
+  const { CENSUS_NOTE, CENSUS_NO_TOTAL } = await import("../../lib/wallet/wallet-sections.ts");
+  const vault = (extra = {}) =>
+    pos("vaults", { card: { kind: "vault" }, headRead: "stored", usdOwnOracle: false, debtUsd: undefined, ...extra });
+  const s = walletSections(
+    [
+      vault({ collateralUsd: 500, readAt: 1_795_000_000 }),
+      vault({ collateralUsd: 20, readAt: 1_794_900_000 }),
+      pos("aave-v3", { collateralUsd: 100, debtUsd: 10 }),
+    ],
+    { bands: true },
+  );
+  const v = s.find((x) => x.slug === "vaults");
+  assert.equal(v.census, true);
+  assert.equal(v.collateral, undefined);
+  assert.equal(v.band.note, CENSUS_NOTE);
+  // The biggest census value first.
+  assert.deepEqual(
+    v.open.map((p) => p.collateralUsd),
+    [500, 20],
+  );
+  assert.deepEqual(
+    v.band.legs.map((l) => [l.label, l.value, l.footnote.text]),
+    [["Subtotal", "$520.00", "as read from 17 Nov 2026 to 18 Nov 2026"]],
+  );
+  const t = walletTotal(s, "collateral");
+  assert.equal(t.figure.usd, 100);
+  assert.equal(t.leaves, "Leaves out Vault shares (valued at the census blocks).");
+  // Vault shares alone: no wallet total.
+  const alone = walletSections([vault({ collateralUsd: 5, readAt: 1_795_000_000 })], { bands: true });
+  assert.equal(walletTotal(alone, "collateral").gap, "No wallet total: vault shares are valued at their census blocks");
+  // A share with no dollars: no subtotal.
+  const unpriced = walletSections([vault({ readAt: 1_795_000_000 })], { bands: true });
+  assert.deepEqual(unpriced[0].band.legs, []);
+  assert.equal(unpriced[0].band.note, CENSUS_NO_TOTAL);
+  // A head read that failed is said as one.
+  const failed = walletSections([vault({ headRead: "failed" })], { bands: true });
+  assert.equal(failed[0].census, false);
+  assert.equal(failed[0].band.note, unreadNote(1, 1));
+});
+
+test("a stored section holding a Trove on an emptied branch states no subtotal", () => {
+  const stored = { headRead: "stored", readAt: 1_795_000_000 };
+  const shut = { ...shutDownTrove(forkTrove("ebisu", "stcUSD", 10), ebisuState("stcUSD")), ...stored };
+  const live = { ...shutDownTrove(forkTrove("ebisu", "WBTC", 5000), null), ...stored };
+  const [s] = walletSections([shut, live], { bands: true });
+  assert.equal(s.collateral, undefined);
+  assert.deepEqual(s.band.legs, []);
+  assert.equal(s.band.note, unreadNote(2, 2));
+});
+
+test("the undrawn line follows the Status pill, as the heading's count", async () => {
+  const { undrawnCount, undrawnLine } = await import("../../lib/wallet/wallet-sections.ts");
+  const u = { open: 80, closed: 1100 };
+  assert.equal(undrawnCount(u), 1180);
+  assert.equal(
+    undrawnLine(u, "Base"),
+    "1,180 more holdings on Base are not drawn (80 open); the open ones with the largest census value come first.",
+  );
+  assert.equal(
+    undrawnLine(u, "Base", "open"),
+    "80 more open holdings on Base are not drawn; the ones with the largest census value come first.",
+  );
+  assert.equal(undrawnLine(u, "Base", "closed"), "1,100 more closed holdings on Base are not drawn.");
+  assert.equal(
+    undrawnLine({ open: 1, closed: 0 }, "Ethereum", "open").startsWith("1 more open holding on Ethereum is"),
+    true,
+  );
+  assert.equal(undrawnCount({ open: 0, closed: 3 }, "open"), 0);
 });

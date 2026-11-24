@@ -143,7 +143,7 @@ export function LiquityForkClosedExplanation({
         <H>
           <AmountText value={peakDebt} /> {debtSymbol}
         </H>{" "}
-        of debt: the highest balances in its record, each its own lifetime maximum.
+        of debt: the peak balances in its record.
       </span>,
     );
   }

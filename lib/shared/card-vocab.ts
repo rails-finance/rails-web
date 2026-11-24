@@ -12,11 +12,12 @@
 //   collateral ratio, pooled lenders a health factor. The label must describe
 //   the figure it sits over — a card whose native figure is the inverse (a
 //   debt ratio) converts it or keeps its own label; it never borrows this one.
-// - Terminal cards name a lifetime maximum "Peak <side>" ("Peak supplied",
-//   "Peak debt", "Peak collateral"), and a last-known state that is not a
-//   peak "Final recorded …"; "not recorded" has one sentence. "Peak value"
-//   is the side's assets valued together on their highest day. Surfaces
-//   still reading "Highest recorded" are listed in ui-jobs 809.
+// - A lifetime maximum is a "Peak" everywhere it is named (ui-jobs 809): the
+//   closed card's heads, the dropdown lines, the exports and the share cards
+//   ("Peak supplied", "Peak debt", "Peak collateral"). A last-known state
+//   that is not a peak is "Final recorded …"; "not recorded" has one
+//   sentence. "Peak value" is the side's assets valued together on their
+//   highest day.
 //
 // Labels here are the column HEADERS (12px, sentence case). Tower segment
 // names ("Borrowed (all time)") and mode-pill words ("Borrowing", "Supply
@@ -35,12 +36,13 @@ export const CARD_VOCAB = {
     cdp: "Collateral ratio",
     pooled: "Health factor",
   } satisfies Record<RatioFamily, string>,
-  /** Still "Highest recorded": the surfaces in ui-jobs 809. */
-  peakCollateral: "Highest recorded collateral",
-  peakSupply: "Highest recorded supply",
+  /** A side's lifetime maximum, as the dropdowns, exports and share cards
+   *  name it. */
+  peakCollateral: "Peak collateral",
+  peakSupply: "Peak supplied",
   /** Every supplied reserve or market, collateral or not. */
-  peakSupplied: "Highest recorded supplied",
-  peakDebt: "Highest recorded debt",
+  peakSupplied: "Peak supplied",
+  peakDebt: "Peak debt",
   /** A closed account card's side heads: the largest asset leads. */
   headSupplied: "Peak supplied",
   headDebt: "Peak debt",
