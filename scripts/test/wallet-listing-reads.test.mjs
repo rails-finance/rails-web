@@ -152,7 +152,9 @@ globalThis.fetch = async (input, init = {}) => {
   return json({ error: `no stub for ${url.pathname}` }, 404);
 };
 
-const { readListingRows, readSummary, readWalletCounts } = await import("../../lib/wallet/read-wallet.ts");
+const { readListingRows, readSummary, readWalletCounts, readWalletUncached } = await import(
+  "../../lib/wallet/read-wallet.ts"
+);
 
 const signal = () => new AbortController().signal;
 
@@ -287,6 +289,15 @@ test("summary: Sepolia rows stay in the rows and leave the totals", async () => 
   assert.equal(s.total, counted.length);
   assert.equal(s.open, counted.filter((r) => r.status === "open").length);
   assert.equal(s.closed, 0);
+});
+
+test("the wallet read's total leaves a Sepolia row out once", async () => {
+  v2sp = "ok";
+  const s = await readSummary(W2, signal());
+  const counted = s.rows.filter((r) => r.chain !== "sepolia").length;
+  const read = await readWalletUncached(W2);
+  assert.equal(read.total, counted);
+  assert.equal(read.total, s.total);
 });
 
 test("menu: a null-href row resolves its protocol by chain and family, through the real roster", async () => {
