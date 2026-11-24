@@ -3,7 +3,7 @@
 // receipts from lib/euler/provenance.ts.
 
 import type { EulerPosition, EulerWalletRow, UnitShow } from "./position";
-import type { EulerChainId } from "./types";
+import { EULER_INDEXED, type EulerChainId } from "./types";
 
 export const LABEL = "Euler V2";
 export const CHAIN_NAME: Record<EulerChainId, string> = { 8453: "Base", 42161: "Arbitrum" };
@@ -53,7 +53,11 @@ export const FRONT_DOOR = {
     `A wallet's Euler V2 accounts on ${CHAIN_NAME[chain]}: each loan with its collateral and health score, and each deposit over the last 30 days.`,
   heading: "Euler V2 accounts",
   narrowing: "Deposits not used as collateral are read on account 0.",
-  none: "This wallet has no Euler V2 loan or collateral on any of its 256 accounts, and no deposit on account 0.",
+  /** Follows EULER_INDEXED: an indexed chain finds deposits on every account. */
+  none: (chain: EulerChainId) =>
+    EULER_INDEXED[chain]
+      ? "This wallet has no Euler V2 loan, collateral or deposit on any of its 256 accounts."
+      : "This wallet has no Euler V2 loan or collateral on any of its 256 accounts, and no deposit on account 0.",
   unanswered: "Rails could not read this wallet from the chain. Try again in a minute.",
   truncated: "This wallet holds more than Rails reads in one visit; the first 150 holdings are shown.",
   loan: "Borrows",

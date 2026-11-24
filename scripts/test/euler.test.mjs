@@ -395,3 +395,10 @@ test("a controller with no debt and no shares holds nothing", () => {
 test("a pair the read does not list is null", () => {
   assert.equal(eulerPairOf(read([holding(V1, "5", "1", "0", false)]), ACC, V2), null);
 });
+
+test("the wallet page's empty line follows EULER_INDEXED", async () => {
+  const { FRONT_DOOR } = await import("../../lib/euler/words.ts");
+  const { EULER_INDEXED } = await import("../../lib/euler/types.ts");
+  for (const chain of [8453, 42161])
+    assert.match(FRONT_DOOR.none(chain), EULER_INDEXED[chain] ? /any of its 256 accounts\.$/ : /on account 0\.$/);
+});

@@ -58,7 +58,7 @@ export async function EulerWalletAccounts({ chain, wallet: raw }: { chain: Euler
             </UnansweredLine>
           ) : answer.data.accounts.length === 0 ? (
             <p className="text-sm text-rb-500" data-euler-none="">
-              {FRONT_DOOR.none}
+              {FRONT_DOOR.none(chain)}
             </p>
           ) : (
             <EulerWalletList w={answer.data} home={home} />
