@@ -56,6 +56,8 @@ export async function fetchWithRetry(
     try {
       const res = await fetch(url, { ...init, headers, signal: AbortSignal.timeout(attemptTimeoutMs) });
       if (isRetryableStatus(res.status) && !isLast) {
+        // The dropped answer's body would hold its pool connection (lib/api/api-pool.ts).
+        void res.body?.cancel().catch(() => undefined);
         console.warn(`resilient-fetch: retry ${attempt + 1} for ${url} — ${res.status} ${res.statusText}`);
         continue;
       }

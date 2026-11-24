@@ -16,15 +16,28 @@
 // through the pool alike.
 //
 // A connection the host resets fails the one request it carried (pipelining
-// is 1); the pool opens a fresh connection for the next. The wallet page's
-// retry (lib/wallet/api-hop.ts) and the route gate's chain fallback handle that
+// is 1); the pool opens a fresh connection for the next. A GET or HEAD that
+// fails at the socket before any response headers arrive (a keep-alive socket
+// gone stale while a Vercel instance was frozen) is sent once more
+// (`retryStaleSocket`). Past that, the wallet page's retry
+// (lib/wallet/api-hop.ts) and the route gate's chain fallback handle the
 // request as before.
 //
+// A response's body holds its connection until the body is read to the end
+// or cancelled, so a call site reads or cancels every body, including the one
+// it drops on a non-2xx (`void res.body?.cancel().catch(() => undefined)`).
+// Six unread bodies leave every other request to the api host queued.
+//
+// The router marks a request's wait (lib/api/pool-wait.ts) `queued` when it
+// takes it and `granted` when the pool hands it to a connection, so the route
+// gate can tell a wait spent in this queue from a slow api.
+//
 // SERVER-ONLY: instrumentation.ts installs it once per server process, and no
-// other module imports it. Its one import is undici, so
-// scripts/test/api-pool.test.mjs loads it directly.
+// other module imports it. It imports undici and ./pool-wait, so
+// scripts/test/api-pool.test.mjs loads it with a hook that adds the .ts.
 
-import { Dispatcher, Pool, getGlobalDispatcher, setGlobalDispatcher } from "undici";
+import { Client, Dispatcher, Pool, getGlobalDispatcher, setGlobalDispatcher } from "undici";
+import { currentPoolWait } from "./pool-wait";
 
 /** At most this many open connections to the api host per server process.
  *  Above 814's wallet cap of 4, so a wallet read leaves a render on the same
@@ -42,15 +55,97 @@ export interface ApiPoolOptions {
   keepAliveMs?: number;
 }
 
-/** The pool for `origin`: at most `connections` sockets, one request on each at a time. */
-export function createApiPool(origin: string, opts: ApiPoolOptions = {}): Pool {
+/** The pause before a stale socket's request is sent again (ms). */
+export const STALE_RETRY_DELAY_MS = 10;
+
+const STALE_SOCKET_CODES = new Set(["UND_ERR_SOCKET", "ECONNRESET"]);
+const IDEMPOTENT = new Set(["GET", "HEAD"]);
+
+/** Sends a request again, once, where its socket failed before any response
+ *  headers arrived. Every other outcome passes to `handler` unchanged. */
+class RetryStaleSocket implements Dispatcher.DispatchHandler {
+  #answered = false;
+  #retried = false;
+  readonly #dispatch: Dispatcher.Dispatch;
+  readonly #opts: Dispatcher.DispatchOptions;
+  readonly #handler: Dispatcher.DispatchHandler;
+
+  constructor(dispatch: Dispatcher.Dispatch, opts: Dispatcher.DispatchOptions, handler: Dispatcher.DispatchHandler) {
+    this.#dispatch = dispatch;
+    this.#opts = opts;
+    this.#handler = handler;
+  }
+
+  onRequestStart(controller: Dispatcher.DispatchController, context: unknown): void {
+    this.#handler.onRequestStart?.(controller, context);
+  }
+
+  onRequestUpgrade(...args: Parameters<NonNullable<Dispatcher.DispatchHandler["onRequestUpgrade"]>>): void {
+    this.#handler.onRequestUpgrade?.(...args);
+  }
+
+  onResponseStart(...args: Parameters<NonNullable<Dispatcher.DispatchHandler["onResponseStart"]>>): void {
+    this.#answered = true;
+    this.#handler.onResponseStart?.(...args);
+  }
+
+  onResponseData(...args: Parameters<NonNullable<Dispatcher.DispatchHandler["onResponseData"]>>): void {
+    this.#handler.onResponseData?.(...args);
+  }
+
+  onResponseEnd(...args: Parameters<NonNullable<Dispatcher.DispatchHandler["onResponseEnd"]>>): void {
+    this.#handler.onResponseEnd?.(...args);
+  }
+
+  onResponseError(controller: Dispatcher.DispatchController, err: Error): void {
+    const code = (err as { code?: string }).code;
+    if (this.#answered || this.#retried || controller.aborted || !code || !STALE_SOCKET_CODES.has(code)) {
+      this.#handler.onResponseError?.(controller, err);
+      return;
+    }
+    this.#retried = true;
+    setTimeout(() => {
+      try {
+        this.#dispatch(this.#opts, this);
+      } catch (e) {
+        this.#handler.onResponseError?.(controller, e as Error);
+      }
+    }, STALE_RETRY_DELAY_MS);
+  }
+}
+
+/** An interceptor that sends a GET or HEAD once more where it failed with
+ *  UND_ERR_SOCKET or ECONNRESET before any response headers arrived. Other
+ *  methods, later failures and every status code pass through. */
+export const retryStaleSocket: Dispatcher.DispatcherComposeInterceptor = (dispatch) => (opts, handler) =>
+  IDEMPOTENT.has(opts.method) ? dispatch(opts, new RetryStaleSocket(dispatch, opts, handler)) : dispatch(opts, handler);
+
+/** The mark the router sets on a request's options: called when the pool
+ *  hands the request to a connection. */
+const ON_GRANT = Symbol("rails.api.onGrant");
+type GrantOptions = Dispatcher.DispatchOptions & { [ON_GRANT]?: () => void };
+
+/** One of the pool's connections. The pool calls `dispatch` when it hands a
+ *  request over, straight away where a connection is free and otherwise when
+ *  one frees. */
+class GrantingClient extends Client {
+  dispatch(opts: Dispatcher.DispatchOptions, handler: Dispatcher.DispatchHandler): boolean {
+    (opts as GrantOptions)[ON_GRANT]?.();
+    return super.dispatch(opts, handler);
+  }
+}
+
+/** The pool for `origin`: at most `connections` sockets, one request on each
+ *  at a time, with a stale socket's GET or HEAD retried once. */
+export function createApiPool(origin: string, opts: ApiPoolOptions = {}): Dispatcher {
   const keepAlive = opts.keepAliveMs ?? API_KEEPALIVE_MS;
   return new Pool(origin, {
     connections: opts.connections ?? API_CONNECTIONS,
     pipelining: 1,
     keepAliveTimeout: keepAlive,
     keepAliveMaxTimeout: keepAlive,
-  });
+    factory: (url, clientOpts) => new GrantingClient(url, clientOpts),
+  }).compose(retryStaleSocket);
 }
 
 const originOf = (o: unknown): string | undefined => {
@@ -78,8 +173,17 @@ export class OriginRouter extends Dispatcher {
   }
 
   dispatch(opts: Dispatcher.DispatchOptions, handler: Dispatcher.DispatchHandler): boolean {
-    const target = originOf(opts.origin) === this.origin ? this.pool : this.rest;
-    return target.dispatch(opts, handler);
+    if (originOf(opts.origin) !== this.origin) return this.rest.dispatch(opts, handler);
+    const wait = currentPoolWait();
+    if (!wait) return this.pool.dispatch(opts, handler);
+    wait.state = "queued";
+    const marked: GrantOptions = {
+      ...opts,
+      [ON_GRANT]: () => {
+        wait.state = "granted";
+      },
+    };
+    return this.pool.dispatch(marked, handler);
   }
 
   /** Closes the pool; the dispatcher for other origins belongs to the process. */

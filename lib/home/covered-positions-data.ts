@@ -71,6 +71,7 @@ import { CHAINS } from "@/lib/shared/chains";
 import { LAUNCHED_PROTOCOLS } from "@/lib/shared/protocols";
 import type { CoveredPositions } from "./covered-positions";
 import { CENSUS_ENDPOINT, fetchCensusCount, type RosterCount, type RosterState } from "./census-leg";
+import { countSlot } from "./count-slot";
 
 const RAILS_API_URL = process.env.RAILS_API_URL;
 
@@ -205,6 +206,7 @@ async function fetchTotal(id: string, path: string, status: string | null): Prom
     // malformed envelope still fails here on the first answer.
     const res = await fetchWithRetry(url, createAuthFetchOptions({ next: { revalidate: REVALIDATE_SECONDS } }));
     if (!res.ok) {
+      void res.body?.cancel().catch(() => undefined);
       console.error(`covered-positions: ${id} ${path} [${status ?? "all-time"}] -> ${res.status} ${res.statusText}`);
       return null;
     }
@@ -248,8 +250,8 @@ async function fetchTotal(id: string, path: string, status: string | null): Prom
  */
 async function fetchRosterCount(id: string, path: string): Promise<RosterState> {
   const [open, allTime] = await Promise.all([
-    fetchTotal(id, path, "open"),
-    fetchTotal(id, path, ALL_TIME_STATUS[id] ?? null),
+    countSlot(() => fetchTotal(id, path, "open")),
+    countSlot(() => fetchTotal(id, path, ALL_TIME_STATUS[id] ?? null)),
   ]);
   if (open === null || allTime === null) return null;
   // Both legs read the same coverage row; either saying "not yet" is enough.
@@ -391,8 +393,10 @@ function assertRosterCovered(): string[] | null {
 function fetchExplorerCount(id: string): Promise<RosterState> {
   const census = CENSUS_ENDPOINT[id];
   if (census) {
-    return fetchCensusCount(id, `${RAILS_API_URL}${census}`, (url) =>
-      fetchWithRetry(url, createAuthFetchOptions({ next: { revalidate: REVALIDATE_SECONDS } })),
+    return countSlot(() =>
+      fetchCensusCount(id, `${RAILS_API_URL}${census}`, (url) =>
+        fetchWithRetry(url, createAuthFetchOptions({ next: { revalidate: REVALIDATE_SECONDS } })),
+      ),
     );
   }
   return fetchRosterCount(id, LISTING_ENDPOINT[id]);
@@ -400,8 +404,9 @@ function fetchExplorerCount(id: string): Promise<RosterState> {
 
 /**
  * The roster-wide open and closed position counts, or null if any explorer's
- * rosters are unavailable (see the all-or-nothing note above). Fetches every
- * explorer concurrently; each leg retries transient failures with a per-attempt
+ * rosters are unavailable (see the all-or-nothing note above). Asks for every
+ * explorer at once, with at most COUNT_CONCURRENCY legs in flight
+ * (./count-slot.ts); each leg retries transient failures with a per-attempt
  * timeout (fetchWithRetry), and failures are not cached, so the next
  * regeneration retries from scratch. A Base explorer still backfilling its
  * history, or an Arbitrum explorer whose census is incomplete, is not a

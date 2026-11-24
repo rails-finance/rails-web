@@ -246,6 +246,9 @@ export async function readLiquityV2Sp<T>(
 ): Promise<T> {
   const url = `${opts.baseUrl ?? ""}${opts.api ?? "/api/liquity-v2"}/${route}?${liquityV2SpQuery(route, params)}`;
   const res = await fetch(url, { cache: "no-store", headers: opts.headers, signal: opts.signal });
-  if (!res.ok) throw new LiquityV2SpHttpError(res.status, res.statusText);
+  if (!res.ok) {
+    void res.body?.cancel().catch(() => undefined);
+    throw new LiquityV2SpHttpError(res.status, res.statusText);
+  }
   return scaleSpAnswer((await res.json()) as T);
 }

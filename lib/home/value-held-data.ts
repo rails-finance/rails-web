@@ -51,6 +51,7 @@ export async function getValueHeld(): Promise<ValueHeld | null> {
       { attemptTimeoutMs: 90_000 },
     );
     if (!res.ok) {
+      void res.body?.cancel().catch(() => undefined);
       console.error(`value-held: /api/stats/value-held -> ${res.status} ${res.statusText}`);
       return null;
     }
