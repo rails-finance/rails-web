@@ -214,6 +214,9 @@ const nextConfig: NextConfig = {
   // `next dev` would otherwise write an AGENTS.md into the repo; this repo
   // keeps only CLAUDE.md and README.md as prose (rails-ops decision 0004).
   agentRules: false,
+  // The api-host pool (lib/api/api-pool.ts) requires undici from node_modules
+  // at runtime instead of a bundled copy.
+  serverExternalPackages: ["undici"],
   experimental: {
     // Compile in a child process. Next turns the build worker off by default
     // when a config has a `webpack` function (the YAML loader below), so
