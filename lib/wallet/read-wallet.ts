@@ -43,7 +43,7 @@ import {
   ebisuDeposits,
 } from "@/lib/wallet/families/liquity-forks";
 import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
-import { withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
+import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
@@ -254,13 +254,12 @@ export async function readSummary(address: string, signal: AbortSignal, readerIp
   }
   const extra = await listing;
   const open = extra.rows.filter((r) => r.status === "open").length;
-  // Testnet rows are not counted (WALLET_COUNTS_SCOPE): they leave the rows
-  // and the totals together.
-  const testnet = rows.filter((r) => r.chain === "sepolia");
+  // Testnet rows stay in `rows` and leave the totals.
+  const testnet = rows.filter((r) => !countedRow(r));
   const testnetOpen = testnet.filter((r) => r.status === "open").length;
   return {
     ...first!,
-    rows: [...rows.filter((r) => r.chain !== "sepolia"), ...extra.rows],
+    rows: [...rows, ...extra.rows],
     total: first!.total - testnet.length + extra.rows.length,
     open: first!.open - testnetOpen + open,
     closed: first!.closed - (testnet.length - testnetOpen) + extra.rows.length - open,
@@ -489,7 +488,7 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
       }
     }
     for (const r of summary.rows) {
-      if (!taken.has(r))
+      if (!taken.has(r) && countedRow(r))
         positions.push({
           chain: r.chain,
           family: r.family,

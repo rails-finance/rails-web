@@ -37,6 +37,9 @@ export interface WalletSummaryRow {
   writtenAt: string;
 }
 
+/** Sepolia rows are drawn and never counted (WALLET_COUNTS_SCOPE). */
+export const countedRow = (r: Pick<WalletSummaryRow, "chain">): boolean => r.chain !== "sepolia";
+
 export interface WalletSummaryAnswer {
   address: string;
   rows: WalletSummaryRow[];

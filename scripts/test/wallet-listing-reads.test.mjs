@@ -274,15 +274,16 @@ test("counts: a row with a null href counts and passes through without throwing"
   assert.deepEqual(noPage.map((p) => p.chain).sort(), ["arc", "ethereum", "ethereum"]);
 });
 
-test("summary: Sepolia rows leave the rows and the totals together", async () => {
+test("summary: Sepolia rows stay in the rows and leave the totals", async () => {
   v2sp = "ok";
   const s = await readSummary(W2, signal());
+  const counted = s.rows.filter((r) => r.chain !== "sepolia");
   assert.equal(
     s.rows.some((r) => r.chain === "sepolia"),
-    false,
+    true,
   );
-  assert.equal(s.total, s.rows.length);
-  assert.equal(s.open, s.rows.filter((r) => r.status === "open").length);
+  assert.equal(s.total, counted.length);
+  assert.equal(s.open, counted.filter((r) => r.status === "open").length);
   assert.equal(s.closed, 0);
 });
 
