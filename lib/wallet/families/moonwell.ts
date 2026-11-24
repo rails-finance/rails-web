@@ -14,6 +14,7 @@
 // roster.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { apiHop } from "@/lib/wallet/api-hop";
 import {
   buildMoonwellPositionRows,
   type MoonwellListingRoster,
@@ -33,14 +34,17 @@ const USD_SOURCE = "Moonwell Base Comptroller's oracle at the sweep's block";
 async function readRoster(signal: AbortSignal, readerIp?: string): Promise<RawMoonwellBaseMarketState[]> {
   const base = process.env.RAILS_API_URL?.replace(/\/$/, "");
   if (!base) throw new Error("RAILS_API_URL is not set");
-  const res = await fetch(`${base}/api/moonwell-base/positions?limit=1`, {
-    ...createAuthFetchOptions({ signal }, readerIp),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`/api/moonwell-base/positions answered ${res.status}`);
-  const body = (await res.json()) as { marketState?: RawMoonwellBaseMarketState[] | null };
-  if (!body.marketState?.length) throw new Error("/api/moonwell-base/positions sent no market state");
-  return body.marketState;
+  // One slot of the wallet page's cap on the api host, retried once on a reset (lib/wallet/api-hop.ts).
+  return apiHop(async () => {
+    const res = await fetch(`${base}/api/moonwell-base/positions?limit=1`, {
+      ...createAuthFetchOptions({ signal }, readerIp),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`/api/moonwell-base/positions answered ${res.status}`);
+    const body = (await res.json()) as { marketState?: RawMoonwellBaseMarketState[] | null };
+    if (!body.marketState?.length) throw new Error("/api/moonwell-base/positions sent no market state");
+    return body.marketState;
+  }, signal);
 }
 
 /** Both sides in dollars at the oracle, or undefined where a leg is unpriced

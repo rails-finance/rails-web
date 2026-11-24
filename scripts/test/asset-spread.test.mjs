@@ -17,9 +17,17 @@ export async function resolve(specifier, context, next) {
 }`;
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
-const { fmtSignedSpread, fmtSpread, gapSince, inForce, lineSpreads, roundDeviations, SPREAD_LIMIT } = await import(
-  "../../lib/shared/asset-spread.ts"
-);
+const {
+  dashReason,
+  dashTitle,
+  fmtSignedSpread,
+  fmtSpread,
+  gapSince,
+  inForce,
+  lineSpreads,
+  roundDeviations,
+  SPREAD_LIMIT,
+} = await import("../../lib/shared/asset-spread.ts");
 
 const main = {
   key: "main",
@@ -175,4 +183,32 @@ test("day closes given without their rounds compare at the same moment (the Pric
   assert.equal(s.roundsFrom, 101);
   assert.ok(!s.byDay.has(100), "the daily part keeps the read window");
   assert.ok(s.byDay.has(101) && s.passes, "the rounds' close compares with no read window");
+});
+
+test("each kind of dash carries its reason", () => {
+  const near = {
+    key: "near",
+    points: [
+      [100, 1.0, 1010],
+      [101, 0.9691, 2196],
+      [102, 1.0, null],
+    ],
+  };
+  const [s] = lineSpreads(main, [near], 1);
+  assert.ok(s.apart.has(101) && !s.apart.has(100), "day 101 was read 39 minutes apart");
+  assert.ok(!s.apart.has(102) && !s.byDay.has(102), "day 102 has no read block: no gap and no window claim");
+  assert.equal(dashReason(s, 102, false), "none");
+  assert.equal(dashReason(s, 101, false), "window");
+  assert.equal(dashReason(s, 99, false), "none", "no price that day");
+  assert.equal(dashReason(undefined, 101, false), "none");
+  assert.equal(dashReason(s, 101, true), "rounds");
+  // The rounds/daily boundary: the same cell reads by which grid holds it.
+  assert.equal(dashReason(s, 100, true), "rounds", "on the rounds");
+  assert.equal(dashReason(s, 100, false), "none", "on the daily store, a day that compared");
+  assert.equal(
+    dashTitle("window", "Chainlink ETH / USD"),
+    "Read more than ten minutes from Chainlink ETH / USD on this day",
+  );
+  assert.equal(dashTitle("none", "x"), "No stored round for this line at this moment");
+  assert.equal(dashTitle("rounds", "x"), "No stored round for this line at this moment");
 });

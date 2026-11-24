@@ -23,6 +23,7 @@
 // ONE RETRY OVER THE MISSES, and only the misses, 300 ms after the first wave.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { apiSlot } from "@/lib/wallet/api-hop";
 
 /** The chains the server route reads. */
 export type VaultBlockChain = 1 | 8453;
@@ -84,12 +85,19 @@ async function askServer(
     qs.set("decimals", String(vault.decimals));
   }
   try {
-    const response = await fetch(
-      `${base}/api/at-block/vault/blocks?${qs.toString()}`,
-      createAuthFetchOptions({ signal: opts.signal }, opts.readerIp),
-    );
-    if (!response.ok) return [];
-    const body = (await response.json()) as { reads?: ServerRead[] };
+    // Inside a wallet read, one slot of the api host's cap (lib/wallet/api-hop.ts),
+    // released before the chain reads the blocks the answer left out.
+    const body = await apiSlot(async () => {
+      const response = await fetch(
+        `${base}/api/at-block/vault/blocks?${qs.toString()}`,
+        createAuthFetchOptions({ signal: opts.signal }, opts.readerIp),
+      );
+      if (!response.ok) {
+        void response.body?.cancel().catch(() => undefined);
+        return {};
+      }
+      return (await response.json()) as { reads?: ServerRead[] };
+    }, opts.signal);
     return Array.isArray(body.reads) ? body.reads : [];
   } catch {
     return [];

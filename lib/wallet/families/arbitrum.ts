@@ -62,6 +62,7 @@ export const aaveV3Arbitrum: FamilyModule = {
   chain: ARBITRUM_CHAIN_ID,
   summaryChain: "arbitrum",
   summaryFamily: "aave-v3",
+  storedOnVisit: true,
   async shape(summary) {
     return rowsOf(summary, readAaveAnswer).map(({ row, r }): WalletPosition => {
       const raw = r.card as { reserves?: { hasBorrow?: boolean; borrowApr?: number }[] };
@@ -100,6 +101,7 @@ export const compoundV3Arbitrum: FamilyModule = {
   chain: ARBITRUM_CHAIN_ID,
   summaryChain: "arbitrum",
   summaryFamily: "compound-v3",
+  storedOnVisit: true,
   async shape(summary) {
     const out: WalletPosition[] = [];
     rowsOf(summary, readCompoundAnswer).forEach(({ row, r }) => {
@@ -170,6 +172,7 @@ export const morphoArbitrum: FamilyModule = {
   chain: ARBITRUM_CHAIN_ID,
   summaryChain: "arbitrum",
   summaryFamily: "morpho",
+  storedOnVisit: true,
   async shape(summary) {
     return rowsOf(summary, readMorphoAnswer).map(({ row, r }): WalletPosition => {
       const base = {

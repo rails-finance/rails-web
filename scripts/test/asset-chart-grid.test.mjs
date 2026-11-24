@@ -14,6 +14,8 @@ import {
   sampleJoined,
   sampleRuns,
   needsRegrid,
+  rangeActive,
+  rangePressed,
   sampleSpread,
   sampleTrack,
   withDetail,
@@ -200,4 +202,23 @@ test("step runs hold each value to the next vertex and end on their last", () =>
     [[500, 9]],
   ];
   assert.deepEqual(sampleRuns(g, runs), [5, 5, 7, null, 9, null]);
+});
+
+test("the full span presses All, padded or not, and no other range", () => {
+  const b = { t0: 1_000_000, t1: 1_000_000 + 1000 * DAY_S };
+  assert.equal(rangeActive({ from: b.t0, to: b.t1 }, b, null), true);
+  assert.equal(rangeActive({ from: b.t0 - 20 * DAY_S, to: b.t1 + 20 * DAY_S }, b, null), true, "padding either side");
+  assert.equal(rangeActive({ from: b.t0 + 100 * DAY_S, to: b.t1 }, b, null), false);
+  assert.equal(rangeActive({ from: b.t0 + 20 * DAY_S, to: b.t1 }, b, null), false, "a first round 2 % in is no preset");
+  assert.equal(rangeActive({ from: b.t0, to: b.t1 }, b, 30 * DAY_S), false);
+  assert.equal(rangeActive({ from: b.t1 - 30 * DAY_S, to: b.t1 }, b, 30 * DAY_S), true);
+});
+
+test("no range button presses on the opening window, even one that starts at the first stored day", () => {
+  const b = { t0: 1_000_000, t1: 1_000_000 + 1000 * DAY_S };
+  const home = { from: b.t0 + 3600, to: b.t1 };
+  assert.equal(rangeActive(home, b, null), true, "a first round an hour after t0 spans All");
+  assert.equal(rangePressed(home, b, null, false), false, "but nothing presses until a range is chosen");
+  assert.equal(rangePressed({ from: b.t0, to: b.t1 }, b, null, true), true, "All, once chosen");
+  assert.equal(rangePressed({ from: b.t1 - 30 * DAY_S, to: b.t1 }, b, 30 * DAY_S, true), true);
 });

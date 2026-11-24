@@ -2,12 +2,16 @@
 // (decision 0050, step 3; SERVER-ONLY). Each card is the family's listing row,
 // built from the summary row's `card` by the family's listing builder (the
 // Liquity V2 TroveSummary is the row as served). The head reads:
-//   Morpho Blue  the existing position reader once per open position with
-//                debt: LTV against LLTV at the market's own oracle (no
+//   Morpho Blue  the existing position reader once per open position: LTV
+//                against LLTV at the market's own oracle where it owes (no
 //                dollars). It runs over rails-server's answer first
 //                (/api/at-block/morpho/position, every market at the chain's
 //                block B), waiting up to 3.5 s (walletApiWait); a position the route
 //                does not answer is read on the chain, all of those at one block.
+//                The card's debt with interest takes the market totals from
+//                that read, and every open card its stamp: the stored card's
+//                totals are not read, and the row's stamp is its last event
+//                (mig 532, morpho-card.ts).
 //   MakerDAO     the existing Vat reader once per open vault: the collateral
 //                at the OSM price, the debt in DAI, the liquidation price.
 //   Fluid        the existing VaultResolver reader once per open NFT with
@@ -39,6 +43,9 @@ import { shutDownTrove } from "@/lib/wallet/trove-shutdown";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { morphoHasDebt } from "@/lib/morpho/position-legs";
+import { morphoCardAtHead, storedMorphoCard } from "./morpho-card";
+import { apiHop, createLimiter } from "@/lib/wallet/api-hop";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, opt, plural, storeStamp } from "@/lib/wallet/summary-row";
 import { formerHoldOf, movedHistory } from "@/lib/wallet/moved-row";
@@ -87,6 +94,9 @@ async function eachOpen(
 
 // ── Morpho Blue ─────────────────────────────────────────────────────────────
 
+/** At most this many of one wallet's Morpho Ethereum chain reads at once. */
+const MORPHO_CHAIN_READS = 4;
+
 export const morphoEthereum: FamilyModule = {
   id: "morpho",
   name: "Morpho Blue",
@@ -96,7 +106,7 @@ export const morphoEthereum: FamilyModule = {
   async shape(rows) {
     // The builder leaves out a row whose market it cannot parse, so each card
     // finds its summary row by id.
-    const cards = await buildMorphoPositionRows(rows.map((r) => r.card as RawMorphoPositionRow));
+    const cards = await buildMorphoPositionRows(rows.map((r) => storedMorphoCard(r.card)));
     const byId = new Map(rows.map((r) => [r.positionId, r]));
     return cards.flatMap((s): WalletPosition[] => {
       const r = byId.get(s.positionId);
@@ -131,15 +141,20 @@ export const morphoEthereum: FamilyModule = {
       ];
     });
   },
-  async head(open, address, signal, apiMs): Promise<HeadResult> {
-    const owing = open.filter((p) => {
-      const s = (p.card as { row: MorphoPositionSummary }).row;
-      return (s.currentDebt?.amount ?? s.borrowed.amount) > 0 && !s.isIdle;
-    });
-    if (owing.length === 0) return { positions: open, reads: 0 };
+  async head(open, address, signal, apiMs, { rows }): Promise<HeadResult> {
+    if (open.length === 0) return { positions: open, reads: 0 };
+    const storedById = new Map(rows.map((r) => [r.positionId, r.card]));
+    // Each read position's stored card with the head read's totals.
+    const atHead = new Map<string, RawMorphoPositionRow>();
     // The chain's block, read once and only when a position needs the chain.
     let block: Promise<bigint> | null = null;
-    const r = await eachOpen(owing, async (p) => {
+    // Every open row is read at once: each route request takes a slot of the
+    // wallet page's cap on the api host inside route-gate.ts, released before
+    // its chain read, with no retry. The chain reads go at most
+    // MORPHO_CHAIN_READS at once.
+    const chainLimit = createLimiter(MORPHO_CHAIN_READS);
+    const r = await eachOpen(open, readOne);
+    async function readOne(p: WalletPosition): Promise<WalletPosition> {
       const s = (p.card as { row: MorphoPositionSummary }).row;
       const served = await withServerHead(
         {
@@ -152,11 +167,23 @@ export const morphoEthereum: FamilyModule = {
         { timeoutMs: apiMs, signal },
       ).catch(() => null);
       let live = served?.answer;
-      if (!live) {
-        block ??= chainClient(MAINNET_CHAIN_ID).getBlockNumber();
-        live = await loadMorphoPositionFromChain(s.marketId, address, undefined, await block);
-      }
+      if (!live)
+        live = await chainLimit(async () => {
+          block ??= chainClient(MAINNET_CHAIN_ID).getBlockNumber();
+          return loadMorphoPositionFromChain(s.marketId, address, undefined, await block);
+        }, signal);
       if (live.chainStale) return { ...p, headRead: "failed" };
+      // A row stored owing nothing that the chain finds owing is behind the
+      // chain: its card states no debt, so it is not a head read.
+      if (!morphoHasDebt(s.borrowSharesRaw) && morphoHasDebt(live.borrowSharesRaw)) return { ...p, headRead: "failed" };
+      const stored = storedById.get(p.positionId);
+      const card = stored != null ? morphoCardAtHead(storedMorphoCard(stored), live) : null;
+      if (card) atHead.set(p.positionId, card);
+      // The share leg, as the server words the status: the principal can read
+      // through zero while a debt is open (position-legs.ts). A row owing
+      // nothing takes the read's stamp and states no risk.
+      if (!morphoHasDebt(s.borrowSharesRaw) || s.isIdle)
+        return { ...p, headRead: "read", readAtBlock: live.blockNumber, readAt: live.timestamp };
       const dollarLoan = DOLLAR_LOANS.has((live.loanSymbol ?? "").toUpperCase());
       return {
         ...p,
@@ -169,8 +196,20 @@ export const morphoEthereum: FamilyModule = {
         readAtBlock: live.blockNumber,
         readAt: live.timestamp,
       };
-    });
-    const byId = new Map(r.positions.map((p) => [p.positionId, p]));
+    }
+    // One build for every card the head read reached; a card it did not keeps
+    // the stored row's figures, and its section states no total (unreadAtHead).
+    const rebuilt = await buildMorphoPositionRows([...atHead.values()]);
+    const cardById = new Map(rebuilt.map((s) => [s.positionId, s]));
+    // A failed read states no stamp: the row's is its last event (mig 532),
+    // a time no one read the chain, and the page's "Updated" takes the oldest.
+    const byId = new Map(
+      r.positions.map((p): [string, WalletPosition] => {
+        if (p.headRead === "failed") return [p.positionId, { ...p, readAt: undefined, readAtBlock: undefined }];
+        const s = p.headRead === "read" ? cardById.get(p.positionId) : undefined;
+        return [p.positionId, s ? { ...p, card: { kind: "morpho" as const, row: s } } : p];
+      }),
+    );
     return { reads: r.reads, positions: open.map((p) => byId.get(p.positionId) ?? p) };
   },
 };
@@ -337,13 +376,16 @@ const priceOf = (type: string, p: OraclePricesData | null): number | undefined =
 async function liquityPrices(signal: AbortSignal): Promise<OraclePricesData | null> {
   const base = process.env.RAILS_API_URL?.replace(/\/$/, "");
   if (!base) throw new Error("RAILS_API_URL is not set");
-  const res = await fetch(`${base}/api/oracle/liquity-v2`, {
-    ...createAuthFetchOptions({ signal }),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`/api/oracle/liquity-v2 answered ${res.status}`);
-  const json = (await res.json()) as OraclePricesResponse;
-  return json.success && json.data ? json.data : null;
+  // One slot of the wallet page's cap on the api host, retried once on a reset (lib/wallet/api-hop.ts).
+  return apiHop(async () => {
+    const res = await fetch(`${base}/api/oracle/liquity-v2`, {
+      ...createAuthFetchOptions({ signal }),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`/api/oracle/liquity-v2 answered ${res.status}`);
+    const json = (await res.json()) as OraclePricesResponse;
+    return json.success && json.data ? json.data : null;
+  }, signal);
 }
 
 export const liquityV2: FamilyModule = {

@@ -93,6 +93,9 @@ import { AaveV4ArcWalletCard } from "@/components/protocol/aave-v4-arc/aave-v4-a
 import { AaveV4DeploymentProvider, BASE_AAVE_V4 } from "@/lib/aave-v4/deployment";
 import { ArbitrumReadCard, CometReadCard } from "@/components/shared/arbitrum-positions-listing";
 import { VaultPositionCard } from "@/components/vaults/vault-position-card";
+import { AaveV3OptimismWalletCard } from "@/components/protocol/aave-v3-optimism/aave-v3-optimism-wallet-card";
+import { CompoundV3OptimismWalletCard } from "@/components/protocol/compound-v3-optimism/compound-v3-optimism-wallet-card";
+import { MorphoAtBlockWalletCard } from "@/components/protocol/morpho-at-block/morpho-at-block-wallet-card";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletCard, WalletPosition } from "@/lib/wallet/types";
@@ -313,6 +316,13 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
       return <BalancerPositionCard r={card.read} surface="listing" />;
     case "vault":
       return <VaultPositionCard row={card.row} lane={card.lane} />;
+    // The families read at visit (lib/wallet/families/visit.ts): each explorer's wallet read.
+    case "aave-v3-optimism":
+      return <AaveV3OptimismWalletCard read={card.read} />;
+    case "compound-v3-optimism":
+      return <CompoundV3OptimismWalletCard read={card.read} />;
+    case "morpho-at-block":
+      return <MorphoAtBlockWalletCard dep={card.dep} read={card.read} />;
   }
 }
 

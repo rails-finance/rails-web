@@ -1,11 +1,10 @@
 // The wallet page's Liquidity section (W9): its owner routes
-// (lib/wallet/liquidity/sources.ts) and the limit every request shares
-// (lib/wallet/liquidity/limit.ts). Run: npm test
+// (lib/wallet/liquidity/sources.ts). The cap its requests share is the wallet page's
+// (wallet-api-cap.test.mjs). Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
 import { register } from "node:module";
 import { LIQUIDITY_SOURCES, ownerPath, walletLiquidityLine } from "../../lib/wallet/liquidity/sources.ts";
-import { createLimit } from "../../lib/wallet/liquidity/limit.ts";
 
 const W = "0xAbC0000000000000000000000000000000000001";
 const src = (key) => LIQUIDITY_SOURCES.find((s) => s.key === key);
@@ -37,25 +36,6 @@ test("the empty state names each explorer once with its chains", () => {
     walletLiquidityLine(),
     "Uniswap V3 and V4 on Ethereum, Arbitrum, Optimism and Arc; Uniswap V3 on Base; PancakeSwap V3 on Base and Arbitrum; Aerodrome on Base; Velodrome on Optimism; Balancer V3 on Ethereum and Arbitrum",
   );
-});
-
-test("the limit holds at most n in flight and runs every call", async () => {
-  const limit = createLimit(4);
-  let active = 0;
-  let peak = 0;
-  const call = (i) =>
-    limit(async () => {
-      active += 1;
-      peak = Math.max(peak, active);
-      await new Promise((r) => setTimeout(r, 5));
-      active -= 1;
-      if (i === 3) throw new Error("one fails");
-      return i;
-    });
-  const settled = await Promise.allSettled(Array.from({ length: 11 }, (_, i) => call(i)));
-  assert.equal(peak, 4);
-  assert.equal(settled.filter((s) => s.status === "fulfilled").length, 10);
-  assert.equal(settled[3].status, "rejected");
 });
 
 // The card builders import sibling modules extensionless: resolve them to their .ts files.

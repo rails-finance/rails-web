@@ -20,6 +20,7 @@
 // the card and kept out of the section and wallet totals (wallet-sections.ts).
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { apiHop } from "@/lib/wallet/api-hop";
 import { toRow, type BackendPositionRow } from "@/lib/vaults/position-row";
 import { vaultPositionUsd, type VaultCensusRow, type VaultPositionRow } from "@/lib/aave-vaults/vault-position";
 import { readBlockTimes } from "@/lib/sources/chain/vault-block-reads";
@@ -115,16 +116,19 @@ async function readHolderCensus(
       limit: String(PAGE),
       offset: String(offset),
     });
-    const res = await fetch(`${base}/api/vaults/positions?${qs}`, {
-      ...createAuthFetchOptions({ signal }, readerIp),
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error(`/api/vaults/positions answered ${res.status}`);
-    return (await res.json()) as {
-      data?: BackendPositionRow[];
-      pagination?: { total?: number };
-      census?: VaultCensusRow[];
-    };
+    // One slot of the wallet page's cap on the api host, retried once on a reset (lib/wallet/api-hop.ts).
+    return apiHop(async () => {
+      const res = await fetch(`${base}/api/vaults/positions?${qs}`, {
+        ...createAuthFetchOptions({ signal }, readerIp),
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`/api/vaults/positions answered ${res.status}`);
+      return (await res.json()) as {
+        data?: BackendPositionRow[];
+        pagination?: { total?: number };
+        census?: VaultCensusRow[];
+      };
+    }, signal);
   };
   const rows: BackendPositionRow[] = [];
   const left = new Set(want);

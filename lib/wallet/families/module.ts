@@ -50,6 +50,10 @@ export interface FamilyModule {
   /** The head read also reads the open positions the store has not read
    *  (`notRead`), and fills them where it can (f(x)). */
   readsNotRead?: true;
+  /** The module's rows are written when Rails reads the wallet on its
+   *  explorer there (the Arbitrum lane, Aave V4 on Arc): the empty state's
+   *  sentence says so. */
+  storedOnVisit?: true;
   /** The names the empty state's sentence gives the module where `name`
    *  covers several (the vault families). */
   lineNames?: string[];

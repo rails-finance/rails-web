@@ -32,7 +32,7 @@ import { formatDate } from "@/lib/date";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatPrice } from "@/lib/shared/flows-price";
 import { lineReaders, type PageLine } from "@/lib/shared/asset-roster";
-import { fmtSignedSpread, type LineSpread } from "@/lib/shared/asset-spread";
+import { dashReason, fmtSignedSpread, type DashReason, type LineSpread } from "@/lib/shared/asset-spread";
 import {
   CHUNK_MAX,
   DAY_S,
@@ -44,6 +44,7 @@ import {
   inForce,
   lineTrack,
   needsRegrid,
+  rangePressed,
   sampleSpread,
   sampleTrack,
   withDetail,
@@ -191,6 +192,8 @@ export function AssetLwChart({
   // The window shown, and the grid drawn under it.
   const view = useRef(home);
   const [shown, setShown] = useState(home);
+  // No range button presses until a reader chooses one.
+  const [rangeChosen, setRangeChosen] = useState(false);
   const [grid, setGrid] = useState<Grid | null>(null);
   const gridRef = useRef<Grid | null>(null);
   gridRef.current = grid;
@@ -644,6 +647,17 @@ export function AssetLwChart({
     },
     [tracks, lines, at, spreads],
   );
+  // Why a line has no deviation at the cursor.
+  const reasonAt = useCallback(
+    (lineId: string): DashReason => {
+      const i = lines.findIndex((l) => l.line.id === lineId);
+      const m = tracks?.[0]?.track;
+      const o = tracks?.[i]?.track;
+      const both = m?.roundsFrom != null && o?.roundsFrom != null ? Math.max(m.roundsFrom, o.roundsFrom) : null;
+      return dashReason(spreads?.others[i - 1]?.spread, Math.floor(at / DAY_S), both != null && at >= both);
+    },
+    [tracks, lines, at, spreads],
+  );
   const onJump = useCallback(
     (day: number, ts?: number) => {
       const t = ts ?? day * DAY_S + DAY_S - 1;
@@ -652,11 +666,7 @@ export function AssetLwChart({
     },
     [show],
   );
-  const active = (span: number | null) => {
-    const w = shown.to - shown.from;
-    const want = span ?? bounds.t1 - bounds.t0;
-    return Math.abs(w - want) <= want * 0.03 && Math.abs(shown.to - bounds.t1) <= want * 0.03;
-  };
+  const active = (span: number | null) => rangePressed(shown, bounds, span, rangeChosen);
   /** A line's key: the main hue, or its slot's token and dash. */
   const keyOf = (id: string, isMain: boolean) => {
     const st = styleOf(id);
@@ -700,9 +710,10 @@ export function AssetLwChart({
               key={word}
               type="button"
               aria-pressed={active(span)}
-              onClick={() =>
-                show(span == null ? { from: bounds.t0, to: bounds.t1 } : { from: bounds.t1 - span, to: bounds.t1 })
-              }
+              onClick={() => {
+                setRangeChosen(true);
+                show(span == null ? { from: bounds.t0, to: bounds.t1 } : { from: bounds.t1 - span, to: bounds.t1 });
+              }}
               className={`rounded px-2 py-0.5 tabular-nums ${active(span) ? "bg-[var(--surface-sunken)] font-semibold text-foreground" : "text-rb-500 hover:text-foreground"}`}
               data-asset-range={word}
             >
@@ -843,6 +854,7 @@ export function AssetLwChart({
           cursorTs={at}
           stamp={grid ? cellWords(grid, at, firstRound) : null}
           valueAt={spreadAt}
+          reasonAt={reasonAt}
           onJump={onJump}
           keyOf={(id) => keyOf(id, false)}
           rowHover={rowHover}

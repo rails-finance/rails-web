@@ -57,6 +57,8 @@ function servedAtOneBlock(chainId: ChainId, record: HeadRecord): { block: number
 
 async function postSnapshot(scope: HeadSnapshotScope, block: number, rounds: string[]): Promise<void> {
   try {
+    // A write posted after the response: it takes no slot of the wallet page's
+    // read cap (lib/wallet/api-hop.ts), whose scope after() keeps.
     const res = await fetch(
       `${process.env.RAILS_API_URL}/api/at-block/head/snapshot`,
       createAuthFetchOptions({

@@ -38,6 +38,8 @@ export interface LineSpread {
   key: string;
   /** Day → the line's price over the main line's, less one. */
   byDay: Map<number, number>;
+  /** Days both lines have a price but the reads fell outside READ_WINDOW_S. */
+  apart: Set<number>;
   /** The largest gap, by size, with its moment where it is the rounds'.
    *  Null where no day compares. */
   largest: { day: number; dev: number; ts?: number } | null;
@@ -88,6 +90,7 @@ export function lineSpreads(main: SpreadLine, others: readonly SpreadLine[], cha
   const at = new Map(main.points.map((p) => [p[0], p]));
   return others.map((o) => {
     const byDay = new Map<number, number>();
+    const apartDays = new Set<number>();
     let largest: LineSpread["largest"] = null;
     // A line given its rounds' day closes alone (the Prices list's flags) has
     // no points: its days compare at the same moment, with no moments between.
@@ -105,14 +108,43 @@ export function lineSpreads(main: SpreadLine, others: readonly SpreadLine[], cha
       // On the rounds both points are the day's close: one moment.
       const sameMoment = roundsFrom != null && p[0] >= roundsFrom;
       const timed = !sameMoment && !main.fixed && !o.fixed;
-      if (timed && (p[2] == null || q[2] == null || apart(p[2], q[2]) > READ_WINDOW_S)) continue;
+      if (timed && (p[2] == null || q[2] == null)) continue;
+      if (timed && apart(p[2]!, q[2]!) > READ_WINDOW_S) {
+        apartDays.add(p[0]);
+        continue;
+      }
       const dev = p[1] / q[1] - 1;
       byDay.set(p[0], dev);
       note(p[0], dev);
     }
     const big = largest as LineSpread["largest"];
-    return { key: o.key, byDay, largest: big, passes: big != null && Math.abs(big.dev) > SPREAD_LIMIT, roundsFrom };
+    return {
+      key: o.key,
+      byDay,
+      apart: apartDays,
+      largest: big,
+      passes: big != null && Math.abs(big.dev) > SPREAD_LIMIT,
+      roundsFrom,
+    };
   });
+}
+
+/** Why a line has no deviation at a cell: its read fell outside READ_WINDOW_S of
+ *  the main line's that day (`window`), the rounds chart holds no stored round
+ *  for it then (`rounds`), or no day compares (`none`, as before a line began). */
+export type DashReason = "window" | "rounds" | "none";
+
+/** The reason for a dash at `day` (UTC day number); `onRounds` where the cell is read on the rounds. */
+export function dashReason(spread: Pick<LineSpread, "apart"> | undefined, day: number, onRounds: boolean): DashReason {
+  if (onRounds) return "rounds";
+  return spread?.apart.has(day) ? "window" : "none";
+}
+
+/** The tooltip on a dash. A line with no data, or no read block, keeps the rounds wording. */
+export function dashTitle(reason: DashReason, mainName: string): string {
+  return reason === "window"
+    ? `Read more than ten minutes from ${mainName} on this day`
+    : "No stored round for this line at this moment";
 }
 
 /** The largest gap past SPREAD_LIMIT on or after `fromDay`, or null. */
