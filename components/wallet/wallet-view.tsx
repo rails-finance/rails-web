@@ -364,7 +364,8 @@ export function WalletView({
   status?: WalletStatus;
   /** The families the page reads, by chain (`walletFamiliesLine`). */
   reads: string;
-  /** The families with no store it reads at each visit, by chain (`walletVisitLine`). */
+  /** The families with no store it reads at each visit, by chain
+   *  (`walletVisitLine`); empty while none is on. */
   visits: string;
   /** The explorer the reader came from, for the empty state's link back. */
   back: { href: string; name: string } | null;
@@ -573,7 +574,7 @@ export function WalletView({
                   ) : (
                     <p className="text-sm text-foreground/80" data-wallet-reads="">
                       Rails holds no stored position for this wallet. This page reads {reads}. At each visit it reads{" "}
-                      {visits}, and the liquidity positions on {walletLiquidityLine()}.
+                      {visits && `${visits}, and `}the liquidity positions on {walletLiquidityLine()}.
                     </p>
                   )}
                   {back && (

@@ -127,8 +127,8 @@ export const WALLET_FAMILIES: FamilyModule[] = [
 ];
 
 /** The families read at visit, with no store (lib/wallet/families/visit.ts),
- *  in the decision's order. Morpho Blue on Arc makes no call while
- *  ARC_ON_WALLET is false. */
+ *  in the decision's order. Each makes no call while its explorer is
+ *  unlaunched. */
 export const WALLET_VISIT_FAMILIES: VisitModule[] = [aaveV3Optimism, compoundV3Optimism, morphoOptimism, morphoArc];
 
 /** The families the page reads, by chain, in one sentence for the empty
@@ -158,7 +158,7 @@ export function walletFamiliesLine(): string {
 }
 
 /** The families read at each visit, by chain, for the empty state: "Aave V3,
- *  Compound V3 and Morpho Blue on Optimism". */
+ *  Compound V3 and Morpho Blue on Optimism"; empty while none is on. */
 export const walletVisitLine = (): string => visitFamiliesLine(WALLET_VISIT_FAMILIES);
 
 /** A listing read that did not answer, or answered part of the wallet: its

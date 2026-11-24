@@ -1,8 +1,10 @@
 // The wallet read's families with no store, read at visit (rails-ops decision 0071, group 4;
 // lib/wallet/families/visit.ts): Aave V3, Compound V3 and Morpho Blue on Optimism, Morpho Blue on
-// Arc behind ARC_ON_WALLET; and Euler V2 on Arbitrum beside Base (lib/wallet/families/euler.ts).
-// Each module's read, a failed read, no position, Arc off making no call, the shared limiter, and
-// the reads starting only once the summary and listing reads have settled. The backend is a
+// Arc, each on while its explorer is launched; and Euler V2 on Arbitrum beside Base
+// (lib/wallet/families/euler.ts). Each module's read, a failed read, no position, a module whose
+// explorer is unlaunched making no call and drawing nothing, the shared limiter, and the reads
+// starting only once the summary and listing reads have settled. The launch flags are flipped in
+// memory on the roster's entries (protocolForSession), never in lib/shared/protocols.ts. The backend is a
 // stubbed fetch; the modules import through `@/`, resolved as wallet-listing-reads.test.mjs does.
 // Run: npm test
 import test from "node:test";
@@ -197,7 +199,18 @@ const AT_BLOCK = {
   "/api/at-block/euler/positions": () => answers.euler,
 };
 let answers;
-const reset = () => {
+const SESSIONS = ["aave-v3-optimism", "compound-v3-optimism", "morpho-optimism", "morpho-arc"];
+const OPTIMISM = SESSIONS.slice(0, 3);
+/** The sessions launched for a test; the others as protocols.ts has them. */
+let launched = OPTIMISM;
+const reset = (opts = {}) => {
+  launched = opts.launched ?? OPTIMISM;
+  for (const s of SESSIONS) {
+    const e = protocolForSession(s);
+    if (launched.includes(s)) delete e.unlaunched;
+    else if (FLAGS[s]) e.unlaunched = true;
+    else delete e.unlaunched;
+  }
   answers = { aave: AAVE, compound: COMPOUND, morpho: MORPHO, euler: 502 };
   summaryDelay = 0;
 };
@@ -238,6 +251,17 @@ globalThis.fetch = async (input) => {
   return end(json({ error: `no stub for ${path}` }, 404));
 };
 
+const { protocolForSession } = await import("../../lib/shared/protocols.ts");
+/** The flags as protocols.ts has them today. */
+const FLAGS = Object.fromEntries(SESSIONS.map((s) => [s, protocolForSession(s)?.unlaunched === true]));
+test.after(() => {
+  for (const s of SESSIONS) {
+    const e = protocolForSession(s);
+    if (FLAGS[s]) e.unlaunched = true;
+    else delete e.unlaunched;
+  }
+});
+
 const { readWalletUncached, walletFamiliesLine, walletVisitLine, WALLET_VISIT_FAMILIES } = await import(
   "../../lib/wallet/read-wallet.ts"
 );
@@ -245,7 +269,6 @@ const { readVisitFamilies } = await import("../../lib/wallet/families/visit.ts")
 const { aaveV3Optimism, compoundV3Optimism } = await import("../../lib/wallet/families/optimism.ts");
 const { morphoArc, morphoOptimism, morphoAtBlockModule } = await import("../../lib/wallet/families/morpho-at-block.ts");
 const { MORPHO_ARC } = await import("../../lib/morpho-at-block/types.ts");
-const { ARC_ON_WALLET } = await import("../../lib/wallet/families/aave-v4.ts");
 const { eulerV2Arbitrum, eulerV2Base } = await import("../../lib/wallet/families/euler.ts");
 const { apiHop, API_CONCURRENCY } = await import("../../lib/wallet/api-hop.ts");
 
@@ -349,11 +372,57 @@ test("a wallet holding nothing on a family draws no section and names no failure
   assert.deepEqual(r, { positions: [], families: [], failed: [] });
 });
 
-// ── Arc behind ARC_ON_WALLET ─────────────────────────────────────────────
+// ── Each module behind its explorer's launch flag ────────────────────────
 
-test("Morpho Arc follows ARC_ON_WALLET; a module that is off makes no call", async () => {
+test("with today's flags every module is off", () => {
+  for (const s of SESSIONS) assert.equal(FLAGS[s], true, `${s} is unlaunched in protocols.ts`);
+  reset({ launched: [] });
+  assert.deepEqual(
+    WALLET_VISIT_FAMILIES.map((m) => [m.id, m.on]),
+    SESSIONS.map((s) => [s, false]),
+  );
+});
+
+test("each module turns on when its own explorer's flag flips, and no other does", () => {
+  for (const s of SESSIONS) {
+    reset({ launched: [s] });
+    assert.deepEqual(
+      WALLET_VISIT_FAMILIES.filter((m) => m.on).map((m) => m.id),
+      [s],
+    );
+  }
+  assert.deepEqual([aaveV3Optimism.id, compoundV3Optimism.id, morphoOptimism.id, morphoArc.id], SESSIONS);
+});
+
+test("a module that is off makes no call and leaves the page: totals, sections, counts, pills", async () => {
+  reset({ launched: [] });
+  urls = [];
+  const read = await readWalletUncached(W);
+  assert.deepEqual(atBlockCalls(), []);
+  assert.deepEqual(read.positions, []);
+  assert.deepEqual(read.families, []);
+  assert.deepEqual(read.held, []);
+  assert.equal(read.total, 0);
+  assert.equal(read.partial, undefined);
+  // One launched: that family alone joins the page.
+  reset({ launched: ["compound-v3-optimism"] });
+  urls = [];
+  const one = await readWalletUncached(W);
+  assert.deepEqual(atBlockCalls(), ["/api/at-block/compound-v3-optimism/wallet"]);
+  assert.deepEqual(
+    one.positions.map((p) => p.family),
+    ["compound-v3"],
+  );
+  assert.deepEqual(
+    one.held.map((h) => h.slug),
+    ["compound-v3"],
+  );
+  assert.equal(one.total, 1);
+});
+
+test("Morpho Arc follows morpho-arc's flag; built and working once on", async () => {
   reset();
-  assert.equal(morphoArc.on, ARC_ON_WALLET);
+  assert.equal(morphoArc.on, false);
   urls = [];
   const off = await readVisitFamilies([morphoAtBlockModule(MORPHO_ARC, false)], W, 2000);
   assert.deepEqual(off, { positions: [], families: [], failed: [] });
@@ -366,12 +435,17 @@ test("Morpho Arc follows ARC_ON_WALLET; a module that is off makes no call", asy
   assert.equal(on.positions[0].card.dep, "arc");
 });
 
-test("the wallet read calls Arc only while ARC_ON_WALLET is on", async () => {
+test("the wallet read calls each launched route once per visit, Arc only once launched", async () => {
   reset();
   urls = [];
   await readWalletUncached(W);
-  const calls = atBlockCalls();
-  assert.equal(calls.includes("/api/at-block/morpho-arc/wallet"), ARC_ON_WALLET);
+  let calls = atBlockCalls();
+  assert.equal(calls.includes("/api/at-block/morpho-arc/wallet"), false);
+  reset({ launched: SESSIONS });
+  urls = [];
+  await readWalletUncached(W);
+  calls = atBlockCalls();
+  assert.equal(calls.filter((c) => c === "/api/at-block/morpho-arc/wallet").length, 1);
   for (const p of [
     "/api/at-block/aave-v3-optimism/position",
     "/api/at-block/compound-v3-optimism/wallet",
@@ -454,17 +528,19 @@ test("one protocol chosen reads only its module", async () => {
 
 // ── The empty state's lines ──────────────────────────────────────────────
 
-test("the empty state names the families read at visit by chain, Arc only while it is on", () => {
+test("the empty state names the launched families read at visit by chain, and none while none is", () => {
   assert.deepEqual(
     WALLET_VISIT_FAMILIES.map((m) => m.id),
-    ["aave-v3-optimism", "compound-v3-optimism", "morpho-optimism", "morpho-arc"],
+    SESSIONS,
   );
-  assert.equal(
-    walletVisitLine(),
-    ARC_ON_WALLET
-      ? "Aave V3, Compound V3 and Morpho Blue on Optimism; Morpho Blue on Arc"
-      : "Aave V3, Compound V3 and Morpho Blue on Optimism",
-  );
+  reset({ launched: [] });
+  assert.equal(walletVisitLine(), "");
+  reset({ launched: ["aave-v3-optimism", "morpho-optimism"] });
+  assert.equal(walletVisitLine(), "Aave V3 and Morpho Blue on Optimism");
+  reset();
+  assert.equal(walletVisitLine(), "Aave V3, Compound V3 and Morpho Blue on Optimism");
+  reset({ launched: SESSIONS });
+  assert.equal(walletVisitLine(), "Aave V3, Compound V3 and Morpho Blue on Optimism; Morpho Blue on Arc");
   const line = walletFamiliesLine();
   assert.match(line, /Aave V3, Compound V3 and Morpho Blue on Arbitrum where Rails has read the wallet/);
   assert.match(line, /; Euler V2 on Arbitrum(;|$)/);

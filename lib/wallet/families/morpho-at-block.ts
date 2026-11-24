@@ -3,8 +3,8 @@
 // one module per deployment from one builder. The answer is the explorer's
 // wallet read, the one /optimism/morpho/<wallet> and /arc/morpho/<wallet>
 // draw: every market the wallet holds a position in, at one head block.
-// Arc's module stays off while ARC_ON_WALLET is false (Arc has not launched;
-// a cold Arc wallet read is about 160 chain calls). Dollars are at a Chainlink
+// Each module is on while its explorer is launched (morpho-optimism,
+// morpho-arc; a cold Arc wallet read is about 160 chain calls). Dollars are at a Chainlink
 // feed, or Aave's oracle on Optimism, for the loan asset (decision 0046):
 // shown on the card and kept out of the tiles, as Morpho Arbitrum's are.
 
@@ -17,8 +17,7 @@ import {
 } from "@/lib/morpho-at-block/types";
 import { pairName } from "@/lib/morpho-at-block/words";
 import type { WalletPosition } from "@/lib/wallet/types";
-import { ARC_ON_WALLET } from "./aave-v4";
-import { visitKind, type VisitModule } from "./visit";
+import { explorerLaunched, visitKind, type VisitModule } from "./visit";
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 const ZERO = BigInt(0);
@@ -30,14 +29,17 @@ function usdSourceOf(dep: MorphoAtBlockDeployment, source: "chainlink" | "aave-o
     : `Chainlink USD feed on ${dep.chain} for the loan asset`;
 }
 
-export function morphoAtBlockModule(dep: MorphoAtBlockDeployment, on: boolean): VisitModule {
+/** `on`: fixed, for a test; unset, the explorer's launch flag at each call. */
+export function morphoAtBlockModule(dep: MorphoAtBlockDeployment, on?: boolean): VisitModule {
   return {
     id: dep.session,
     name: "Morpho Blue",
     chain: dep.chainId,
     chainName: dep.chain,
     family: "morpho",
-    on,
+    get on() {
+      return on ?? explorerLaunched(dep.session);
+    },
     path: (address) => `/api/at-block/${dep.api}/wallet?${new URLSearchParams({ owner: address.toLowerCase() })}`,
     shape(answer, address) {
       const r = answer as MorphoAtBlockWalletRead;
@@ -79,6 +81,5 @@ export function morphoAtBlockModule(dep: MorphoAtBlockDeployment, on: boolean): 
   };
 }
 
-export const morphoOptimism = morphoAtBlockModule(MORPHO_OPTIMISM, true);
-/** Off while ARC_ON_WALLET is false: no call is made. */
-export const morphoArc = morphoAtBlockModule(MORPHO_ARC, ARC_ON_WALLET);
+export const morphoOptimism = morphoAtBlockModule(MORPHO_OPTIMISM);
+export const morphoArc = morphoAtBlockModule(MORPHO_ARC);

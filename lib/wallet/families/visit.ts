@@ -10,6 +10,8 @@
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { isReadCeiling } from "@/lib/shared/read-ceiling";
 import type { ChainId } from "@/lib/shared/chains";
+import { protocolForSession } from "@/lib/shared/protocols";
+import type { SessionProtocol } from "@/lib/shared/sessions";
 import { publicErrorMessage } from "@/lib/api/public-error";
 import { apiHop } from "@/lib/wallet/api-hop";
 import { withBudget } from "@/lib/wallet/summary-row";
@@ -24,8 +26,9 @@ export interface VisitModule {
   chainName: string;
   /** The explorer slug: the protocol section and the Protocol pill. */
   family: string;
-  /** Whether the page reads the module: Morpho Blue on Arc while ARC_ON_WALLET. */
-  on: boolean;
+  /** Whether the page reads the module: while its explorer is launched
+   *  (`explorerLaunched`). */
+  readonly on: boolean;
   /** The head route for the wallet, under RAILS_API_URL. */
   path(address: string): string;
   /** One position per position the answer holds; none where it holds nothing.
@@ -53,6 +56,10 @@ async function readOne(m: VisitModule, address: string, budgetMs: number, reader
     }, signal),
   );
 }
+
+/** Whether an explorer is launched: a module read at visit is on from the
+ *  change that takes its explorer's `unlaunched` flag off. Read at each call. */
+export const explorerLaunched = (session: SessionProtocol): boolean => !protocolForSession(session)?.unlaunched;
 
 export interface VisitRead {
   positions: WalletPosition[];
