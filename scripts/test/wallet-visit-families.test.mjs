@@ -383,7 +383,7 @@ test("with today's flags every module is off", () => {
   );
 });
 
-test("each module turns on when its own explorer's flag flips, and no other does", () => {
+test("each module turns on when its explorer's flag flips, and no other does", () => {
   for (const s of SESSIONS) {
     reset({ launched: [s] });
     assert.deepEqual(
@@ -542,7 +542,7 @@ test("the empty state names the launched families read at visit by chain, and no
   reset({ launched: SESSIONS });
   assert.equal(walletVisitLine(), "Aave V3, Compound V3 and Morpho Blue on Optimism; Morpho Blue on Arc");
   const line = walletFamiliesLine();
-  assert.match(line, /Aave V3, Compound V3 and Morpho Blue on Arbitrum where Rails has read the wallet/);
+  assert.match(line, /Aave V3, Compound V3 and Morpho Blue on Arbitrum once the wallet has been opened there/);
   assert.match(line, /; Euler V2 on Arbitrum(;|$)/);
   assert.match(line, /Euler V2[^;]* on Base/);
 });
