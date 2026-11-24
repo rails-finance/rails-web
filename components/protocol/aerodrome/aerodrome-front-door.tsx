@@ -9,5 +9,14 @@ import { AERODROME, type SlipstreamSite } from "@/lib/aerodrome/sites";
 import { frontDoorWords } from "@/lib/aerodrome/words";
 
 export function AerodromeFrontDoor({ site = AERODROME }: { site?: SlipstreamSite }) {
-  return <PoolFrontDoor id={site.id} label={site.label} line={frontDoorWords(site).line} route={site.route} />;
+  // Velodrome names its chain (ui-jobs 578); Aerodrome follows with its own review.
+  return (
+    <PoolFrontDoor
+      id={site.id}
+      label={site.label}
+      line={frontDoorWords(site).line}
+      route={site.route}
+      chainId={site.chainId === 10 ? 10 : undefined}
+    />
+  );
 }

@@ -16,6 +16,8 @@ export function MorphoAtBlockFrontDoor({ dep }: { dep: MorphoAtBlockDeployment }
       label={LABEL}
       line={words.line}
       route={dep.route}
+      // Optimism names its chain (ui-jobs 578); Arc follows with its own review.
+      chainId={dep.chainId === 10 ? 10 : undefined}
       links={[{ href: `${dep.route}/markets`, label: words.links.markets }]}
     />
   );
