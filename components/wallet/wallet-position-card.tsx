@@ -209,11 +209,16 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
         <PolarisLoanCard
           row={card.row}
           surface="listing"
-          receipts={{ via: card.via, debtAt: card.via === "listing" ? "index" : "touch" }}
+          receipts={{
+            via: card.via,
+            debtAt: card.via === "listing" ? "index" : "touch",
+            collBlock: card.blocks.coll,
+            debtBlock: card.blocks.debt,
+          }}
         />
       );
     case "polaris-deposit":
-      return <PolarisDepositCard row={card.row} surface="listing" receipts={{ via: card.via }} />;
+      return <PolarisDepositCard row={card.row} surface="listing" receipts={{ via: card.via, block: card.block }} />;
     case "morpho-arbitrum":
       return <ArbitrumReadCard row={card.row} family="morpho" />;
     case "spark":

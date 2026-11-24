@@ -71,6 +71,9 @@ export interface FrankencoinPositionSummary {
   openedAt: number | null;
   lastActivityAt: number;
   lastBlockNumber: number;
+  /** The last MintingUpdate's block, which the latest absolutes are at; null
+   *  where the ledger never spoke or the backend does not state it. */
+  stateBlock?: number | null;
   lastTxHash: string | null;
   eventCount: number;
   txCount: number;
@@ -209,6 +212,7 @@ export function buildFrankencoinPositionRows(raw: RawFrankencoinPositionRow[]): 
       openedAt: r.opened_at != null ? intOf(r.opened_at) : null,
       lastActivityAt: intOf(r.last_activity_at),
       lastBlockNumber: intOf(r.last_block_number),
+      stateBlock: r.state_block != null ? intOf(r.state_block) : null,
       lastTxHash: r.last_tx_hash,
       eventCount: intOf(r.event_count),
       txCount: intOf(r.tx_count),

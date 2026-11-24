@@ -259,22 +259,26 @@ const LOAN_ROW: Record<"coll" | "debtAtTouch" | "costAtTouch" | "debtAtIndex" | 
     "Cost so far — the debt at the deployment's latest FeesAccrued index less the WETH borrowed net of repayments, summed from the loan's LoanOpened and LoanAdjusted logs.",
 };
 
-/** A reserve loan's listing-row figure, as the wallet page draws it. */
-export function loanRowProv(what: keyof typeof LOAN_ROW, via: PolarisRowVia): Provenance {
+/** A reserve loan's listing-row figure, as the wallet page draws it, at the
+ *  block its row states it at. */
+export function loanRowProv(what: keyof typeof LOAN_ROW, via: PolarisRowVia, block?: number): Provenance {
   return {
     kind: "derived",
     pclass: "indexed",
     summary: LOAN_ROW[what],
     contract: manager,
     via: ROW_VIA.loan[via],
+    ...(block != null ? { source: { block } } : {}),
   };
 }
 
-/** A Stability Pool deposit's listing-row figure, as the wallet page draws it. */
+/** A Stability Pool deposit's listing-row figure, as the wallet page draws it,
+ *  at the block its row states it at. */
 export function spRowProv(
   what: "recorded" | "bcGain" | "stableGain",
   market: PolarisMarket,
   via: PolarisRowVia,
+  block?: number,
 ): Provenance {
   return {
     kind: "derived",
@@ -282,5 +286,6 @@ export function spRowProv(
     summary: SP_SUM[what](stableOf(market)),
     contract: pool(market),
     via: ROW_VIA.sp[via],
+    ...(block != null ? { source: { block } } : {}),
   };
 }

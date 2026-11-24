@@ -3,12 +3,13 @@
 // the listing's raw row, shaped by the listing's builder. A denied position is
 // written closed and keeps 'denied' in the card, which the listing card words
 // as denied; a succeeded challenge or a forced sale is a flag in the card, as
-// the listing shows it, never a liquidation. Units at the last MintingUpdate.
+// the listing shows it. Units at the last MintingUpdate.
 // The head read is the listing's read of the owner (/api/frankencoin/positions
 // with the owner, one call to rails-server): each position's row as the index
-// holds it now. A position the read lists closed or denied holds nothing. One
-// it does not list (passed to another owner) keeps its stored card; a whole
-// answer then holds nothing for it at the index's latest block. No dollars: Frankencoin runs no oracle (decision 0041).
+// holds it now, its figures at the last MintingUpdate (state_block, the
+// stored row's read block too). A position the read lists closed or denied
+// holds nothing. One it does not list (passed to another owner) keeps its
+// stored card: the route states no index head. No dollars: Frankencoin runs no oracle (decision 0041).
 
 import {
   buildFrankencoinPositionRows,
@@ -20,7 +21,6 @@ import { answerBody, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, plural, storeStamp } from "@/lib/wallet/summary-row";
-import { holdsNothingSince } from "@/lib/wallet/holds-nothing";
 import type { FamilyModule, HeadResult } from "./module";
 
 /** The listing route's most rows in one answer. */
@@ -78,29 +78,23 @@ export const frankencoin: FamilyModule = {
     const body = answerBody(
       await readFrankencoinPositions(qs, routeBoxHop(base, readerIp), signal),
       "Frankencoin positions",
-    ) as { data: FrankencoinPositionSummary[]; pagination: { total: number } };
+    ) as { data: FrankencoinPositionSummary[] };
     const listed = new Map(body.data.map((s) => [s.position, s]));
-    // The index has replayed every hub through the latest event it states.
-    const indexed = body.data.reduce<number | undefined>((m, s) => Math.max(m ?? 0, s.lastBlockNumber), undefined);
-    const whole = body.pagination.total <= body.data.length;
     return {
       reads: 1,
       positions: open.map((p): WalletPosition => {
         const s = listed.get(rowOf(p).position);
-        // Not listed for the owner (passed on): the stored card stands. Left
-        // out of a whole answer, the wallet holds nothing there at the
-        // index's block, where that is at or past the stored read.
-        if (!s) {
-          const head = whole ? holdsNothingSince(indexed, p.readAtBlock) : undefined;
-          return { ...p, ...(head != null ? { closedSince: { block: head } } : {}), headRead: "stored" };
-        }
+        // Not listed for the owner (passed on): the stored card stands. The
+        // route states no index head, so no block says when it left.
+        if (!s) return { ...p, headRead: "stored" };
         if (s.status !== "open") return { ...p, closedSince: { block: s.lastBlockNumber }, headRead: "stored" };
         return {
           ...p,
           card: { kind: "frankencoin", row: s },
           headRead: "read",
-          readAtBlock: s.lastBlockNumber,
-          readAt: s.lastActivityAt,
+          // The figures' block, state_block, as on the stored row.
+          readAtBlock: s.stateBlock ?? undefined,
+          readAt: undefined,
         };
       }),
     };
