@@ -2,18 +2,25 @@
 // routes answer the head-only fields the listing card draws, so the card's read is the row with
 // the answer's head, and no history (no past read, no daily grid, no logs). A Uniswap-family or
 // Slipstream row whose head fields are missing (`now` null: past the server's first 25 rows, or a
-// pool that answered no state) has no card.
+// pool that answered no state) has no card, and so has a staked row whose stake read is missing:
+// drawn, it would read as unstaked.
 //
 // Pure, with relative imports only: scripts/test/wallet-liquidity.test.mjs reads it.
 
 import { siteOf } from "../../aerodrome/sites";
+import { UNI_DEPLOYMENTS } from "../../uniswap/deployments";
 import type { UniPositionRead, UniPositionsRead } from "../../uniswap/types";
 import type { AeroPositionRead, AeroPositionsRead } from "../../aerodrome/types";
 import type { BalPositionRead, BalPositionsRead } from "../../balancer/types";
 
 /** A Uniswap V3 or V4, or PancakeSwap V3, row's card read; null without its head fields. */
+/** PancakeSwap's farms, which hold a staked position's NFT. */
+const MASTER_CHEFS = new Set(UNI_DEPLOYMENTS.flatMap((d) => (d.masterChef ? [d.masterChef.toLowerCase()] : [])));
+
 export function uniCardRead(a: UniPositionsRead, row: UniPositionsRead["positions"][number]): UniPositionRead | null {
   if (!row.now) return null;
+  // Staked in a PancakeSwap farm with no stake read: no card.
+  if ((row.staked === true || MASTER_CHEFS.has(row.owner.toLowerCase())) && !row.stake) return null;
   return {
     ...row,
     chainId: a.chainId,
@@ -35,6 +42,9 @@ export function slipstreamCardRead(
   row: AeroPositionsRead["positions"][number],
 ): AeroPositionRead | null {
   if (!row.now || row.pool == null || row.fee == null || !a.aero) return null;
+  // Staked in a gauge with no gauge read: no card.
+  const inGauge = row.staked || (row.gauge != null && row.owner.toLowerCase() === row.gauge.toLowerCase());
+  if (inGauge && !row.stake) return null;
   return {
     ...row,
     chainId: a.chainId,

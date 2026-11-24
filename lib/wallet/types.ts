@@ -261,6 +261,7 @@ export interface LiquiditySourceRead {
   key: string;
   /** "Uniswap V3 and V4 on Ethereum". */
   what: string;
+  chainId: ChainId;
   /** "ok", or why it did not answer: the read ceiling's 503, a Balancer index refusal, a failure. */
   state: "ok" | "ceiling" | "refused" | "failed";
   /** The route answered part of the wallet's positions (`truncated`). */

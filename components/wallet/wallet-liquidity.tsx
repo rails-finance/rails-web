@@ -7,17 +7,20 @@
 // the fourth headline, Balancer's with its share and tokens. Every card is drawn from its owner
 // route's answer at the head block. The cards state no dollars, so the section states no total.
 // A route or a position that could not be read, a truncated answer, and the positions past the
-// route's first 25 are each said under the cards.
+// route's first 25 are each said under the cards; under Focus, those on a chain in focus. A card
+// that cannot be drawn drops alone and says so (LiquidityBoundary).
 
 import Link from "next/link";
-import { use } from "react";
+import { Component, use, type ReactNode } from "react";
 import { WalletPositionCard } from "@/components/wallet/wallet-position-card";
 import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { useScopedRows } from "@/components/shared/asset-scope-note";
 import { walletPositionAssetKeys } from "@/lib/wallet/aim-assets";
 import { andList, LIQUIDITY_NO_TOTAL } from "@/lib/wallet/wallet-sections";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
-import type { LiquiditySourceRead, WalletLiquidity } from "@/lib/wallet/types";
+import { useAssetScope } from "@/lib/shared/asset-scope";
+import { chainMeta } from "@/lib/shared/chains";
+import type { LiquiditySourceRead, WalletLiquidity, WalletPosition } from "@/lib/wallet/types";
 
 const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
 const LINE = "text-xs text-rb-500";
@@ -26,10 +29,29 @@ const LINE = "text-xs text-rb-500";
 export function LiquidityReading() {
   return (
     <p className={LINE} data-wallet-liquidity-reading="">
-      Reading liquidity positions at the head block…
+      Reading liquidity positions…
     </p>
   );
 }
+
+/** A render that throws draws `fallback` in its place: a card built from a row it cannot read
+ *  drops alone, and the section, should it throw, leaves the page standing. */
+export class LiquidityBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+/** A card that could not be drawn. */
+const cardFailed = (p: WalletPosition) => (
+  <p className={LINE} data-wallet-liquidity-card-failed={p.positionId}>
+    A {p.familyName} position on {chainMeta(p.chain).name} could not be read.
+  </p>
+);
 
 /** A route whose answer holds more rows than it reads at the head: those past them are on the
  *  explorer's wallet page. */
@@ -37,7 +59,7 @@ function MoreLine({ s }: { s: LiquiditySourceRead }) {
   const over = s.held - s.drawn - s.failed;
   return (
     <p className={LINE} data-wallet-liquidity-more={s.key}>
-      {s.what}: the newest {s.headRows} are drawn; {over} more {over === 1 ? "is" : "are"} on{" "}
+      {s.what}: the first {s.headRows} are read; {over} more {over === 1 ? "is" : "are"} on{" "}
       <Link href={s.href} prefetch={false} className={INLINE_LINK}>
         its wallet page
       </Link>
@@ -54,17 +76,21 @@ export function LiquiditySection({ read }: { read: Promise<WalletLiquidity> }) {
   const l = use(read);
   // Focus (ui-jobs 557): a position stays where a token of its pool is in focus.
   const scoped = useScopedRows(l.positions, walletPositionAssetKeys, (p) => p.chain as number);
-  const unread = l.sources.filter(
+  // Under Focus, the lines name only the routes on a chain in focus, as W3's do.
+  const scope = useAssetScope();
+  const focused = scoped.on && !scoped.peek;
+  const sources = focused ? l.sources.filter((s) => scope.chainOk(s.chainId)) : l.sources;
+  const unread = sources.filter(
     (s) => s.state === "failed" || s.state === "refused" || (s.state === "ok" && s.failed > 0),
   );
-  const ceiling = l.sources.some((s) => s.state === "ceiling");
-  const truncated = l.sources.filter((s) => s.state === "ok" && s.truncated);
-  const more = l.sources.filter((s) => s.state === "ok" && s.held > s.drawn + s.failed);
-  if (l.positions.length === 0 && unread.length === 0 && !ceiling && truncated.length === 0 && more.length === 0)
-    return null;
+  const ceiling = sources.some((s) => s.state === "ceiling");
+  const truncated = sources.filter((s) => s.state === "ok" && s.truncated);
+  const more = sources.filter((s) => s.state === "ok" && s.held > s.drawn + s.failed);
+  const lines = unread.length > 0 || ceiling || truncated.length > 0 || more.length > 0;
+  if (scoped.rows.length === 0 && !lines) return null;
   return (
     <section
-      aria-labelledby="wallet-liquidity"
+      {...(scoped.rows.length > 0 ? { "aria-labelledby": "wallet-liquidity" } : { "aria-label": "Liquidity" })}
       data-anatomy="W9"
       data-wallet-liquidity={scoped.rows.length}
       data-wallet-liquidity-ms={l.ms}
@@ -72,25 +98,30 @@ export function LiquiditySection({ read }: { read: Promise<WalletLiquidity> }) {
         l.sources.map((s) => ({ key: s.key, state: s.state, held: s.held, drawn: s.drawn, ms: s.ms })),
       )}
     >
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
-        <h2 id="wallet-liquidity" className={H2}>
-          Liquidity{" "}
-          <span className="font-medium text-rb-500" data-prov-exempt="">
-            {scoped.rows.length}
-          </span>
-        </h2>
-      </div>
+      {/* With no card shown (none held, or none in focus), the lines stand without the heading. */}
       {scoped.rows.length > 0 && (
-        <p className={`${LINE} mb-3`} data-wallet-liquidity-note="">
-          {LIQUIDITY_NO_TOTAL}
-        </p>
+        <>
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
+            <h2 id="wallet-liquidity" className={H2}>
+              Liquidity{" "}
+              <span className="font-medium text-rb-500" data-prov-exempt="">
+                {scoped.rows.length}
+              </span>
+            </h2>
+          </div>
+          <p className={`${LINE} mb-3`} data-wallet-liquidity-note="">
+            {LIQUIDITY_NO_TOTAL}
+          </p>
+          <div className="mb-3 flex flex-col gap-3">
+            {scoped.rows.map((p) => (
+              <LiquidityBoundary key={`${p.chain}:${p.family}:${p.positionId}`} fallback={cardFailed(p)}>
+                <WalletPositionCard position={p} />
+              </LiquidityBoundary>
+            ))}
+          </div>
+        </>
       )}
-      <div className="flex flex-col gap-3">
-        {scoped.rows.map((p) => (
-          <WalletPositionCard key={`${p.chain}:${p.family}:${p.positionId}`} position={p} />
-        ))}
-      </div>
-      <div className="mt-3 flex flex-col gap-1">
+      <div className="flex flex-col gap-1">
         {unread.length > 0 && (
           <p className={LINE} data-wallet-liquidity-unanswered={unread.map((s) => s.key).join(",")}>
             {andList(unread.map(unreadWhat))} could not be read.
@@ -103,7 +134,7 @@ export function LiquiditySection({ read }: { read: Promise<WalletLiquidity> }) {
         )}
         {truncated.map((s) => (
           <p key={s.key} className={LINE} data-wallet-liquidity-truncated={s.key}>
-            {s.what}: the wallet holds more positions than one read takes, so the newest are read.
+            {s.what}: the wallet holds more positions than one read takes; the first are read.
           </p>
         ))}
         {more.map((s) => (

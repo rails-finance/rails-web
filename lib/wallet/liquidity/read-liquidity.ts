@@ -23,8 +23,10 @@ import type { AeroPositionsRead } from "@/lib/aerodrome/types";
 import type { BalPositionsRead } from "@/lib/balancer/types";
 import type { LiquiditySourceRead, WalletCard, WalletLiquidity, WalletPosition } from "@/lib/wallet/types";
 
-/** The whole read's budget, inside the page's 30 s: the section streams in after the page. */
+/** The read's budget from its start, and its end from the page's start: it starts once the page's
+ *  main read has settled (up to 8 s), and the page's response ends at maxDuration, 30 s. */
 const LIQUIDITY_BUDGET_MS = 25_000;
+const PAGE_END_MS = 27_000;
 /** An owner route's wait: a cold one reads the wallet's NFTs and, for V4 and Balancer, logs. */
 const OWNER_WAIT_MS = 15_000;
 
@@ -104,6 +106,7 @@ async function readSource(
   const base = {
     key: s.key,
     what: `${s.name} on ${s.chainName}`,
+    chainId: s.chainId,
     name: s.name,
     chainName: s.chainName,
     href: `${s.route}/${owner}`,
@@ -166,10 +169,15 @@ async function readSource(
 }
 
 /** Every owner route at once; a route that fails leaves its positions out and says so. */
-export async function readWalletLiquidity(address: string, readerIp?: string): Promise<WalletLiquidity> {
+/** `pageStart`: when the page's request began (epoch ms). */
+export async function readWalletLiquidity(
+  address: string,
+  readerIp: string | undefined,
+  pageStart: number,
+): Promise<WalletLiquidity> {
   const t0 = Date.now();
   const owner = address.toLowerCase();
-  const hop = { readerIp, deadline: t0 + LIQUIDITY_BUDGET_MS };
+  const hop = { readerIp, deadline: Math.min(pageStart + PAGE_END_MS, t0 + LIQUIDITY_BUDGET_MS) };
   const parts = await Promise.all(
     LIQUIDITY_SOURCES.map((s) =>
       // An answer the shaping cannot read counts as a route that did not answer.
@@ -177,6 +185,7 @@ export async function readWalletLiquidity(address: string, readerIp?: string): P
         read: {
           key: s.key,
           what: `${s.name} on ${s.chainName}`,
+          chainId: s.chainId,
           name: s.name,
           chainName: s.chainName,
           href: `${s.route}/${owner}`,

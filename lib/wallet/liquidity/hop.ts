@@ -1,8 +1,7 @@
 import "server-only";
 
 // The one way the wallet page's Liquidity section (W9) reaches rails-server: each of its eleven
-// owner routes goes through `liquidityHop`, at most four at once (createLimit), each under its
-// own wait. ui-jobs 814 moves the wallet page's api calls onto 813's limiter
+// owner routes goes through `liquidityHop`, at most four at once (createLimit), each with a wait. ui-jobs 814 moves the wallet page's api calls onto 813's limiter
 // (lib/wallet/api-hop.ts, `apiHop`): the fetch marked below is the one line that changes.
 //
 // SERVER-ONLY: reads RAILS_API_URL and the bearer token.
@@ -24,7 +23,7 @@ const REFUSALS = new Set(["index_unavailable", "index_behind"]);
 /** At most four requests to rails-server in flight, 813's limit. */
 const limit = createLimit(4);
 
-/** `waitMs`: the request's own wait, cut to what is left before `deadline` (epoch ms) when its turn comes. */
+/** `waitMs`: the request's wait, cut to what is left before `deadline` (epoch ms) when its turn comes. */
 export function liquidityHop<T>(
   path: string,
   opts: { readerIp?: string; waitMs: number; deadline: number },

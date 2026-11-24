@@ -67,7 +67,7 @@ import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { useAssetScope } from "@/lib/shared/asset-scope";
 import { walletPositionAssetKeys } from "@/lib/wallet/aim-assets";
 import { COW_TERMS } from "@/lib/cow/terms";
-import { LiquidityReading, LiquiditySection } from "@/components/wallet/wallet-liquidity";
+import { LiquidityBoundary, LiquidityReading, LiquiditySection } from "@/components/wallet/wallet-liquidity";
 import { walletLiquidityLine } from "@/lib/wallet/liquidity/sources";
 import type { WalletLiquidity } from "@/lib/wallet/types";
 
@@ -385,9 +385,17 @@ export function WalletView({
   // The liquidity positions (W9), below the protocol sections: drawn, like the trades, with
   // neither Kind nor Status chosen.
   const liquiditySection = liquidity && !byKind && status == null && (
-    <Suspense fallback={<LiquidityReading />}>
-      <LiquiditySection read={liquidity} />
-    </Suspense>
+    <LiquidityBoundary
+      fallback={
+        <p className="text-xs text-rb-500" data-wallet-liquidity-unanswered="">
+          Liquidity positions could not be read.
+        </p>
+      }
+    >
+      <Suspense fallback={<LiquidityReading />}>
+        <LiquiditySection read={liquidity} />
+      </Suspense>
+    </LiquidityBoundary>
   );
   const filterBar = read.held.length > 0 && (
     <WalletFilterBar

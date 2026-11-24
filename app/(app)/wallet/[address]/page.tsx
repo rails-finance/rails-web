@@ -71,6 +71,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 }
 
 export default async function WalletPage({ params, searchParams }: Props) {
+  const pageStart = Date.now();
   const { address: raw } = await params;
   const query = await searchParams;
   const sp = toURLSearchParams(query);
@@ -104,8 +105,8 @@ export default async function WalletPage({ params, searchParams }: Props) {
   const liquidity = protocol
     ? null
     : wallet.then(
-        () => readWalletLiquidity(address, ip),
-        () => readWalletLiquidity(address, ip),
+        () => readWalletLiquidity(address, ip, pageStart),
+        () => readWalletLiquidity(address, ip, pageStart),
       );
   const [read, names] = await Promise.all([
     wallet,

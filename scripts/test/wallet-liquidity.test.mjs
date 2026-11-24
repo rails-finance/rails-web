@@ -71,6 +71,7 @@ export async function resolve(specifier, context, next) {
 }`;
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 const { uniCardRead, slipstreamCardRead, balancerCardRead } = await import("../../lib/wallet/liquidity/cards.ts");
+const { isFullRange } = await import("../../lib/uniswap/position.ts");
 
 const HEAD = { block: 100, time: 1_794_000_000 };
 const T0 = { address: "0x0000000000000000000000000000000000000001", symbol: "A", decimals: 18 };
@@ -164,4 +165,72 @@ test("a Balancer row is the card's read from the owner route alone", () => {
   assert.equal(r.tokens[0].tokenType, 0);
   assert.deepEqual(r.flows, []);
   assert.equal(r.past, null);
+});
+
+test("a staked row whose stake read is missing has no card", () => {
+  const cake = {
+    masterChef: "0xC6A2Db661D5a5690172d8eB0a7DEA2d3008665A3",
+    user: "0xu",
+    pid: "1",
+    pendingCake: "0",
+    cake: T0,
+  };
+  const row = {
+    version: "v3",
+    id: "9",
+    token0: T0,
+    token1: T1,
+    fee: 500,
+    liquidity: "1",
+    pool: "0xp",
+    owner: "0xo",
+    tickLower: -10,
+    tickUpper: 10,
+    tickSpacing: null,
+    hooks: null,
+    hasSubscriber: false,
+    now: POOL,
+    staked: false,
+    stake: null,
+  };
+  const a = { chainId: 8453, head: HEAD, positions: [row], truncated: false };
+  assert.notEqual(uniCardRead(a, row), null);
+  assert.equal(uniCardRead(a, { ...row, staked: true }), null);
+  // Held by the farm on record, whatever `staked` says.
+  assert.equal(uniCardRead(a, { ...row, owner: "0xc6a2db661d5a5690172d8eb0a7dea2d3008665a3" }), null);
+  assert.deepEqual(uniCardRead(a, { ...row, staked: true, stake: cake }).staked, cake);
+
+  const aero = { usdc: {}, weth: {} };
+  const slip = {
+    deployment: "gv3",
+    id: "4",
+    token0: T0,
+    token1: T1,
+    tickSpacing: 100,
+    liquidity: "1",
+    staked: false,
+    gauge: null,
+    pool: "0xp",
+    owner: "0xw",
+    tickLower: -100,
+    tickUpper: 100,
+    fee: 400,
+    now: POOL,
+    stake: null,
+  };
+  const sa = { chainId: 8453, head: HEAD, positions: [slip], aero, truncated: false };
+  assert.notEqual(slipstreamCardRead(sa, slip), null);
+  assert.equal(slipstreamCardRead(sa, { ...slip, staked: true, gauge: "0xG", owner: "0xg" }), null);
+  assert.equal(slipstreamCardRead(sa, { ...slip, gauge: "0xG", owner: "0xg" }), null);
+});
+
+test("full range is the outermost ticks usable at the pool's spacing", () => {
+  // Slipstream spacing 2,000: ±886,000.
+  assert.equal(isFullRange(-886000, 886000, 2000), true);
+  assert.equal(isFullRange(-884000, 886000, 2000), false);
+  // V3 spacing 60 (the 0.3% tier): ±887,220.
+  assert.equal(isFullRange(-887220, 887220, 60), true);
+  assert.equal(isFullRange(-887160, 887220, 60), false);
+  // No spacing known: past ±887,000.
+  assert.equal(isFullRange(-887100, 887100, null), true);
 });
