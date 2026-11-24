@@ -12,8 +12,8 @@
 // rails-server): each position's figures at the line's head reading. A
 // position it reads closed holds nothing at that block. One it does not list
 // (its NFT passed to another holder), or lists refused or with no reading,
-// keeps its stored card; a whole answer then holds nothing for it at its
-// line's head block. No dollars: the listing prices none (decision 0041).
+// keeps its stored card: the route states no index head, so no block says when
+// it left. No dollars: the listing prices none (decision 0041).
 
 import { readAlchemixPositionsFromBackend } from "@/lib/sources/api/alchemix-positions-backend";
 import { ALCHEMIX_BASE, ALCHEMIX_ETHEREUM, type AlchemixDeployment } from "@/lib/alchemix/lines";
@@ -26,7 +26,6 @@ import type {
   AlchemixStoredPositionSummary,
   AlchemixV2PositionSummary,
 } from "@/types/api/alchemix";
-import { holdsNothingSince } from "@/lib/wallet/holds-nothing";
 import type { FamilyModule, HeadResult } from "./module";
 
 /** The listing route's most rows in one answer. */
@@ -96,13 +95,6 @@ function module(dep: AlchemixDeployment, lane: "ethereum" | "base"): FamilyModul
         (s.chainReading && !s.chainReading.stale ? s.chainReading.blockNumber : null) ??
         s.figures.debt?.asOfBlock ??
         null;
-      // Each line's head block, from the answer's rows on it.
-      const lineBlock = new Map<string, number>();
-      for (const s of data) {
-        const b = blockOf(s);
-        if (b != null && b > (lineBlock.get(s.lineKey) ?? 0)) lineBlock.set(s.lineKey, b);
-      }
-      const whole = read.result.pagination.total <= data.length;
       return {
         reads: 1,
         positions: open.map((p): WalletPosition => {
@@ -119,10 +111,7 @@ function module(dep: AlchemixDeployment, lane: "ethereum" | "base"): FamilyModul
               readAt: undefined,
             };
           // The read answered without figures for it: the stored card stands.
-          // Not listed in a whole answer, the wallet holds nothing there at
-          // the line's head block, where that is at or past the stored read.
-          const head = !s && whole ? holdsNothingSince(lineBlock.get(stored.lineKey), p.readAtBlock) : undefined;
-          return { ...p, ...(head != null ? { closedSince: { block: head } } : {}), headRead: "stored" };
+          return { ...p, headRead: "stored" };
         }),
       };
     },
