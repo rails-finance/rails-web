@@ -20,6 +20,17 @@ import type { AaveV3PositionRow, AaveV3ReserveSummary } from "@/lib/api/fetch-aa
 import { MARKET_NAME, POOL_BY_MARKET, asV3Market } from "@/lib/aave-v3/asset-catalog";
 import { AAVE_V3_BASE_CHAIN_ID, AAVE_V3_BASE_ORACLE, AAVE_V3_BASE_POOL } from "@/lib/aave-v3-base/asset-catalog";
 import { SPARK_ADDRESSES } from "@/lib/spark/asset-catalog";
+import {
+  accrueLines,
+  accrueReserves,
+  cardIsScaled,
+  indexMap,
+  type SparkBalanceReserve,
+  type SparkReserveIndex,
+  type SparkScaledReserve,
+} from "@/lib/spark/scaled-accrual";
+import { sparkReserveIndicesFor } from "@/lib/sources/api/spark-reserve-indices";
+import { scaleRaw } from "@/lib/shared/scale-raw";
 import { SEAMLESS_CHAIN_ID, SEAMLESS_ORACLE, SEAMLESS_POOL } from "@/lib/seamless/asset-catalog";
 import { hfLabelV3 } from "@/lib/aave-v3/position-state";
 import { chainClient } from "@/lib/sources/chain/rpc";
@@ -349,6 +360,28 @@ export const aaveV3Base = aaveLane("base");
 
 const SPARK_POOL = SPARK_ADDRESSES.POOL.toLowerCase();
 
+/** A stored spark card: its reserves as balances (before rails-server mig 535)
+ *  or as scaled sums (from it), which the page accrues (lib/spark/scaled-accrual.ts). */
+type StoredSparkCard = Omit<RawSparkWalletRow, "reserves"> & {
+  reserves: (SparkBalanceReserve | SparkScaledReserve)[];
+};
+
+type SparkRow = import("@/lib/sources/api/spark-positions").SparkPositionSummary;
+
+/** The row's open lines accrued to `at`, from the stored card's scaled sums. */
+function accrueSparkRow(
+  row: SparkRow,
+  card: StoredSparkCard,
+  indices: Map<string, SparkReserveIndex> | null,
+  at: number,
+): SparkRow {
+  return {
+    ...row,
+    supplies: accrueLines(row.supplies, card.reserves, indices, "supply", at, scaleRaw),
+    borrows: accrueLines(row.borrows, card.reserves, indices, "debt", at, scaleRaw),
+  };
+}
+
 export const spark: FamilyModule = {
   id: "spark",
   name: "SparkLend",
@@ -356,9 +389,18 @@ export const spark: FamilyModule = {
   summaryChain: "ethereum",
   summaryFamily: "spark",
   async shape(rows) {
-    const cards = await buildSparkPositionRows(rows.map((r) => r.card as RawSparkWalletRow));
+    // A card holding scaled sums is built with every scaled side unread while
+    // the indices are asked, then accrues to the time of the indices' block;
+    // the head read accrues it again to its block's time. The route is read
+    // once for the family's rows, and only where a card holds scaled sums.
+    const stored = rows.map((r) => r.card as StoredSparkCard);
+    const [answer, built] = await Promise.all([
+      stored.some(cardIsScaled) ? sparkReserveIndicesFor(rows) : null,
+      buildSparkPositionRows(stored.map((c) => ({ ...c, reserves: accrueReserves(c.reserves ?? [], null, 0) }))),
+    ]);
+    const indices = indexMap(answer);
     return rows.map((r, i): WalletPosition => {
-      const row = cards[i];
+      const row = cardIsScaled(stored[i]) ? accrueSparkRow(built[i], stored[i], indices, answer?.at ?? 0) : built[i];
       const status = asStatus(r.status);
       const base: WalletPosition = {
         chain: MAINNET_CHAIN_ID,
@@ -388,10 +430,9 @@ export const spark: FamilyModule = {
       return base;
     });
   },
-  async head(open, address, signal, apiMs): Promise<HeadResult> {
+  async head(open, address, signal, apiMs, ctx): Promise<HeadResult> {
     if (open.length === 0) return { positions: open, reads: 0 };
-    const rowOf = (p: WalletPosition) =>
-      (p.card as { kind: "spark"; row: import("@/lib/sources/api/spark-positions").SparkPositionSummary }).row;
+    const rowOf = (p: WalletPosition) => (p.card as { kind: "spark"; row: SparkRow }).row;
     const reserves = [...new Set(open.flatMap((p) => rowOf(p).borrows.map((b) => b.address.toLowerCase())))];
     const r = await readAccounts(
       MAINNET_CHAIN_ID,
@@ -401,13 +442,26 @@ export const spark: FamilyModule = {
       apiMs,
     );
     const got = r.byPool.get(SPARK_POOL);
+    // The stored cards holding scaled sums, and the indices shape read for them.
+    const scaledCards = new Map(
+      ctx.rows
+        .filter((x) => cardIsScaled(x.card as StoredSparkCard))
+        .map((x) => [x.positionId, x.card as StoredSparkCard]),
+    );
+    const indices = got?.account && scaledCards.size > 0 ? indexMap(await sparkReserveIndicesFor(ctx.rows)) : null;
     return {
       reads: r.reads,
       positions: open.map((p) => {
         if (!got) return { ...p, headRead: "failed" };
-        const row = rowOf(p);
-        const rate = weightedRate(row.borrows, row.priceByAddress, got.rateOf);
-        return applyAccount(p, got.account, got.block, got.at, rate);
+        const card = scaledCards.get(p.positionId);
+        // Where the head read answered, the amounts accrue to its block's time.
+        const row = card && got.account ? accrueSparkRow(rowOf(p), card, indices, got.at) : rowOf(p);
+        // A borrow drawn "Not read" leaves the debt's weights unknown.
+        const rate = row.borrows.some((b) => b.amountUnread)
+          ? undefined
+          : weightedRate(row.borrows, row.priceByAddress, got.rateOf);
+        const next = applyAccount(p, got.account, got.block, got.at, rate);
+        return card && got.account ? { ...next, card: { kind: "spark", row } } : next;
       }),
     };
   },
