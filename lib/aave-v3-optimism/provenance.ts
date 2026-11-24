@@ -231,7 +231,7 @@ export function opWalletSuppliedProv(c: OpReceiptContext): Provenance {
   const base = opCardProv(
     "supplied-total",
     c,
-    ` Collateral ${collateral}, the reserves switched on as collateral, is the part the wallet total sums.`,
+    ` Collateral ${collateral}, the reserves switched on, is the part the wallet total sums.`,
   );
   return {
     ...base,
