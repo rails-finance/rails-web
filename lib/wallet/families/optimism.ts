@@ -52,6 +52,7 @@ export const aaveV3Optimism: VisitModule = {
         status: "open",
         kind: visitKind(p.debtUsd),
         card: { kind: "aave-v3-optimism", read: r },
+        // The total sums collateral, as on every lender row; Supplied's receipt states it.
         collateralUsd: priced ? p.collateralUsd : undefined,
         debtUsd: priced ? p.debtUsd : undefined,
         usdSource: "Aave V3 Optimism oracle",
@@ -86,9 +87,10 @@ export const compoundV3Optimism: VisitModule = {
     return r.comets.flatMap((a): WalletPosition[] => {
       const f = accountFigures(a, r.ethUsd);
       if (!f.held) return [];
-      // Debt over the collateral at its Liquidation CFs, the Comet's line at 1.
-      const hf = f.debtValue > 0 && f.liquidationCapacity > 0 ? f.liquidationCapacity / f.debtValue : null;
       const priced = f.unpriced.length === 0;
+      // Debt over the collateral at its Liquidation CFs, the Comet's line at 1;
+      // none with a collateral unpriced, as on Arbitrum.
+      const hf = priced && f.debtValue > 0 && f.liquidationCapacity > 0 ? f.liquidationCapacity / f.debtValue : null;
       // Nothing borrowed is no debt, priced or not.
       const debtUsd = f.borrowed === 0 ? 0 : (f.borrowedUsd ?? undefined);
       return [
@@ -103,6 +105,7 @@ export const compoundV3Optimism: VisitModule = {
           kind: visitKind(f.borrowed),
           // The answer with this Comet alone.
           card: { kind: "compound-v3-optimism", read: { ...r, comets: [a] } },
+          // The total sums collateral, as on every lender row; Lent's receipt states it.
           collateralUsd: priced ? (f.collateralUsd ?? undefined) : undefined,
           debtUsd,
           usdSource: "Compound V3 Optimism Comet prices",

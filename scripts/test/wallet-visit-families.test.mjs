@@ -3,7 +3,9 @@
 // Arc, each on while its explorer is launched; and Euler V2 on Arbitrum beside Base
 // (lib/wallet/families/euler.ts). Each module's read, a failed read, no position, a module whose
 // explorer is unlaunched making no call and drawing nothing, the shared limiter, and the reads
-// starting only once the summary and listing reads have settled. The launch flags are flipped in
+// starting only once the summary and listing reads have settled; the Optimism cards' receipts stating
+// the collateral the total sums, an unpriced Comet with no health factor, and a narrowed read keeping
+// every launched module's pill. The launch flags are flipped in
 // memory on the roster's entries (protocolForSession), never in lib/shared/protocols.ts. The backend is a
 // stubbed fetch; the modules import through `@/`, resolved as wallet-listing-reads.test.mjs does.
 // Run: npm test
@@ -271,6 +273,11 @@ const { morphoArc, morphoOptimism, morphoAtBlockModule } = await import("../../l
 const { MORPHO_ARC } = await import("../../lib/morpho-at-block/types.ts");
 const { eulerV2Arbitrum, eulerV2Base } = await import("../../lib/wallet/families/euler.ts");
 const { apiHop, API_CONCURRENCY } = await import("../../lib/wallet/api-hop.ts");
+const { bufferFromHealth } = await import("../../lib/wallet/summary-row.ts");
+const { opPosition } = await import("../../lib/aave-v3-optimism/position.ts");
+const { opWalletSuppliedProv } = await import("../../lib/aave-v3-optimism/provenance.ts");
+const { accountFigures } = await import("../../lib/compound-v3-optimism/position.ts");
+const { opcWalletLentProv } = await import("../../lib/compound-v3-optimism/provenance.ts");
 
 const atBlockCalls = () => urls.filter((u) => u.pathname.startsWith("/api/at-block/")).map((u) => u.pathname);
 
@@ -337,6 +344,74 @@ test("Morpho Blue Optimism: one position per market, dollars kept out of the til
   assert.deepEqual(p.card, { kind: "morpho-at-block", dep: "optimism", read: MORPHO });
   // The card crosses to the page: nothing in it a JSON answer cannot carry.
   assert.doesNotThrow(() => JSON.stringify(r.positions));
+});
+
+// ── The Optimism cards' receipts, and an unpriced Comet ─────────────────
+
+const fig = (x) => x.toLocaleString("en-US", { maximumSignificantDigits: 8 });
+
+/** The receipt's "Collateral $X": as a row, and in its prose. */
+const statedCollateral = (prov) => {
+  const row = prov.inputs.find((x) => x.label === "Collateral");
+  assert.ok(row, "a Collateral row");
+  assert.ok(prov.summary.includes(`Collateral ${row.value}, `), "the prose states it");
+  return row.value;
+};
+
+test("Aave V3 Optimism: Supplied's receipt states the collateral the wallet total sums", async () => {
+  reset();
+  // A borrower with its reserve as collateral, and a lender with the switch off.
+  const lender = {
+    ...AAVE,
+    reserves: AAVE.reserves.map((x) => ({ ...x, scaledDebt: "0", isCollateral: false })),
+  };
+  for (const read of [AAVE, lender]) {
+    answers.aave = read;
+    const [row] = (await readVisitFamilies([aaveV3Optimism], W, 2000)).positions;
+    const prov = opWalletSuppliedProv({ p: opPosition(read), r: read });
+    assert.equal(statedCollateral(prov), `$${fig(row.collateralUsd)}`);
+    assert.match(prov.summary, /^Supplied in USD\./, "the Supplied headline's receipt");
+  }
+  assert.equal(statedCollateral(opWalletSuppliedProv({ p: opPosition(lender), r: lender })), "$0");
+});
+
+test("Compound V3 Optimism: Lent's receipt states the collateral the wallet total sums", async () => {
+  reset();
+  const lender = comet({ supply: "1000000000", borrow: "0", principal: "1000000000" });
+  answers.compound = { ...COMPOUND, comets: [lender] };
+  const [row] = (await readVisitFamilies([compoundV3Optimism], W, 2000)).positions;
+  assert.equal(row.kind, "deposits");
+  assert.equal(row.collateralUsd, 2000, "the posted WETH, the lent USDC left out");
+  const ctx = (a) => ({ a, f: accountFigures(a, null), head: HEAD, ethUsd: null });
+  const prov = opcWalletLentProv(ctx(lender));
+  assert.equal(statedCollateral(prov), "$2,000");
+  assert.match(prov.summary, /^USDC lent in USD\./, "the Lent headline's receipt");
+  // A lender with nothing posted states $0.
+  const bare = comet({ supply: "1000000000", borrow: "0", principal: "1000000000", collateral: [] });
+  assert.equal(statedCollateral(opcWalletLentProv(ctx(bare))), "$0");
+});
+
+test("Compound V3 Optimism: an unpriced collateral gives no health factor and no collateral figure", async () => {
+  reset();
+  const base = comet();
+  const unpriced = comet({
+    collateral: [
+      ...base.collateral,
+      { ...base.collateral[0], asset: "0x68f180fcce6836688e9084f035309e29bf0a2095", symbol: "WBTC", price: "0" },
+    ],
+  });
+  answers.compound = { ...COMPOUND, comets: [unpriced] };
+  const [row] = (await readVisitFamilies([compoundV3Optimism], W, 2000)).positions;
+  assert.equal(row.riskFigure, undefined, "no health factor");
+  assert.equal(row.buffer, bufferFromHealth(null));
+  assert.equal(row.collateralUsd, undefined);
+  assert.equal(row.debtUsd, 1000);
+  // The receipt states no collateral the total does not sum.
+  const prov = opcWalletLentProv({ a: unpriced, f: accountFigures(unpriced, null), head: HEAD, ethUsd: null });
+  assert.equal(
+    prov.inputs.some((x) => x.label === "Collateral"),
+    false,
+  );
 });
 
 // ── A failed read, and no position ───────────────────────────────────────
@@ -518,12 +593,34 @@ test("the wallet read: a failed read leaves the answer partial and names its fam
   assert.equal(read.total, 2);
 });
 
-test("one protocol chosen reads only its module", async () => {
+test("one protocol chosen: every launched module is read for the pills, and only its positions are drawn", async () => {
   reset();
   urls = [];
   const read = await readWalletUncached(W, undefined, { protocol: "compound-v3" });
-  assert.deepEqual(atBlockCalls(), ["/api/at-block/compound-v3-optimism/wallet"]);
+  assert.deepEqual(atBlockCalls().sort(), [
+    "/api/at-block/aave-v3-optimism/position",
+    "/api/at-block/compound-v3-optimism/wallet",
+    "/api/at-block/morpho-optimism/wallet",
+  ]);
+  assert.deepEqual(
+    read.held.map((h) => [h.slug, h.positions]),
+    [
+      ["aave-v3", 1],
+      ["compound-v3", 1],
+      ["morpho", 1],
+    ],
+    "the other launched modules keep their pills",
+  );
+  assert.deepEqual(
+    read.positions.map((p) => p.family),
+    ["compound-v3"],
+  );
+  assert.deepEqual(
+    read.families.map((f) => f.id),
+    ["compound-v3-optimism"],
+  );
   assert.equal(read.total, 1);
+  assert.equal(read.protocol, "compound-v3");
 });
 
 // ── The empty state's lines ──────────────────────────────────────────────

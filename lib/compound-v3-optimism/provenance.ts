@@ -125,8 +125,38 @@ export function opcCollateralProv(key: OpcCollateralFigure, c: OpcReceiptContext
 
 export type OpcBaseFigure = "amount" | "usd" | "rate" | "interest" | "usd-interest";
 
-/** The base balance's figures: the amount lent or borrowed, its dollars, the rate and the 30-day interest. */
-export function opcBaseProv(key: OpcBaseFigure, c: OpcReceiptContext): Provenance {
+/** The wallet card's Lent headline (decision 0071): its receipt, with the
+ *  figure the wallet total sums for the account, the collateral posted to the
+ *  Comet, stated as "Collateral $X". With a collateral unpriced the total sums
+ *  nothing for the account and the receipt states no collateral. */
+export function opcWalletLentProv(c: OpcReceiptContext): Provenance {
+  const { f } = c;
+  if (f.unpriced.length > 0 || f.collateralUsd == null) return opcBaseProv("usd", c);
+  const collateral = `$${fig(f.collateralUsd)}`;
+  const base = opcBaseProv(
+    "usd",
+    c,
+    ` Collateral ${collateral}, the assets posted to the Comet, is the part the wallet total sums.`,
+  );
+  return {
+    ...base,
+    inputs: [
+      ...(base.inputs ?? []),
+      {
+        label: "Collateral",
+        value: collateral,
+        kind: "chain",
+        pclass: "oracle",
+        step: true,
+        note: f.collateral.length ? f.collateral.map((x) => x.symbol).join(", ") : "none posted",
+      },
+    ],
+  };
+}
+
+/** The base balance's figures: the amount lent or borrowed, its dollars, the rate and the 30-day interest.
+ *  `more`: a sentence the dollars' prose ends with. */
+export function opcBaseProv(key: OpcBaseFigure, c: OpcReceiptContext, more = ""): Provenance {
   const { a, f } = c;
   const lend = f.supplied > 0;
   const fn = lend ? "balanceOf" : "borrowBalanceOf";
@@ -151,7 +181,7 @@ export function opcBaseProv(key: OpcBaseFigure, c: OpcReceiptContext): Provenanc
         pclass: "oracle",
         source: head,
         contract: cometC(a),
-        summary: `${a.baseSymbol} ${lend ? "lent" : "owed"} in USD. The amount at the Comet's base price${a.quoteUnit === "ETH" ? " in ETH, then WETH's dollar price" : ""}, read at ${at(c.head)}.`,
+        summary: `${a.baseSymbol} ${lend ? "lent" : "owed"} in USD. The amount at the Comet's base price${a.quoteUnit === "ETH" ? " in ETH, then WETH's dollar price" : ""}, read at ${at(c.head)}.${more}`,
         via: `${blk} · ${fn} × getPrice(base feed)${toUsd(c)}`,
         formula: a.quoteUnit === "ETH" ? "amount × price × WETH/USD" : "amount × price",
         inputs: [chain(`${a.baseSymbol} ${lend ? "lent" : "owed"}`, fig(amt)), basePriceInput(c), ...ethInput(c)],

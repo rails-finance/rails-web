@@ -3,14 +3,20 @@
 // One Compound V3 Comet account on Optimism as the wallet view lists it (W3;
 // rails-ops decision 0071): Collateral, the base supplied or owed, and
 // Borrowing capacity used, the figures and receipts of the explorer's wallet
-// rows (U3), from its wallet read at the head block. The Comet is the tag.
+// rows (U3), from its wallet read at the head block. Lent's receipt also states
+// the collateral the wallet total sums. The Comet is the tag.
 
 import { PositionCard, type PositionCardHead } from "@/components/shared/position-card";
 import { ListingTag } from "@/components/shared/listing-tag";
 import { Prov } from "@/components/shared/provenance";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { accountFigures } from "@/lib/compound-v3-optimism/position";
-import { opcBaseProv, opcCardProv, type OpcReceiptContext } from "@/lib/compound-v3-optimism/provenance";
+import {
+  opcBaseProv,
+  opcCardProv,
+  opcWalletLentProv,
+  type OpcReceiptContext,
+} from "@/lib/compound-v3-optimism/provenance";
 import type { OpcWalletRead } from "@/lib/compound-v3-optimism/types";
 import { CARD_WORDS, pctText, usd } from "@/lib/compound-v3-optimism/words";
 
@@ -40,7 +46,7 @@ export function CompoundV3OptimismWalletCard({ read }: { read: OpcWalletRead }) 
       tier: "amount",
       value:
         (f.supplied > 0 || f.borrowed > 0) && baseUsd != null ? (
-          <Prov info={opcBaseProv("usd", c)}>{usd(baseUsd)}</Prov>
+          <Prov info={lend ? opcWalletLentProv(c) : opcBaseProv("usd", c)}>{usd(baseUsd)}</Prov>
         ) : null,
     },
     {

@@ -40,7 +40,7 @@ import { moonwellBase, moonwellEthereum } from "@/lib/wallet/families/moonwell";
 import { eulerV2Arbitrum, eulerV2Base } from "@/lib/wallet/families/euler";
 import { aaveV3Optimism, compoundV3Optimism } from "@/lib/wallet/families/optimism";
 import { morphoArc, morphoOptimism } from "@/lib/wallet/families/morpho-at-block";
-import { readVisitFamilies, visitFamiliesLine, type VisitModule } from "@/lib/wallet/families/visit";
+import { readVisitFamilies, visitFamiliesLine, type VisitModule, type VisitRead } from "@/lib/wallet/families/visit";
 import { skySavings } from "@/lib/wallet/families/sky-savings";
 import { llamalend } from "@/lib/wallet/families/llamalend";
 import { dolomite } from "@/lib/wallet/families/dolomite";
@@ -421,8 +421,21 @@ function heldOf(rows: WalletSummaryRow[], visited: WalletPosition[] = []): Walle
   })).filter((p) => p.positions > 0);
 }
 
+/** The chosen protocol's part of the reads at visit: its positions, its
+ *  modules' entries and its failures. */
+function narrowVisit(v: VisitRead, protocol: string): VisitRead {
+  const ours = new Set(WALLET_VISIT_FAMILIES.filter((m) => m.family === protocol).map((m) => m.id));
+  const families = v.families.filter((f) => ours.has(f.id));
+  return {
+    positions: v.positions.filter((p) => p.family === protocol),
+    families,
+    failed: families.flatMap((f) => (f.unanswered ? [f.unanswered.what] : [])),
+  };
+}
+
 /** `protocol`: read that protocol's families alone (ui-jobs 738); the summary
- *  route still answers every row, which names the others for the pill. Every
+ *  route still answers every row, and every launched module read at visit is
+ *  still read, which names the others for the pill. Every
  *  request it makes to the api host shares the page's cap (lib/wallet/api-hop.ts),
  *  and none is made past the read's budget. */
 export function readWalletUncached(
@@ -456,11 +469,12 @@ async function readWalletInScope(address: string, readerIp: string | undefined, 
   const serverMs = Date.now() - t0;
   const reading = opts.protocol ? WALLET_FAMILIES.filter((f) => f.summaryFamily === opts.protocol) : WALLET_FAMILIES;
   // The families read at visit start here, once the summary and the listing
-  // reads have settled, beside the stored families' head reads.
-  const visiting = WALLET_VISIT_FAMILIES.filter((m) => !opts.protocol || m.family === opts.protocol);
+  // reads have settled, beside the stored families' head reads. A narrowed
+  // read still reads every launched module, since no stored row names their
+  // holdings for the pills, and draws only the chosen protocol's.
   // The floor does not reach the api host: a visit family whose request is
   // past the read's deadline fails, and the read is partial and uncached.
-  const visits = readVisitFamilies(visiting, address, Math.max(500, deadline - Date.now()), readerIp);
+  const visits = readVisitFamilies(WALLET_VISIT_FAMILIES, address, Math.max(500, deadline - Date.now()), readerIp);
   const groups = reading
     .map((f) => ({
       f,
@@ -468,8 +482,9 @@ async function readWalletInScope(address: string, readerIp: string | undefined, 
     }))
     .filter((g) => g.rows.length > 0);
   const settled = await Promise.allSettled(groups.map((g) => readFamily(g.f, g.rows, address, deadline, readerIp)));
-  const visited = await visits;
-  const held = heldOf(summary.rows, visited.positions);
+  const visitedAll = await visits;
+  const held = heldOf(summary.rows, visitedAll.positions);
+  const visited = opts.protocol ? narrowVisit(visitedAll, opts.protocol) : visitedAll;
   const families: WalletFamilyRead[] = [];
   const positions: WalletPosition[] = [];
   settled.forEach((s, i) => {
