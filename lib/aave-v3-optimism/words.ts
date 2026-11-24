@@ -26,7 +26,6 @@ export const pctText = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%
 export const hfText = (x: number) => x.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 
 export const FRONT_DOOR = {
-  line: "Enter a wallet address above to see its Aave V3 position on Optimism. You'll see what it has supplied and borrowed in dollars, how close it is to liquidation, and the interest it earned and paid over the last 30 days.",
   links: { markets: "Market overview" },
 };
 
