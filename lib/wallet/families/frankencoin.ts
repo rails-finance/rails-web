@@ -6,9 +6,9 @@
 // the listing shows it, never a liquidation. Units at the last MintingUpdate.
 // The head read is the listing's read of the owner (/api/frankencoin/positions
 // with the owner, one call to rails-server): each position's row as the index
-// holds it now. A position the read lists closed or denied holds nothing; one
-// it does not list (passed to another owner) keeps its stored card. No
-// dollars: Frankencoin runs no oracle (decision 0041).
+// holds it now. A position the read lists closed or denied holds nothing. One
+// it does not list (passed to another owner) keeps its stored card; a whole
+// answer then holds nothing for it at the index's latest block. No dollars: Frankencoin runs no oracle (decision 0041).
 
 import {
   buildFrankencoinPositionRows,
@@ -20,6 +20,7 @@ import { answerBody, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, plural, storeStamp } from "@/lib/wallet/summary-row";
+import { holdsNothingSince } from "@/lib/wallet/holds-nothing";
 import type { FamilyModule, HeadResult } from "./module";
 
 /** The listing route's most rows in one answer. */
@@ -77,14 +78,22 @@ export const frankencoin: FamilyModule = {
     const body = answerBody(
       await readFrankencoinPositions(qs, routeBoxHop(base, readerIp), signal),
       "Frankencoin positions",
-    ) as { data: FrankencoinPositionSummary[] };
+    ) as { data: FrankencoinPositionSummary[]; pagination: { total: number } };
     const listed = new Map(body.data.map((s) => [s.position, s]));
+    // The index has replayed every hub through the latest event it states.
+    const indexed = body.data.reduce<number | undefined>((m, s) => Math.max(m ?? 0, s.lastBlockNumber), undefined);
+    const whole = body.pagination.total <= body.data.length;
     return {
       reads: 1,
       positions: open.map((p): WalletPosition => {
         const s = listed.get(rowOf(p).position);
-        // Not listed for the owner (passed on): the stored card stands.
-        if (!s) return { ...p, headRead: "stored" };
+        // Not listed for the owner (passed on): the stored card stands. Left
+        // out of a whole answer, the wallet holds nothing there at the
+        // index's block, where that is at or past the stored read.
+        if (!s) {
+          const head = whole ? holdsNothingSince(indexed, p.readAtBlock) : undefined;
+          return { ...p, ...(head != null ? { closedSince: { block: head } } : {}), headRead: "stored" };
+        }
         if (s.status !== "open") return { ...p, closedSince: { block: s.lastBlockNumber }, headRead: "stored" };
         return {
           ...p,

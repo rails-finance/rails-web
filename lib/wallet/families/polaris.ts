@@ -14,7 +14,9 @@
 // wallet), and for open CDPs the CDP listing's market board (one Sepolia
 // Multicall, kept 60 s), which gives each CDP card its ratio. A position the
 // read lists closed or liquidated holds nothing; one it does not list (its
-// NFT passed on) keeps its stored card. A loan untouched since the store's
+// NFT passed on) keeps its stored card; a whole answer then holds nothing for
+// it at the answer's block (a CDP market's lastScannedBlock, the loan and
+// deposit routes' served_thru_block). A loan untouched since the store's
 // row keeps its stored debt; one touched since takes the listing's row.
 
 import {
@@ -35,6 +37,7 @@ import { createAuthHeaders } from "@/lib/api/fetch-with-auth";
 import { SEPOLIA_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, plural, storeStamp, type WalletSummaryRow } from "@/lib/wallet/summary-row";
+import { holdsNothingSince } from "@/lib/wallet/holds-nothing";
 import type { FamilyModule, HeadResult } from "./module";
 
 /** The listing routes' most rows in one answer. */
@@ -107,8 +110,18 @@ function shapeRow(r: WalletSummaryRow): WalletPosition | null {
   return null;
 }
 
-/** What one kind's listing read answered: each position's row by its key. */
-type Listed<T> = Map<string, T> | null;
+/** What one kind's listing read answered: each position's row by its key,
+ *  and the block a whole answer holds nothing else at, by market where the
+ *  route states it per market (null on an answer cut short). */
+interface Listed<T> {
+  rows: Map<string, T>;
+  head: (market?: string) => number | undefined;
+}
+
+const blockOf = (v: string | number | null | undefined): number | undefined => {
+  const n = v == null ? NaN : Number(v);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+};
 
 const cdpKey = (s: { market: string; cdpId: string }) => `${s.market}:${s.cdpId}`;
 const spKey = (r: { market: string; token_id: string }) => `${r.market}:${r.token_id}`;
@@ -146,7 +159,14 @@ export const polaris: FamilyModule = {
           signal,
         );
         if (!r.ok) throw new Error(`/api/polaris/positions answered ${r.status}`);
-        return new Map(r.result.data.map((s) => [cdpKey(s), s]));
+        const whole = r.result.pagination.total <= r.result.data.length;
+        // Each market's book is scanned through its lastScannedBlock.
+        const scanned = new Map(r.result.markets.map((m) => [m.market as string, m.lastScannedBlock]));
+        const listed: Listed<PolarisPositionSummary> = {
+          rows: new Map(r.result.data.map((s) => [cdpKey(s), s])),
+          head: (m) => (whole && m ? blockOf(scanned.get(m)) : undefined),
+        };
+        return listed;
       }),
       read(has("polaris-cdp"), async (): Promise<PolarisMarketsChainResponse | null> => {
         const b = await loadPolarisMarketsFromChain();
@@ -154,27 +174,46 @@ export const polaris: FamilyModule = {
       }),
       read(has("polaris-loan"), async () => {
         const r = await readPolarisSpLoans<PolarisLoanListResponse>("reserve-loans", list, hop);
-        return { rows: new Map(r.rows.map((x) => [x.loan_id, x])), index: r.index };
+        const whole = r.pagination.total <= r.rows.length;
+        const listed: Listed<PolarisLoanRow> & { index: PolarisLoanListResponse["index"] } = {
+          rows: new Map(r.rows.map((x) => [x.loan_id, x])),
+          head: () => (whole ? blockOf(r.served_thru_block) : undefined),
+          index: r.index,
+        };
+        return listed;
       }),
       read(has("polaris-deposit"), async () => {
         const r = await readPolarisSpLoans<PolarisDepositListResponse>("stability-pool", list, hop);
-        return new Map(r.rows.map((x) => [spKey(x), x]));
+        const whole = r.pagination.total <= r.rows.length;
+        const listed: Listed<PolarisDepositRow> = {
+          rows: new Map(r.rows.map((x) => [spKey(x), x])),
+          head: () => (whole ? blockOf(r.served_thru_block) : undefined),
+        };
+        return listed;
       }),
     ]);
     signal.throwIfAborted();
-    const cdpRows: Listed<PolarisPositionSummary> = settledOr(cdps);
+    const cdpRows = settledOr(cdps);
     const markets = settledOr(board) ?? null;
     const loanRead = settledOr(loans);
-    const spRows: Listed<PolarisDepositRow> = settledOr(deposits);
+    const spRows = settledOr(deposits);
+    // Left out of a whole answer: the wallet holds nothing there at the
+    // answer's block, where that is at or past the stored read. A read that
+    // did not answer leaves the stored card as failed.
+    const leftOut = <T>(p: WalletPosition, read: Listed<T> | null, market?: string): WalletPosition => {
+      if (!read) return { ...p, headRead: "failed" };
+      const head = holdsNothingSince(read.head(market), p.readAtBlock);
+      return { ...p, ...(head != null ? { closedSince: { block: head } } : {}), headRead: "stored" };
+    };
 
     return {
       reads,
       positions: open.map((p): WalletPosition => {
         const c = p.card;
         if (c.kind === "polaris-cdp") {
-          const s = cdpRows?.get(cdpKey(c.row));
+          const s = cdpRows?.rows.get(cdpKey(c.row));
           // The board still gives a stored CDP its ratio.
-          if (!s) return { ...p, card: { ...c, markets }, headRead: cdpRows ? "stored" : "failed" };
+          if (!s) return leftOut({ ...p, card: { ...c, markets } }, cdpRows, c.row.market);
           if (s.status !== "open")
             return { ...p, card: { ...c, markets }, closedSince: { block: s.lastBlock }, headRead: "stored" };
           return {
@@ -187,7 +226,7 @@ export const polaris: FamilyModule = {
         }
         if (c.kind === "polaris-loan") {
           const s = loanRead?.rows.get(c.row.loan_id);
-          if (!s) return { ...p, headRead: loanRead ? "stored" : "failed" };
+          if (!s) return leftOut(p, loanRead);
           if (s.status !== "open") return { ...p, closedSince: { block: Number(s.last_block) }, headRead: "stored" };
           // Untouched since the store's row: its debt at the last touch, which
           // the card's tip states, stands.
@@ -204,8 +243,8 @@ export const polaris: FamilyModule = {
           };
         }
         if (c.kind === "polaris-deposit") {
-          const s = spRows?.get(spKey(c.row));
-          if (!s) return { ...p, headRead: spRows ? "stored" : "failed" };
+          const s = spRows?.rows.get(spKey(c.row));
+          if (!s) return leftOut(p, spRows);
           if (s.status !== "open") return { ...p, closedSince: { block: Number(s.last_block) }, headRead: "stored" };
           return {
             ...p,

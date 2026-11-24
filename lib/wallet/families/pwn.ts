@@ -8,8 +8,9 @@
 // The link is the wallet's own PWN page for the loan. The head read is the
 // listing's read of the wallet (/api/pwn/positions with the wallet, one call
 // to rails-server): each loan's row as the store holds it now. A loan it lists
-// repaid or defaulted holds nothing for the wallet; one it does not list keeps
-// its stored card. No dollars: the listing prices none (decision 0041).
+// repaid or defaulted holds nothing for the wallet. One it does not list keeps
+// its stored card; a whole answer then holds nothing for it at the store's
+// latest block. No dollars: the listing prices none (decision 0041).
 
 import { buildPwnPositionRows, type PwnPositionSummary, type RawPwnPositionRow } from "@/lib/sources/api/pwn-positions";
 import { readPwnPositions } from "@/lib/pwn/proxy-reads";
@@ -17,6 +18,7 @@ import { answerBody, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { historyBase, storeStamp } from "@/lib/wallet/summary-row";
+import { holdsNothingSince } from "@/lib/wallet/holds-nothing";
 import type { FamilyModule, HeadResult } from "./module";
 
 /** The listing route's most rows in one answer (it caps `limit` at 100). */
@@ -66,14 +68,26 @@ export const pwn: FamilyModule = {
     });
     const body = answerBody(await readPwnPositions(qs, routeBoxHop(base, readerIp), signal), "PWN loans") as {
       data: PwnPositionSummary[];
+      pagination: { total: number };
     };
     const listed = new Map(body.data.map((s) => [keyOf(s), s]));
+    // The store holds every loan event through the latest one it states.
+    const indexed = body.data.reduce<number | undefined>(
+      (m, s) => Math.max(m ?? 0, s.closedBlock ?? 0, s.createdBlock ?? 0),
+      undefined,
+    );
+    const whole = body.pagination.total <= body.data.length;
     return {
       reads: 1,
       positions: open.map((p): WalletPosition => {
         const s = listed.get(keyOf(rowOf(p)));
-        // Not listed for the wallet: the stored card stands.
-        if (!s) return { ...p, headRead: "stored" };
+        // Not listed for the wallet: the stored card stands. Left out of a
+        // whole answer, the wallet holds nothing there at the store's block,
+        // where that is at or past the stored read.
+        if (!s) {
+          const head = whole ? holdsNothingSince(indexed, p.readAtBlock) : undefined;
+          return { ...p, ...(head != null ? { closedSince: { block: head } } : {}), headRead: "stored" };
+        }
         if (s.status !== "open")
           return { ...p, closedSince: { block: s.closedBlock ?? s.createdBlock ?? 0 }, headRead: "stored" };
         return { ...p, card: { kind: "pwn", row: s }, headRead: "read" };
