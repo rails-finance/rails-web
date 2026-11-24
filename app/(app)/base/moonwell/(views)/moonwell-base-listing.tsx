@@ -2,8 +2,8 @@
 
 // Moonwell Base listing — client half. The shared Moonwell listing driver
 // pointed at the Base route, the shared Moonwell card bound to the Base lane
-// (session, sweep receipts, no replay peaks), and the one thing the Ethereum
-// listing never has to say: how complete the lane is.
+// (session, sweep receipts, the row's per-market peaks), and the one thing
+// the Ethereum listing never has to say: how complete the lane is.
 //
 // A row is one wallet's standing across every market under the one
 // Comptroller, as on Ethereum: every balance a chain read at the block the row
@@ -112,7 +112,7 @@ export function MoonwellBaseListing({
         defaults={MOONWELL_BASE_LIST_DEFAULTS}
         sortOptions={MOONWELL_BASE_SORT_OPTIONS}
         searchPlaceholder="Search wallet address"
-        renderCard={(p) => <MoonwellPositionCard v={viewFromSummary(p)} surface="listing" peaks={false} />}
+        renderCard={(p) => <MoonwellPositionCard v={viewFromSummary(p)} surface="listing" />}
         hrefFor={(p) => `/base/moonwell/${p.wallet}`}
         keyFor={(p) => p.wallet}
         strategy={serverStrategy<MoonwellPositionSummary, MoonwellListFilters, MoonwellBaseRosterState>({
