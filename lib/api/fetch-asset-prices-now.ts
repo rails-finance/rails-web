@@ -1,11 +1,11 @@
 // Every oracle line's price now for an asset page (ui-jobs 818;
-// lib/shared/asset-prices-now.ts has the answer's shape). The server's
-// same-block read, GET /api/prices/assets/now?chain=&token=, is not served
-// yet: this client is its STUB, answering from the stored rounds
-// (/api/prices/rounds) and daily store (/api/prices/daily) with each line's
-// latest stored value at its block (`sameBlock: false`, `stub: true`).
-// The real client replaces this file alone: the page calls
-// `fetchAssetPricesNow` and reads the answer's shape.
+// lib/shared/asset-prices-now.ts has the answer's shape). It reads the
+// server's same-block route, GET /api/prices/assets/now?chain=&token=: every
+// line at one block, `sameBlock: true`. Where the route is not served (404,
+// or a network error) it answers from the stored rounds (/api/prices/rounds)
+// and daily store (/api/prices/daily): each line's latest stored value at its
+// block (`sameBlock: false`, `stub: true`). A 502 (the round failed past its
+// grace) answers every line unread.
 //
 // SERVER-ONLY. Reads `RAILS_API_URL` + `API_BEARER_TOKEN`.
 
@@ -13,7 +13,10 @@ import "server-only";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { ROUNDS_REVALIDATE_S } from "@/lib/api/fetch-asset-prices-server";
 import {
+  pricesNowSource,
   RECENT_DAYS,
+  routePricesNow,
+  type RouteNowAnswer,
   storedPricesNow,
   unreadPricesNow,
   type AssetPricesNow,
@@ -42,6 +45,27 @@ async function get<T>(path: string, readerIp?: string | null): Promise<T | null>
   return res?.ok ? ((await res.json()) as T) : null;
 }
 
+/** The route's status (null on a network error) with its body where it is a 200. */
+async function getRoute(
+  chain: number,
+  token: string,
+  readerIp?: string | null,
+): Promise<{ status: number | null; body: RouteNowAnswer | null }> {
+  const base = process.env.RAILS_API_URL;
+  if (!base) throw new Error("RAILS_API_URL environment variable is not set");
+  const q = new URLSearchParams({ chain: String(chain), token: token.toLowerCase() });
+  const res = await fetch(
+    `${base}/api/prices/assets/now?${q.toString()}`,
+    createAuthFetchOptions(
+      { next: { revalidate: ROUNDS_REVALIDATE_S }, signal: AbortSignal.timeout(TIMEOUT_MS) },
+      readerIp ?? undefined,
+    ),
+  ).catch(() => null);
+  if (!res) return { status: null, body: null };
+  const body = res.status === 200 ? ((await res.json().catch(() => null)) as RouteNowAnswer | null) : null;
+  return { status: res.status, body };
+}
+
 /** `token`'s lines on `chain`, each priced now. Never throws: a failed read
  *  answers every line unread, with its reason. */
 export async function fetchAssetPricesNow(
@@ -50,8 +74,11 @@ export async function fetchAssetPricesNow(
   lines: readonly PageLine[],
   readerIp?: string | null,
 ): Promise<AssetPricesNow> {
-  void token; // the same-block route keys on the token; the stub reads the lines
   try {
+    const route = await getRoute(chain, token, readerIp);
+    const source = pricesNowSource(route.status);
+    if (source === "route" && route.body) return routePricesNow(route.body);
+    if (source === "unread") return unreadPricesNow(chain, lines, "The prices were not read");
     const now = Math.floor(Date.now() / 1000);
     const oracles = [...new Set(lines.map((l) => l.oracle.address.toLowerCase()))].slice(0, MAX_ORACLES);
     const keys = [...new Set(lines.flatMap((l) => (l.drawn ? [l.drawn.key] : [])))].slice(0, MAX_SERIES);

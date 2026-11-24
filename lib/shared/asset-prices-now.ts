@@ -41,6 +41,9 @@ export interface AssetPricesNow {
   sameBlock: boolean;
   /** The answer is the stub's, from stored values. */
   stub?: true;
+  /** The route served its last round past its cache time (a refresh failed
+   *  within grace): the prices are real but not this moment's. */
+  stale?: true;
   /** By line id (`<chain>:<oracle>`). */
   prices: Record<string, LinePriceNow>;
 }
@@ -126,4 +129,76 @@ export function unreadPricesNow(chain: number, lines: readonly PageLine[], reaso
   const prices: Record<string, LinePriceNow> = {};
   for (const l of lines) prices[l.id] = { ok: false, price: null, reason, block: null, timestamp: null, read: "" };
   return { chain, block: null, timestamp: null, sameBlock: false, prices };
+}
+
+/** One line as GET /api/prices/assets/now answers it, the parts the page reads. */
+export interface RouteNowLine {
+  lineId: string;
+  /** An integer string at `decimals`; null where the line was not read. */
+  price: string | null;
+  decimals?: number;
+  stale: boolean;
+  ok: boolean;
+  /** The literal "not read" where the oracle did not answer. */
+  reason?: string;
+  read: string;
+}
+/** The route's 200 answer: every line read in one round, the block and time at the top. */
+export interface RouteNowAnswer {
+  chain: number;
+  token: string;
+  block: number;
+  timestamp: number;
+  sameBlock: true;
+  stale?: true;
+  lines: RouteNowLine[];
+}
+
+const ROUTE_NOT_READ = "not read";
+const NOT_ANSWERED = "The oracle did not answer at this block.";
+
+/** An integer string at `decimals` as a number: whole and fraction divided
+ *  apart in BigInt, so a 36-digit price loses nothing before the division.
+ *  NaN where the string is not an integer. */
+export function scaledPrice(raw: string, decimals: number): number {
+  if (!/^\d+$/.test(raw)) return NaN;
+  const scale = BigInt("1" + "0".repeat(decimals));
+  const n = BigInt(raw);
+  return Number(n / scale) + Number(n % scale) / Number(scale);
+}
+
+/** The same-block route's answer as the page's: prices by line id, each at the answer's block and time. */
+export function routePricesNow(answer: RouteNowAnswer): AssetPricesNow {
+  const prices: Record<string, LinePriceNow> = {};
+  for (const l of answer.lines) {
+    const price = l.ok && l.price != null ? scaledPrice(l.price, l.decimals ?? 0) : NaN;
+    const ok = Number.isFinite(price) && price > 0;
+    prices[l.lineId] = {
+      ok,
+      price: ok ? price : null,
+      ...(ok && l.stale ? { stale: true } : {}),
+      ...(ok ? {} : { reason: !l.reason || l.reason === ROUTE_NOT_READ ? NOT_ANSWERED : l.reason }),
+      block: answer.block,
+      timestamp: answer.timestamp,
+      read: l.read,
+    };
+  }
+  return {
+    chain: answer.chain,
+    block: answer.block,
+    timestamp: answer.timestamp,
+    sameBlock: true,
+    ...(answer.stale ? { stale: true as const } : {}),
+    prices,
+  };
+}
+
+/** What the client does with the route's reply: "route" on a 200, "unread" on
+ *  a 502 (the round failed past its grace), else "stub". A 404 (not served
+ *  yet, or a token outside the roster), a 400, a network error (status null)
+ *  and any other status fall back to the stored values, which say what they are. */
+export function pricesNowSource(status: number | null): "route" | "stub" | "unread" {
+  if (status === 200) return "route";
+  if (status === 502) return "unread";
+  return "stub";
 }

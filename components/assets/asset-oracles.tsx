@@ -265,6 +265,11 @@ export function AsOfLine({ now }: { now: AssetPricesNow }) {
       data-anatomy="A2.6"
     >
       {text}
+      {now.stale && (
+        <span data-asset-as-of-cached="true" title="The server's last read, served while it refreshes">
+          (cached)
+        </span>
+      )}
       <RevealTip tip={AS_OF_NOTE} label={`About the prices: ${AS_OF_NOTE}`} focusable wrap>
         <Info className="h-4 w-4" aria-hidden="true" />
       </RevealTip>
