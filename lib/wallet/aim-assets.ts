@@ -9,6 +9,11 @@
 //   sky-savings            USDS
 //   llamalend              the market's collateral and borrowed symbols
 //   compound-v2            each supplied, borrowed and peak market's symbol
+//   dolomite               each supplied, borrowed and peak market's symbol
+//   alchemix               the synthetic, and the vault's underlying where the card names it
+//   alchemix-v2            the synthetic
+//   maple                  each held or peak pool's asset symbol
+//   fx                     the pool's collateral token symbol, and fxUSD
 //   compound-v3            base token + each collateral line's address
 //   spark                  each supplied and borrowed reserve's address (peaks for a closed one)
 //   aave-v3, seamless      the dominant supply and debt addresses only (the row carries counts, not the list)
@@ -100,6 +105,22 @@ export function walletPositionAssetKeys(p: WalletPosition): string[] {
       break;
     case "llamalend":
       symbols.push(c.row.collateralSymbol, c.row.borrowedSymbol);
+      break;
+    case "dolomite":
+      for (const r of [...c.row.supplies, ...c.row.borrows, ...c.row.peakSupplies, ...c.row.peakBorrows])
+        symbols.push(r.symbol);
+      break;
+    case "alchemix":
+      symbols.push(c.row.syntheticSymbol, c.row.figures.collateral?.underlying?.symbol);
+      break;
+    case "alchemix-v2":
+      symbols.push(c.row.syntheticSymbol);
+      break;
+    case "maple":
+      for (const r of [...c.row.pools, ...c.row.peakPools]) symbols.push(r.assetSymbol);
+      break;
+    case "fx":
+      symbols.push(c.row.poolSymbol, "fxUSD");
       break;
     default:
       break;

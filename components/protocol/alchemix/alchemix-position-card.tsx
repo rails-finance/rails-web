@@ -47,7 +47,7 @@ import type {
   AlchemixCollateral,
   AlchemixLiveCollateral,
   AlchemixPositionStatus,
-  AlchemixPositionSummary,
+  AlchemixStoredPositionSummary,
 } from "@/types/api/alchemix";
 import { alchemixMarketWord } from "@/lib/alchemix/naming";
 import { BlockRef } from "@/components/shared/block-ref";
@@ -194,7 +194,11 @@ function stamp(block: number | null | undefined): ReactNode {
   ) : null;
 }
 
-export function alchemixListingSlots(p: AlchemixPositionSummary, session: SessionProtocol): PositionCardListingSlots {
+/** A listing row, or the wallet page's stored one (every listing row is one). */
+export function alchemixListingSlots(
+  p: AlchemixStoredPositionSummary,
+  session: SessionProtocol,
+): PositionCardListingSlots {
   const sym = p.syntheticSymbol;
   const c = p.figures.collateral;
   const collSettled = c && c.asOfBlock != null ? c : null;
@@ -239,6 +243,6 @@ export function alchemixListingSlots(p: AlchemixPositionSummary, session: Sessio
   };
 }
 
-export function AlchemixPositionCard({ p, session }: { p: AlchemixPositionSummary; session: SessionProtocol }) {
+export function AlchemixPositionCard({ p, session }: { p: AlchemixStoredPositionSummary; session: SessionProtocol }) {
   return <PositionCard slots={alchemixListingSlots(p, session)} />;
 }

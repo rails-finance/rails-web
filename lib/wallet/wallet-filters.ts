@@ -47,6 +47,10 @@ export const WALLET_PROTOCOLS: WalletProtocol[] = [
   { slug: "euler-v2", name: "Euler V2", kinds: ["loans", "deposits"] },
   { slug: "sky-savings", name: "Sky Savings", kinds: ["deposits"] },
   { slug: "llamalend", name: "LlamaLend", kinds: ["loans"] },
+  { slug: "dolomite", name: "Dolomite", kinds: ["loans", "deposits"] },
+  { slug: "alchemix", name: "Alchemix", kinds: ["loans", "deposits"] },
+  { slug: "maple", name: "Maple", kinds: ["deposits"] },
+  { slug: "fx", name: "f(x) Protocol", kinds: ["loans"] },
 ];
 
 export const walletProtocol = (slug: string | null | undefined): WalletProtocol | undefined =>
@@ -85,8 +89,9 @@ export function walletSearchHref(protocol: string | undefined, q: string | null 
   return WALLET_ADDRESS.test(v) || isWalletEnsName(v) ? walletProtocolHref(v, protocol) : null;
 }
 
-/** Fields that name a market's figures or a count, never the account's debt. */
-const NOT_THE_ACCOUNTS = /total|bad_?debt|rate|count|symbol|address|apy|index|share|cap/i;
+/** Fields that name a market's figures, a count or a block, never the
+ *  account's debt (Alchemix states each debt with its `asOfBlock`). */
+const NOT_THE_ACCOUNTS = /total|bad_?debt|rate|count|symbol|address|apy|index|share|cap|block/i;
 const DEBT_KEY = /debt|borr/i;
 const positive = (v: unknown) => (typeof v === "number" || typeof v === "string") && Number(v) > 0;
 
@@ -120,8 +125,16 @@ export function kindOfRow(row: WalletSummaryRow): WalletKind {
   // debt (about 1,800 stored pairs, mig 517), so the flag is the best signal
   // the store gives and no proof of a loan.
   const controller = (row.card as { controller?: unknown } | null)?.controller === true;
+  // A Dolomite account borrowing in several markets states no debt unit (mig
+  // 522): its borrow market count says it owes.
+  const borrowsIn = Number((row.card as { borrowMarketCount?: unknown } | null)?.borrowMarketCount ?? 0) > 0;
   const owed =
-    positive(row.debt?.amount) || positive(row.peakDebt) || positive(row.debtUsd) || owedIn(row.card) || controller;
+    positive(row.debt?.amount) ||
+    positive(row.peakDebt) ||
+    positive(row.debtUsd) ||
+    owedIn(row.card) ||
+    controller ||
+    borrowsIn;
   return owed ? "loans" : "deposits";
 }
 

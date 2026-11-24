@@ -19,6 +19,10 @@ import type { MoonwellPositionSummary } from "@/lib/sources/api/moonwell-positio
 import type { LlamalendPositionSummary } from "@/lib/sources/api/llamalend-positions";
 import type { SkyAsOf, SkyPosition } from "@/lib/sky-savings/types";
 import type { EulerWalletCardRow } from "@/lib/euler/wallet-card";
+import type { DolomitePositionSummary } from "@/lib/sources/api/dolomite-positions";
+import type { MaplePositionSummary } from "@/lib/sources/api/maple-positions";
+import type { FxPositionSummary } from "@/lib/sources/api/fx-positions";
+import type { AlchemixStoredPositionSummary, AlchemixV2PositionSummary } from "@/types/api/alchemix";
 import type { MorphoBaseVaultOwnerNote } from "@/lib/morpho-base/vault-owner-note";
 import type { MorphoPositionSummary } from "@/lib/sources/api/morpho-positions";
 import type { SparkPositionSummary } from "@/lib/sources/api/spark-positions";
@@ -81,6 +85,20 @@ export type WalletCard =
    *  last event. */
   | { kind: "sky-savings"; row: SkyPosition; asOf: SkyAsOf | null }
   | { kind: "llamalend"; row: LlamalendPositionSummary }
+  /** A Dolomite account: par from the store, in tokens at the market index
+   *  where the head read answered. */
+  | { kind: "dolomite"; row: DolomitePositionSummary }
+  /** An Alchemix V3 position: the stored reading at its last band edge, or the
+   *  listing's head reading. `lane` names the explorer it links to. */
+  | { kind: "alchemix"; lane: "ethereum" | "base"; row: AlchemixStoredPositionSummary }
+  /** An Alchemix V2 account: closed history, frozen at the wind-down. */
+  | { kind: "alchemix-v2"; row: AlchemixV2PositionSummary }
+  /** A Maple lender: pool shares from the store, with what they redeem for at
+   *  the exit rate where the head read answered. */
+  | { kind: "maple"; row: MaplePositionSummary }
+  /** An f(x) position: getPosition at its last event, or the sweep's read
+   *  where the head read answered. */
+  | { kind: "fx"; row: FxPositionSummary }
   | { kind: "morpho-arbitrum"; row: ArbitrumReadRow }
   | { kind: "spark"; row: SparkPositionSummary }
   | { kind: "fluid"; row: FluidPositionSummary }
@@ -178,7 +196,9 @@ export interface WalletPosition {
    *  stablecoin loan token. Ranks, never displayed. */
   dustUsd?: number;
   /** An Aave V3 Base account the chain has not been read for yet (open
-   *  point 8): shown with a "not read" mark, outside the tiles and the sort. */
+   *  point 8), or an f(x) position with no boundary read stored that the head
+   *  read could not fill: shown with a "not read" mark, outside the tiles and
+   *  the sort. */
   notRead?: boolean;
   /** A Liquity-family Trove's or Stability Pool deposit's branch shutdown
    *  (ui-jobs 802): the catalog's record with the live read, from a Trove's
