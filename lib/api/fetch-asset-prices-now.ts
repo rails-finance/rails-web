@@ -23,6 +23,7 @@ import {
   cachedPricesNow,
   readPricesNow,
   RECENT_DAYS,
+  storedRequest,
   routePricesNow,
   type RouteNowAnswer,
   storedPricesNow,
@@ -40,8 +41,6 @@ const NOW_REVALIDATE_S = 60;
 const DAY_S = 86_400;
 /** The rounds read: the first and last of the last 40 days, as the Prices list reads them. */
 const ROUND_DAYS = 40;
-const MAX_ORACLES = 12;
-const MAX_SERIES = 40;
 
 async function get<T>(path: string, signal: AbortSignal, readerIp?: string): Promise<T | null> {
   const base = process.env.RAILS_API_URL;
@@ -83,9 +82,10 @@ class Uncached extends Error {
  *  unread, with its reason.
  *
  *  The key is chain and token alone. `lines` are that token's roster lines
- *  on the chain, the same set on every explorer's page (`viaPage` only puts
- *  the explorer's line first), so they are sorted by id before the read and
- *  any page's miss reads what every other page would. */
+ *  on the chain in the roster's order (`assetPage`, before `viaPage` puts an
+ *  explorer's line first): the same on every page, with the main lines first,
+ *  so any page's miss reads what every other page would and the fallback's
+ *  caps (`storedRequest`) keep them. */
 export async function fetchAssetPricesNow(
   chain: number,
   token: string,
@@ -93,10 +93,9 @@ export async function fetchAssetPricesNow(
   readerIp?: string,
 ): Promise<AssetPricesNow> {
   const t = token.toLowerCase();
-  const sorted = [...lines].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const read = unstable_cache(
     async () => {
-      const answer = await readNow(chain, t, sorted, readerIp);
+      const answer = await readNow(chain, t, lines, readerIp);
       if (!cachedPricesNow(answer)) throw new Uncached(answer);
       return answer;
     },
@@ -140,8 +139,7 @@ async function storedNow(
   readerIp?: string,
 ): Promise<AssetPricesNow> {
   const now = Math.floor(Date.now() / 1000);
-  const oracles = [...new Set(lines.map((l) => l.oracle.address.toLowerCase()))].slice(0, MAX_ORACLES);
-  const keys = [...new Set(lines.flatMap((l) => (l.drawn ? [l.drawn.key] : [])))].slice(0, MAX_SERIES);
+  const { oracles, keys } = storedRequest(lines);
   const rq = new URLSearchParams({
     chain: String(chain),
     oracles: oracles.join(","),

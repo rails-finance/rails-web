@@ -68,6 +68,22 @@ export interface StoredDaily {
 const DAY_S = 86_400;
 /** The days back the stub reads the daily store. */
 export const RECENT_DAYS = 10;
+
+/** The stored fallback's request caps: the first oracles and drawn series, in
+ *  the order given. */
+export const MAX_ORACLES = 12;
+export const MAX_SERIES = 40;
+
+/** The oracles and drawn series the stored fallback reads, capped in the
+ *  lines' order. Callers pass the roster's order (`assetPage`: drawn, readers,
+ *  span), the same on every page and with the main lines first, so the cap
+ *  never drops them. */
+export function storedRequest(lines: readonly PageLine[]): { oracles: string[]; keys: string[] } {
+  return {
+    oracles: [...new Set(lines.map((l) => l.oracle.address.toLowerCase()))].slice(0, MAX_ORACLES),
+    keys: [...new Set(lines.flatMap((l) => (l.drawn ? [l.drawn.key] : [])))].slice(0, MAX_SERIES),
+  };
+}
 const NO_STORE = "Rails stores no price for this oracle";
 const NOT_RECENT = `Rails stores no price for this oracle in the last ${RECENT_DAYS} days`;
 const NOT_READ = "The stored prices were not read";

@@ -248,7 +248,9 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
   const own = view?.lineId != null;
   // The one price-now read, started here and not awaited: the header and the
   // table stream from it (ui-jobs 829).
-  const nowRead = fetchAssetPricesNow(chain, t, section.lines, readerIp);
+  // The roster's order (before viaPage), the same on every page: the cached read's lines.
+  const rosterLines = opened?.chains.find((c) => c.chain === chain)?.lines ?? section.lines;
+  const nowRead = fetchAssetPricesNow(chain, t, rosterLines, readerIp);
   // Each explorer's page for the token: this protocol's, and the others' from the chips.
   const hrefs: Record<string, string> = Object.fromEntries(
     line.also.flatMap((ch) => {
