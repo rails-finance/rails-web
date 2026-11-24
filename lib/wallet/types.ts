@@ -138,7 +138,8 @@ export interface WalletPosition {
    *  History table ("Core", "WETH"). */
   market?: string;
   positionId: string;
-  href: string;
+  /** Null on a position with no page. */
+  href: string | null;
   status: WalletPositionStatus;
   /** Trove, deposit, loan or vault, for the Kind pill (ui-jobs 738). */
   kind?: WalletKind;
