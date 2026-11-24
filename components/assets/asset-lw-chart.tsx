@@ -156,11 +156,11 @@ function HeadNow({ head }: { head: HeadPrice }) {
 function HeadPending() {
   return (
     <span className="contents" data-asset-head-pending="">
-      <span className="inline-flex h-[1em] min-w-[9ch] items-center text-3xl leading-none sm:text-4xl">
+      <span className="inline-flex h-[1em] min-w-[7ch] items-center text-3xl leading-none sm:text-4xl">
         <SkeletonBar width="100%" figure />
       </span>
       <SkeletonBar width={64} height={20} />
-      <SkeletonBar width={88} height={20} />
+      <SkeletonBar width={116} height={20} />
     </span>
   );
 }
