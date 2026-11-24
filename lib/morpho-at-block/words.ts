@@ -28,11 +28,8 @@ export const usd = (x: number) =>
 export const pctText = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%`;
 
 export const frontDoorWords = ({ chain }: Dep) => ({
-  // Optimism's door first (ui-jobs 578); Arc's line waits on its own review.
-  line:
-    chain === "Optimism"
-      ? "Enter a wallet address above to see its Morpho Blue positions on Optimism. You'll see each position's collateral and debt, how close it is to liquidation, and its interest over the last 30 days."
-      : `A wallet's Morpho Blue positions on ${chain}, each with its collateral, debt and health factor, in dollars where ${chain} has a price feed for the loan asset, and its interest over the last 30 days.`,
+  /** Arc's door line; Optimism's door has none (ui-jobs 578). */
+  line: `A wallet's Morpho Blue positions on ${chain}, each with its collateral, debt and health factor, in dollars where ${chain} has a price feed for the loan asset, and its interest over the last 30 days.`,
   links: { markets: "Markets" },
   heading: "Morpho Blue positions",
   none: `This address holds no Morpho Blue position on ${chain}.`,

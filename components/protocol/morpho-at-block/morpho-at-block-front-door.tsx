@@ -10,14 +10,16 @@ import type { MorphoAtBlockDeployment } from "@/lib/morpho-at-block/types";
 
 export function MorphoAtBlockFrontDoor({ dep }: { dep: MorphoAtBlockDeployment }) {
   const words = frontDoorWords(dep);
+  // Optimism names its chain and draws no line, as the shared front door (ui-jobs 578); Arc follows
+  // with its own review.
+  const optimism = dep.chainId === 10;
   return (
     <PoolFrontDoor
       id={dep.session}
       label={LABEL}
-      line={words.line}
+      line={optimism ? undefined : words.line}
       route={dep.route}
-      // Optimism names its chain (ui-jobs 578); Arc follows with its own review.
-      chainId={dep.chainId === 10 ? 10 : undefined}
+      chainId={optimism ? 10 : undefined}
       links={[{ href: `${dep.route}/markets`, label: words.links.markets }]}
     />
   );

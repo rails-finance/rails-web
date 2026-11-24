@@ -32,7 +32,8 @@ export function PoolFrontDoor({
 }: {
   id: string;
   label: string;
-  line: string;
+  /** The line under the search; Optimism's doors have none, as the shared front door has none. */
+  line?: string;
   route: string;
   /** A second line under `line`. */
   extra?: string;
@@ -66,7 +67,7 @@ export function PoolFrontDoor({
       <div className="w-full max-w-xl">
         <FrontDoorSearch href={(wallet) => `${route}/${wallet}`} />
       </div>
-      <p className="mt-6 max-w-xl text-center text-sm text-rb-500">{line}</p>
+      {line && <p className="mt-6 max-w-xl text-center text-sm text-rb-500">{line}</p>}
       {extra && <p className="mt-2 max-w-xl text-center text-sm text-rb-500">{extra}</p>}
       {below}
       {/* The info page's door, as the shared front door draws it. */}
@@ -94,7 +95,7 @@ export function UniswapFrontDoor({
   version: UniswapVersion;
   protocol?: UniProtocol;
   chainId?: UniChainId;
-  /** Name the chain under the name and in the info page's door (Optimism's doors). */
+  /** Name the chain under the name and in the info page's door, with no line (Optimism's doors). */
   chainNamed?: boolean;
 }) {
   const x = uniExplorer(protocol, chainId, version);
@@ -102,7 +103,7 @@ export function UniswapFrontDoor({
     <PoolFrontDoor
       id={x.id}
       label={versionLabel(version, protocol)}
-      line={FRONT_DOOR.line(version, protocol, chainId)}
+      line={chainNamed ? undefined : FRONT_DOOR.line(version, protocol, chainId)}
       extra={x.deployment.masterChef ? FRONT_DOOR.stakedLine : undefined}
       route={x.route}
       chainId={chainNamed ? chainId : undefined}
