@@ -334,10 +334,10 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
     ) : p.closedSince ? (
       <span
         className="text-[11px] font-medium text-rb-500"
-        data-wallet-closed-since={p.closedSince.block}
+        data-wallet-holds-nothing-since={p.closedSince.block}
         title={`At block ${p.closedSince.block.toLocaleString("en-US")} the position holds nothing; the card shows the sweep's earlier read.`}
       >
-        Closed since the sweep
+        Holds nothing since the sweep
       </span>
     ) : (
       // A closed position's card states its ending; the read's age is an

@@ -448,8 +448,8 @@ export function eventsAloneDebtProv(
   };
 }
 
-/** A figure a `derived` line replays from the position's own events, exact to
- *  the wei at the block it states (no redemption on the line). */
+/** A figure a `derived` line replays from the position's events, exact to the
+ *  wei at the block it states (no redemption on the line). */
 export function replayedFigureProv(
   label: string,
   symbol: string,
@@ -461,7 +461,7 @@ export function replayedFigureProv(
   return {
     kind: "chain-derived",
     pclass: "indexed",
-    summary: `${label} — every mint, burn, repay, deposit, withdrawal and liquidation this position emitted, added up to block ${asOfBlock}; the market has had no redemption, so the sum is exact to the wei.`,
+    summary: `${label} — every mint, burn, repay, deposit, withdrawal and liquidation this position emitted, added up to block ${asOfBlock}; the line has had no redemption, so the sum is exact to the wei.`,
     contract: alchemistContract(coords),
     via: `${ALCHEMIX_VIA} · replayed per position`,
     verify: { kind: "recompute", text: "To check: add up the moves on this position's event cards." },

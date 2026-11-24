@@ -17,6 +17,7 @@ import { toFxSummary, type FxPositionSummary, type RawFxPositionRow } from "@/li
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { historyBase, plural, storeStamp } from "@/lib/wallet/summary-row";
+import { holdsNothingSince } from "@/lib/wallet/holds-nothing";
 import type { FamilyModule, HeadResult } from "./module";
 
 /** The listing route's most rows in one answer. */
@@ -97,8 +98,9 @@ export const fx: FamilyModule = {
         if (!s || s.status !== "open" || s.settled.block == null || s.settled.colls == null) {
           // The read answered without a sweep read for it: the stored card
           // stands, a position not read stays so. Not listed in a whole
-          // answer, the wallet holds nothing there at the pool's sweep block.
-          const head = !s && whole ? poolBlock.get(stored.pool) : undefined;
+          // answer, the wallet holds nothing there at the pool's sweep block,
+          // where that is at or past the stored read.
+          const head = !s && whole ? holdsNothingSince(poolBlock.get(stored.pool), p.readAtBlock) : undefined;
           if (head != null) return { ...p, notRead: undefined, closedSince: { block: head }, headRead: "stored" };
           return p.notRead ? p : { ...p, headRead: "stored" };
         }
