@@ -54,6 +54,9 @@ export const WALLET_PROTOCOLS: WalletProtocol[] = [
   { slug: "frankencoin", name: "Frankencoin", kinds: ["loans"] },
   { slug: "pwn", name: "PWN", kinds: ["loans", "deposits"] },
   { slug: "polaris", name: "Polaris", kinds: ["loans", "deposits"] },
+  // MetaMorpho, Yearn V3 and Aave's vaults, from the holder census (ui-jobs
+  // 783): a share holding is a deposit.
+  { slug: "vaults", name: "Vault shares", kinds: ["deposits"] },
 ];
 
 export const walletProtocol = (slug: string | null | undefined): WalletProtocol | undefined =>

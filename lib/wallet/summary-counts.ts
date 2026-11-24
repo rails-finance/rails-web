@@ -102,8 +102,38 @@ export interface MenuProtocol {
   listing: string | null;
 }
 
+/** The summary rows' family for vault shares (rails-server mig 531): one
+ *  family over MetaMorpho, Yearn V3 and Aave's vaults on Ethereum and Base. */
+export const VAULT_SHARES_FAMILY = "vaults";
+
+/** The vault protocols a vault-share row can belong to, by the root of its
+ *  holder page (`/<chain>/<root>/vaults/<vault>/<holder>`, lib/vaults/routes.ts). */
+const VAULT_ROOTS: Record<string, string> = { morpho: "MetaMorpho vaults", aave: "Aave vaults", yearn: "Yearn V3" };
+
+/** A vault-share row's protocol root from its href (morpho, aave, yearn);
+ *  undefined for a path outside the vault routes. */
+export function vaultRoot(href: string | null): string | undefined {
+  const m = href ? /^\/[^/]+\/([^/]+)\/vaults\//.exec(href.split("?")[0].toLowerCase()) : null;
+  return m && m[1] in VAULT_ROOTS ? m[1] : undefined;
+}
+
+/** The menu's name for a vault-share row's protocol ("MetaMorpho vaults"), or
+ *  undefined where its href names none (or it has no page). */
+export const vaultProtocolOfHref = (href: string | null): string | undefined => {
+  const root = vaultRoot(href);
+  return root ? VAULT_ROOTS[root] : undefined;
+};
+
+/** A position's row in the menu: its chain and family, a vault-share row's
+ *  split by its vault protocol, so MetaMorpho vaults, Aave vaults and Yearn V3
+ *  each take a row. */
+export const menuKey = (p: Pick<WalletCountsPosition, "chain" | "family" | "href">): string =>
+  p.family === VAULT_SHARES_FAMILY
+    ? `${p.chain}:${p.family}:${vaultRoot(p.href) ?? "other"}`
+    : `${p.chain}:${p.family}`;
+
 export interface WalletProtocolRow<P extends WalletCountsPosition> {
-  /** `<chain>:<family>`. */
+  /** `<chain>:<family>`, and `:<root>` on a vault-share row (`menuKey`). */
   key: string;
   name: string;
   /** Any one of its positions, for its chain and family. */
@@ -125,7 +155,7 @@ export interface WalletProtocolRow<P extends WalletCountsPosition> {
 
 /** The positions menu under the wallet heading (H13.2; Miles 17 Nov 2026,
  *  ui-jobs 701): one row per protocol and chain the wallet holds positions
- *  in, those with an open position first, each group in roster order; closed
+ *  in (each vault protocol its own, `menuKey`), those with an open position first, each group in roster order; closed
  *  counts closed, liquidated and redeemed, as the counts do, and moved (a
  *  position passed to another wallet, ui-jobs 705) is counted apart. Null when the
  *  wallet holds nothing besides the page's position. */
@@ -139,7 +169,7 @@ export function walletProtocolMenu<P extends WalletCountsPosition>(
   if (positions.length === page.length) return null;
   const groups = new Map<string, { protocol: MenuProtocol | undefined; positions: P[] }>();
   for (const p of positions) {
-    const key = `${p.chain}:${p.family}`;
+    const key = menuKey(p);
     const g = groups.get(key) ?? { protocol: undefined, positions: [] };
     // The group takes its name from any row that resolves.
     g.protocol ??= protocolOf(p);

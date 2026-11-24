@@ -16,6 +16,7 @@
 //   fx                     the pool's collateral token symbol, and fxUSD
 //   frankencoin            the collateral token's address, and ZCHF
 //   pwn                    the collateral and credit addresses of the loan's ERC20 legs
+//   vault                  the vault's asset: its address where the census header names it, else its symbol
 //   polaris-*              nothing: AIM's universe has no Sepolia token
 //   compound-v3            base token + each collateral line's address
 //   spark                  each supplied and borrowed reserve's address (peaks for a closed one)
@@ -140,6 +141,10 @@ export function walletPositionAssetKeys(p: WalletPosition): string[] {
       break;
     case "pwn":
       for (const a of [c.row.collateral, c.row.credit]) if (a?.category === "ERC20") addresses.push(a.address);
+      break;
+    case "vault":
+      addresses.push(c.row.asset?.address ?? c.row.value.asset);
+      symbols.push(c.row.asset?.symbol ?? c.row.value.assetSymbol);
       break;
     default:
       break;

@@ -10,7 +10,7 @@
 import { WALLET_FORMER_FAMILIES } from "@/lib/wallet/moved-row";
 import { walletRowStatus } from "@/lib/wallet/moved-row";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
-import { takesRow, walletApiWait, type HeadResult, type FamilyModule } from "@/lib/wallet/families/module";
+import { drawn, takesRow, walletApiWait, type HeadResult, type FamilyModule } from "@/lib/wallet/families/module";
 import {
   liquityV1,
   liquityV1Deposits,
@@ -45,6 +45,7 @@ import { frankencoin } from "@/lib/wallet/families/frankencoin";
 import { pwn } from "@/lib/wallet/families/pwn";
 import { polaris } from "@/lib/wallet/families/polaris";
 import { morphoBase } from "@/lib/wallet/families/morpho-base";
+import { vaultsBase, vaultsEthereum } from "@/lib/wallet/families/vaults";
 import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/families/ethereum-single";
 import { aaveV3Arbitrum, compoundV3Arbitrum, morphoArbitrum } from "@/lib/wallet/families/arbitrum";
 import {
@@ -111,6 +112,8 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   frankencoin,
   pwn,
   polaris,
+  vaultsEthereum,
+  vaultsBase,
 ];
 
 /** The families the page reads, by chain, in one sentence for the empty
@@ -120,7 +123,7 @@ export function walletFamiliesLine(): string {
   const byChain = new Map<WalletSummaryRow["chain"], string[]>();
   for (const f of WALLET_FAMILIES) {
     const names = byChain.get(f.summaryChain) ?? [];
-    if (!names.includes(f.name)) names.push(f.name);
+    for (const n of f.lineNames ?? [f.name]) if (!names.includes(n)) names.push(n);
     byChain.set(f.summaryChain, names);
   }
   const list = (n: string[]) => (n.length < 2 ? n.join("") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`);
@@ -361,7 +364,7 @@ async function readFamily(
   const headKinded = head.positions.map((p) =>
     p.headRead === "read" && p.kind === "deposits" && (p.debtUsd ?? 0) > 0 ? { ...p, kind: "loans" as const } : p,
   );
-  const all = [...headKinded, ...rest];
+  const { drawn: all, undrawn } = drawn(f, [...headKinded, ...rest]);
   return {
     positions: all,
     read: {
@@ -374,6 +377,7 @@ async function readFamily(
       ms: Date.now() - t0,
       reads: head.reads,
       error,
+      ...(undrawn ? { undrawn } : {}),
     },
   };
 }
