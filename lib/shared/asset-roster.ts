@@ -17,7 +17,7 @@
 // the most protocols read (a protocol's markets and ilks counted once), the
 // longest series breaking a tie; the others are measured against it.
 
-import { CHAINS, type ChainId } from "@/lib/shared/chains";
+import { CHAINS, type ChainId } from "./chains";
 
 /** Native ETH's key on every chain (BTC's is 0xbbbb…bbbb, Chainlink's Denominations address). */
 export const NATIVE = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
@@ -27,6 +27,20 @@ export interface RosterOracle {
   name: string;
   kind: string;
   reads?: string;
+  /** Rails' short words for the oracle, as the roster serves them, where it stores them. */
+  label?: OracleLabel;
+  /** A Maker OSM's hop in seconds: it releases each price this long late. */
+  hop?: number;
+}
+
+/** How an asset page names an oracle in a table cell: a short name for the
+ *  oracle's full name, and the kind of read under it in the words the
+ *  same-block price read answers with ("1 h delayed", "fixed", "aggregated",
+ *  "capped"). Each is optional: a page falls back to the full name and draws
+ *  no kind. No label names who deployed an oracle. */
+export interface OracleLabel {
+  short?: string;
+  kind?: string;
 }
 export interface RosterSeries {
   key: string;

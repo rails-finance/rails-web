@@ -69,6 +69,7 @@ import {
 import { hueStyle, RowZone } from "@/components/shared/row-zone";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
+import { leadHeaderName } from "@/lib/shared/data-table-words";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
 
 export type DataTableDir = "asc" | "desc";
@@ -433,8 +434,17 @@ export function DataTableCell({
   );
 }
 
-/** The lead column's header: no visible label, its name for a screen reader. */
-export function DataTableLeadHeader({ sticky = "", plain }: { sticky?: string; plain?: boolean }) {
+/** The lead column's header: no visible label, its name for a screen reader
+ *  (`chainless` where the column's cells draw no chain glyph). */
+export function DataTableLeadHeader({
+  sticky = "",
+  plain,
+  chainless,
+}: {
+  sticky?: string;
+  plain?: boolean;
+  chainless?: boolean;
+}) {
   const stacked = useContext(Stacked);
   return (
     <th
@@ -442,7 +452,7 @@ export function DataTableLeadHeader({ sticky = "", plain }: { sticky?: string; p
       role={stacked ? "columnheader" : undefined}
       className={`${plain ? "w-[76px]" : "w-[124px]"} p-0 ${sticky ? `${sticky} z-10 bg-background` : ""}`}
     >
-      <span className="sr-only">Protocol and chain</span>
+      <span className="sr-only">{leadHeaderName(chainless)}</span>
     </th>
   );
 }
@@ -520,12 +530,21 @@ export function DataTableLeadCell({
 /** The lead zone's mark and chain glyph for a stacked card's first line (D6),
  *  where the zone narrows to its edge; drawn only there, and silent (the lead
  *  cell names both). */
-export function DataTableLeadMark({ protocol, chain }: { protocol: string; chain: ChainId }) {
+export function DataTableLeadMark({
+  protocol,
+  chain,
+  chainless,
+}: {
+  protocol: string;
+  chain: ChainId;
+  /** With a plain lead cell on a page that is one chain: the mark alone, as the cell draws it. */
+  chainless?: boolean;
+}) {
   return (
     <span className="dt-lead-mark shrink-0 items-center gap-1 text-rb-500" aria-hidden>
       {/* An empty id is a vault no explorer deploys (sBOLD, ui-jobs 765): no mark. */}
       {protocol && <ProtocolIcon id={protocol} className="h-4 w-4 shrink-0 [&:is(img)]:grayscale" />}
-      <ChainGlyph id={chain} className="h-4 w-4 shrink-0" />
+      {!chainless && <ChainGlyph id={chain} className="h-4 w-4 shrink-0" />}
     </span>
   );
 }

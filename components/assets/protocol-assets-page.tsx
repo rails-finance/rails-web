@@ -3,33 +3,52 @@
 //
 //   /<chain>/<slug>/assets          the assets the explorer uses on its chain,
 //                                   under its heading (ProtocolAssets);
-//   /<chain>/<slug>/assets/<token>  one asset under the protocol: the price
-//                                   band and the chain's price section read
-//                                   from the protocol's side (`via`), what the
-//                                   asset is in the protocol, and the other
-//                                   explorers using it on the chain.
+//   /<chain>/<slug>/assets/<token>  one asset under the protocol, read from
+//                                   its side (`via`; Miles, 24 Nov 2026,
+//                                   ui-jobs 818): Back and the token, the
+//                                   chart panel with the price now, the row
+//                                   naming the oracle it charts, the
+//                                   protocols also reading that oracle, the
+//                                   other oracles with their prices now, and
+//                                   the as-of line.
 //
 // One token's pages under several protocols share the price section, so each
 // names one canonical URL: the page under the first explorer, by the roster's
 // order (alphabetical by name), that uses it on that chain.
 
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { RailHeader } from "@/components/shared/rail-header";
 import { ProtocolAssets } from "@/components/assets/assets-by-protocol";
-import { AssetPageHead, type RelationGroup } from "@/components/assets/asset-page-head";
+import { AssetTitle, SourceRow, UnpricedPanel, type RelationGroup } from "@/components/assets/asset-page-head";
 import { AssetPriceChart } from "@/components/assets/asset-price-chart";
-import { ExplorerChip } from "@/components/assets/asset-explorer";
+import { AsOfLine, OracleTable } from "@/components/assets/asset-oracles";
+import { AssetReceipts } from "@/components/assets/asset-receipts";
 import { BoldLivePrice } from "@/components/assets/bold-live-price";
 import { fetchAssetExplorerServer, fetchAssetHeadServer } from "@/lib/api/fetch-asset-explorer-server";
+import { fetchAssetPricesNow } from "@/lib/api/fetch-asset-prices-now";
 import { fetchAssetRosterServer } from "@/lib/api/fetch-asset-roster-server";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { unpricedPage } from "@/lib/api/asset-explorer-chips";
 import { loadBoldPriceWithin } from "@/lib/sources/chain/liquity-v2-bold-price";
 import { assetCategory, ASSET_CATEGORY_ORDER } from "@/lib/shared/asset-categories";
 import { cardLines, type AssetCard } from "@/lib/shared/asset-explorer";
-import { assetPage, chainName, type AssetPage } from "@/lib/shared/asset-roster";
+import { assetPage, mainLine, type AssetPage } from "@/lib/shared/asset-roster";
+import {
+  alsoListed,
+  alsoReads,
+  listedRows,
+  oracleRows,
+  rowPageOf,
+  sameRows,
+  tableRows,
+  priceCell,
+  priceProv,
+  headTime,
+  historyLine,
+  multiLineFamilies,
+  sourceLine,
+} from "@/lib/shared/asset-oracle-view";
 import { viaPage } from "@/lib/shared/asset-via";
 import { viaExplorer } from "@/lib/shared/asset-via-links";
 import {
@@ -40,12 +59,10 @@ import {
   type AssetsExplorer,
   type ProtocolAssetLine,
 } from "@/lib/shared/assets-by-protocol";
-import type { ChipUse } from "@/lib/shared/asset-uses";
 import { CHAINS, MAINNET_CHAIN_ID, type ChainMeta } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
 import { PROTOCOLS, positionNounPlural, type ProtocolEntry } from "@/lib/shared/protocols";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { comptrollerMarketLinks } from "@/lib/comptroller/market-pages";
 
 type Search = Record<string, string | string[] | undefined>;
@@ -192,60 +209,98 @@ export async function ProtocolAssetPage({ id, token }: { id: string; token: stri
   if (!line) notFound();
   const { card } = line;
 
-  const aside = <ProtocolUse protocol={e} line={line} chain={chain} />;
   const relationsFor = (page: AssetPage | null) => relations(page, card, chain, data.cards, e);
+  // Back's fresh-tab landing: the protocol's Assets list, the "Assets" entry of its sections menu.
+  const backHref = protocolAssetsHref(e.href);
   const opened = answer ? assetPage(answer, chain) : null;
+  // The page under it, read from the protocol's side, and its line on the chain.
+  const via = viaExplorer(e.id);
+  const { page, view } = opened && via ? viaPage(opened, via) : { page: opened, view: null };
+  const section = page?.chains.find((c) => c.chain === chain) ?? null;
+  const pageLine =
+    (view?.lineId ? section?.lines.find((l) => l.id === view.lineId) : null) ?? (section ? mainLine(section) : null);
 
-  if (!opened || !opened.chains.some((c) => c.chain === chain)) {
-    // No stored price on this chain: the card's line, its figure, and BOLD's
-    // live read where it is BOLD (ui-jobs 746b).
+  if (!page || !section || !pageLine) {
+    // No stored price on this chain: the card's figure, and BOLD's live read
+    // where it is BOLD (ui-jobs 746b).
     const bold = chain === MAINNET_CHAIN_ID && t === TOKEN_ADDRESSES.BOLD;
     const [unpriced, boldRead] = await Promise.all([unpricedPage(chain, t), bold ? loadBoldPriceWithin() : undefined]);
+    const figure = unpriced?.figure ?? card.figure;
     return (
       <Frame protocol={e}>
-        <AssetPageHead
-          chain={chain}
-          token={t}
-          symbol={card.symbol}
-          category={card.category ?? assetCategory(card.symbol)}
-          row={null}
-          figure={unpriced?.figure ?? card.figure}
-          relations={relationsFor(opened)}
-          note={null}
-          aside={aside}
-          chainLabel={false}
+        <AssetTitle chain={chain} token={t} symbol={card.symbol} backHref={backHref} />
+        <UnpricedPanel
+          figure={figure}
           livePrice={bold ? <BoldLivePrice read={boldRead ?? null} figure={unpriced?.figure ?? null} /> : undefined}
         />
+        <SourceRow chain={chain} token={t} source={null} relations={relationsFor(opened)} markets={line.markets} />
       </Frame>
     );
   }
 
-  // The price read from this protocol's side: its line leads the chain's chart.
-  const via = viaExplorer(e.id);
-  const { page, view } = via ? viaPage(opened, via) : { page: opened, view: null };
-  const head = await fetchAssetHeadServer(chain, t, via ? e.id : null, readerIp).catch(() => null);
-  const section = page.chains.find((c) => c.chain === chain);
+  const own = view?.lineId != null;
+  const [head, now] = await Promise.all([
+    fetchAssetHeadServer(chain, t, via ? e.id : null, readerIp).catch(() => null),
+    fetchAssetPricesNow(chain, t, section.lines, readerIp),
+  ]);
+  // Each explorer's page for the token: this protocol's, and the others' from the chips.
+  const hrefs: Record<string, string> = Object.fromEntries(
+    line.also.flatMap((ch) => {
+      const at = ch.token || ch.chain !== chain ? null : hrefOf(ch.explorer);
+      return at ? [[ch.explorer, protocolAssetsHref(at, t)]] : [];
+    }),
+  );
+  hrefs[e.id] = protocolAssetsHref(e.href, t);
+  const pageOf = (id: string) => hrefs[id] ?? null;
+  const nowMs = Date.now();
+  const read = now.prices[pageLine.id];
+  const symbol = page.symbol;
+  const reads = alsoReads(pageLine, e.id, pageOf, multiLineFamilies(section.lines));
+  const other = oracleRows(section.lines, pageLine, now, rowPageOf(e.id, pageOf));
+  const rows = tableRows(
+    sameRows(pageLine, reads, own ? e.label : null, now),
+    other,
+    listedRows(alsoListed(line.line.chips, chain, e.id, { reads, rows: other }, pageOf), now),
+  );
   return (
     <Frame protocol={e}>
-      <AssetPageHead
-        chain={chain}
-        token={t}
-        symbol={page.symbol}
-        category={card.category}
-        row={head?.row ?? null}
-        figure={null}
-        relations={relationsFor(page)}
-        note={null}
-        aside={aside}
-        chainLabel={false}
-      />
-      {section && (
-        <AssetPriceChart
-          section={section}
-          symbol={page.symbol}
-          via={view && section.chain === view.explorer.chain ? view : null}
-        />
-      )}
+      <AssetTitle chain={chain} token={t} symbol={symbol} backHref={backHref} />
+      <AssetReceipts>
+        <section data-asset-chain={chain} data-asset-via={view?.lineId ?? "none"} data-anatomy="A2">
+          <AssetPriceChart
+            chain={chain}
+            line={pageLine}
+            symbol={symbol}
+            head={{
+              price: priceCell(read),
+              info: read?.ok ? priceProv(pageLine, read, symbol) : null,
+              symbol,
+              change: head?.row?.change ?? null,
+              updated: headTime(read, nowMs),
+            }}
+          />
+          <SourceRow
+            chain={chain}
+            token={t}
+            source={sourceLine(pageLine, own ? e.id : null, own ? undefined : { protocol: e.label, symbol })}
+            relations={relationsFor(page)}
+            markets={line.markets}
+            history={historyLine(pageLine, own ? e.id : null)}
+          />
+          <OracleTable
+            rows={rows}
+            lines={section.lines}
+            pageLine={pageLine.id}
+            chain={chain}
+            symbol={symbol}
+            refName={own ? `${e.label}'s price` : "the price most protocols read"}
+            gapFrom={own ? `${e.label}'s price` : "the price charted above"}
+            chainName={CHAINS[chain].name}
+            now={now}
+          />
+          <AsOfLine now={now} />
+        </section>
+      </AssetReceipts>
     </Frame>
   );
 }
@@ -264,64 +319,9 @@ function Frame({ protocol: e, children }: { protocol: ProtocolEntry; children: R
   );
 }
 
-/** Beside the price band (A7.1, A7.2): "In <protocol>", what the asset is
- *  there as links to the protocol's pages for it, then "Also used in", the
- *  other explorers on the chain, each opening its page for the asset. */
-function ProtocolUse({
-  protocol: e,
-  line,
-  chain,
-}: {
-  protocol: ProtocolEntry;
-  line: ProtocolAssetLine;
-  chain: number;
-}) {
-  const where = chainName(chain);
-  return (
-    <div className="min-w-0 space-y-4 md:border-l md:border-rb-200 md:pl-6 dark:md:border-rb-700">
-      <section aria-labelledby="asset-in-protocol" data-anatomy="A7.1">
-        <h2 id="asset-in-protocol" className="mb-2 text-sm text-rb-500">
-          In {e.label}
-        </h2>
-        {line.markets.length > 0 ? (
-          <ul className="flex flex-wrap gap-x-3 gap-y-1 text-sm" data-asset-markets="">
-            {line.markets.map((m: ChipUse) => (
-              <li key={m.href + m.label}>
-                <Link href={m.href} className={INLINE_LINK} data-asset-market={m.href}>
-                  {m.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-rb-500">
-            {e.label} lists it on {where}.
-          </p>
-        )}
-      </section>
-      <section aria-labelledby="asset-also-used" data-anatomy="A7.2">
-        <h2 id="asset-also-used" className="mb-2 text-sm text-rb-500">
-          Also used in
-        </h2>
-        {line.also.length > 0 ? (
-          <ul className="flex flex-wrap gap-1" data-asset-chips="" data-asset-also="">
-            {line.also.map((ch) => (
-              <li key={ch.explorer}>
-                <ExplorerChip chip={ch} symbol={line.card.symbol} chainMark={false} />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-rb-500">No other Rails explorer uses it on {where}.</p>
-        )}
-      </section>
-    </div>
-  );
-}
-
 type Ref = { symbol: string; chain: number; token: string; kind?: "wraps" | "rate" };
 
-/** The line under the band (A1.6) in the card's words, on this chain alone,
+/** The relations in the line under the source (A1.6), in the card's words, on this chain alone,
  *  each token linking its page under this protocol where it uses it, else
  *  under the first explorer that does, else not drawn. */
 function relations(
@@ -353,7 +353,7 @@ function relations(
   const under = [page?.underlying, card.underlying].filter((u): u is Ref => u != null);
   const wrapped: Ref[] = [...(page?.wrapped ?? []), ...card.wrapped];
   add(
-    "Wraps",
+    "Wrapped",
     under.filter((u) => u.kind !== "rate"),
   );
   add(

@@ -17,9 +17,10 @@
 //      answers 200); "Also used in" opens other explorers' pages, never Aave
 //      V3's; ?cat=stablecoin keeps stablecoins alone.
 //   3. /ethereum/liquity-v2/assets: WETH links its branch, BOLD its Stability Pools.
-//   4. USDC under Aave V3: "In Aave V3" and "Also used in"; from WETH under
-//      Liquity V2, Aave V3's pill opens WETH under Aave V3, and the two pages
-//      name one canonical URL.
+//   4. USDC under Aave V3: its title, the reserve link at the heading's right
+//      (A1.10) and the other oracles' protocols (A2.4); from WETH under
+//      Liquity V2, Aave V3's link in the oracle table opens WETH under Aave
+//      V3, and the two pages name one canonical URL.
 //   5. BOLD under Liquity V2 answers 200; BOLD under Aave V3 is a 404.
 //   6. A front-door explorer's H5 opens with "Overview", its front door.
 //   7. At 375 no sideways scroll on the Assets page; each line reads as a card.
@@ -317,30 +318,32 @@ await shot(page, "liquity-assets-1280");
 
 // 4. USDC under Aave V3
 await go(page, `/ethereum/aave-v3/assets/${USDC}`);
-await page.waitForSelector('[data-anatomy="A7.2"]', { timeout: 120_000 });
+await page.waitForSelector("[data-asset-oracles]", { timeout: 120_000 });
 const hu = await header(page);
 check(
   "4a the asset page: H3 plain, Assets current",
   hu.identityLinks === 0 && hu.current === "Assets",
   `${hu.current}`,
 );
-const inAave = (await page.locator("#asset-in-protocol").textContent())?.trim();
-const reserve = await page.$$eval('[data-anatomy="A7.1"] [data-asset-market]', (as) =>
+const titleAave = (await page.locator("[data-asset-title]").textContent())?.trim();
+const reserve = await page.$$eval('[data-anatomy="A1.10"] [data-asset-market]', (as) =>
   as.map((a) => a.getAttribute("href")),
 );
 check(
-  '4b "In Aave V3" links its reserve',
-  inAave === "In Aave V3" && reserve[0] === `/ethereum/aave-v3/markets/${USDC}`,
-  reserve.join(", "),
+  '4b the page titled "USDC" links its reserve',
+  titleAave === "USDC" && reserve[0] === `/ethereum/aave-v3/markets/${USDC}`,
+  `${titleAave}; ${reserve.join(", ")}`,
 );
-const pills = await page.$$eval('[data-anatomy="A7.2"] [data-asset-chip]', (as) =>
-  as.map((a) => [a.getAttribute("data-asset-chip"), a.getAttribute("href")]),
+const pills = await page.$$eval("[data-asset-oracles] a[data-asset-oracle-link]", (as) =>
+  as.map((a) => [a.getAttribute("data-asset-oracle-link"), a.getAttribute("href")]),
 );
 const pillStatus = await Promise.all(pills.slice(0, 4).map(([, h]) => status(h)));
 check(
-  '4c "Also used in" names the others, each link answering',
-  pills.length > 3 &&
+  "4c the other oracles name their protocols, each link answering",
+  pills.length > 2 &&
+    // The page's protocol has no link in its table: its rows are unlinked.
     pills.every(([id]) => id !== "aave-v3") &&
+    pills.every(([, h]) => /^\/ethereum\/[a-z0-9-]+\/assets\/0x[0-9a-f]{40}$/.test(h)) &&
     pillStatus.every((x) => x === 200 || x === 307 || x === 308),
   pills
     .map(([, h]) => h)
@@ -356,24 +359,25 @@ await shot(page, "aave-usdc-1280");
 // From WETH under Liquity V2, Aave V3's pill opens WETH under Aave V3.
 const WETH = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
 await go(page, `/ethereum/liquity-v2/assets/${WETH}`);
-await page.waitForSelector('[data-anatomy="A7.2"]', { timeout: 120_000 });
+await page.waitForSelector("[data-asset-oracles]", { timeout: 120_000 });
 const canonLiquity = await canonical();
 const toAave = `/ethereum/aave-v3/assets/${WETH}`;
-const aavePill = await page.getAttribute('[data-anatomy="A7.2"] [data-asset-chip="aave-v3"]', "href").catch(() => null);
-check("4e WETH under Liquity V2: Aave V3's pill opens WETH under Aave V3", aavePill === toAave, aavePill ?? "none");
+const AAVE_LINK = '[data-asset-oracles] a[data-asset-oracle-link="aave-v3"]';
+const aavePill = await page.getAttribute(AAVE_LINK, "href").catch(() => null);
+check("4e WETH under Liquity V2: Aave V3's link opens WETH under Aave V3", aavePill === toAave, aavePill ?? "none");
 await shot(page, "liquity-weth-1280");
 if (aavePill === toAave) {
-  await Promise.all([
-    page.waitForURL((u) => u.pathname === toAave, { timeout: 120_000 }),
-    page.click('[data-anatomy="A7.2"] [data-asset-chip="aave-v3"]'),
-  ]);
+  await Promise.all([page.waitForURL((u) => u.pathname === toAave, { timeout: 120_000 }), page.click(AAVE_LINK)]);
   await page.waitForSelector('[data-anatomy="A7"]', { timeout: 120_000 });
 }
-const otherIn = (await page.locator("#asset-in-protocol").textContent())?.trim();
+const otherIn = (await page.locator("[data-asset-title]").textContent())?.trim();
 const canonAaveWeth = await canonical();
 check(
   "4f it lands under Aave V3, and both pages name one canonical URL",
-  otherIn === "In Aave V3" && canonLiquity != null && canonLiquity === canonAaveWeth,
+  otherIn === "WETH" &&
+    new URL(page.url()).pathname === toAave &&
+    canonLiquity != null &&
+    canonLiquity === canonAaveWeth,
   `${otherIn}; ${canonLiquity} / ${canonAaveWeth}; USDC's ${canonAave}`,
 );
 
