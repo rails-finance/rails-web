@@ -16,6 +16,9 @@ import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { CompoundV3OptimismPositionCard } from "@/components/protocol/compound-v3-optimism/compound-v3-optimism-position-card";
 import { fetchCompoundV3OptimismPosition } from "@/lib/api/fetch-compound-v3-optimism";
 import { compoundOptimismMarketOf } from "@/lib/compound-v3-optimism/asset-catalog";
+import { positionFigures } from "@/lib/compound-v3-optimism/position";
+import type { OpcPositionRead } from "@/lib/compound-v3-optimism/types";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { isOpcWallet, OPC_ROUTE, OPC_SESSION, opcWalletHref } from "@/lib/compound-v3-optimism/types";
 import { NOT_INDEXED, POSITION_PAGE } from "@/lib/compound-v3-optimism/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
@@ -25,6 +28,18 @@ import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 export const loadCompoundV3OptimismPosition = cache((wallet: string, comet: string) =>
   fetchCompoundV3OptimismPosition(wallet, comet),
 );
+
+/** The Prices menu's list: the base and each collateral at the Comet's price
+ *  feeds, in dollars, the prices the card values them at. An asset with no
+ *  price, or the WETH Comet without its ETH price, is named with none. */
+function cometPrices(r: OpcPositionRead): LatestPriceAsset[] {
+  const p = positionFigures(r);
+  const dollars = (price: number) => (p.fx == null || price === 0 ? undefined : price * p.fx);
+  return [
+    { symbol: p.baseSymbol, address: p.baseToken, price: dollars(p.basePrice) },
+    ...p.collateral.map((x) => ({ symbol: x.symbol, address: x.asset, price: dollars(x.price) })),
+  ];
+}
 
 export async function CompoundV3OptimismPositionPage({ market, wallet: raw }: { market: string; wallet: string }) {
   const m = compoundOptimismMarketOf(market);
@@ -38,6 +53,7 @@ export async function CompoundV3OptimismPositionPage({ market, wallet: raw }: { 
       session={session}
       fallbackHref={OPC_ROUTE}
       showStamp={false}
+      assets={answer.kind === "ok" ? cometPrices(answer.data) : []}
       priceReason={ORACLE_USD_REASON[session]}
       owner={{ wallet, filterProtocol: null }}
       tools={false}
