@@ -407,7 +407,7 @@ test("the unread note reads for all, some and none of a section's open positions
   assert.equal(unreadNote(0, 5), undefined);
   assert.equal(
     unreadNote(1, 1, true),
-    "The open position could not be read at the chain head, so the subtotal is the stored figures and the wallet total leaves it out.",
+    "The open position could not be read at the chain head, so the wallet total leaves it out.",
   );
 });
 
@@ -431,6 +431,47 @@ test("a section of stored reads alone states a dated subtotal outside the wallet
   });
   assert.deepEqual(undated.band.legs, []);
   assert.equal(undated.band.note, unreadNote(1, 1));
+  // A head read that failed keeps the store's figures and its read stamp:
+  // dated as stored.
+  const [failed] = walletSections(
+    [pos("aave-v3", { collateralUsd: 80, debtUsd: 8, headRead: "failed", readAt: day })],
+    { bands: true },
+  );
+  assert.deepEqual(
+    failed.band.legs.map((l) => [l.label, l.value]),
+    [
+      ["Collateral subtotal", "$80.00"],
+      ["Debt subtotal", "$8.00"],
+    ],
+  );
+  assert.equal(failed.band.note, unreadNote(1, 1, true));
+  // Owing nothing: the collateral subtotal alone.
+  const [owing0] = walletSections(
+    [pos("aave-v3", { collateralUsd: 40, debtUsd: 0, headRead: "stored", readAt: day })],
+    { bands: true },
+  );
+  assert.deepEqual(
+    owing0.band.legs.map((l) => l.label),
+    ["Collateral subtotal"],
+  );
+});
+
+test("the leaves line names each reason once, its sections together", () => {
+  const s = walletSections(
+    [
+      pos("aave-v3", { collateralUsd: 100, debtUsd: 10 }),
+      pos("morpho", { usdOwnOracle: false, collateralUsd: 7, debtUsd: 1 }),
+      pos("fluid", { usdOwnOracle: false }),
+      pos("spark", { collateralUsd: 5, debtUsd: 1, headRead: "failed" }),
+    ],
+    { bands: true },
+  );
+  const coll = walletTotal(s, "collateral", ["Liquity V1 Troves"]);
+  assert.equal(coll.figure.usd, 100);
+  assert.equal(
+    coll.leaves,
+    "Leaves out Liquity V1 Troves (could not be read), Morpho Blue and Fluid (no dollars) and SparkLend (not read at the chain head).",
+  );
 });
 
 test("a testnet's section stands outside the wallet totals and the risk tile, after every mainnet one", async () => {
@@ -483,7 +524,7 @@ test("a vault-share section states a dated subtotal outside the wallet total (ui
   );
   assert.deepEqual(
     v.band.legs.map((l) => [l.label, l.value, l.footnote.text]),
-    [["Subtotal", "$520.00", "at the census blocks, as read from 17 Nov 2026 to 18 Nov 2026"]],
+    [["Subtotal", "$520.00", "as read from 17 Nov 2026 to 18 Nov 2026"]],
   );
   const t = walletTotal(s, "collateral");
   assert.equal(t.figure.usd, 100);
@@ -499,4 +540,14 @@ test("a vault-share section states a dated subtotal outside the wallet total (ui
   const failed = walletSections([vault({ headRead: "failed" })], { bands: true });
   assert.equal(failed[0].census, false);
   assert.equal(failed[0].band.note, unreadNote(1, 1));
+});
+
+test("a stored section holding a Trove on an emptied branch states no subtotal", () => {
+  const stored = { headRead: "stored", readAt: 1_795_000_000 };
+  const shut = { ...shutDownTrove(forkTrove("ebisu", "stcUSD", 10), ebisuState("stcUSD")), ...stored };
+  const live = { ...shutDownTrove(forkTrove("ebisu", "WBTC", 5000), null), ...stored };
+  const [s] = walletSections([shut, live], { bands: true });
+  assert.equal(s.collateral, undefined);
+  assert.deepEqual(s.band.legs, []);
+  assert.equal(s.band.note, unreadNote(2, 2));
 });

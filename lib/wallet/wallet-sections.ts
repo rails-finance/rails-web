@@ -115,9 +115,9 @@ const atCensus = (p: WalletPosition) => p.card.kind === "vault" && p.headRead ==
 /** The band's note for a vault-share section: its subtotal stands outside
  *  the wallet total, or, where a share states no dollars, it has none. */
 export const CENSUS_NOTE =
-  "The vault values are the census's at each vault's census block, so the wallet total leaves them out.";
+  "Vault share values are the census's at each share's census block, so the wallet total leaves them out.";
 export const CENSUS_NO_TOTAL =
-  "The vault values are the census's at each vault's census block, so the section states no total.";
+  "Vault share values are the census's at each share's census block, so the section states no total.";
 
 /** A position on a testnet, which no wallet count or total takes in. */
 export const onTestnet = (p: Pick<WalletPosition, "chain">): boolean => CHAINS[p.chain]?.testnet === true;
@@ -149,7 +149,7 @@ export function unreadNote(unread: number, open: number, subtotal = false): stri
         : `None of the ${open} open positions`;
   const could = unread === open && open > 1 ? "could be read" : "could not be read";
   return subtotal
-    ? `${who} ${could} at the chain head, so the subtotal is the stored figures and the wallet total leaves it out.`
+    ? `${who} ${could} at the chain head, so the wallet total leaves it out.`
     : `${who} ${could} at the chain head, so the section states no total.`;
 }
 
@@ -181,8 +181,8 @@ function sumOfCards(
   name: string,
   held: WalletPosition[],
   field: "collateralUsd" | "debtUsd",
-  /** A vault share's value at the census's price, which is no protocol's
-   *  oracle: summed as its card states it, under this word. */
+  /** A vault share's value at the census's price: summed as its card
+   *  states it, under this word. */
   census?: string,
 ): SectionFigure | undefined {
   if (held.length === 0) return undefined;
@@ -255,9 +255,11 @@ const usdLeg = (id: string, label: string, f: SectionFigure): HolderLeg => ({
 
 /** The band's legs where every open position is a stored read (a vault
  *  share at its census block, a last-visit read): each figure the cards'
- *  stored dollars, dated by the reads (Miles, 24 Nov 2026, "wallet total
- *  b"). None where a position states no dollars or no read time. */
+ *  stored dollars, dated by the reads. None where a position states no
+ *  dollars or no read time, or a Trove is on an emptied branch (its
+ *  collateral states no dollars, as on the head path). */
 function storedSubtotal(name: string, open: WalletPosition[], census: boolean): HolderLeg[] | null {
+  if (open.some(onEmptiedBranch)) return null;
   const times = open.map((p) => p.readAt);
   if (open.length === 0 || times.some((t) => t == null)) return null;
   const from = formatDate(Math.min(...(times as number[])));
@@ -269,7 +271,7 @@ function storedSubtotal(name: string, open: WalletPosition[], census: boolean): 
   if (!census && !debt) return null;
   const dated = (l: HolderLeg): HolderLeg => ({
     ...l,
-    footnote: { text: census ? `at the census blocks, ${when}` : when },
+    footnote: { text: when },
   });
   return [
     dated(usdLeg("collateral", census ? "Subtotal" : "Collateral subtotal", coll)),
@@ -602,9 +604,8 @@ export function closestToLiquidation(sections: WalletSection[]): WalletPosition 
 
 /** One total over the sections: each section's figure as its band states it,
  *  summed to the cent. The total covers every section that states both
- *  figures and names the rest (Miles, 24 Nov 2026, "wallet total b"); each
- *  of those keeps its own band, a dated subtotal where its figures are
- *  stored ones. */
+ *  figures and names the rest; each of those keeps its own band, a dated
+ *  subtotal where its figures are stored ones. */
 export interface WalletTotal {
   /** Absent while no section holding an open position states both figures. */
   figure?: SectionFigure;
@@ -613,7 +614,7 @@ export interface WalletTotal {
   /** Where nothing is summed: "No wallet total: Morpho Blue states no dollars". */
   gap?: string;
   /** Beside a figure, what it leaves out: "Leaves out Morpho Blue and
-   *  Fluid (no dollars); Vaults (valued at the census blocks)." */
+   *  Fluid (no dollars) and Vault shares (valued at the census blocks)." */
   leaves?: string;
 }
 
@@ -662,7 +663,7 @@ export function walletTotal(
   const oracle = holding.every((s) => s[which]!.prov.pclass === "oracle");
   return {
     of: holding.length,
-    ...(left.length ? { leaves: `Leaves out ${left.join("; ")}.` } : {}),
+    ...(left.length ? { leaves: `Leaves out ${andList(left)}.` } : {}),
     figure: {
       usd,
       prov: {

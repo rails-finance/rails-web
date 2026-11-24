@@ -105,7 +105,7 @@ const across = (t: WalletTotal | null) => (t?.figure ? `across ${plural(t.of, "p
 
 /** The wallet's totals (W2): each figure the sum of the protocol sections'
  *  figures below it, with its receipt; the sections it leaves out named
- *  under the row (Miles, 24 Nov 2026, "wallet total b"). */
+ *  under the row (`walletTotal`). */
 function Totals({
   sections,
   filtered,
@@ -170,8 +170,12 @@ function Totals({
         ))
       ) : (
         <p className="mt-2 text-xs text-rb-500">
-          {filtered ? "The positions shown" : "Each protocol’s total below"}, summed in dollars at the sources each
-          receipt names.
+          {filtered
+            ? "The positions shown"
+            : leaves.length > 0
+              ? "Each protocol’s total below that states both figures"
+              : "Each protocol’s total below"}
+          , summed in dollars at the sources each receipt names.
           {leaves.map((l) => (
             <span key={l} data-wallet-total-leaves="">
               {" "}
