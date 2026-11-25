@@ -9,6 +9,8 @@ import "server-only";
 // SERVER-ONLY: reads RAILS_API_URL and the bearer token.
 
 import { liquidityHop, type HopAnswer } from "@/lib/wallet/liquidity/hop";
+import { walletPresence } from "@/lib/wallet/read-wallet";
+import { presenceReads } from "@/lib/wallet/presence";
 import {
   LIQUIDITY_HEAD_ROWS,
   LIQUIDITY_SOURCES,
@@ -178,8 +180,10 @@ export async function readWalletLiquidity(
   const t0 = Date.now();
   const owner = address.toLowerCase();
   const hop = { readerIp, deadline: Math.min(pageStart + PAGE_END_MS, t0 + LIQUIDITY_BUDGET_MS) };
+  // A source whose check finds nothing makes no read and states nothing (decision 0073 point 2).
+  const answers = await walletPresence(owner);
   const parts = await Promise.all(
-    LIQUIDITY_SOURCES.map((s) =>
+    LIQUIDITY_SOURCES.filter((s) => presenceReads(answers.get(s.key))).map((s) =>
       // An answer the shaping cannot read counts as a route that did not answer.
       readSource(s, owner, hop).catch(() => ({
         read: {

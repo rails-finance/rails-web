@@ -16,6 +16,7 @@ import { publicErrorMessage } from "@/lib/api/public-error";
 import { apiHop, inChain } from "@/lib/wallet/api-hop";
 import { withBudget } from "@/lib/wallet/summary-row";
 import type { WalletFamilyRead, WalletPosition } from "@/lib/wallet/types";
+import type { Presence } from "@/lib/wallet/presence";
 
 export interface VisitModule {
   /** The family's id on this page (`aave-v3-optimism`). */
@@ -31,6 +32,8 @@ export interface VisitModule {
   readonly on: boolean;
   /** The head route for the wallet, under RAILS_API_URL. */
   path(address: string): string;
+  /** The presence check in front of the read (decision 0073 point 2; lib/wallet/presence-checks.ts). */
+  presence: Presence;
   /** One position per position the answer holds; none where it holds nothing.
    *  Throws on an answer outside the route's shape. */
   shape(answer: unknown, address: string): WalletPosition[];

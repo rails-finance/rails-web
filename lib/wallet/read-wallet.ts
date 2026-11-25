@@ -69,6 +69,16 @@ import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/l
 import { publicErrorMessage } from "@/lib/api/public-error";
 import { explorerName, PROTOCOLS } from "@/lib/shared/protocols";
 import { LIQUIDITY_SOURCES } from "@/lib/wallet/liquidity/sources";
+import { LIQUIDITY_PRESENCE } from "@/lib/wallet/presence-checks";
+import {
+  PRESENCE_BUDGET_MS,
+  presenceReads,
+  readPresence,
+  type PresenceAnswer,
+  type PresenceEntry,
+  type PresenceMulticall,
+} from "@/lib/wallet/presence";
+import { chainClient } from "@/lib/sources/chain/rpc";
 import { apiHop, inChain, inWalletRead } from "@/lib/wallet/api-hop";
 import { kindOfRow, WALLET_PROTOCOLS } from "@/lib/wallet/wallet-filters";
 
@@ -162,6 +172,45 @@ export function walletFamiliesLine(): string {
 /** The families read at each visit, by chain, for the empty state: "Aave V3,
  *  Compound V3 and Morpho Blue on Optimism"; empty while none is on. */
 export const walletVisitLine = (): string => visitFamiliesLine(WALLET_VISIT_FAMILIES);
+
+/** Every entry the presence check asks about (decision 0073 point 2): each visit module that is
+ *  on, by its id, and each liquidity source, by its key. */
+export function walletPresenceEntries(): PresenceEntry[] {
+  return [
+    ...WALLET_VISIT_FAMILIES.filter((m) => m.on).map((m) => ({ id: m.id, presence: m.presence })),
+    ...LIQUIDITY_SOURCES.map((s) => ({ id: s.key, presence: LIQUIDITY_PRESENCE[s.key] })),
+  ];
+}
+
+/** One multicall at the head on the chain's state RPC, in one request (no chunking). The
+ *  presence read gives it up at its budget. */
+const chainMulticall: PresenceMulticall = async (chainId, contracts) =>
+  (await chainClient(chainId).multicall({ contracts, allowFailure: true, batchSize: 0 })) as Awaited<
+    ReturnType<PresenceMulticall>
+  >;
+
+/** The multicall the presence read makes; a test swaps it. */
+export const presenceDeps: { multicall: PresenceMulticall } = { multicall: chainMulticall };
+
+// Kept as the wallet read is, so the page's read and its liquidity read share one check.
+const presenceCache = new Map<string, { at: number; read: Promise<Map<string, PresenceAnswer>> }>();
+
+/** The wallet's presence answers, one read per address for WALLET_CACHE_MS. A read with an entry
+ *  that failed is not kept. */
+export function walletPresence(address: string): Promise<Map<string, PresenceAnswer>> {
+  const key = address.toLowerCase();
+  const hit = presenceCache.get(key);
+  if (hit && Date.now() - hit.at < WALLET_CACHE_MS) return hit.read;
+  const read = readPresence(walletPresenceEntries(), key, presenceDeps.multicall, PRESENCE_BUDGET_MS);
+  presenceCache.set(key, { at: Date.now(), read });
+  void read.then((m) => {
+    if ([...m.values()].includes("failed")) presenceCache.delete(key);
+  });
+  if (presenceCache.size > 500) {
+    for (const [k, v] of presenceCache) if (Date.now() - v.at >= WALLET_CACHE_MS) presenceCache.delete(k);
+  }
+  return read;
+}
 
 /** A launched explorer the page does not read, linked at the wallet. */
 export interface UnreadExplorer {
@@ -482,6 +531,8 @@ export function readWalletUncached(
 async function readWalletInScope(address: string, readerIp: string | undefined, opts: { protocol?: string }) {
   const t0 = Date.now();
   const deadline = t0 + WALLET_BUDGET_MS;
+  // The presence check runs beside the summary read; the visit modules wait for it.
+  const presence = walletPresence(address);
   let summary: Summary;
   try {
     summary = await withBudget(WALLET_BUDGET_MS, (signal) => readSummary(address, signal, readerIp));
@@ -507,7 +558,14 @@ async function readWalletInScope(address: string, readerIp: string | undefined, 
   // holdings for the pills, and draws only the chosen protocol's.
   // The floor does not reach the api host: a visit family whose request is
   // past the read's deadline fails, and the read is partial and uncached.
-  const visits = readVisitFamilies(WALLET_VISIT_FAMILIES, address, Math.max(500, deadline - Date.now()), readerIp);
+  // A module whose check finds nothing makes no read (decision 0073 point 2).
+  const answers = await presence;
+  const visits = readVisitFamilies(
+    WALLET_VISIT_FAMILIES.filter((m) => presenceReads(answers.get(m.id))),
+    address,
+    Math.max(500, deadline - Date.now()),
+    readerIp,
+  );
   const groups = reading
     .map((f) => ({
       f,

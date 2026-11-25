@@ -18,6 +18,7 @@ import {
 import { pairName } from "@/lib/morpho-at-block/words";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { explorerLaunched, visitKind, type VisitModule } from "./visit";
+import { MORPHO_BLUE_PRESENCE } from "@/lib/wallet/presence-checks";
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 const ZERO = BigInt(0);
@@ -40,6 +41,7 @@ export function morphoAtBlockModule(dep: MorphoAtBlockDeployment, on?: boolean):
     get on() {
       return on ?? explorerLaunched(dep.session);
     },
+    presence: MORPHO_BLUE_PRESENCE,
     path: (address) => `/api/at-block/${dep.api}/wallet?${new URLSearchParams({ owner: address.toLowerCase() })}`,
     shape(answer, address) {
       const r = answer as MorphoAtBlockWalletRead;
