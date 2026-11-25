@@ -279,7 +279,7 @@ export async function AaveVaultsInfo() {
   return (
     <ProtocolInfoPage
       session="aave-v3"
-      layer={{ title: "About Aave vaults", menu: MENU }}
+      layer={{ title: "About Aave vaults on Ethereum", menu: MENU }}
       tracks={
         <>
           {AAVE_VAULTS_LEAD} The{" "}
@@ -328,7 +328,7 @@ export async function AaveVaultsInfo() {
       }
       guide={false}
       sources={<AaveFirstPartySources />}
-      docs={{ label: "Aave V3 tokenization", href: AAVE_TOKENIZATION_DOCS }}
+      docs={{ label: "Aave V3 documentation", href: AAVE_TOKENIZATION_DOCS }}
     />
   );
 }

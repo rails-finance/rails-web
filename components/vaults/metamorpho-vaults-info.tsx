@@ -37,6 +37,7 @@ import { metaMorphoVaultRosterHref, metaMorphoVaultsListingHref } from "@/lib/va
 import { loadMetaMorphoVaultRoster, type MetaMorphoChainId } from "@/lib/metamorpho/vault-roster";
 import { vaultDirectoryCensusProv } from "@/lib/morpho-base/vault-provenance";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { chainMeta } from "@/lib/shared/chains";
 import { metaMorphoLead } from "@/lib/vaults/family-leads";
 import { MORPHO_VAULT_V1_ROLES_DOCS } from "@/lib/vaults/family-docs";
 
@@ -259,10 +260,11 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
     },
   ];
 
+  const layerTitle = `About MetaMorpho vaults on ${chainMeta(chainId).name}`;
   return (
     <ProtocolInfoPage
       session={chainId === 1 ? "morpho" : "morpho-base"}
-      layer={{ title: "About MetaMorpho vaults", menu }}
+      layer={{ title: layerTitle, menu }}
       tracks={
         <>
           {metaMorphoLead(chainId)} The{" "}
@@ -301,7 +303,7 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
         </span>
       }
       guide={false}
-      notCovered="Morpho Vault V2 vaults aren't listed here."
+      notCovered="Morpho Vault V2 isn't listed here."
       docs={{ label: "Morpho documentation", href: `${MORPHO_DOCS}/` }}
     />
   );

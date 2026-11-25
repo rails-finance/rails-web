@@ -191,10 +191,10 @@ export function IporFusionInfoPage({ chainId }: { chainId: IporFusionChainId }) 
       section: "vaults",
       body: (
         <p data-intro-units>
-          Amounts are in each vault&rsquo;s asset and nothing is priced in dollars, so two assets are never ordered or
-          added together. A vault&rsquo;s total assets include the balances it last recorded in each market, which can
-          trail the markets. An empty vault answered zero to <code>totalAssets()</code>: one never funded looks the same
-          as one whose depositors have all left. A vault&rsquo;s position in a protocol Rails covers is that
+          Amounts are in each vault&rsquo;s asset and nothing is priced in USD, so two assets are never ordered or added
+          together. A vault&rsquo;s total assets include the balances it last recorded in each market, which can trail
+          the markets. An empty vault answered zero to <code>totalAssets()</code>: one never funded looks the same as
+          one whose depositors have all left. A vault&rsquo;s position in a protocol Rails covers is that
           explorer&rsquo;s row, under the vault&rsquo;s address.
         </p>
       ),
@@ -206,8 +206,8 @@ export function IporFusionInfoPage({ chainId }: { chainId: IporFusionChainId }) 
       layer={{}}
       tracks={
         <>
-          The IPOR Fusion roster lists every vault the IPOR Fusion factory made on {chain}, with each vault&rsquo;s
-          totals and share price.
+          The roster lists every vault the IPOR Fusion factory made on {chain}, with each vault&rsquo;s totals and share
+          price.
         </>
       }
       glossary={IPOR_GLOSSARY}
