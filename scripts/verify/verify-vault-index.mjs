@@ -160,13 +160,15 @@ await page.waitForSelector("[data-overview-row]", { timeout: 120_000 });
 const MENU = ["/vaults", "/vaults/products", "/vaults/fronts", "/vaults/compare"];
 const readMenu = async (p) => {
   await p.locator("[data-vault-index-head] [data-sections-trigger]").click();
-  const entries = await p.locator('[data-vault-index-head] [data-sections-menu] [role="menuitem"]').evaluateAll((els) =>
-    els.map((el) => ({
-      href: el.getAttribute("href"),
-      name: el.textContent.trim(),
-      current: el.getAttribute("aria-current"),
-    })),
-  );
+  const entries = await p
+    .locator('[data-vault-index-head] [data-sections-menu] [role="menuitem"]:not([data-sections-chain])')
+    .evaluateAll((els) =>
+      els.map((el) => ({
+        href: el.getAttribute("href"),
+        name: el.textContent.trim(),
+        current: el.getAttribute("aria-current"),
+      })),
+    );
   await p.keyboard.press("Escape");
   return entries;
 };
