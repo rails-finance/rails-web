@@ -26,8 +26,7 @@ export const usd = (x: number) =>
 export const pctText = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%`;
 
 export const FRONT_DOOR = {
-  line: "A wallet's Compound V3 accounts on Optimism: what it lends, borrows and puts up as collateral in each Comet, in dollars at the Comet's price feeds, its borrowing capacity and its interest over the last 30 days.",
-  links: { markets: "Market overview" },
+  links: { markets: "Markets" },
 };
 
 export const WALLET_PAGE = {
@@ -60,30 +59,32 @@ export const CARD_WORDS = {
   debtTip: (base: string) => `The ${base} borrowed from the market, including the interest accrued at its Borrow APR.`,
   limit: "Borrowing capacity used",
   limitTip:
-    "The borrow balance as a share of the account's borrowing capacity, which each collateral's Borrow CF (borrow collateral factor) sets. The account becomes liquidatable at a higher level, set by the Liquidation CFs (liquidation collateral factors).",
+    "The borrow balance as a share of the account's borrowing capacity, which each collateral's Borrow CF (borrow collateral factor) sets. At 100% the account can borrow no more; it becomes liquidatable later, at the liquidation point, which the Liquidation CFs (liquidation collateral factors) set.",
   noDebt: "no borrow balance",
   room: "Room to borrow",
   roomTip:
     "How much more of the base the account can borrow before it reaches its borrowing capacity, from the Comet's collateral balances, price feeds and Borrow CFs.",
   absorbedAt: "Liquidation point",
   absorbedAtTip:
-    "Liquidation point is Rails's name; Compound's docs name no such level. It is the borrow balance at which the account becomes liquidatable: each collateral's value at the Comet's price feed times its Liquidation CF (liquidation collateral factor), in base tokens.",
+    "The borrow balance at which the account becomes liquidatable: each collateral's value at the Comet's price feed times its Liquidation CF (liquidation collateral factor), summed, in base tokens.",
   lineReached: "Liquidation point reached",
-  lineReachedTip:
-    "The borrow balance as a share of the liquidation point, Rails's name for the level. The Comet's isLiquidatable says whether the account is liquidatable.",
+  lineReachedTip: "The borrow balance as a share of the liquidation point. At 100% anyone can absorb the account.",
   drop: "Liquidates on a drop of",
   dropTip:
-    "How far the collateral's value can fall, every asset together, before the borrow balance reaches the liquidation point.",
+    "How far the collateral's value can fall, every asset together, before the borrow balance reaches the liquidation point. It is measured at today's debt; interest accruing on the debt shortens it.",
   past: "liquidatable",
   reached: "reached",
   collateralRow: (sym: string) => `${sym} collateral`,
   columns: { asset: "Asset", amount: "Amount", factors: "Borrow CF / Liquidation CF" },
+  factorsTip:
+    "Borrow CF, the borrow collateral factor, is the share of the asset's value the account can borrow against. Liquidation CF, the liquidation collateral factor, is the higher share at which the account becomes liquidatable.",
   baseRow: (sym: string, lend: boolean) => `${sym} ${lend ? "supplied" : "borrowed"}`,
   supplyRateLabel: "Supply APR",
   borrowRateLabel: "Borrow APR",
-  rateTip:
-    "The Comet's rate at its utilization now, a year, without compounding. The 30-day line is the interest added over the last 30 days.",
-  interest30: "Interest, 30 days:",
+  rateTip: "The Comet's rate at its utilization now, for a year, without compounding.",
+  interest30: "Interest, 30 days",
+  interestTip:
+    "The interest the account earned or paid over the last 30 days, shown where no base was supplied, withdrawn, borrowed or repaid in that time.",
   withheld: {
     opened: "opened inside the window",
     changed: "changed inside the window",
@@ -130,8 +131,8 @@ export function cardExplainer(p: OpcPositionFigures): { title: string; bullets: 
   groups.push({
     title: "Interest over 30 days",
     bullets: [
-      "The Comet holds each account's base as a principal that grows into base through the market's supply or borrow index. Where the principal is the same at both dates, the interest is the balance now less the balance 30 days back.",
-      "Where the account supplied, withdrew, borrowed or repaid base inside the 30 days, the figure is withheld.",
+      "The figure is the interest the account earned or paid over the last 30 days: its base balance now less its base balance 30 days back.",
+      "It is shown only where nothing was added to or taken from the base balance in that time; a supply, withdrawal, borrow or repay inside the 30 days hides it.",
     ],
   });
   return groups;

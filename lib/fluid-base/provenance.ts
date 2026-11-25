@@ -5,8 +5,8 @@
 // point 1); this module is where they live.
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
-import type { FluidBasePosition } from "@/lib/fluid-base/position";
-import { FLUID_BASE_CONTRACTS, type FluidBasePositionRead } from "@/lib/fluid-base/types";
+import { exact, legDecimals, legUnit, type FluidBasePosition } from "@/lib/fluid-base/position";
+import { FLUID_BASE_CONTRACTS, type FluidBasePositionRead, type FluidBasePositionsRead } from "@/lib/fluid-base/types";
 import { FLUID_BASE_DOLLARS } from "@/lib/fluid-base/dollars";
 
 const n = (v: number) => v.toLocaleString("en-US");
@@ -234,4 +234,27 @@ export function fluidBaseProv(key: FluidBaseFigure, c: FluidBaseReceiptContext):
         inputs: [chain("configs · collateralFactor (1e4 = 100%)", String(r.now.collateralFactor))],
       };
   }
+}
+
+/** Collateral or debt on the wallet view's row: one position of the wallet read
+ *  (`positionsByUser`) at its head block. */
+export function fluidBaseRowProv(
+  side: "collateral" | "debt",
+  row: FluidBasePositionsRead["positions"][number],
+  read: Pick<FluidBasePositionsRead, "head">,
+): Provenance {
+  const supply = side === "collateral";
+  const leg = supply ? row.supplyLeg : row.borrowLeg;
+  const raw = supply ? row.supply : row.borrow;
+  const unit = legUnit(leg);
+  return {
+    kind: "chain",
+    pclass: "state",
+    source: { block: read.head.block },
+    summary: `${supply ? "Collateral" : "Debt"} — position #${row.id}'s ${supply ? "supply" : "borrow"} at ${at(read.head)}, settled by the vault's math (liquidations applied, interest through the vault's exchange price): ${exact(BigInt(raw), legDecimals(leg))} ${unit}.`,
+    contract: resolver,
+    via: via(`block ${n(read.head.block)}`),
+    inputs: [chain(`positionsByUser · ${supply ? "supply" : "borrow"} (#${row.id})`, raw), chain("vault", row.vault)],
+    scaling: { raw, from: "call", places: legDecimals(leg), why: `${unit} counts in that many decimals` },
+  };
 }

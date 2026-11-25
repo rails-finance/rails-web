@@ -91,6 +91,13 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
     provider deposits both into a <GlossaryLink term="Position">position</GlossaryLink> with a range, a lower and an
     upper price, and it earns only while the pool&apos;s price sits inside that range.
   </>,
+  // lib/aerodrome/sites.ts, after velodrome-finance/slipstream's README ("Deployment", "Gauges V2").
+  <>
+    Velodrome runs two sets of Slipstream contracts on Optimism, each with its own position manager and pool factory:
+    the first, shown as {DEPLOYMENT_LABEL.initial}, and a later set the Slipstream repository calls Gauges V2, shown as{" "}
+    {DEPLOYMENT_LABEL.gv2}. A position belongs to the set whose position manager minted it, and its number counts within
+    that set.
+  </>,
   <>
     An unstaked position earns a share of each swap&apos;s fee. A position{" "}
     <GlossaryLink term="Staking">staked</GlossaryLink> in its pool&apos;s{" "}

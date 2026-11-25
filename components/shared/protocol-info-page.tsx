@@ -324,10 +324,24 @@ export function ProtocolInfoShell({ session, children }: { session: SessionProto
 
 /** A menu entry as the About page reads it: its key (`InfoView.section`) and
  *  its label, which is the section's heading. */
-interface MenuSection {
+export interface MenuSection {
   key: string;
   label: string;
   href: string;
+}
+
+/** A vault layer's About page at its sub-page's `/info` (ui-jobs 791). The
+ *  body carries `data-intro-drawer`, the marker the vault verifiers read the
+ *  prose inside. */
+export interface InfoLayer {
+  /** The h1 where the layer is one section of a wider explorer (Aave V3,
+   *  Morpho Blue); "About this explorer" where absent. */
+  title?: string;
+  /** The layer's pages, each a section, in place of the explorer's menu: the
+   *  roster, then its holder listing as `positions`. Absent where the layer is
+   *  the explorer's whole menu (Yearn V3, IPOR Fusion); there the explorer's
+   *  menu stands and About is lit. */
+  menu?: readonly [MenuSection, ...MenuSection[]];
 }
 
 const POSITIONS_KEY = "positions";
@@ -390,8 +404,14 @@ export interface ProtocolInfoPageProps {
   /** Slot 5: the search and filter line, only where the listing has them. */
   search?: ReactNode;
   /** Slot I6, how to read the pages, where the explorer's pages differ from the
-   *  default sentence (`GUIDE_NO_LEARN_MORE` where its cards have no ?). */
+   *  default sentence (`GUIDE_NO_LEARN_MORE` where its cards have no ?); `false`
+   *  draws no pointer line. */
   guide?: ReactNode;
+  /** A vault layer's About page (ui-jobs 791). */
+  layer?: InfoLayer;
+  /** After the figures: the protocol's own pages about what the page lists
+   *  (Aave's vault layer, `AaveFirstPartySources`). Absent, nothing is drawn. */
+  sources?: ReactNode;
   /** One sentence naming what a reader might expect here and will not find, shown beside the coverage door. Omit it when nothing is expected and missing. */
   notCovered?: string;
   /** Slot 6: the official documentation, the page's final line. */
@@ -439,10 +459,12 @@ export function ProtocolInfoPage({
   docs,
   docsAndChain,
   figures,
+  layer,
+  sources,
 }: ProtocolInfoPageProps) {
   const entry = protocolForSession(session);
   const chainId = entry?.chainId ?? MAINNET_CHAIN_ID;
-  const menu = menuSections(session);
+  const menu = layer?.menu ?? menuSections(session);
   const inMenu = (v: InfoView) => v.section === INTRO_KEY || menu.some((m) => m.key === v.section);
   // A view naming an entry this explorer's menu lacks: an error outside
   // production (scripts/test/info-sections.test.mjs reads the same keys);
@@ -466,22 +488,25 @@ export function ProtocolInfoPage({
           {search}
         </p>
       )}
-      <p className="mt-3" data-anatomy="I6">
-        {guide ?? GUIDE_DEFAULT}
-      </p>
+      {guide !== false && (
+        <p className="mt-3" data-anatomy="I6">
+          {guide ?? GUIDE_DEFAULT}
+        </p>
+      )}
     </>
   );
   return (
     <div className="py-8">
       <div className="mb-6">
-        <RailHeader session={session} venue="info" />
+        {/* A layer with its own menu is one section of the explorer: its tab stays lit. */}
+        <RailHeader session={session} venue={layer?.menu ? "subPage" : "info"} />
       </div>
       <h1 className="text-2xl font-semibold text-foreground" data-anatomy="I1">
-        About this explorer
+        {layer?.title ?? "About this explorer"}
       </h1>
       {entry?.history && <InfoHistoryLine id={entry.id} />}
       <div className="mt-3 text-sm text-rb-500 sm:grid sm:grid-cols-[minmax(0,1fr)_15rem] sm:gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:gap-12">
-        <div className="min-w-0 max-w-3xl">
+        <div className="min-w-0 max-w-3xl" data-intro-drawer={layer ? "" : undefined}>
           <div className="space-y-2" data-anatomy="I2" data-info-section="intro">
             <p>{tracks}</p>
             <h2 className={`${H3} mt-4`}>How it works</h2>
@@ -513,6 +538,8 @@ export function ProtocolInfoPage({
           ))}
 
           {figures && <div className={`mt-6 ${HAIRLINE}`}>{figures}</div>}
+
+          {sources && <div className={`mt-6 ${HAIRLINE} [&>section]:mt-0 [&>section]:mb-0`}>{sources}</div>}
 
           {reads && (
             <div className={`mt-6 ${HAIRLINE} [&>section>h2]:mt-0`}>

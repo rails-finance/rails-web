@@ -5,7 +5,8 @@
 // wallet read alone (lib/wallet/read-wallet.ts).
 //
 // A section's dollars count in the totals only where every open position in it
-// states its dollars at the protocol's oracle (decision 0050, open point 7).
+// states dollars at a source the totals count (`countsDollars`: the protocol's
+// oracle, or another one named on the row; decisions 0046 and 0050).
 // The wallet total sums the sections that state both figures and names the
 // ones it leaves out under the row (Miles, 24 Nov 2026, "wallet total b";
 // rails-ops infra item 37). Liquity V1's and V2's
@@ -46,6 +47,7 @@ import type { WalletPosition } from "@/lib/wallet/types";
 import { onEmptiedBranch, recordedCollateralLeg } from "@/lib/wallet/trove-shutdown";
 import { CHAINS } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
+import { HISTORY_NONE } from "@/lib/shared/history-tier";
 import { SP_DEPLOYMENTS, spPool, type SpDeploymentId } from "@/lib/liquity-v2/sp-deployment";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
@@ -180,6 +182,10 @@ export function unreadNote(unread: number, open: number, subtotal = false): stri
  *  states no total; in the wording of the wallet total's gap. */
 export const LIQUIDITY_NO_TOTAL = "No total: liquidity positions state no dollars.";
 
+/** A read at visit's line (decision 0073 point 3), the history tag's "none" line: on a card's stamp, and once as the Liquidity
+ *  section's line. */
+export const READ_AT_VISIT = HISTORY_NONE.line;
+
 /** A position's dollars in one field. A missing debt counts as none only on
  *  a deposit or a stake no head read contradicts: a head read states its debt, so one
  *  missing there is unpriced, not zero. */
@@ -191,9 +197,14 @@ const dollarsOf = (p: WalletPosition, field: "collateralUsd" | "debtUsd") =>
 const owesNothingUnread = (p: WalletPosition) =>
   (p.kind === "deposits" || p.kind === "stakes") && p.headRead !== "read" && p.debtUsd == null;
 
-/** The position states its dollars in the field at the protocol's oracle. */
+/** The position's dollars count toward the totals: at the protocol's oracle, or at another
+ *  protocol's oracle or a price feed its row names (decision 0046; Miles, "844 A", 25 Nov 2026). */
+export const countsDollars = (p: Pick<WalletPosition, "usdOwnOracle" | "usdSource">): boolean =>
+  p.usdOwnOracle === true || p.usdSource != null;
+
+/** The position states its dollars in the field at a source the totals count. */
 const stated = (p: WalletPosition, field: "collateralUsd" | "debtUsd") =>
-  p.usdOwnOracle === true && dollarsOf(p, field) != null;
+  countsDollars(p) && dollarsOf(p, field) != null;
 
 /** The label a receipt row gives one position: its market, or its id. */
 const positionLabel = (p: WalletPosition) => {

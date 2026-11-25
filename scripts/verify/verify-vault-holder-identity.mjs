@@ -106,7 +106,7 @@
 //
 //  (f) THE NAMED ADDRESS ADDED TO THE VAULT CATALOGUE — the scope-discipline
 //      mistake §4 forbids. 9/12.
-//      FAIL N5  — "/ethereum/aave/vaults/0x8822…f5e3 → 200"
+//      FAIL N5  — "/ethereum/aave-v3/vaults/0x8822…f5e3 → 200"
 //      FAIL N1  — 'kind aave-vault … "a vault in this same catalogue."'
 //      FAIL N1b — the same line
 //      🔑 A GSM is a HOLDER identity. Made a catalogue row it would grow a market
@@ -194,7 +194,7 @@ console.log(`\n── the naming ladder · ${BASE} ──\n`);
 
 /** One position page, read as a reader sees it. */
 async function readPage(f) {
-  const url = `${BASE}/ethereum/aave/vaults/${f.vault}/${f.holder}`;
+  const url = `${BASE}/ethereum/aave-v3/vaults/${f.vault}/${f.holder}`;
   const res = await page.goto(url, { waitUntil: "networkidle", timeout: 120_000 });
   const status = res?.status() ?? 0;
   if (status !== 200) return { url, status };
@@ -211,7 +211,7 @@ async function readPage(f) {
 
 /** One pair's card on the positions listing, read as a reader sees it. */
 async function readListingCard(f) {
-  const url = `${BASE}/ethereum/aave/vaults/positions?q=${f.holder}`;
+  const url = `${BASE}/ethereum/aave-v3/vaults/positions?q=${f.holder}`;
   const res = await page.goto(url, { waitUntil: "networkidle", timeout: 120_000 });
   const status = res?.status() ?? 0;
   const key = `${f.vault}:${f.holder}`.toLowerCase();
@@ -322,7 +322,7 @@ check(
 );
 
 // ── N6: the listing row says it too, in the card's own register ─────────────
-const listingUrl = `${BASE}/ethereum/aave/vaults/positions?q=${F1.holder}`;
+const listingUrl = `${BASE}/ethereum/aave-v3/vaults/positions?q=${F1.holder}`;
 const listingRes = await page.goto(listingUrl, { waitUntil: "networkidle", timeout: 120_000 });
 const listing = await page.evaluate(() => ({
   cards: [...document.querySelectorAll("[data-position-card]")].map((e) => e.getAttribute("data-position-card")),
@@ -344,14 +344,14 @@ check(
 );
 
 // ── N5: a name is not a vault — the GSM keeps 404-ing on its own route ──────
-const gsmPage = await page.goto(`${BASE}/ethereum/aave/vaults/${F1.holder}`, {
+const gsmPage = await page.goto(`${BASE}/ethereum/aave-v3/vaults/${F1.holder}`, {
   waitUntil: "domcontentloaded",
   timeout: 120_000,
 });
 check(
   "N5 the named address has no vault page of its own — it is a holder identity, not a catalogue row",
   gsmPage?.status() === 404,
-  `/ethereum/aave/vaults/${short(F1.holder)} → ${gsmPage?.status()}`,
+  `/ethereum/aave-v3/vaults/${short(F1.holder)} → ${gsmPage?.status()}`,
 );
 
 // ── N3: THE REFUSAL ────────────────────────────────────────────────────────
@@ -429,7 +429,7 @@ check(
 // catalogue member; the VAULT page names the same token as this vault's backing
 // with the share it holds. One relationship, stated from both ends.
 const f3Card = await readListingCard(F3);
-const vaultRes = await page.goto(`${BASE}/ethereum/aave/vaults/${F3.vault}`, {
+const vaultRes = await page.goto(`${BASE}/ethereum/aave-v3/vaults/${F3.vault}`, {
   waitUntil: "networkidle",
   timeout: 120_000,
 });

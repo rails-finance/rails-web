@@ -39,7 +39,8 @@ const { CHAINS, OPTIMISM_CHAIN_ID, ARC_CHAIN_ID, nativeCurrency, explorerUrl, AR
 );
 const P = await import("../../lib/shared/protocols.ts");
 
-const NEW = [OPTIMISM_CHAIN_ID, ARC_CHAIN_ID];
+// Arc is unlaunched; Optimism launched with its explorers (ui-jobs 578).
+const NEW = [ARC_CHAIN_ID];
 
 test("the rule: no explorers, or only unlaunched ones, is an unlaunched chain", () => {
   assert.equal(P.chainLaunchedIn([], 10), false);
@@ -57,7 +58,10 @@ test("the rule: no explorers, or only unlaunched ones, is an unlaunched chain", 
   assert.equal(P.chainLaunchedIn([{ chainId: 10, unlaunched: true }, { chainId: 10 }], 10), true);
 });
 
-test("Optimism and Arc are registered and unlaunched", () => {
+test("Arc is registered and unlaunched; Optimism is registered and launched", () => {
+  assert.ok(CHAINS[OPTIMISM_CHAIN_ID], "CHAINS has Optimism");
+  assert.equal(P.isLaunchedChain(OPTIMISM_CHAIN_ID), true);
+  assert.ok(P.protocolsForChain(OPTIMISM_CHAIN_ID).length > 0);
   for (const id of NEW) {
     assert.ok(CHAINS[id], `CHAINS has ${id}`);
     assert.equal(P.isLaunchedChain(id), false);
@@ -76,7 +80,9 @@ test("an unlaunched chain is on no roster-derived listing", () => {
       .map((c) => c.id),
   );
   const names = P.launchedProductionChainNames();
-  assert.doesNotMatch(names, /Optimism|Arc\b/);
+  assert.doesNotMatch(names, /Arc\b/);
+  assert.match(names, /Optimism/);
+  assert.ok(ids.includes(OPTIMISM_CHAIN_ID), "launchedChains() has Optimism");
   for (const e of [...P.LAUNCHED_PROTOCOLS, ...P.LAUNCHED_PROTOCOL_VERSIONS])
     assert.ok(!NEW.includes(e.chainId), `${e.id} is a launched entry on a new chain`);
 });

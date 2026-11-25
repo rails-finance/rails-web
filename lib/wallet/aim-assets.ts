@@ -33,6 +33,8 @@
 //   aave-v3-optimism       each reserve the account holds
 //   compound-v3-optimism   the Comet's base token and each collateral held
 //   morpho-at-block        the market's loan and collateral tokens
+//   fluid-base             each side's token, both of a DEX-share side
+//   lido                   stETH and wstETH
 //   uniswap, slipstream    the pool's two tokens (the native coin as AIM's native key)
 //   balancer               each of the pool's tokens
 //
@@ -43,6 +45,7 @@ import { assetKey } from "@/lib/shared/asset-family";
 import { SCOPE_SYMBOLS } from "@/lib/shared/asset-scope";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { poolTokenKeys } from "@/components/protocol/uniswap/pool-focus-keys";
+import { STETH, WSTETH } from "@/lib/lido/types";
 
 // The forks' debt symbols (lib/<fork>/asset-catalog.ts DEBT_SYMBOL), written
 // out so this module does not pull the catalogs into the wallet's bundle.
@@ -159,6 +162,13 @@ export function walletPositionAssetKeys(p: WalletPosition): string[] {
       // An idle market's collateral is the zero address.
       for (const m of c.read.positions)
         addresses.push(m.loanToken, /^0x0+$/.test(m.collateralToken) ? null : m.collateralToken);
+      break;
+    case "fluid-base":
+      for (const p of c.read.positions)
+        for (const l of [p.supplyLeg, p.borrowLeg]) addresses.push(l.token.address, l.token1?.address);
+      break;
+    case "lido":
+      addresses.push(STETH, WSTETH);
       break;
     default:
       break;

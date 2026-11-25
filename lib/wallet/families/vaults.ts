@@ -16,8 +16,9 @@
 // stored last transfer (holdsNothingSince); one the answer does not list stays
 // stored.
 //
-// The census value is a stored figure at the census block, so it is shown on
-// the card and kept out of the section and wallet totals (wallet-sections.ts).
+// The census value is a stored figure at the census block: its rows are
+// `headRead: "stored"`, which keeps them out of the section and wallet totals
+// (rule 743, wallet-sections.ts).
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { apiHop } from "@/lib/wallet/api-hop";

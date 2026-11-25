@@ -2,10 +2,13 @@
 
 // One sentence of a family's event prose (lib/shared/event-prose/engine.ts),
 // drawn as the generator marked it: each figure bolded, echoed into the
-// card's receipt the family names for its key, or linked. The text is the
+// card's receipt the family names for its key, or linked (an address, a
+// transaction, or words that open a page inside Rails). The text is the
 // generator's, character for character.
 
 import type { ReactNode } from "react";
+import Link from "next/link";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { LinkedTx } from "@/components/shared/linked-tx";
@@ -47,6 +50,21 @@ export function ProseSentenceText<E extends string>({
             <LinkedAddress key={i} address={seg.address} holderOf={seg.tone === "wallet" ? holderOf : undefined} />
           );
         if (seg.tx) return <LinkedTx key={i} txHash={seg.tx} />;
+        // Words that open a page inside Rails (a swap's trade on the wallet's CoW page).
+        if (seg.href)
+          return (
+            <Link
+              key={i}
+              href={seg.href}
+              prefetch={false}
+              title={seg.title}
+              onClick={(e) => e.stopPropagation()}
+              className={INLINE_LINK}
+              data-prose-link=""
+            >
+              {seg.text}
+            </Link>
+          );
         if (!seg.emph) return <span key={i}>{seg.text}</span>;
         if (seg.emph === "bold") return <Bold key={i}>{seg.text}</Bold>;
         const prov = echo(seg.emph);

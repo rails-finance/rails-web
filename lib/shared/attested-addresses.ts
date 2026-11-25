@@ -96,7 +96,7 @@ const GSM_WHAT = "a GHO Stability Module, Aave's peg facility for one reserve";
  *
  *  The two GSMs are here because they are HOLDER identities and nothing else: a
  *  GSM is not a vault, has no page of its own in this section, and
- *  `/ethereum/aave/vaults/0x8822…` must keep answering 404. */
+ *  `/ethereum/aave-v3/vaults/0x8822…` must keep answering 404. */
 export const AAVE_BOOK_ADDRESSES: readonly AttestedAddress[] = [
   {
     address: "0x3a3868898305f04bec7fea77becff04c13444112",

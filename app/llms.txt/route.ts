@@ -18,8 +18,8 @@ export function GET() {
     ...protocolsForChain(chain.id).map(
       (p) =>
         `- [${explorerName(p)}](${SITE_URL}${p.href}): ${p.desc}` +
-        // The /info page explains the protocol; an explorer with no position listing redirects it.
-        (p.positionListing !== false ? ` [How it works](${SITE_URL}${p.infoHref})` : ""),
+        // The /info page explains the protocol; left out where it redirects or is not drawn.
+        (!p.noInfoPage && !p.redirects?.includes("info") ? ` [How it works](${SITE_URL}${p.infoHref})` : ""),
     ),
   ]);
 

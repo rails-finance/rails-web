@@ -15,7 +15,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { WalletUnresolved, WalletView } from "@/components/wallet/wallet-view";
-import { readWallet, walletFamiliesLine, walletVisitLine } from "@/lib/wallet/read-wallet";
+import { readWallet, walletUnreadExplorers } from "@/lib/wallet/read-wallet";
 import {
   isWalletEnsName,
   parseKinds,
@@ -119,8 +119,7 @@ export default async function WalletPage({ params, searchParams }: Props) {
       read={read}
       cow={cow}
       liquidity={liquidity}
-      reads={walletFamiliesLine()}
-      visits={walletVisitLine()}
+      notRead={protocol ? [] : walletUnreadExplorers(address)}
       back={back}
       kinds={parseKinds(sp.get("kind") ?? undefined)}
       status={parseStatus(sp.get("status") ?? undefined)}

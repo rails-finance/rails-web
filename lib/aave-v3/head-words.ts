@@ -35,6 +35,11 @@ export interface AaveFamilyHeadTable {
   legWrittenOff: string;
   legSent: string;
   legReceived: string;
+  /** The Trade's other side on a flow swap's spine, for the spoken label: a
+   *  withdraw and swap's bought token, a supply from a swap's sold token. A
+   *  family without them reads by direction. */
+  legBought?: string;
+  legSold?: string;
   /** The protocol's treasury, a liquidation fee's recipient. */
   treasury: string;
   /** The family's WETH gateway, where no registry names it (SparkLend). */

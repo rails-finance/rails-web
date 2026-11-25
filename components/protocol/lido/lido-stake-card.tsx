@@ -22,10 +22,10 @@ export function LidoReadStamp({ c, what }: { c: LidoReceiptContext; what: string
   return <PoolReadStamp chainId={1} head={c.r.head} then={c.r.then} contracts={readContracts(c.r)} what={what} />;
 }
 
-function slots(r: LidoStakeRead): PositionCardSlots {
-  const s = lidoStake(r);
-  const c = { s, r };
-  const heads: PositionCardHead[] = [
+/** The card's headline figures: the stake, its stETH and wstETH legs, and the share rate. */
+export function lidoStakeHeads(c: LidoReceiptContext): PositionCardHead[] {
+  const { s } = c;
+  return [
     {
       id: "stake",
       label: CARD_WORDS.stake,
@@ -71,11 +71,16 @@ function slots(r: LidoStakeRead): PositionCardSlots {
       ),
     },
   ];
+}
+
+function slots(r: LidoStakeRead): PositionCardSlots {
+  const s = lidoStake(r);
+  const c = { s, r };
   return {
     surface: "detail",
     heading: CARD_WORDS.heading,
     status: s.now.shares === 0 ? { word: CARD_WORDS.closed, tone: "muted", tip: CARD_WORDS.none } : null,
-    heads,
+    heads: lidoStakeHeads(c),
     counters: null,
     // The stake's name: the wallet (lib/shared/position-name.ts).
     name: positionName({ noun: POSITION_NOUN.lido, id: r.wallet }),

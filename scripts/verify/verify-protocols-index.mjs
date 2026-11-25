@@ -134,7 +134,7 @@ check(
 const menuOf = async (href) => {
   const p = await open(1280);
   await go(p, href);
-  const m = await p.$$eval("[data-sections-menu] [role='menuitem']", (as) =>
+  const m = await p.$$eval("[data-sections-menu] [role='menuitem']:not([data-sections-chain])", (as) =>
     as.map((a) => [a.textContent.trim(), a.getAttribute("href")]),
   );
   await p.close();

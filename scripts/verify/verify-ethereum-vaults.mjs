@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The Vaults section's ROSTER on Ethereum, checked against the chain rather
-// than against itself. /ethereum/aave/vaults — Aave's own vault layer:
+// than against itself. /ethereum/aave-v3/vaults — Aave's own vault layer:
 // sGHO, the Umbrella stake tokens and the static aTokens. The section route is
 // the position listing and the roster is the VAULTS tab beside it, so every
 // check here opens that page (`openRoster`) and reads the same DOM it always
@@ -320,14 +320,14 @@ const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1280, height: 1200 } });
 const page = await context.newPage();
 
-/** THE ROSTER IS THE VAULTS TAB'S LANDING PAGE — /ethereum/aave/vaults, since
+/** THE ROSTER IS THE VAULTS TAB'S LANDING PAGE — /ethereum/aave-v3/vaults, since
  *  rails-ops decision 0028 moved Aave's vault layer under its own unstamped
- *  door (app/(app)/ethereum/aave/vaults/(views)/page.tsx). The position listing
+ *  door (app/(app)/ethereum/aave-v3/vaults/(views)/page.tsx). The position listing
  *  is one segment under it. Every assertion below is the one it always was —
  *  the selector is where it moved to, and `[data-roster-panel]` came with it. A
  *  roster that never fills is a FAILURE here, not a skip: the timeout throws
  *  and the run stops with the wait's own message. */
-const ROSTER = "/ethereum/aave/vaults";
+const ROSTER = "/ethereum/aave-v3/vaults";
 async function openRoster(target = page) {
   // ui-jobs 485: every row, and (ui-jobs 605) the table sorted by Total assets,
   // which is what the roster checks read; the last section checks the default
@@ -751,20 +751,23 @@ check(
   JSON.stringify(vaultsRowAny),
 );
 await page.locator(`${CHOOSER} [role='tab'][aria-label='Ethereum']`).click();
-// Aave vaults is not among Ethereum's eight most used (explorer-rank.json),
-// so its row is behind "View all", which opens /protocols on Ethereum (ui-jobs 781).
+// "View all" opens /protocols on Ethereum (ui-jobs 781). Aave's vaults are Aave
+// V3's Vaults section (ui-jobs 789): no row opens /ethereum/aave, and Aave V3's
+// row links its Vaults section. The row draws its sections twice (the phone
+// card and the desktop cell), so the count takes the visible copy, as
+// verify-protocols-index.mjs does.
 await page.locator(`${CHOOSER} [data-chooser-view-all]`).click();
 await page.waitForSelector("[data-protocol-row]", { timeout: 60_000 }).catch(() => {});
-const aaveVaultsRow = await page
-  .locator("[data-protocol-row] a[data-protocol-hub][href='/ethereum/aave']")
-  .evaluateAll((els) => els.map((e) => (e.textContent ?? "").replace(/\s+/g, " ").trim()));
-// Aave's vault layer launched on 20 Oct 2026 (ui-jobs 412; `unlaunched` left
-// its entry in lib/shared/protocols.ts), so the switcher's Ethereum column
-// carries it as an ordinary row, "Aave vaults".
+const retiredRows = await page.locator("[data-protocol-row] a[data-protocol-hub][href='/ethereum/aave']").count();
+const aaveV3VaultsLinks = await page
+  .locator(
+    "[data-protocol-row] td [data-protocol-sections] a[data-protocol-section][href='/ethereum/aave-v3/vaults']:visible",
+  )
+  .count();
 check(
-  "11b …and Aave's vault layer is an Ethereum explorer, launched, on the chooser's View all",
-  aaveVaultsRow.length === 1 && /^Aave vaults/.test(aaveVaultsRow[0]),
-  JSON.stringify(aaveVaultsRow),
+  "11b …and Aave's vaults are Aave V3's Vaults section on the chooser's View all",
+  retiredRows === 0 && aaveV3VaultsLinks === 1,
+  `${retiredRows} row(s) to /ethereum/aave, ${aaveV3VaultsLinks} Vaults link(s) to /ethereum/aave-v3/vaults`,
 );
 await page.keyboard.press("Escape");
 
@@ -781,20 +784,21 @@ const coverage = async (slug) => {
 };
 const covEth = await coverage("ethereum");
 const covSep = await coverage("sepolia");
-// The Vaults SECTION beneath the matrix is gone from every coverage page; the
-// vault layer has a row IN the matrix instead, which is what 12b reads.
-const covEthRow = await page
-  .goto(`${BASE}/coverage/ethereum`, { waitUntil: "domcontentloaded" })
-  .then(() => page.locator("a[href='/ethereum/aave']").evaluateAll((els) => els.length));
+// The Vaults SECTION beneath the matrix is gone from every coverage page, and
+// the vault layer's row went into Aave V3's (ui-jobs 789), which is what 12b reads.
+const covEthRow = await page.goto(`${BASE}/coverage/ethereum`, { waitUntil: "domcontentloaded" }).then(async () => ({
+  retired: await page.locator("a[href='/ethereum/aave']").count(),
+  aaveV3: await page.locator("a[href='/ethereum/aave-v3']").count(),
+}));
 check(
   "12a no coverage page carries a Vaults section any more",
   covEth.count === 0 && covSep.count === 0,
   `ethereum ${covEth.count}, sepolia ${covSep.count}`,
 );
 check(
-  "12b /coverage/ethereum carries the Aave vault-layer row, launched",
-  covEthRow >= 1,
-  `${covEthRow} link(s) to /ethereum/aave`,
+  "12b /coverage/ethereum carries Aave V3's row and no Aave vaults row",
+  covEthRow.retired === 0 && covEthRow.aaveV3 >= 1,
+  `${covEthRow.retired} link(s) to /ethereum/aave, ${covEthRow.aaveV3} to /ethereum/aave-v3`,
 );
 
 // ── 12c: the retired section routes ─────────────────────────────────────────
@@ -986,7 +990,7 @@ check(
 // script directly, the line's days against the store's, no absolute figure.
 {
   const stripVault = SGHO;
-  await page.goto(`${BASE}/ethereum/aave/vaults/${stripVault}`, { waitUntil: "networkidle", timeout: 240_000 });
+  await page.goto(`${BASE}/ethereum/aave-v3/vaults/${stripVault}`, { waitUntil: "networkidle", timeout: 240_000 });
   await page.waitForSelector('[data-anatomy="V5"]', { timeout: 120_000 }).catch(() => null);
   const strip = await readVaultStrip(page);
   const store = await readStoreSeries(BASE, 1, stripVault);

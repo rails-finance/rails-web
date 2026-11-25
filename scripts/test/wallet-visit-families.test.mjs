@@ -1,12 +1,13 @@
 // The wallet read's families with no store, read at visit (rails-ops decision 0071, group 4;
 // lib/wallet/families/visit.ts): Aave V3, Compound V3 and Morpho Blue on Optimism, Morpho Blue on
-// Arc, each on while its explorer is launched; and Euler V2 on Arbitrum beside Base
+// Arc, each on while its explorer is launched and the module is not held off (VISIT_HELD_OFF); and Euler V2 on Arbitrum beside Base
 // (lib/wallet/families/euler.ts). Each module's read, a failed read, no position, a module whose
 // explorer is unlaunched making no call and drawing nothing, the shared limiter, and the reads
 // starting only once the summary and listing reads have settled; the Optimism cards' receipts stating
 // the collateral the total sums, an unpriced Comet with no health factor, and a narrowed read keeping
 // every launched module's pill. The launch flags are flipped in
-// memory on the roster's entries (protocolForSession), never in lib/shared/protocols.ts. The backend is a
+// memory on the roster's entries (protocolForSession), never in lib/shared/protocols.ts, and the
+// held-off set is emptied for the tests that read a module and restored after. The backend is a
 // stubbed fetch; the modules import through `@/`, resolved as wallet-listing-reads.test.mjs does.
 // Run: npm test
 import test from "node:test";
@@ -203,16 +204,18 @@ const AT_BLOCK = {
 let answers;
 const SESSIONS = ["aave-v3-optimism", "compound-v3-optimism", "morpho-optimism", "morpho-arc"];
 const OPTIMISM = SESSIONS.slice(0, 3);
-/** The sessions launched for a test; the others as protocols.ts has them. */
+/** The sessions launched for a test; the others are flagged off. */
 let launched = OPTIMISM;
+/** `held`: the modules held off for a test; none unless named. */
 const reset = (opts = {}) => {
   launched = opts.launched ?? OPTIMISM;
   for (const s of SESSIONS) {
     const e = protocolForSession(s);
     if (launched.includes(s)) delete e.unlaunched;
-    else if (FLAGS[s]) e.unlaunched = true;
-    else delete e.unlaunched;
+    else e.unlaunched = true;
   }
+  VISIT_HELD_OFF.clear();
+  for (const s of opts.held ?? []) VISIT_HELD_OFF.add(s);
   answers = { aave: AAVE, compound: COMPOUND, morpho: MORPHO, euler: 502 };
   summaryDelay = 0;
 };
@@ -254,17 +257,22 @@ globalThis.fetch = async (input) => {
 };
 
 const { protocolForSession } = await import("../../lib/shared/protocols.ts");
+const { VISIT_HELD_OFF } = await import("../../lib/wallet/families/visit.ts");
 /** The flags as protocols.ts has them today. */
 const FLAGS = Object.fromEntries(SESSIONS.map((s) => [s, protocolForSession(s)?.unlaunched === true]));
+/** The modules visit.ts holds off today. */
+const HELD = [...VISIT_HELD_OFF];
 test.after(() => {
   for (const s of SESSIONS) {
     const e = protocolForSession(s);
     if (FLAGS[s]) e.unlaunched = true;
     else delete e.unlaunched;
   }
+  VISIT_HELD_OFF.clear();
+  for (const s of HELD) VISIT_HELD_OFF.add(s);
 });
 
-const { readWalletUncached, walletFamiliesLine, walletVisitLine, WALLET_VISIT_FAMILIES } = await import(
+const { readWalletUncached, walletFamiliesLine, walletVisitLine, WALLET_VISIT_FAMILIES, presenceDeps } = await import(
   "../../lib/wallet/read-wallet.ts"
 );
 const { readVisitFamilies } = await import("../../lib/wallet/families/visit.ts");
@@ -277,8 +285,10 @@ const { bufferFromHealth } = await import("../../lib/wallet/summary-row.ts");
 const { opPosition } = await import("../../lib/aave-v3-optimism/position.ts");
 const { opWalletSuppliedProv } = await import("../../lib/aave-v3-optimism/provenance.ts");
 const { accountFigures } = await import("../../lib/compound-v3-optimism/position.ts");
-const { opcWalletLentProv } = await import("../../lib/compound-v3-optimism/provenance.ts");
+const { opcWalletBaseProv } = await import("../../lib/compound-v3-optimism/provenance.ts");
 
+/** A wallet no other test reads, so the 60 s presence cache holds no other test's answer for it. */
+const EMPTY = "0x00000000000000000000000000000000000000e6";
 const atBlockCalls = () => urls.filter((u) => u.pathname.startsWith("/api/at-block/")).map((u) => u.pathname);
 
 // ── Each module's read ───────────────────────────────────────────────────
@@ -326,7 +336,7 @@ test("Compound V3 Optimism: one position per Comet the wallet holds, at the Come
   assert.equal(p.card.read.comets[0].key, "usdc");
 });
 
-test("Morpho Blue Optimism: one position per market, dollars kept out of the tiles", async () => {
+test("Morpho Blue Optimism: one position per market, its dollars at a named feed", async () => {
   reset();
   const r = await readVisitFamilies([morphoOptimism], W, 2000);
   assert.equal(r.positions.length, 1);
@@ -383,12 +393,23 @@ test("Compound V3 Optimism: Lent's receipt states the collateral the wallet tota
   assert.equal(row.kind, "deposits");
   assert.equal(row.collateralUsd, 2000, "the posted WETH, the lent USDC left out");
   const ctx = (a) => ({ a, f: accountFigures(a, null), head: HEAD, ethUsd: null });
-  const prov = opcWalletLentProv(ctx(lender));
+  const prov = opcWalletBaseProv(ctx(lender));
   assert.equal(statedCollateral(prov), "$2,000");
   assert.match(prov.summary, /^USDC lent in USD\./, "the Lent headline's receipt");
   // A lender with nothing posted states $0.
   const bare = comet({ supply: "1000000000", borrow: "0", principal: "1000000000", collateral: [] });
-  assert.equal(statedCollateral(opcWalletLentProv(ctx(bare))), "$0");
+  assert.equal(statedCollateral(opcWalletBaseProv(ctx(bare))), "$0");
+});
+
+test("Compound V3 Optimism: Owed's receipt states the collateral the wallet total sums", async () => {
+  reset();
+  const borrower = comet();
+  answers.compound = { ...COMPOUND, comets: [borrower] };
+  const [row] = (await readVisitFamilies([compoundV3Optimism], W, 2000)).positions;
+  assert.equal(row.kind, "loans");
+  const prov = opcWalletBaseProv({ a: borrower, f: accountFigures(borrower, null), head: HEAD, ethUsd: null });
+  assert.equal(statedCollateral(prov), `$${fig(row.collateralUsd)}`);
+  assert.match(prov.summary, /^USDC owed in USD\./, "the Owed headline's receipt");
 });
 
 test("Compound V3 Optimism: an unpriced collateral gives no health factor and no collateral figure", async () => {
@@ -407,7 +428,7 @@ test("Compound V3 Optimism: an unpriced collateral gives no health factor and no
   assert.equal(row.collateralUsd, undefined);
   assert.equal(row.debtUsd, 1000);
   // The receipt states no collateral the total does not sum.
-  const prov = opcWalletLentProv({ a: unpriced, f: accountFigures(unpriced, null), head: HEAD, ethUsd: null });
+  const prov = opcWalletBaseProv({ a: unpriced, f: accountFigures(unpriced, null), head: HEAD, ethUsd: null });
   assert.equal(
     prov.inputs.some((x) => x.label === "Collateral"),
     false,
@@ -449,12 +470,62 @@ test("a wallet holding nothing on a family draws no section and names no failure
 
 // ── Each module behind its explorer's launch flag ────────────────────────
 
-test("with today's flags every module is off", () => {
-  for (const s of SESSIONS) assert.equal(FLAGS[s], true, `${s} is unlaunched in protocols.ts`);
+test("today: Aave V3 and Compound V3 on Optimism are on behind their presence check, Morpho Blue on Optimism held off", async () => {
+  for (const s of OPTIMISM) assert.equal(FLAGS[s], false, `${s} is launched in protocols.ts`);
+  assert.equal(FLAGS["morpho-arc"], true, "morpho-arc is unlaunched in protocols.ts");
+  // Fluid on Base's and Lido's modules (decision 0073), off with their explorers.
+  for (const s of ["fluid-base", "lido"]) assert.equal(protocolForSession(s)?.unlaunched, true, s);
+  // Miles, 25 Nov 2026: Morpho Blue on Optimism held off until it has a presence check.
+  assert.deepEqual(HELD, ["morpho-optimism"]);
+  reset({ held: HELD });
+  assert.deepEqual(
+    WALLET_VISIT_FAMILIES.map((m) => [m.id, m.on]),
+    [...SESSIONS, "fluid-base", "lido"].map((s) => [s, s === "aave-v3-optimism" || s === "compound-v3-optimism"]),
+  );
+  // A wallet the presence check finds empty makes no read at visit.
+  const prior = presenceDeps.multicall;
+  presenceDeps.multicall = async (_chain, contracts) =>
+    contracts.map((c) => ({
+      status: "success",
+      result:
+        c.functionName === "getUserReservesData"
+          ? [[], 0]
+          : c.functionName === "userBasic"
+            ? [BigInt(0), BigInt(0), BigInt(0), 0, 0]
+            : BigInt(0),
+    }));
+  try {
+    urls = [];
+    const read = await readWalletUncached(EMPTY);
+    assert.deepEqual(atBlockCalls(), []);
+    assert.deepEqual(read.positions, []);
+  } finally {
+    presenceDeps.multicall = prior;
+  }
+});
+
+test("a held-off module stays off while launched, and comes on when it leaves the held-off set", () => {
+  for (const s of OPTIMISM) {
+    reset({ held: OPTIMISM });
+    assert.equal(WALLET_VISIT_FAMILIES.find((m) => m.id === s).on, false, `${s} held off`);
+    reset({ held: OPTIMISM.filter((x) => x !== s) });
+    assert.deepEqual(
+      WALLET_VISIT_FAMILIES.filter((m) => m.on).map((m) => m.id),
+      [s],
+    );
+  }
+});
+
+test("launched and not held off, the Optimism modules are on and Arc's is off", () => {
+  reset();
+  assert.deepEqual(
+    WALLET_VISIT_FAMILIES.map((m) => [m.id, m.on]),
+    [...SESSIONS, "fluid-base", "lido"].map((s) => [s, OPTIMISM.includes(s)]),
+  );
   reset({ launched: [] });
   assert.deepEqual(
     WALLET_VISIT_FAMILIES.map((m) => [m.id, m.on]),
-    SESSIONS.map((s) => [s, false]),
+    [...SESSIONS, "fluid-base", "lido"].map((s) => [s, false]),
   );
 });
 
@@ -628,7 +699,7 @@ test("one protocol chosen: every launched module is read for the pills, and only
 test("the empty state names the launched families read at visit by chain, and none while none is", () => {
   assert.deepEqual(
     WALLET_VISIT_FAMILIES.map((m) => m.id),
-    SESSIONS,
+    [...SESSIONS, "fluid-base", "lido"],
   );
   reset({ launched: [] });
   assert.equal(walletVisitLine(), "");

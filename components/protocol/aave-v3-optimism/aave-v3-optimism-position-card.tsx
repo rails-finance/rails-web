@@ -7,6 +7,7 @@
 // liquidation threshold, rate and interest over the last 30 days. Every figure
 // is read when the page opens; the read stamp names the blocks.
 
+import Link from "next/link";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardSlots } from "@/components/shared/position-card";
 import {
@@ -23,6 +24,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { PoolReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { OPTIMISM_CHAIN_ID } from "@/lib/shared/chains";
 import { opPosition, type OpInterest, type OpReserveFigures } from "@/lib/aave-v3-optimism/position";
 import { opCardProv, opReserveProv, readContracts, type OpReceiptContext } from "@/lib/aave-v3-optimism/provenance";
@@ -77,7 +79,10 @@ function ReserveRow({ c, x, side }: { c: OpReceiptContext; x: OpReserveFigures; 
           <TokenChipIcon symbol={x.symbol} address={x.asset} size={20} filterable={false} />
           <span className="min-w-0 text-[13px] leading-snug">
             <span className="block font-medium text-foreground">
-              {supply ? CARD_WORDS.supplyRow(x.symbol) : CARD_WORDS.debtRow(x.symbol)}
+              <Link href={CARD_WORDS.reserveHref(x.asset)} className={INLINE_LINK} data-reserve-link={x.asset}>
+                {x.symbol}
+              </Link>{" "}
+              {supply ? CARD_WORDS.supplySide : CARD_WORDS.debtSide}
             </span>
             {supply && (
               <span className="block text-[12px] text-rb-500">
@@ -128,11 +133,20 @@ function ReservesTable({ c }: { c: OpReceiptContext }) {
   const { p } = c;
   if (!p.supplied.length && !p.borrowed.length) return null;
   return (
-    <DataTable label={CARD_WORDS.reserves} stacked anatomy="C21" className="mt-4" data-reserves-table="">
+    // overflow-visible: a heading tip opens above the frame, which would clip
+    // it; the table draws only from lg, where it fits the card.
+    <DataTable
+      label={CARD_WORDS.reserves}
+      stacked
+      stackBelow="lg"
+      anatomy="C21"
+      className="mt-4 overflow-visible!"
+      data-reserves-table=""
+    >
       <DataTableHead>
         <DataTableHeader label={COLS.asset} />
         <DataTableHeader label={COLS.amount} align="right" />
-        <DataTableHeader label={COLS.threshold} align="right" />
+        <DataTableHeader label={<HeadingTip text={COLS.threshold} tip={CARD_WORDS.thresholdTip} />} align="right" />
         <DataTableHeader label={<HeadingTip text={COLS.rate} tip={CARD_WORDS.rateTip} />} align="right" />
         <DataTableHeader label={<HeadingTip text={COLS.interest} tip={CARD_WORDS.interestTip} />} align="right" />
       </DataTableHead>

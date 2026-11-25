@@ -408,8 +408,11 @@ function shellHtml(body) {
 // version already tiled. The count in the headline and the "+N" chip is the
 // site's, imported, so the card and app/layout.tsx's PROTOCOL_COUNT cannot
 // disagree: production chains only, Polaris on Sepolia left out.
-function homeHtml(protocols, glyphs) {
-  const byId = new Map(protocols.map((p) => [p.id, p]));
+// The marquee's ids are looked up among every launched row (`launched`): the
+// version kept for a protocol is the roster's first launched row, which may be
+// another chain's (Morpho Blue on Optimism sits before Morpho Blue).
+function homeHtml(protocols, glyphs, launched) {
+  const byId = new Map(launched.map((p) => [p.id, p]));
   const shown = MARQUEE.map((id) => byId.get(id));
   const count = LAUNCHED_PRODUCTION_PROTOCOL_VERSION_COUNT;
   const moreCount = count - shown.length;
@@ -465,6 +468,6 @@ async function render(html, out) {
 
 const launchedProtocols = protocols.filter((p) => !p.unlaunched);
 const launchedVersions = dedupeByProtocolKey(launchedProtocols);
-await render(homeHtml(launchedVersions, glyphs), HOME_OUT);
+await render(homeHtml(launchedVersions, glyphs, launchedProtocols), HOME_OUT);
 for (const p of protocols) await render(explorerHtml(p, glyphs), cardOut(p.id));
 await browser.close();

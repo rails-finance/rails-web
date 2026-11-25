@@ -39,12 +39,6 @@ export type SessionProtocol =
   | "aave-v3-base"
   // Aave V3 on Arbitrum, at `/arbitrum/aave-v3`: its own Pool, so its own scope.
   | "aave-v3-arbitrum"
-  // Aave's vault layer — savings GHO, Umbrella stake tokens and static
-  // aTokens. Its own roster subject at an UNSTAMPED door, `/ethereum/aave`,
-  // because those contracts carry no version and a version in the URL of a
-  // contract that has none is false (rails-ops decision 0028 point 5). The
-  // pool explorers above are version-scoped and truthfully stamped.
-  | "aave-vaults"
   // Alchemix V3's Ethereum lines (alUSD, alETH), at `/ethereum/alchemix`. The
   // position is an NFT inside a line, so a bookmark on this rail is a wallet's
   // standing across both lines rather than one id.

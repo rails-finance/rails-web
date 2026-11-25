@@ -38,7 +38,7 @@ export default async function Image({ params }: Props) {
   return eventImage({
     // A vault is the protocol's whose factory deployed it (rails-ops decision
     // 0028), so a render that draws nothing falls back to Aave's own card.
-    session: "aave-vaults",
+    session: "aave-v3",
     load: async () => {
       const address = vault.toLowerCase();
       const who = holder.toLowerCase();
@@ -46,7 +46,7 @@ export default async function Image({ params }: Props) {
       const hop = await ssrHop();
       const units = await vaultUnitsFromCensus({ chainId: MAINNET_CHAIN_ID, vault: address, holder: who, ...hop });
       return vaultEventCardModel({
-        session: "aave-vaults",
+        session: "aave-v3",
         chainId: MAINNET_CHAIN_ID,
         vault: address,
         holder: who,

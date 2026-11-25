@@ -101,7 +101,7 @@ export function vaultSizeDimension<F extends { size?: string }>(): SerializableD
 // cross-vault ORDER the raw shares sort was never able to be. "Shares held"
 // still sorts on the RAW balance, which is a different unit per vault (6-, 8-
 // and 18-decimal share tokens all sit in this list) — the label says so, and
-// the vaults info page (/ethereum/aave/vaults/info) says it again in full.
+// the vaults info page (/ethereum/aave-v3/vaults/info) says it again in full.
 export const VAULT_POSITION_SORT_OPTIONS: SortOption[] = [
   { value: "value", label: "Value · USD at census" },
   { value: "share", label: "Share of the vault" },

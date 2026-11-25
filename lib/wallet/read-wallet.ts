@@ -40,6 +40,8 @@ import { moonwellBase, moonwellEthereum } from "@/lib/wallet/families/moonwell";
 import { eulerV2Arbitrum, eulerV2Base } from "@/lib/wallet/families/euler";
 import { aaveV3Optimism, compoundV3Optimism } from "@/lib/wallet/families/optimism";
 import { morphoArc, morphoOptimism } from "@/lib/wallet/families/morpho-at-block";
+import { fluidBase } from "@/lib/wallet/families/fluid-base";
+import { lido } from "@/lib/wallet/families/lido";
 import { readVisitFamilies, visitFamiliesLine, type VisitModule, type VisitRead } from "@/lib/wallet/families/visit";
 import { skySavings } from "@/lib/wallet/families/sky-savings";
 import { llamalend } from "@/lib/wallet/families/llamalend";
@@ -63,10 +65,28 @@ import {
   ebisuDeposits,
 } from "@/lib/wallet/families/liquity-forks";
 import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
-import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
+import {
+  countedRow,
+  servedSummaryRow,
+  withBudget,
+  type WalletSummaryAnswer,
+  type WalletSummaryRow,
+} from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
+import { explorerName, PROTOCOLS } from "@/lib/shared/protocols";
+import { LIQUIDITY_SOURCES } from "@/lib/wallet/liquidity/sources";
+import { LIQUIDITY_PRESENCE } from "@/lib/wallet/presence-checks";
+import {
+  PRESENCE_BUDGET_MS,
+  presenceReads,
+  readPresence,
+  type PresenceAnswer,
+  type PresenceEntry,
+  type PresenceMulticall,
+} from "@/lib/wallet/presence";
+import { chainClient } from "@/lib/sources/chain/rpc";
 import { apiHop, inChain, inWalletRead } from "@/lib/wallet/api-hop";
 import { kindOfRow, WALLET_PROTOCOLS } from "@/lib/wallet/wallet-filters";
 
@@ -129,7 +149,14 @@ export const WALLET_FAMILIES: FamilyModule[] = [
 /** The families read at visit, with no store (lib/wallet/families/visit.ts),
  *  in the decision's order. Each makes no call while its explorer is
  *  unlaunched. */
-export const WALLET_VISIT_FAMILIES: VisitModule[] = [aaveV3Optimism, compoundV3Optimism, morphoOptimism, morphoArc];
+export const WALLET_VISIT_FAMILIES: VisitModule[] = [
+  aaveV3Optimism,
+  compoundV3Optimism,
+  morphoOptimism,
+  morphoArc,
+  fluidBase,
+  lido,
+];
 
 /** The families the page reads, by chain, in one sentence for the empty
  *  state: "Aave V3, … and Asymmetry on Ethereum; … on Base; …". A module whose
@@ -160,6 +187,81 @@ export function walletFamiliesLine(): string {
 /** The families read at each visit, by chain, for the empty state: "Aave V3,
  *  Compound V3 and Morpho Blue on Optimism"; empty while none is on. */
 export const walletVisitLine = (): string => visitFamiliesLine(WALLET_VISIT_FAMILIES);
+
+/** Every entry the presence check asks about (decision 0073 point 2): each visit module that is
+ *  on, by its id, and each liquidity source, by its key. */
+export function walletPresenceEntries(): PresenceEntry[] {
+  return [
+    ...WALLET_VISIT_FAMILIES.filter((m) => m.on).map((m) => ({ id: m.id, presence: m.presence })),
+    ...LIQUIDITY_SOURCES.map((s) => ({ id: s.key, presence: LIQUIDITY_PRESENCE[s.key] })),
+  ];
+}
+
+/** One multicall at the head on the chain's state RPC, in one request (no chunking). The
+ *  presence read gives it up at its budget. */
+const chainMulticall: PresenceMulticall = async (chainId, contracts) =>
+  (await chainClient(chainId).multicall({ contracts, allowFailure: true, batchSize: 0 })) as Awaited<
+    ReturnType<PresenceMulticall>
+  >;
+
+/** The multicall the presence read makes; a test swaps it. */
+export const presenceDeps: { multicall: PresenceMulticall } = { multicall: chainMulticall };
+
+// Kept as the wallet read is, so the page's read and its liquidity read share one check.
+// `failed`: the entries whose check failed, set once the read settles.
+const presenceCache = new Map<
+  string,
+  { at: number; read: Promise<Map<string, PresenceAnswer>>; failed?: Set<string> }
+>();
+
+/** The wallet's presence answers, one read per address for WALLET_CACHE_MS. An entry whose check
+ *  failed is asked again at the next call, alone, and its answer merged into the kept ones. */
+export function walletPresence(address: string): Promise<Map<string, PresenceAnswer>> {
+  const key = address.toLowerCase();
+  const hit = presenceCache.get(key);
+  const fresh = hit != null && Date.now() - hit.at < WALLET_CACHE_MS;
+  if (fresh && !hit.failed?.size) return hit.read;
+  const entries = walletPresenceEntries();
+  const ask = fresh ? entries.filter((e) => hit.failed!.has(e.id)) : entries;
+  const asked = readPresence(ask, key, presenceDeps.multicall, PRESENCE_BUDGET_MS);
+  const read = fresh ? Promise.all([hit.read, asked]).then(([kept, again]) => new Map([...kept, ...again])) : asked;
+  const entry: { at: number; read: typeof read; failed?: Set<string> } = { at: fresh ? hit.at : Date.now(), read };
+  presenceCache.set(key, entry);
+  void read.then((m) => {
+    entry.failed = new Set([...m].filter(([, a]) => a === "failed").map(([id]) => id));
+  });
+  if (presenceCache.size > 500) {
+    for (const [k, v] of presenceCache) if (Date.now() - v.at >= WALLET_CACHE_MS) presenceCache.delete(k);
+  }
+  return read;
+}
+
+/** A launched explorer the page does not read, linked at the wallet. */
+export interface UnreadExplorer {
+  id: string;
+  /** "Fluid on Base", "Lido" (`explorerName`). */
+  name: string;
+  href: string;
+}
+
+/** The launched explorers with no index that no wallet read covers (decision 0073 point 4): a
+ *  roster entry with `history: "none"` that no switched-on family or visit module and no liquidity
+ *  source reads, in roster order, each linked to its wallet route at `address`. Read at each call, so an
+ *  entry joins at its launch and leaves with the change that reads it. */
+export function walletUnreadExplorers(address: string): UnreadExplorer[] {
+  const read = new Set<string>([
+    ...WALLET_FAMILIES.filter((f) => f.summaryChain !== "arc" || ARC_ON_WALLET).map((f) => f.id),
+    // A switched-off module reads nothing, so its explorer is named.
+    ...WALLET_VISIT_FAMILIES.filter((m) => m.on).map((m) => m.id),
+    ...LIQUIDITY_SOURCES.flatMap((s) => s.explorers),
+  ]);
+  const wallet = address.toLowerCase();
+  return PROTOCOLS.filter((p) => !p.unlaunched && p.history === "none" && !read.has(p.id)).map((p) => ({
+    id: p.id,
+    name: explorerName(p),
+    href: `${p.href}/${wallet}`,
+  }));
+}
 
 /** A listing read that did not answer, or answered part of the wallet: its
  *  module's part of the answer says so, and no total stands while it does. */
@@ -329,7 +431,7 @@ export async function readSummary(address: string, signal: AbortSignal, readerIp
   for (let offset = 0; offset < MAX_ROWS; offset += PAGE) {
     const page = offset === 0 ? await firstPage : await pageAt(offset);
     first ??= page;
-    rows.push(...page.rows);
+    rows.push(...page.rows.map(servedSummaryRow));
     if (rows.length >= page.total || page.rows.length < PAGE) break;
   }
   const extra = await listing;
@@ -454,6 +556,8 @@ export function readWalletUncached(
 async function readWalletInScope(address: string, readerIp: string | undefined, opts: { protocol?: string }) {
   const t0 = Date.now();
   const deadline = t0 + WALLET_BUDGET_MS;
+  // The presence check runs beside the summary read; the visit modules wait for it.
+  const presence = walletPresence(address);
   let summary: Summary;
   try {
     summary = await withBudget(WALLET_BUDGET_MS, (signal) => readSummary(address, signal, readerIp));
@@ -479,7 +583,14 @@ async function readWalletInScope(address: string, readerIp: string | undefined, 
   // holdings for the pills, and draws only the chosen protocol's.
   // The floor does not reach the api host: a visit family whose request is
   // past the read's deadline fails, and the read is partial and uncached.
-  const visits = readVisitFamilies(WALLET_VISIT_FAMILIES, address, Math.max(500, deadline - Date.now()), readerIp);
+  // A module whose check finds nothing makes no read (decision 0073 point 2).
+  const answers = await presence;
+  const visits = readVisitFamilies(
+    WALLET_VISIT_FAMILIES.filter((m) => presenceReads(answers.get(m.id))),
+    address,
+    Math.max(500, deadline - Date.now()),
+    readerIp,
+  );
   const groups = reading
     .map((f) => ({
       f,

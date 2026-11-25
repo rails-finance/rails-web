@@ -225,6 +225,7 @@ export function AaveV3EventExplainer({
     siblings,
     previousEvent: previous?.event,
     timestamp,
+    blockNumber,
   });
   const echo = (key: AaveV3EchoKey) => echoFor(key, ctx, coords);
   const items = aaveV3ExplanationRuns(prose).flatMap((run) =>

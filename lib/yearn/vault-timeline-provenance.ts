@@ -198,7 +198,7 @@ export const yearnVaultTimelineAccrualProv = (c: VaultTimelineCoords): Provenanc
 // `vaultClaimNowProv`. A second pair here would be two receipts for one figure,
 // and the one the page renders would be whichever the reducer reached for.
 //
-// What that reducer's receipts still say is "(/ethereum/aave/vaults)" in their
+// What that reducer's receipts still say is "(/ethereum/aave-v3/vaults)" in their
 // lane sentence, on this page and on the MetaMorpho one alike. The call and the
 // block they name are this page's and correct; the LANE NAME is the Aave arm's.
 // Fixing it means giving the reducer a receipt kit the way the row takes one

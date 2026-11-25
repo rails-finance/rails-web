@@ -902,8 +902,10 @@ async function readInfoDom() {
       `/base/morpho/vaults/info carries ${drawers} [data-intro-drawer] bodies — every prose check below rests on exactly one`,
     );
   const text = (await page.locator("[data-intro-drawer]").innerText()).replace(/\s+/g, " ").trim();
+  // The view's wrapper, two levels up, holds the "Three blocks" heading the
+  // About layout draws over the list (ui-jobs 791).
   const blocks = (await page.locator("[data-intro-blocks]").count())
-    ? (await page.locator("[data-intro-blocks]").innerText()).replace(/\s+/g, " ").trim()
+    ? (await page.locator("[data-intro-blocks]").locator("xpath=../..").innerText()).replace(/\s+/g, " ").trim()
     : "";
   await page.close();
   return { status, text, blocks };

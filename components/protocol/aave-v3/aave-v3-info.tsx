@@ -9,6 +9,7 @@ import { BaseLendingCoverageNote } from "@/components/shared/base-lending-covera
 import { aaveV3Glossary } from "@/lib/aave-v3/event-templates";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { CowAaveFigures } from "@/components/protocol/cow/cow-aave-figures";
+import { ethereumVaultRosterHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
 
 const UL = "list-disc space-y-1 pl-5";
 
@@ -82,7 +83,11 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
             <Link href="/ethereum/aave-v3/markets" className={INLINE_LINK}>
               the Core market
             </Link>
-            , with their rates, risk settings and prices.
+            , with their rates, risk settings and prices, and{" "}
+            <Link href={ethereumVaultRosterHref()} className={INLINE_LINK}>
+              Aave&rsquo;s vaults
+            </Link>
+            : savings GHO, the static aTokens and the Umbrella stake tokens.
           </>
         }
         notCovered="The reserves of the Prime and EtherFi markets aren't covered here."
@@ -117,6 +122,33 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
           },
           POSITION_PAGE,
           marketView("/ethereum/aave-v3/markets", "Core"),
+          {
+            heading: "Vaults",
+            section: "vaults",
+            body: (
+              <ul className={UL}>
+                <li>
+                  <Link href={ethereumVaultRosterHref()} className={INLINE_LINK}>
+                    The vault roster
+                  </Link>{" "}
+                  lists every vault Aave publishes on Ethereum (savings GHO, the static aTokens and the Umbrella stake
+                  tokens) with its total assets, share price and 30-day yield.
+                </li>
+                <li>
+                  <Link href={ethereumVaultsListingHref()} className={INLINE_LINK}>
+                    The vault positions listing
+                  </Link>{" "}
+                  shows each address that holds shares in a vault.
+                </li>
+                <li>
+                  <Link href={`${ethereumVaultRosterHref()}/info`} className={INLINE_LINK}>
+                    About Aave vaults
+                  </Link>{" "}
+                  explains how Rails builds the roster and that listing.
+                </li>
+              </ul>
+            ),
+          },
         ]}
         docs={docs}
         figures={<CowAaveFigures family="aave-v3" />}

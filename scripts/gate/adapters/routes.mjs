@@ -427,10 +427,10 @@ const POSITIONS = [
     routes: ([, holder]) => [`/api/sky-savings/positions?status=all&owner=${lower(holder)}&limit=1`],
   },
   {
-    // app/(app)/ethereum/aave/vaults/[vault]/page.tsx: loadAaveEthereumVault,
+    // app/(app)/ethereum/aave-v3/vaults/[vault]/page.tsx: loadAaveEthereumVault,
     // which /api/chain/aave-vaults/vault serves without a holder.
     id: "aave-vault",
-    match: re(`/ethereum/aave/vaults/${ADDR}`),
+    match: re(`/ethereum/aave-v3/vaults/${ADDR}`),
     routes: ([, vault]) => [`/api/chain/aave-vaults/vault?vault=${lower(vault)}`],
   },
   {
@@ -735,7 +735,7 @@ const LISTINGS = [
   },
   {
     id: "aave-vault-positions",
-    match: re(`/ethereum/aave/vaults/positions`),
+    match: re(`/ethereum/aave-v3/vaults/positions`),
     routes: listing(
       () => aaveVaultPositionList.vaultPositionListDimensions(),
       aaveVaultPositionList.VAULT_POSITION_LIST_DEFAULTS,
@@ -877,9 +877,9 @@ const SYSTEM = [
       }),
   },
   {
-    // /ethereum/aave redirects here; loadAaveEthereumVaultDirectory and the census.
+    // Aave V3's Vaults section; loadAaveEthereumVaultDirectory and the census.
     id: "aave-vaults",
-    match: re(`/ethereum/aave(?:/vaults)?`),
+    match: re(`/ethereum/aave-v3/vaults`),
     routes: vaultDirectory("/api/chain/aave-vaults/directory", MAINNET_CHAIN_ID),
   },
   {

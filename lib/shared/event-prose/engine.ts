@@ -20,6 +20,7 @@ import type {
   ModalData,
   ModalLink,
   ProseFile,
+  ProseLinks,
   ProseSeg,
   ProseSentence,
   ProseValue,
@@ -44,6 +45,7 @@ type Fill<E extends string> = (
   text: string,
   env: FmtEnv,
   emph?: Record<string, E | "bold">,
+  links?: ProseLinks,
 ) => { text: string; segs: ProseSeg<E>[]; uses: string[] };
 
 export class Speaker<E extends string = string> {
@@ -63,9 +65,10 @@ export class Speaker<E extends string = string> {
     this.sentenceOf = sentenceOf;
     this.fill = fill;
   }
-  say(id: string, emph?: Record<string, E | "bold">): void {
+  /** `links`: placeholders whose words open a page inside Rails. */
+  say(id: string, emph?: Record<string, E | "bold">, links?: ProseLinks): void {
     const s = this.sentenceOf(this.t, id);
-    const f = this.fill(s.text, this.env, emph);
+    const f = this.fill(s.text, this.env, emph, links);
     this.said.set(id, { sentence_id: id, text: f.text, uses: f.uses, segs: f.segs });
   }
   /** The sentences said, in the template's order; the list apart. */
@@ -107,6 +110,7 @@ export function eventProseEngine<K extends string, E extends string = string>(
     text: string,
     env: FmtEnv,
     emph: Record<string, E | "bold"> = {},
+    links: ProseLinks = {},
   ): { text: string; segs: ProseSeg<E>[]; uses: string[] } {
     const segs: ProseSeg<E>[] = [];
     const uses: string[] = [];
@@ -121,6 +125,10 @@ export function eventProseEngine<K extends string, E extends string = string>(
       const out = ROUNDING[rounding](v, name, env);
       const seg: ProseSeg<E> = { text: out, name };
       if (emph[name]) seg.emph = emph[name];
+      if (links[name]) {
+        seg.href = links[name].href;
+        if (links[name].title) seg.title = links[name].title;
+      }
       if (rounding === "ratio_pair")
         seg.pair = { cr: ROUNDING.ratio(v, name, env), ltv: `${(10000 / num(v)).toFixed(2)}%` };
       if (rounding === "tx_hash") seg.tx = String(v);

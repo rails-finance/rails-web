@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // One Aave vault on Ethereum, checked against the chain rather than against
-// itself. /ethereum/aave/vaults/<vault> and /ethereum/aave/vaults/<vault>/<holder>.
+// itself. /ethereum/aave-v3/vaults/<vault> and /ethereum/aave-v3/vaults/<vault>/<holder>.
 // ----------------------------------------------------------------------------
 // EVERY EXPECTED FIGURE HERE IS THIS SCRIPT'S OWN CHAIN READ OR ITS OWN PARSE.
 // Each page states the block it read at; this script then makes its OWN
@@ -32,7 +32,7 @@
 // one block, so the whole run works on a state endpoint.
 //
 // ── 2026-09-08 · THE HOLDER IS A PATH SEGMENT ──────────────────────────────
-// `?holder=` is gone: a position is `/ethereum/aave/vaults/<vault>/<holder>`, and
+// `?holder=` is gone: a position is `/ethereum/aave-v3/vaults/<vault>/<holder>`, and
 // the vault's own route is the MARKET VIEW. 1d reads the roster's vault links
 // inside the listing's drawer (the listing's own cards link to a holder, whose
 // last segment is not a vault). 6d reads the printed shares, fraction and claim
@@ -176,7 +176,7 @@
 //      FAIL 11a — 'page null null "null"; own 0x6bf1…8aa6 49334226126838
 //                  "79.76%" (stkwaEthUSDC.v1) · sentence ""'
 //      FAIL 11b — 'page "null", own balanceOf÷totalSupply "79.76%"'
-//      FAIL 11c — 'href "null", want "/ethereum/aave/vaults/positions?vault=0x6bf1…8aa6"'
+//      FAIL 11c — 'href "null", want "/ethereum/aave-v3/vaults/positions?vault=0x6bf1…8aa6"'
 //      FAIL 11e — "0xb80b…a4df (of 10 unbacked) draws 0 sentence(s);
 //                  0xd4fa…d23e draws 0"
 //      🔑 11e is why it is a PAIR. "The unbacked vault says nothing" is true of a
@@ -192,8 +192,8 @@
 //
 //  (c) THE WAY THROUGH POINTING AT THE VAULT'S OWN PAGE rather than the listing
 //      filtered to it — the link-not-list rule undone. 49/50.
-//      FAIL 11c — 'href "/ethereum/aave/vaults/0x6bf1…8aa6", want
-//                  "/ethereum/aave/vaults/positions?vault=0x6bf1…8aa6"'
+//      FAIL 11c — 'href "/ethereum/aave-v3/vaults/0x6bf1…8aa6", want
+//                  "/ethereum/aave-v3/vaults/positions?vault=0x6bf1…8aa6"'
 //
 //  (d) THE `asset()` GUARD DROPPED in the loader — any stake token, backing or
 //      not. 50/50: IT STAYED GREEN, and the reason is worth keeping. The
@@ -209,7 +209,7 @@
 //      FAIL 11f — 'holder-vault-holders null, href "null"'
 //
 //  (f) THE (i) PARAGRAPH REMOVED. 49/50.
-//      FAIL 11g — "no [data-intro-layers] paragraph on /ethereum/aave/vaults/info"
+//      FAIL 11g — "no [data-intro-layers] paragraph on /ethereum/aave-v3/vaults/info"
 //
 import { chromium } from "playwright";
 import { createPublicClient, http, parseAbi } from "viem";
@@ -282,7 +282,7 @@ const HOLDERS = [
   // Safe from the vault census takes its place.
   { vault: SGHO, holder: "0x2ea450a8a15d4f5a6535d46a45f4de9dffc33716", shape: "safe" },
   // Re-pinned 2026-10-20 from the vault page's holder roster at census block
-  // 26,235,125 (/ethereum/aave/vaults/positions?vault=<stake token>): the two
+  // 26,235,125 (/ethereum/aave-v3/vaults/positions?vault=<stake token>): the two
   // previous fixtures, 0xcbc4…6b25 on stkwaEthUSDC.v1 and 0x3e43…f8ee on stkGHO,
   // had exited, so 6a/6b were red. Each replacement is a live holder of the
   // roster whose census row counts one transfer, the one that brought the shares
@@ -481,7 +481,7 @@ const head = await client.getBlockNumber();
 /** Open one vault page (optionally on a holder) and read every handle off the
  *  DOM in one pass. Nothing here is an expectation — it is the claim. */
 async function readVaultPage(vault, holder) {
-  const url = `${BASE}/ethereum/aave/vaults/${vault}${holder ? `/${encodeURIComponent(holder)}` : ""}`;
+  const url = `${BASE}/ethereum/aave-v3/vaults/${vault}${holder ? `/${encodeURIComponent(holder)}` : ""}`;
   const res = await page.goto(url, { waitUntil: "networkidle" });
   const status = res?.status() ?? 0;
   if (status !== 200) return { url, status };
@@ -655,7 +655,7 @@ check(
 // vault — so the explorer rail lights VAULTS here, and lights exactly one tab.
 const bad0c = SAMPLE.filter((v) => {
   const lit = (PAGES.get(v).railTabs ?? []).filter((t) => t.current === "page");
-  return lit.length !== 1 || lit[0].href !== "/ethereum/aave/vaults";
+  return lit.length !== 1 || lit[0].href !== "/ethereum/aave-v3/vaults";
 });
 check(
   "0c the explorer rail on a market view lights VAULTS, and nothing else",
@@ -664,7 +664,7 @@ check(
     ? bad0c
         .map((v) => `${short(v)} lit ${JSON.stringify((PAGES.get(v).railTabs ?? []).filter((t) => t.current))}`)
         .join(" · ")
-    : `${SAMPLE.length} pages light /ethereum/aave/vaults`,
+    : `${SAMPLE.length} pages light /ethereum/aave-v3/vaults`,
 );
 
 // ── the chain's own roster, at the block one of the pages named ─────────────
@@ -703,7 +703,7 @@ const outsideNotInRoster = !CHAIN_ROSTER.includes(OUTSIDE_4626);
 // from the flight payload (components/shared/route-not-found.tsx records the
 // measurement), so the body is read after the client has settled rather than
 // off the server's HTML.
-const outsideRes = await page.goto(`${BASE}/ethereum/aave/vaults/${OUTSIDE_4626}`, { waitUntil: "networkidle" });
+const outsideRes = await page.goto(`${BASE}/ethereum/aave-v3/vaults/${OUTSIDE_4626}`, { waitUntil: "networkidle" });
 await page.waitForSelector("text=No vault page for this address", { timeout: 15000 }).catch(() => {});
 check(
   "1a a real ERC-4626 the enumerators did not name answers 404 — the served test is membership, not shape",
@@ -718,7 +718,7 @@ check(
 );
 const roster404 = [];
 for (const v of CHAIN_ROSTER) {
-  const r = await page.goto(`${BASE}/ethereum/aave/vaults/${v}`, { waitUntil: "domcontentloaded" });
+  const r = await page.goto(`${BASE}/ethereum/aave-v3/vaults/${v}`, { waitUntil: "domcontentloaded" });
   if (r?.status() !== 200) roster404.push(`${short(v)} ${r?.status()}`);
 }
 check(
@@ -728,14 +728,14 @@ check(
     ? `${roster404.length} catalogued vaults do not answer 200: ${roster404.slice(0, 4).join(", ")}`
     : `${CHAIN_ROSTER.length} vaults answered 200`,
 );
-// The roster is the VAULTS tab's landing page — /ethereum/aave/vaults —
+// The roster is the VAULTS tab's landing page — /ethereum/aave-v3/vaults —
 // the section rail — so its links are read there, and read INSIDE the panel,
-// because the listing's own cards link to /ethereum/aave/vaults/<vault>/<holder>,
+// because the listing's own cards link to /ethereum/aave-v3/vaults/<vault>/<holder>,
 // whose last segment is a holder rather than a vault.
-await page.goto(`${BASE}/ethereum/aave/vaults`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/ethereum/aave-v3/vaults`, { waitUntil: "networkidle" });
 await page.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 90000 });
 const dirLinks = await page
-  .locator('[data-roster-panel] a[href^="/ethereum/aave/vaults/0x"]')
+  .locator('[data-roster-panel] a[href^="/ethereum/aave-v3/vaults/0x"]')
   .evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute("href")))]);
 const dirTargets = dirLinks.map((h) => h.split("/").pop());
 const dirBad = dirTargets.filter((a) => !CHAIN_ROSTER.includes(a));
@@ -1406,7 +1406,7 @@ check(
 // listing answers with that token's own positions. A list on the vault page is
 // what this replaces (memory `market-views-link-not-list`), so the check is on
 // the href AND on what the href actually serves.
-const wantHref = `/ethereum/aave/vaults/positions?vault=${want?.address}`;
+const wantHref = `/ethereum/aave-v3/vaults/positions?vault=${want?.address}`;
 check(
   "11c P2 the share's sentence links to the listing filtered to that stake token",
   waPage.backedByHoldersHref === wantHref,
@@ -1446,11 +1446,11 @@ check(
   "11f the position page whose holder is a catalogue vault links to the holders behind that balance",
   nestedPos.status === 200 &&
     nestedPos.holderVaultHolders === STK_USDC &&
-    nestedPos.holderVaultHoldersHref === `/ethereum/aave/vaults/positions?vault=${STK_USDC}`,
+    nestedPos.holderVaultHoldersHref === `/ethereum/aave-v3/vaults/positions?vault=${STK_USDC}`,
   `holder-vault-holders ${nestedPos.holderVaultHolders}, href "${nestedPos.holderVaultHoldersHref}"`,
 );
 // D3 — the trap, said once, in the section's own (i) page and nowhere else.
-const infoRes = await page.goto(`${BASE}/ethereum/aave/vaults/info`, { waitUntil: "networkidle" });
+const infoRes = await page.goto(`${BASE}/ethereum/aave-v3/vaults/info`, { waitUntil: "networkidle" });
 const layers = await page.locator("[data-intro-layers]").count();
 const layersText =
   layers > 0 ? (await page.locator("[data-intro-layers]").first().innerText()).replace(/\s+/g, " ") : "";
@@ -1461,7 +1461,7 @@ check(
     /must not add them|not add them together/i.test(layersText) &&
     /stake token/i.test(layersText) &&
     /static aToken/i.test(layersText),
-  layers === 0 ? "no [data-intro-layers] paragraph on /ethereum/aave/vaults/info" : `"${layersText.slice(0, 160)}…"`,
+  layers === 0 ? "no [data-intro-layers] paragraph on /ethereum/aave-v3/vaults/info" : `"${layersText.slice(0, 160)}…"`,
 );
 
 // ── 9: the read stamp ───────────────────────────────────────────────────────

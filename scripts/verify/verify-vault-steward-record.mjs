@@ -94,7 +94,12 @@ async function open(path, ready) {
 // its address; its chain is the link's first segment. Maple's pools page draws no vault
 // rows, so its pools come from lib/maple/asset-catalog.ts, each at /ethereum/maple/pools/<key>.
 const CHAIN = { ethereum: 1, base: 8453, arbitrum: 42161, optimism: 10 };
-const ROSTERS = ["/base/morpho/vaults", "/ethereum/morpho/vaults", "/ethereum/aave/vaults", "/ethereum/yearn/vaults"];
+const ROSTERS = [
+  "/base/morpho/vaults",
+  "/ethereum/morpho/vaults",
+  "/ethereum/aave-v3/vaults",
+  "/ethereum/yearn/vaults",
+];
 const index = {};
 for (const roster of ROSTERS) {
   const dir = await open(`${roster}?show=all`, "[data-vault-row]");

@@ -60,6 +60,8 @@ import type { VaultPositionRow } from "@/lib/aave-vaults/vault-position";
 import type { OpPositionRead } from "@/lib/aave-v3-optimism/types";
 import type { OpcWalletRead } from "@/lib/compound-v3-optimism/types";
 import type { MorphoAtBlockWalletRead } from "@/lib/morpho-at-block/types";
+import type { FluidBasePositionsRead } from "@/lib/fluid-base/types";
+import type { LidoStakeRead } from "@/lib/lido/types";
 
 /** "redeemed" is in the type for the families that end a position by
  *  redemption; no store states it as an ending yet (a fully redeemed Liquity
@@ -171,7 +173,10 @@ export type WalletCard =
    *  Optimism or Arc holding one market. */
   | { kind: "aave-v3-optimism"; read: OpPositionRead }
   | { kind: "compound-v3-optimism"; read: OpcWalletRead }
-  | { kind: "morpho-at-block"; dep: "optimism" | "arc"; read: MorphoAtBlockWalletRead };
+  | { kind: "morpho-at-block"; dep: "optimism" | "arc"; read: MorphoAtBlockWalletRead }
+  /** The wallet read holding this position alone. */
+  | { kind: "fluid-base"; read: FluidBasePositionsRead }
+  | { kind: "lido"; read: LidoStakeRead };
 
 /** A closed position's row in the History table: what the store states, each
  *  field absent where it states nothing. */
@@ -222,9 +227,9 @@ export interface WalletPosition {
   debtUsd?: number;
   /** Whose oracle the dollars are at (decision 0046). */
   usdSource?: string;
-  /** The dollars are the family's own oracle's, so the tiles sum them
-   *  (open point 7). Morpho Arbitrum's, at Aave's oracle, are shown on the
-   *  card and kept out of the tiles. */
+  /** The dollars are at the family's oracle. Dollars at another source
+   *  (Morpho's, at Aave's oracle or a Chainlink feed) set this false and name
+   *  the source in `usdSource`; the totals count both (`countsDollars`). */
   usdOwnOracle?: boolean;
   /** The collateral price move, as a fraction, that starts liquidation;
    *  negative past it; undefined where the family cannot state it. A sort
@@ -269,6 +274,9 @@ export interface WalletPosition {
    *  the wallet read no longer finds): the head read's block.
    *  The card keeps the sweep's figures and its stamp says so. */
   closedSince?: { block: number };
+  /** Read from the chain at this visit by a module with no store behind it
+   *  (lib/wallet/families/visit.ts): its stamp says so (decision 0073 point 3). */
+  readAtVisit?: true;
   headRead: HeadRead;
   readAtBlock?: number;
   /** Unix seconds. */
@@ -298,6 +306,9 @@ export interface WalletFamilyRead {
   /** Positions the family read and the page does not draw (a module's
    *  `drawLimit`): the protocol's slug and how many open and closed. */
   undrawn?: { family: string; open: number; closed: number };
+  /** A line the module states under the section (`VisitModule.note`): the protocol's slug and
+   *  the line. */
+  note?: { family: string; line: string };
 }
 
 /** The answer of /api/chain/wallet/<address>. */

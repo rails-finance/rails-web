@@ -15,6 +15,7 @@
 
 import { IndexNotice } from "@/components/shared/index-notice";
 import Link from "next/link";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { Suspense, use, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
@@ -54,6 +55,7 @@ import type { WalletFamilyRead, WalletRead } from "@/lib/wallet/types";
 import { WALLET_COUNTS_SCOPE } from "@/lib/wallet/summary-counts";
 import {
   closestToLiquidation,
+  countsDollars,
   DUST_USD,
   unreadAtHead,
   walletNet,
@@ -70,9 +72,14 @@ import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { useAssetScope } from "@/lib/shared/asset-scope";
 import { walletPositionAssetKeys } from "@/lib/wallet/aim-assets";
 import { COW_TERMS } from "@/lib/cow/terms";
-import { LiquidityBoundary, LiquidityReading, LiquiditySection } from "@/components/wallet/wallet-liquidity";
-import { walletLiquidityLine } from "@/lib/wallet/liquidity/sources";
+import {
+  LiquidityBoundary,
+  LiquidityReading,
+  LiquiditySection,
+  WhenLiquidityEmpty,
+} from "@/components/wallet/wallet-liquidity";
 import type { WalletLiquidity } from "@/lib/wallet/types";
+import type { UnreadExplorer } from "@/lib/wallet/read-wallet";
 
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
 const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
@@ -131,7 +138,7 @@ function Totals({
   const owing = sections
     .filter((s) => !s.testnet && s.collateral != null && s.debt != null)
     .flatMap((s) => s.open)
-    .filter((p) => p.usdOwnOracle && !unreadAtHead(p) && (p.debtUsd ?? 0) > 0);
+    .filter((p) => countsDollars(p) && !unreadAtHead(p) && (p.debtUsd ?? 0) > 0);
   const rated = owing.filter((p) => p.debtRate != null);
   const ratedUsd = rated.reduce((s, p) => s + p.debtUsd!, 0);
   const rate = ratedUsd > 0 ? rated.reduce((s, p) => s + p.debtUsd! * p.debtRate!, 0) / ratedUsd : null;
@@ -200,7 +207,17 @@ type Undrawn = NonNullable<WalletFamilyRead["undrawn"]> & { chain: ChainId };
 /** One protocol's section (W3): its name, the listing's band (N7) where it
  *  holds two positions or more, then its cards, open by risk, then closed
  *  newest first; under them, how many more the read did not draw. */
-function Section({ s, undrawn, status }: { s: WalletSection; undrawn: Undrawn[]; status?: WalletStatus }) {
+function Section({
+  s,
+  undrawn,
+  notes,
+  status,
+}: {
+  s: WalletSection;
+  undrawn: Undrawn[];
+  notes: string[];
+  status?: WalletStatus;
+}) {
   const atRiskCount = s.open.filter(atRisk).length;
   const id = `wallet-section-${s.slug}`;
   return (
@@ -242,6 +259,11 @@ function Section({ s, undrawn, status }: { s: WalletSection; undrawn: Undrawn[];
           )
         );
       })}
+      {notes.map((line) => (
+        <p key={line} className="mt-3 text-xs text-rb-500" data-wallet-section-note="">
+          {line}
+        </p>
+      ))}
     </section>
   );
 }
@@ -343,8 +365,7 @@ export function WalletView({
   read,
   cow,
   liquidity,
-  reads,
-  visits,
+  notRead,
   back,
   kinds: initialKinds = [],
   status: initialStatus,
@@ -362,13 +383,11 @@ export function WalletView({
   kinds?: WalletKind[];
   /** `?status=`: the Status pill's selection on arrival. */
   status?: WalletStatus;
-  /** The families the page reads, by chain (`walletFamiliesLine`). */
-  reads: string;
-  /** The families with no store it reads at each visit, by chain
-   *  (`walletVisitLine`); empty while none is on. */
-  visits: string;
   /** The explorer the reader came from, for the empty state's link back. */
   back: { href: string; name: string } | null;
+  /** The launched explorers no wallet read takes (`walletUnreadExplorers`); empty where one
+   *  protocol is chosen. */
+  notRead: UnreadExplorer[];
 }) {
   // AIM (ui-jobs 557): the positions naming an AIM asset (lib/wallet/aim-assets.ts),
   // the reader's own wallet included.
@@ -399,6 +418,8 @@ export function WalletView({
   const undrawn: Undrawn[] = read.families.flatMap((r) =>
     r.undrawn && (!focused || scope.chainOk(r.chain)) ? [{ ...r.undrawn, chain: r.chain }] : [],
   );
+  // The lines a module states under its section, on a chain in focus.
+  const notes = read.families.flatMap((r) => (r.note && (!focused || scope.chainOk(r.chain)) ? [r.note] : []));
   // Counted whenever rows are cut, as the line under the section says.
   const notDrawn = (k: "open" | "closed") => undrawn.reduce((n, u) => n + u[k], 0);
   const wallet = {
@@ -441,6 +462,20 @@ export function WalletView({
         <LiquiditySection read={liquidity} />
       </Suspense>
     </LiquidityBoundary>
+  );
+  // The empty wallet's sentence (W3) and, under it, the launched explorers the page does not
+  // read: drawn together, so the line never stands without the sentence.
+  const noPositions = (
+    <>
+      <p className="text-sm text-foreground/80" data-wallet-reads="">
+        Rails found no positions for this wallet on the{" "}
+        <Link href="/coverage" className={`underline-offset-2 ${INLINE_LINK}`} data-wallet-coverage="">
+          protocols and chains it covers
+        </Link>
+        .
+      </p>
+      {notRead.length > 0 && <NotReadLine explorers={notRead} />}
+    </>
   );
   const filterBar = read.held.length > 0 && (
     <WalletFilterBar
@@ -571,12 +606,16 @@ export function WalletView({
                         ? "Rails holds no vault shares for this wallet."
                         : `Rails holds no ${chosen.name} position for this wallet.`}
                     </p>
+                  ) : liquidity && liquiditySection ? (
+                    // Drawn once the liquidity read settles with none (W9 lists any it finds).
+                    <LiquidityBoundary fallback={null}>
+                      <Suspense fallback={null}>
+                        <WhenLiquidityEmpty read={liquidity}>{noPositions}</WhenLiquidityEmpty>
+                      </Suspense>
+                    </LiquidityBoundary>
                   ) : (
-                    <p className="text-sm text-foreground/80" data-wallet-reads="">
-                      Rails holds no stored position for this wallet. This page reads {reads}. At each visit it reads{" "}
-                      {visits && `${visits}, and `}the liquidity positions on {walletLiquidityLine()}.
-                    </p>
-                  )}
+                    noPositions
+                  )}{" "}
                   {back && (
                     <p className="text-sm">
                       <Link
@@ -605,7 +644,13 @@ export function WalletView({
                   <Totals sections={sections} filtered={filtered} unanswered={blocking} />
                 )}
                 {sections.map((s) => (
-                  <Section key={s.slug} s={s} undrawn={undrawn.filter((u) => u.family === s.slug)} status={status} />
+                  <Section
+                    key={s.slug}
+                    s={s}
+                    undrawn={undrawn.filter((u) => u.family === s.slug)}
+                    notes={notes.filter((n) => n.family === s.slug).map((n) => n.line)}
+                    status={status}
+                  />
                 ))}
                 {/* What the filter bar leaves shown, with its noun: the bar
                     draws no count (ui-jobs 801; Miles, 22 Nov 2026). */}
@@ -640,6 +685,25 @@ export function WalletView({
           (lib/shared/prov-preference-routes.ts). */}
       <ProvInspectorLayer />
     </ProvReceiptsScope>
+  );
+}
+
+/** The empty state's line naming the launched explorers the page does not read (decision 0073
+ *  point 4), each linked to its page for the wallet. */
+function NotReadLine({ explorers }: { explorers: UnreadExplorer[] }) {
+  return (
+    <p className="text-sm text-foreground/80" data-wallet-not-read={explorers.map((e) => e.id).join(",")}>
+      This page does not yet read{" "}
+      {explorers.map((e, i) => (
+        <span key={e.id}>
+          {i > 0 && (i === explorers.length - 1 ? " or " : ", ")}
+          <Link href={e.href} prefetch={false} className={`underline-offset-2 ${INLINE_LINK}`}>
+            {e.name}
+          </Link>
+        </span>
+      ))}
+      .
+    </p>
   );
 }
 
