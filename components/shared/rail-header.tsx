@@ -230,11 +230,7 @@ export function SectionsMenu({
       {chains.length > 1 && (
         <>
           <div role="separator" className="mx-1 my-2 border-t border-rb-200 dark:border-rb-800" />
-          <span
-            id={labelId}
-            role="presentation"
-            className={`${OVERLAY_HEADING} block px-3 pb-1`}
-          >
+          <span id={labelId} role="presentation" className={`${OVERLAY_HEADING} block px-3 pb-1`}>
             Chain
           </span>
           <div role="group" aria-labelledby={labelId} className="flex flex-wrap gap-1" data-sections-chains="">
