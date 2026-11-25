@@ -11,7 +11,7 @@ import { publicErrorMessage } from "@/lib/api/public-error";
 // One Aave vault on Ethereum at one pinned block, and one address's reading of
 // it.
 //
-// This is the CLIENT REFRESH lane. The page at /ethereum/aave/vaults/<vault> does
+// This is the CLIENT REFRESH lane. The page at /ethereum/aave-v3/vaults/<vault> does
 // NOT fetch it: that route SSRs by calling `loadAaveEthereumVault` directly, one
 // hop shorter, so the first paint carries the real figures. The route exists so
 // the same read is addressable — re-runnable against a stated block, quotable in

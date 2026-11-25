@@ -1,6 +1,6 @@
-// The families with no store, read at visit (rails-ops decision 0071, group 4;
-// SERVER-ONLY by use): Aave V3, Compound V3 and Morpho Blue on Optimism, and
-// Morpho Blue on Arc. Nothing is written to wallet_positions for them. Each
+// The families with no store, read at visit (rails-ops decision 0071, group 4,
+// and 0073; SERVER-ONLY by use): Aave V3, Compound V3 and Morpho Blue on
+// Optimism, Morpho Blue on Arc, Fluid on Base and Lido. Nothing is written to wallet_positions for them. Each
 // module calls its explorer's per-wallet head route once per visit, through
 // the wallet read's limiter (`apiHop`), and only once the summary and listing
 // reads have settled (readWalletUncached starts them after `readSummary`).
@@ -16,6 +16,7 @@ import { publicErrorMessage } from "@/lib/api/public-error";
 import { apiHop, inChain } from "@/lib/wallet/api-hop";
 import { withBudget } from "@/lib/wallet/summary-row";
 import type { WalletFamilyRead, WalletPosition } from "@/lib/wallet/types";
+import type { Presence } from "@/lib/wallet/presence";
 
 export interface VisitModule {
   /** The family's id on this page (`aave-v3-optimism`). */
@@ -26,14 +27,19 @@ export interface VisitModule {
   chainName: string;
   /** The explorer slug: the protocol section and the Protocol pill. */
   family: string;
-  /** Whether the page reads the module: while its explorer is launched
-   *  (`explorerLaunched`). */
+  /** Whether the page reads the module: while its explorer is launched and
+   *  the module is not held off (`visitOn`). */
   readonly on: boolean;
   /** The head route for the wallet, under RAILS_API_URL. */
   path(address: string): string;
+  /** The presence check in front of the read (decision 0073 point 2; lib/wallet/presence-checks.ts). */
+  presence: Presence;
   /** One position per position the answer holds; none where it holds nothing.
    *  Throws on an answer outside the route's shape. */
   shape(answer: unknown, address: string): WalletPosition[];
+  /** A line the explorer states about the answer, drawn under the section: the Fluid read's
+   *  "Rails read the newest 200". Null where it has none. */
+  note?(answer: unknown): string | null;
 }
 
 /** What a failed read names: "Aave V3 on Optimism". */
@@ -61,6 +67,15 @@ async function readOne(m: VisitModule, address: string, budgetMs: number, reader
  *  change that takes its explorer's `unlaunched` flag off. Read at each call. */
 export const explorerLaunched = (session: SessionProtocol): boolean => !protocolForSession(session)?.unlaunched;
 
+/** The modules held off while their explorer is launched (Miles, 25 Nov 2026, "optimism launch: a"):
+ *  no wallet page reads them until they have a presence check (decision 0073 point 2). Morpho Blue
+ *  on Optimism has none: Morpho Blue states a position one market at a time. The one switch for
+ *  each module. */
+export const VISIT_HELD_OFF = new Set<SessionProtocol>(["morpho-optimism"]);
+
+/** Whether a module is read at visit: its explorer launched, and the module not held off. */
+export const visitOn = (session: SessionProtocol): boolean => explorerLaunched(session) && !VISIT_HELD_OFF.has(session);
+
 export interface VisitRead {
   positions: WalletPosition[];
   /** A family entry for each module holding a position, or failing. */
@@ -82,7 +97,7 @@ export async function readVisitFamilies(
       const t0 = Date.now();
       try {
         const answer = await inChain(() => readOne(m, address, budgetMs, readerIp));
-        return { m, ms: Date.now() - t0, positions: m.shape(answer, address) };
+        return { m, ms: Date.now() - t0, positions: m.shape(answer, address), note: m.note?.(answer) ?? null };
       } catch (err) {
         throw { m, ms: Date.now() - t0, error: publicErrorMessage(err) };
       }
@@ -91,9 +106,9 @@ export async function readVisitFamilies(
   const out: VisitRead = { positions: [], families: [], failed: [] };
   for (const s of settled) {
     if (s.status === "fulfilled") {
-      const { m, ms, positions } = s.value;
+      const { m, ms, positions, note } = s.value;
       if (positions.length === 0) continue;
-      out.positions.push(...positions);
+      out.positions.push(...positions.map((p) => ({ ...p, readAtVisit: true as const })));
       out.families.push({
         id: m.id,
         name: m.name,
@@ -103,6 +118,7 @@ export async function readVisitFamilies(
         headRead: "read",
         ms,
         reads: 1,
+        ...(note ? { note: { family: m.family, line: note } } : {}),
       });
     } else {
       const { m, ms, error } = s.reason as { m: VisitModule; ms: number; error: string };

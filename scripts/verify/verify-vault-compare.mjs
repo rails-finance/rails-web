@@ -111,7 +111,7 @@ const readColumns = (page) =>
 const browser = await chromium.launch();
 
 // ── 1. No Compare on the rows; the picker ──────────────────────────────────
-const ROSTERS = ["/ethereum/morpho/vaults?show=all", "/ethereum/aave/vaults?show=all"];
+const ROSTERS = ["/ethereum/morpho/vaults?show=all", "/ethereum/aave-v3/vaults?show=all"];
 const index = {};
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -250,7 +250,7 @@ const index = {};
     check(
       `2c ${l.key} links its vault's page under its protocol`,
       l.linkKey === l.key &&
-        /^\/(ethereum|base)\/(morpho|aave|yearn|maple)\/(vaults|pools)\//.test(l.href ?? "") &&
+        /^\/(ethereum|base)\/(morpho|aave-v3|yearn|maple)\/(vaults|pools)\//.test(l.href ?? "") &&
         l.href === want,
       `${l.href} (roster ${want})`,
     );

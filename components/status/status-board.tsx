@@ -87,10 +87,25 @@ export type StatusSource = { route: "status"; data: IndexStatus } | { route: "pr
 
 const chainName = (id: number) => CHAINS[id as ChainId]?.name ?? `Chain ${id}`;
 
-/** The roster entry for a protocol key on a chain, else the key's first entry. */
-const rosterFor = (key: string, chain: number) =>
+/** Status keys the server still writes for an explorer that has since become
+ *  another's section: Aave's vault census reports as `aave-vaults`
+ *  (lib/shared/index-progress.ts), now Aave V3's Vaults section (ui-jobs 789).
+ *  The line takes that entry's mark under its own label. */
+const KEY_ALIAS: Record<string, { key: string; label: string }> = {
+  "aave-vaults": { key: "aave-v3", label: "Aave V3 vaults" },
+};
+
+const rosterLookup = (key: string, chain: number) =>
   PROTOCOLS.find((p) => (p.protocolKey ?? p.id) === key && p.chainId === chain) ??
   PROTOCOLS.find((p) => (p.protocolKey ?? p.id) === key || p.id === key);
+
+/** The roster entry for a protocol key on a chain, else the key's first entry. */
+const rosterFor = (key: string, chain: number) => {
+  const alias = KEY_ALIAS[key];
+  if (!alias) return rosterLookup(key, chain);
+  const entry = rosterLookup(alias.key, chain);
+  return entry && { ...entry, label: alias.label };
+};
 
 const protocolLabel = (key: string, chain: number) => rosterFor(key, chain)?.label ?? key;
 

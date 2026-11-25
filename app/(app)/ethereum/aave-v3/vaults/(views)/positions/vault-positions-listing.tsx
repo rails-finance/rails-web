@@ -1,6 +1,6 @@
 "use client";
 
-// Vault positions on Ethereum — client half of /ethereum/aave/vaults/positions.
+// Vault positions on Ethereum — client half of /ethereum/aave-v3/vaults/positions.
 // ----------------------------------------------------------------------------
 // The roster of vaults is the page above this one (the VAULTS tab); this lists
 // every position in those vaults, and each vault's market view is one click on
@@ -12,9 +12,9 @@
 // the toolbar, the URL, the debounced search, pagination and the fetch
 // lifecycle.
 //
-// TWO ROWS ABOVE THE TOOLBAR, AND NOTHING ELSE. The Aave vaults rail —
-// identity, the chain head's recency stamp, VAULTS / (i) — then the census
-// line. How the vault layer is built is at /ethereum/aave/vaults/info, and the
+// TWO ROWS ABOVE THE TOOLBAR, AND NOTHING ELSE. Aave V3's rail — identity,
+// the chain head's recency stamp, its menu with VAULTS lit — then the census
+// line. How the vault layer is built is at /ethereum/aave-v3/vaults/info, and the
 // provenance inspector is gone from this face: a listing card is inert content
 // inside its row link, and the same card carries live receipts on the vault
 // page.
@@ -76,7 +76,7 @@ export function VaultPositionsListing({
   return (
     <ChainTruthListingPage<VaultPositionRow, VaultPositionListFilters>
       title="Vault positions on Ethereum"
-      identity={<RailHeader session="aave-vaults" venue="subPage" stamp />}
+      identity={<RailHeader session="aave-v3" venue="subPage" stamp />}
       titleHidden
       noun="vault positions"
       basePath={ethereumVaultsListingHref()}

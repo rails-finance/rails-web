@@ -3,12 +3,12 @@ import type { CoveredPositions } from "@/lib/home/covered-positions";
 import type { HomeStats } from "@/lib/home/home-stats";
 import { formatValueHeld, spokenValueHeld, type ValueHeld } from "@/lib/home/value-held";
 import { IndexNotice } from "@/components/shared/index-notice";
-import { launchedProductionChainNames } from "@/lib/shared/protocols";
+import { countedChainNames } from "@/lib/home/counted-protocols";
 import { formatMonthDay } from "@/lib/date";
 
 /** The production chains the count is drawn from — the same set the loader
- *  sums over. */
-const COUNTED_SCOPE = launchedProductionChainNames();
+ *  sums over (`COUNTED_PROTOCOLS`). */
+const COUNTED_SCOPE = countedChainNames();
 
 /**
  * Covered stats — the roster, counted, stated at display scale between the live
@@ -36,7 +36,7 @@ const COUNTED_SCOPE = launchedProductionChainNames();
  * The scope phrase is the chains the count is true of, built from the roster
  * rather than written out (`COUNTED_SCOPE` below) — it names the production
  * chains a reader can reach from the nav, which is the same set the loader
- * sums over (`COUNTED_PROTOCOLS` in covered-positions-data.ts). A chain whose
+ * sums over (`COUNTED_PROTOCOLS` in counted-protocols.ts). A chain whose
  * explorers are all unlaunched leaves both in one edit, so the sentence cannot
  * claim coverage of a chain the site does not link.
  *

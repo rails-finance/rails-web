@@ -16,7 +16,7 @@ import { WalletPositionCard } from "@/components/wallet/wallet-position-card";
 import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { useScopedRows } from "@/components/shared/asset-scope-note";
 import { walletPositionAssetKeys } from "@/lib/wallet/aim-assets";
-import { andList, LIQUIDITY_NO_TOTAL } from "@/lib/wallet/wallet-sections";
+import { andList, LIQUIDITY_NO_TOTAL, READ_AT_VISIT } from "@/lib/wallet/wallet-sections";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { useAssetScope } from "@/lib/shared/asset-scope";
 import { chainMeta } from "@/lib/shared/chains";
@@ -124,6 +124,9 @@ export function LiquiditySection({ read }: { read: Promise<WalletLiquidity> }) {
           </div>
           <p className={`${LINE} mb-3`} data-wallet-liquidity-note="">
             {LIQUIDITY_NO_TOTAL}
+          </p>
+          <p className={`${LINE} mb-3`} data-wallet-liquidity-read-at-visit="">
+            {READ_AT_VISIT}
           </p>
           <div className="mb-3 flex flex-col gap-3">
             {scoped.rows.map((p) => (

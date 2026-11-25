@@ -1,4 +1,4 @@
-// The roster of Aave vaults on Ethereum — /ethereum/aave/vaults.
+// The roster of Aave vaults on Ethereum — /ethereum/aave-v3/vaults.
 // ----------------------------------------------------------------------------
 // The VAULTS tab of the section rail. The section route beside it lists
 // POSITIONS; this states the vaults those positions are in, read from Aave's
@@ -41,12 +41,12 @@ export const dynamic = "force-dynamic";
 
 export const metadata = listingMetadata({
   title: "Vaults on Ethereum",
-  canonicalPath: "/ethereum/aave/vaults",
+  canonicalPath: "/ethereum/aave-v3/vaults",
   description:
     "Every ERC-4626 vault Aave deploys and publishes on Ethereum — savings GHO, the static aTokens and the Umbrella stake tokens — with total assets, share price and 30-day yield in each vault's own asset, read from Aave's enumerators at one block, and how many addresses the census has counted in each.",
 });
 
-const PROTOCOL = protocolForHref("/ethereum/aave")!;
+const PROTOCOL = protocolForHref("/ethereum/aave-v3")!;
 
 /** The census header for Ethereum's Aave vaults: the rows' Holders figure. An
  *  unanswered census leaves the figure out. */

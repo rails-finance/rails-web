@@ -30,8 +30,9 @@ export type VaultFamily =
 
 /** The explorer a vault sits under (decision 0028), which is also the session
  *  key its listing is filed under. MetaMorpho's is chain-keyed: `morpho-base`
- *  on Base, `morpho` on Ethereum. */
-export type VaultExplorer = "morpho-base" | "morpho" | "aave-vaults" | "yearn" | "ipor-fusion";
+ *  on Base, `morpho` on Ethereum. Aave's three families are Aave V3's on
+ *  Ethereum (ui-jobs 789). */
+export type VaultExplorer = "morpho-base" | "morpho" | "aave-v3" | "yearn" | "ipor-fusion";
 
 /** The census's word for a family. The census writes `morpho` for every
  *  MetaMorpho vault and `yearn-v3` for Yearn V3. */
@@ -83,7 +84,7 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
       "Morpho's docs call a figure on the same basis (post-fee, excludes rewards) the “realized average APY”; Morpho's API states it compounded.",
   },
   sgho: {
-    explorer: "aave-vaults",
+    explorer: "aave-v3",
     venue: "aave-v3",
     label: "Savings GHO",
     singular: "Savings GHO",
@@ -94,7 +95,7 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
       "Aave's docs state Savings GHO's rate as a “fixed APR”; this figure is the share price's realised growth at that rate.",
   },
   stata: {
-    explorer: "aave-vaults",
+    explorer: "aave-v3",
     venue: "aave-v3",
     label: "Static aTokens",
     singular: "Static aToken",
@@ -103,7 +104,7 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
     served: null,
   },
   "umbrella-stake": {
-    explorer: "aave-vaults",
+    explorer: "aave-v3",
     venue: "aave-v3",
     label: "Umbrella stake tokens",
     singular: "Umbrella stake token",

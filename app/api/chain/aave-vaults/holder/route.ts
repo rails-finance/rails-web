@@ -7,7 +7,7 @@ import { publicErrorMessage } from "@/lib/api/public-error";
 // block: which of them it holds, how much of each, and what those shares convert
 // to.
 //
-// This is the CLIENT REFRESH lane. The page at /ethereum/aave/vaults does NOT fetch
+// This is the CLIENT REFRESH lane. The page at /ethereum/aave-v3/vaults does NOT fetch
 // it: that route SSRs by calling `loadAaveEthereumHolderSweep` directly, one hop
 // shorter, so the first paint carries the real figures. The route exists so the
 // same read is addressable — re-runnable against a stated block, quotable in a

@@ -91,7 +91,7 @@ const FAMILIES = [
   },
   {
     key: "aave-vaults",
-    path: "/ethereum/aave/vaults/0x0bfc9d54fc184518a81162f8fb99c2eaca081202/0xaafd07d53a7365d3e9fb6f3a3b09ec19676b73ce",
+    path: "/ethereum/aave-v3/vaults/0x0bfc9d54fc184518a81162f8fb99c2eaca081202/0xaafd07d53a7365d3e9fb6f3a3b09ec19676b73ce",
   },
   { key: "dolomite", listing: "/ethereum/dolomite", rowHref: /^\/ethereum\/dolomite\/0x[0-9a-f]{40}\/\d+$/i },
   { key: "asymmetry", listing: "/ethereum/asymmetry", rowHref: /^\/ethereum\/asymmetry\/[^/?]+\/\d+$/ },

@@ -12,7 +12,7 @@ export type WalletKind = "troves" | "deposits" | "stakes" | "loans" | "vaults";
 export const WALLET_KINDS: { value: WalletKind; label: string }[] = [
   { value: "troves", label: "Troves" },
   { value: "deposits", label: "Deposits" },
-  { value: "stakes", label: "LQTY stakes" },
+  { value: "stakes", label: "Stakes" },
   { value: "loans", label: "Loans" },
   { value: "vaults", label: "Vaults" },
 ];
@@ -55,6 +55,7 @@ export const WALLET_PROTOCOLS: WalletProtocol[] = [
   { slug: "frankencoin", name: "Frankencoin", kinds: ["loans"] },
   { slug: "pwn", name: "PWN", kinds: ["loans", "deposits"] },
   { slug: "polaris", name: "Polaris", kinds: ["loans", "deposits"] },
+  { slug: "lido", name: "Lido", kinds: ["stakes"] },
   // MetaMorpho, Yearn V3 and Aave's vaults, from the holder census (ui-jobs
   // 783): a share holding is a deposit.
   { slug: "vaults", name: "Vault shares", kinds: ["deposits"] },

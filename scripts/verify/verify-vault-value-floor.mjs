@@ -168,8 +168,8 @@ const CHAINS = {
   },
   1: {
     word: "Ethereum",
-    listing: `${BASE}/ethereum/aave/vaults/positions`,
-    info: `${BASE}/ethereum/aave/vaults/info`,
+    listing: `${BASE}/ethereum/aave-v3/vaults/positions`,
+    info: `${BASE}/ethereum/aave-v3/vaults/info`,
     provider: "0x2f39d218133afab8f2b819b1066c7e434ad94e9e",
     client: createPublicClient({
       chain: mainnet,

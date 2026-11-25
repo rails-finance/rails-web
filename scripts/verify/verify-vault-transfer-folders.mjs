@@ -164,7 +164,7 @@ const skip = (name, why) => {
 };
 
 const routeUrl = (f) => `${BASE}/api/chain/aave-vaults/vault?vault=${f.vault}&holder=${f.holder}`;
-const pageUrl = (f) => `${BASE}/ethereum/aave/vaults/${f.vault}/${f.holder}`;
+const pageUrl = (f) => `${BASE}/ethereum/aave-v3/vaults/${f.vault}/${f.holder}`;
 
 /** The compact form a folder's Σ is drawn in (`fmtHeaderMagnitude` → `fmtSpine`:
  *  "4.8K", "28K", "1.2M"), parsed back WITH the band its own last digit allows.

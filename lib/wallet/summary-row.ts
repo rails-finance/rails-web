@@ -37,6 +37,19 @@ export interface WalletSummaryRow {
   writtenAt: string;
 }
 
+/** The prefix rails-server's mig 531 writes for an Aave vault holding's page,
+ *  and the one that serves it since Aave's vaults became Aave V3's Vaults
+ *  section (ui-jobs 789). */
+const RETIRED_AAVE_VAULTS = "/ethereum/aave/vaults/";
+const AAVE_V3_VAULTS = "/ethereum/aave-v3/vaults/";
+
+/** A summary row with its page at the route that serves it today. */
+export function servedSummaryRow(r: WalletSummaryRow): WalletSummaryRow {
+  return r.href?.startsWith(RETIRED_AAVE_VAULTS)
+    ? { ...r, href: AAVE_V3_VAULTS + r.href.slice(RETIRED_AAVE_VAULTS.length) }
+    : r;
+}
+
 /** Sepolia rows are drawn and never counted (WALLET_COUNTS_SCOPE). */
 export const countedRow = (r: Pick<WalletSummaryRow, "chain">): boolean => r.chain !== "sepolia";
 

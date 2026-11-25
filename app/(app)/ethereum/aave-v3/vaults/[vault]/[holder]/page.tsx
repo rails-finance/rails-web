@@ -1,4 +1,4 @@
-// ONE HOLDING — /ethereum/aave/vaults/<vault>/<holder>.
+// ONE HOLDING — /ethereum/aave-v3/vaults/<vault>/<holder>.
 // ----------------------------------------------------------------------------
 // A holding is the pair `(vault, holder)`, and it has a path of its own the
 // way a trove does. The page is the family header, the holder card, Lifetime
@@ -51,7 +51,7 @@ import { cooldownWords } from "@/lib/aave-vaults/cooldown-words";
 import { HOLDING_REWARDS, vaultPlainHoldingContent } from "@/lib/vaults/card-words";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
-import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
+import { AAVE_VAULT_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { AAVE_FAMILY_SINGULAR } from "@/components/vaults/aave-vault-format";
 import {
   aaveVaultCooldownStateProv,
@@ -499,10 +499,10 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
               sits in the holder's address row, Back stands alone, and Tools
               closes the row. The share is quoted in the vault's asset. */}
             <DetailTopRow
-              session="aave-vaults"
+              session="aave-v3"
               fallbackHref={ethereumVaultsListingHref()}
               assets={shareAssets}
-              priceReason={ORACLE_USD_REASON["aave-vaults"]}
+              priceReason={AAVE_VAULT_USD_REASON}
               owner={{
                 wallet: lookup.address,
                 ensName: lookup.ensName,

@@ -108,9 +108,13 @@ export const VAULT_SHARES_FAMILY = "vaults";
 
 /** The vault protocols a vault-share row can belong to, by the root of its
  *  holder page (`/<chain>/<root>/vaults/<vault>/<holder>`, lib/vaults/routes.ts). */
-const VAULT_ROOTS: Record<string, string> = { morpho: "MetaMorpho vaults", aave: "Aave vaults", yearn: "Yearn V3" };
+const VAULT_ROOTS: Record<string, string> = {
+  morpho: "MetaMorpho vaults",
+  "aave-v3": "Aave vaults",
+  yearn: "Yearn V3",
+};
 
-/** A vault-share row's protocol root from its href (morpho, aave, yearn);
+/** A vault-share row's protocol root from its href (morpho, aave-v3, yearn);
  *  undefined for a path outside the vault routes. */
 export function vaultRoot(href: string | null): string | undefined {
   const m = href ? /^\/[^/]+\/([^/]+)\/vaults\//.exec(href.split("?")[0].toLowerCase()) : null;

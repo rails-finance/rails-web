@@ -1,7 +1,9 @@
 // focus: the explorer's explainer; the shell's gate stands over the explorer
-// How the Yearn V3 roster is built — /ethereum/yearn/vaults/info.
+// How the Yearn V3 roster is built — /ethereum/yearn/vaults/info, on the
+// menu-led About layout (ProtocolInfoPage, ui-jobs 791): the intro, then a
+// section per menu entry (Vaults, Assets), with the glossary in its column.
 // ----------------------------------------------------------------------------
-// The (i) in the rail, and what /ethereum/yearn/info sends a reader to. The
+// The About entry in the rail, which /ethereum/yearn/info redirects here. The
 // roster page carries the figures it read; this page carries what a reader has
 // to know to read them — which contracts are on the list, what puts one there,
 // what the endorsement badge is, and what a Yearn V3 vault is made of.
@@ -15,17 +17,13 @@
 // its cache entry expires, and while it fails the count is stated as not read
 // and the prose stands.
 
-import { INFO_H2, INFO_UL, VaultsInfoPage } from "@/components/vaults/vaults-info-page";
+import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
 import { Prov } from "@/components/shared/provenance";
-import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { loadYearnEthereumVaultDirectory } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
 import { loadYearnCensus } from "@/lib/yearn/vault-census";
 import { yearnEndorsedCountProv, yearnRosterCensusProv } from "@/lib/yearn/vault-provenance";
 import { serverReadOf } from "@/lib/shared/server-head-read";
-import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { protocolForHref } from "@/lib/shared/protocols";
 import { loadYearnVaultRoster } from "@/lib/yearn/vault-roster";
 import { YEARN_VAULTS_LEAD } from "@/lib/vaults/family-leads";
 import { YEARN_DOCS } from "@/lib/vaults/family-docs";
@@ -47,6 +45,52 @@ const n = (v: number) => v.toLocaleString("en-US");
 const WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
 const word = (v: number) => WORDS[v] ?? n(v);
 
+const UL = "list-disc space-y-1 pl-5";
+
+const V3 = "https://docs.yearn.fi/developers/v3";
+
+const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
+  {
+    term: "Vault",
+    definition:
+      "A Yearn V3 vault, which Yearn's docs call an allocator vault, is an ERC-4626 contract that takes deposits, mints shares and allocates the deposits to strategies.",
+    sources: [{ label: "Definitions", href: `${V3}/overview#definitions` }],
+  },
+  {
+    term: "Strategy",
+    definition:
+      "A strategy is a contract added to a vault that puts the vault's token to work in one place. Yearn's tokenized strategies are ERC-4626 vaults a holder can also deposit into directly.",
+    sources: [{ label: "Definitions", href: `${V3}/overview#definitions` }],
+  },
+  {
+    term: "Vault factory",
+    definition:
+      "A vault factory is a contract Yearn governance deployed that anyone can use to deploy a vault. Each V3 release has its own.",
+    sources: [{ label: "Definitions", href: `${V3}/overview#definitions` }],
+  },
+  {
+    term: "Role manager",
+    definition: "The role manager is the contract or address that hands out every power over a vault.",
+    sources: [{ label: "Role Manager", href: `${V3}/periphery#role-manager` }],
+  },
+  {
+    term: "Accountant",
+    definition: "The accountant is the contract that charges a vault's fees when a strategy reports.",
+    sources: [{ label: "Accountant", href: `${V3}/periphery#accountant` }],
+  },
+  {
+    term: "Profit unlock",
+    definition:
+      "A reported gain is locked in shares and released into the share price over the vault's profit unlock window. A loss is not spread out.",
+    sources: [{ label: "Vault accounting", href: `${V3}/yield_accrual#vault-accounting-allocator-vault` }],
+  },
+  {
+    term: "Endorsement",
+    definition: "Endorsement is Yearn putting its name to a vault. Yearn's registry stores the endorsed vaults.",
+    sources: [{ label: "Registry", href: `${V3}/periphery#registry` }],
+  },
+];
+
 export default async function YearnVaultsInfoPage() {
   const [roster, data, census] = await Promise.all([
     loadYearnVaultRoster(),
@@ -58,67 +102,42 @@ export default async function YearnVaultsInfoPage() {
   const endorsed = data.rows.filter((r) => r.endorsed === true).length;
   const holdersBlock = census.length > 0 ? Math.max(...census.map((c) => c.censusBlock)) : null;
   const stalePointers = factories.filter((f) => f.onStalePointer).length;
-  return (
-    <VaultsInfoPage chainId={MAINNET_CHAIN_ID} protocol={protocolForHref("/ethereum/yearn")!}>
-      <p>{YEARN_VAULTS_LEAD}</p>
-
-      <section data-intro-vault>
-        <h2 className={INFO_H2}>How a vault works</h2>
-        <ul className={INFO_UL}>
-          <li>
-            A Yearn V3 vault takes deposits of one token and issues shares for them. It keeps some of the token idle for
-            withdrawals and lends the rest to strategies.
-          </li>
-          <li>Each strategy puts the token to work somewhere and reports what it owes back.</li>
-          <li>
-            A share&rsquo;s worth is the vault&rsquo;s answer to <code>convertToAssets</code>, which the Share price
-            column shows in the vault&rsquo;s asset.
-          </li>
-          <li>
-            The role manager hands out every power over the vault. The accountant charges fees when a strategy reports.
-          </li>
-          <li>
-            A reported gain reaches the share price over the vault&rsquo;s profit unlock window, so the price climbs
-            smoothly. A loss lands at once.
-          </li>
-          <li data-intro-docs>
-            <a href={YEARN_DOCS} target="_blank" rel="noopener" className={`font-medium ${FOOT_LINK}`}>
-              Yearn&rsquo;s documentation
-            </a>{" "}
-            explains vaults and strategies in Yearn&rsquo;s terms.
-          </li>
-        </ul>
-      </section>
-
-      <section data-intro-roster>
-        <h2 className={INFO_H2}>The roster</h2>
-        <p className="mt-1.5" data-figure="roster-census">
-          The roster is every vault the {word(factories.length)} V3 factories deployed,{" "}
-          <Prov info={yearnRosterCensusProv(coords, { catalogSize: vaults.length, censusBlock })}>
-            {n(vaults.length)} of them at block {n(censusBlock)}
-          </Prov>
-          .
-        </p>
-        <ul className={INFO_UL}>
-          <li>Anyone may deploy from a factory, so the roster is wider than the shortlist Yearn endorses.</li>
-          <li>
-            A factory announces each deployment with a creation event. That event is the only list there is: a vault
-            keeps no list of its siblings and a factory none of its children.
-          </li>
-          <li>
-            Each vault found is asked which factory made it, which release it runs and which token it takes. All three
-            answers must match the event before it joins.
-          </li>
-          <li>
-            Each total and share price is read at the block the read stamp names, and re-read at most every five
-            minutes.
-          </li>
-        </ul>
-      </section>
-
-      <section data-intro-floor>
-        <h2 className={INFO_H2}>What the roster leaves out</h2>
-        <ul className={INFO_UL}>
+  const views: readonly [InfoView, ...InfoView[]] = [
+    {
+      heading: "The roster",
+      section: "vaults",
+      body: (
+        <div data-intro-roster>
+          <p data-figure="roster-census">
+            The roster is every vault the {word(factories.length)} V3 factories deployed,{" "}
+            <Prov info={yearnRosterCensusProv(coords, { catalogSize: vaults.length, censusBlock })}>
+              {n(vaults.length)} of them at block {n(censusBlock)}
+            </Prov>
+            .
+          </p>
+          <ul className={`mt-1.5 ${UL}`}>
+            <li>Anyone may deploy from a factory, so the roster is wider than the shortlist Yearn endorses.</li>
+            <li>
+              A factory announces each deployment with a creation event. That event is the only list there is: a vault
+              keeps no list of its siblings and a factory none of its children.
+            </li>
+            <li>
+              Each vault found is asked which factory made it, which release it runs and which token it takes. All three
+              answers must match the event before it joins.
+            </li>
+            <li>
+              Each total and share price is read at the block the read stamp names, and re-read at most every five
+              minutes.
+            </li>
+          </ul>
+        </div>
+      ),
+    },
+    {
+      heading: "What the roster leaves out",
+      section: "vaults",
+      body: (
+        <ul className={UL} data-intro-floor>
           <li>
             A V3 vault deployed by hand, with no factory, announces nothing and is on no list, so the roster is a floor.
           </li>
@@ -135,12 +154,14 @@ export default async function YearnVaultsInfoPage() {
           )}
           <li data-intro-scope>Yearn V2 is a separate registry with different vault code, and is not listed here.</li>
         </ul>
-      </section>
-
-      <section data-intro-endorsed>
-        <h2 className={INFO_H2}>Endorsement</h2>
-        <ul className={INFO_UL}>
-          <li>Endorsement is Yearn putting its name to a vault. The roster shows it as a badge and the Yearn mark.</li>
+      ),
+    },
+    {
+      heading: "Endorsement",
+      section: "vaults",
+      body: (
+        <ul className={UL} data-intro-endorsed>
+          <li>The roster shows Yearn&rsquo;s endorsement as a badge and the Yearn mark.</li>
           <li>Yearn can undo it, so the badge describes the block the roster names.</li>
           <li>
             A vault without the badge is still &ldquo;Yearn V3&rdquo;: a contract from a Yearn factory, running
@@ -161,11 +182,13 @@ export default async function YearnVaultsInfoPage() {
             )}
           </li>
         </ul>
-      </section>
-
-      <section data-intro-units>
-        <h2 className={INFO_H2}>Reading the roster</h2>
-        <ul className={INFO_UL}>
+      ),
+    },
+    {
+      heading: "Reading the roster",
+      section: "vaults",
+      body: (
+        <ul className={UL} data-intro-units>
           <li>
             Every amount is a quantity of one vault&rsquo;s asset, and the roster holds{" "}
             {n(new Set(vaults.map((v) => v.asset.address)).size)} different assets.
@@ -192,9 +215,40 @@ export default async function YearnVaultsInfoPage() {
             &ldquo;Find an address in this vault&rdquo;.
           </li>
         </ul>
-      </section>
+      ),
+    },
+  ];
 
-      <ProvInspectorLayer />
-    </VaultsInfoPage>
+  return (
+    <ProtocolInfoPage
+      session="yearn"
+      layer={{}}
+      tracks={YEARN_VAULTS_LEAD}
+      glossary={glossary}
+      howItWorks={[
+        <>
+          A Yearn V3 <GlossaryLink term="Vault">vault</GlossaryLink> takes deposits of one token and issues shares for
+          them. It keeps some of the token idle for withdrawals and lends the rest to{" "}
+          <GlossaryLink term="Strategy">strategies</GlossaryLink>, each of which puts the token to work somewhere and
+          reports what it owes back.
+        </>,
+        <>
+          A share&rsquo;s worth is the vault&rsquo;s answer to <code>convertToAssets</code>, which the Share price
+          column shows in the vault&rsquo;s asset.
+        </>,
+        <>
+          The <GlossaryLink term="Role manager">role manager</GlossaryLink> hands out every power over the vault. The{" "}
+          <GlossaryLink term="Accountant">accountant</GlossaryLink> charges fees when a strategy reports.
+        </>,
+        <>
+          A reported gain reaches the share price over the vault&rsquo;s{" "}
+          <GlossaryLink term="Profit unlock">profit unlock</GlossaryLink> window, so the price climbs smoothly. A loss
+          lands at once.
+        </>,
+      ]}
+      views={views}
+      guide={false}
+      docs={{ label: "Yearn documentation", href: YEARN_DOCS }}
+    />
   );
 }

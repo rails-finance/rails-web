@@ -44,9 +44,9 @@ for (const [width, tag] of [
     const status = res instanceof Error ? res.message.split("\n")[0] : res?.status();
     if (!check(typeof status === "number" && status < 400, `${tag} ${path}: loads (${status})`)) continue;
     const got = await page.evaluate(() => {
-      const menu = [...document.querySelectorAll("[data-sections-menu] [role=menuitem]")].map((a) =>
-        a.textContent.trim(),
-      );
+      const menu = [
+        ...document.querySelectorAll("[data-sections-menu] [role=menuitem]:not([data-sections-chain])"),
+      ].map((a) => a.textContent.trim());
       const sections = [...document.querySelectorAll("[data-info-section]")].map((s) => ({
         key: s.getAttribute("data-info-section"),
         heading: s.querySelector("h2")?.textContent.trim() ?? "",

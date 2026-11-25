@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // One holder's timeline inside one Aave vault on Ethereum, checked against the
-// chain rather than against itself. /ethereum/aave/vaults/<vault>/<holder>.
+// chain rather than against itself. /ethereum/aave-v3/vaults/<vault>/<holder>.
 // ----------------------------------------------------------------------------
 // EVERY EXPECTED FIGURE HERE IS THIS SCRIPT'S OWN CHAIN READ OR ITS OWN PARSE.
 // Each page states the block it read at; this script then makes its OWN two
@@ -39,7 +39,7 @@
 // topic-filtered, which the state lane answers in one call per direction.
 //
 // ── 2026-09-08 · THE HOLDER IS A PATH SEGMENT ──────────────────────────────
-// One line changed: the URL is `/ethereum/aave/vaults/<vault>/<holder>`. No check
+// One line changed: the URL is `/ethereum/aave-v3/vaults/<vault>/<holder>`. No check
 // was touched, which is the point — the row grammar did not move. 48/48 · 1
 // SKIP, unchanged.
 //
@@ -710,7 +710,7 @@ await showNoteRows(context);
 
 async function readPage(vault, holder, { expandRows = false } = {}) {
   const page = await context.newPage();
-  const url = `${BASE}/ethereum/aave/vaults/${vault}${holder ? `/${holder}` : ""}`;
+  const url = `${BASE}/ethereum/aave-v3/vaults/${vault}${holder ? `/${holder}` : ""}`;
   const res = await page.goto(url, { waitUntil: "networkidle", timeout: 180_000 });
   const status = res?.status() ?? 0;
   if (status !== 200) {

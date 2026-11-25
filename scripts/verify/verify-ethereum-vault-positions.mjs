@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The vault POSITION listing on Ethereum, checked against the chain rather than
-// against itself. /ethereum/aave/vaults — the section route IS this listing.
+// against itself. /ethereum/aave-v3/vaults — the section route IS this listing.
 // ----------------------------------------------------------------------------
 // EVERY EXPECTED FIGURE HERE IS THIS SCRIPT'S OWN CHAIN READ. The listing states
 // two blocks — the census block its membership was swept to, and the block its
@@ -38,7 +38,7 @@
 // Needs ALCHEMY_URL in .env.local (read, never printed).
 //
 // ── 2026-09-08 · THE LISTING IS THE SECTION ROUTE ──────────────────────────
-// Moved from /ethereum/aave/vaults/positions to /ethereum/aave/vaults (the `positions`
+// Moved from /ethereum/aave-v3/vaults/positions to /ethereum/aave-v3/vaults (the `positions`
 // segment is deleted, no redirect). L8b's card links are the position PATH;
 // L12a reads the roster's own links inside the listing's drawer, which is where
 // the roster went. 44/44, unchanged.
@@ -75,7 +75,7 @@
 //  L10  the census line on the listing states every census block the route
 //       returned, in its "census at …" slot
 //  L11  SSR: the filtered URL ?vault=<F1> carries F1's rows in the INITIAL HTML
-//  L12  links: the roster page (/ethereum/aave/vaults) and F2's vault page
+//  L12  links: the roster page (/ethereum/aave-v3/vaults) and F2's vault page
 //       both carry a link to the listing filtered to that vault
 //  L13  the UI-alignment pass: the headline figures are COMPACT on the face
 //       and exact on their `title`, at least one of them is really shortened,
@@ -90,13 +90,13 @@
 // The listing's two drawers became two pages and the four surfaces became one
 // rail row. The claims did not change; the surfaces they are read off did:
 //
-//   • The "How this listing is built" prose is /ethereum/aave/vaults/info, the (i)
+//   • The "How this listing is built" prose is /ethereum/aave-v3/vaults/info, the (i)
 //     in the rail. `readInfoDom` reads it there, with innerText — it is a
 //     VISIBLE page body now, not a mounted-and-hidden panel, so the old
 //     textContent trick would be reading a node under a claim that no longer
 //     describes it. L4b, L6b and L7c assert on it; L9's register rules run
 //     over the listing face AND that page.
-//   • The roster of vaults is /ethereum/aave/vaults, the VAULTS tab.
+//   • The roster of vaults is /ethereum/aave-v3/vaults, the VAULTS tab.
 //     L12a goes there instead of clicking a drawer open; `[data-roster-panel]`
 //     and `[data-vault-row]` are unchanged inside it.
 //   • L14c and L14d are new: the rail is checked as a rail (every tab fetched,
@@ -107,9 +107,9 @@
 // Restored run: 53/53. Two breaks, applied ONE AT A TIME and reverted.
 //
 //  L  THE MOVED CLAIM. `<p data-intro-search>` deleted from
-//     app/(app)/ethereum/aave/vaults/(views)/info/page.tsx — the paragraph L7c
+//     app/(app)/ethereum/aave-v3/vaults/(views)/info/page.tsx — the paragraph L7c
 //     followed off the listing's face and onto the about page. 52/53.
-//     FAIL L7c — '/ethereum/aave/vaults/info does not: "never seen has no row"
+//     FAIL L7c — '/ethereum/aave-v3/vaults/info does not: "never seen has no row"
 //                 false, "records nothing about the search" false'
 //     🔑 The detail names WHICH half of the claim is missing, which is what a
 //     one-paragraph deletion has to say to be worth reading. L4b and L6b
@@ -281,7 +281,7 @@ import { pageBlockRecent, serverHeadBlock } from "./lib/server-head.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3762";
-const LISTING = `${BASE}/ethereum/aave/vaults/positions`;
+const LISTING = `${BASE}/ethereum/aave-v3/vaults/positions`;
 
 const env = Object.fromEntries(
   fs
@@ -424,7 +424,7 @@ const countMatches = (html, needle) => html.split(needle).length - 1;
 // card attribute's prefix: a card is counted by the attribute and its `=`.
 const CARD_ATTR = "data-position-card=";
 
-console.log(`\n── /ethereum/aave/vaults · ${BASE} ──\n`);
+console.log(`\n── /ethereum/aave-v3/vaults · ${BASE} ──\n`);
 
 // ═══ L0 ═══════════════════════════════════════════════════════════════════
 const head = Number(await client.getBlockNumber());
@@ -444,7 +444,7 @@ check(
   cardIds(first.html).size === 20,
   `${cardIds(first.html).size} cards in the server's own HTML (${countMatches(first.html, CARD_ATTR)} matches)`,
 );
-// ⚠️ RESTATED 2026-09-08, when `app/(app)/ethereum/aave/vaults/loading.tsx` landed.
+// ⚠️ RESTATED 2026-09-08, when `app/(app)/ethereum/aave-v3/vaults/loading.tsx` landed.
 // This used to assert the initial HTML carried NO skeleton at all, which a
 // route with a `loading.tsx` cannot satisfy and no listing in the house does:
 // Next wraps the page in a Suspense boundary and streams the fallback ahead of
@@ -747,7 +747,7 @@ async function readListingDom(qs = "") {
   // chrome (memory `vaults-section-build` — the RSC payload makes a body-text
   // check vacuous; here it would make one permanently red instead). The
   // section's prose is no longer on this page at all; it is read off
-  // /ethereum/aave/vaults/info by `readInfoDom` below and the two are judged
+  // /ethereum/aave-v3/vaults/info by `readInfoDom` below and the two are judged
   // together at L9.
   const bodyText = (await page.locator("body").innerText()).replace(/\s+/g, " ").trim();
   // The face's one line — the census line under the section rail
@@ -763,7 +763,7 @@ async function readListingDom(qs = "") {
   return { status, cards, body: bodyText, stance, roster, introOnFace };
 }
 
-/** The section's about page — /ethereum/aave/vaults/info, the (i) in the rail.
+/** The section's about page — /ethereum/aave-v3/vaults/info, the (i) in the rail.
  *
  *  ⚠️ READ WITH innerText, NOT THE HIDDEN-PANEL TRICK. The prose used to be a
  *  drawer beside the listing: a panel always MOUNTED and merely hidden, whose
@@ -776,12 +776,12 @@ async function readListingDom(qs = "") {
  *  so they are read here too. */
 async function readInfoDom() {
   const page = await context.newPage();
-  const res = await page.goto(`${BASE}/ethereum/aave/vaults/info`, { waitUntil: "networkidle" });
+  const res = await page.goto(`${BASE}/ethereum/aave-v3/vaults/info`, { waitUntil: "networkidle" });
   const status = res?.status() ?? 0;
   const drawers = await page.locator("[data-intro-drawer]").count();
   if (drawers !== 1)
     throw new Error(
-      `/ethereum/aave/vaults/info carries ${drawers} [data-intro-drawer] bodies — every prose check below rests on exactly one`,
+      `/ethereum/aave-v3/vaults/info carries ${drawers} [data-intro-drawer] bodies — every prose check below rests on exactly one`,
     );
   const text = (await page.locator("[data-intro-drawer]").innerText()).replace(/\s+/g, " ").trim();
   const emptyVaults = await page
@@ -970,8 +970,8 @@ check(
   "L4b the section's about page states that the shares sort is in each vault's units",
   /each vault.s units/.test(dom.info) && /6, 8 and 18 decimals/.test(dom.info),
   /each vault.s units/.test(dom.info) && /6, 8 and 18 decimals/.test(dom.info)
-    ? "/ethereum/aave/vaults/info names the decimals"
-    : `/ethereum/aave/vaults/info does not: "each vault's units" ${/each vault.s units/.test(dom.info)}, "6, 8 and 18 decimals" ${/6, 8 and 18 decimals/.test(dom.info)}`,
+    ? "/ethereum/aave-v3/vaults/info names the decimals"
+    : `/ethereum/aave-v3/vaults/info does not: "each vault's units" ${/each vault.s units/.test(dom.info)}, "6, 8 and 18 decimals" ${/6, 8 and 18 decimals/.test(dom.info)}`,
 );
 
 const lastAct = await readRoute("chain=1&sortBy=lastActivity&sortOrder=desc&limit=20&overlay=0");
@@ -1059,7 +1059,7 @@ check(
     emptyCensus.every((c) => dom.emptyVaults.includes(c.vault)) &&
     emptyCensus.every((c) => dom.info.includes(c.symbol)) &&
     dom.info.includes(censusBlock.toLocaleString("en-US")),
-  `${dom.emptyVaults.length} marked on /ethereum/aave/vaults/info, ${emptyCensus.length} never-held in the census: ${emptyCensus.map((c) => c.symbol).join(", ")}`,
+  `${dom.emptyVaults.length} marked on /ethereum/aave-v3/vaults/info, ${emptyCensus.length} never-held in the census: ${emptyCensus.map((c) => c.symbol).join(", ")}`,
 );
 let emptyRowBad = [];
 for (const c of emptyCensus) {
@@ -1099,8 +1099,8 @@ check(
   "L7c the section's about page says an address the census has never seen has no row and records nothing",
   /never seen has no row/.test(dom.info) && /records nothing about the search/.test(dom.info),
   /never seen has no row/.test(dom.info) && /records nothing about the search/.test(dom.info)
-    ? "/ethereum/aave/vaults/info states it"
-    : `/ethereum/aave/vaults/info does not: "never seen has no row" ${/never seen has no row/.test(dom.info)}, "records nothing about the search" ${/records nothing about the search/.test(dom.info)}`,
+    ? "/ethereum/aave-v3/vaults/info states it"
+    : `/ethereum/aave-v3/vaults/info does not: "never seen has no row" ${/never seen has no row/.test(dom.info)}, "records nothing about the search" ${/records nothing about the search/.test(dom.info)}`,
 );
 
 // ═══ L8 — one holder, one card per vault ═══════════════════════════════════
@@ -1126,7 +1126,7 @@ check(
 );
 
 const f11Dom = await readListingDom(`q=${F11_HOLDER}`);
-const hrefBad = f11Dom.cards.filter((c) => c.href !== `/ethereum/aave/vaults/${c.vault}/${F11_HOLDER}`);
+const hrefBad = f11Dom.cards.filter((c) => c.href !== `/ethereum/aave-v3/vaults/${c.vault}/${F11_HOLDER}`);
 check(
   "L8b every card links to that vault's own page opened on that holder",
   f11Dom.cards.length === f11.data.length && hrefBad.length === 0,
@@ -1135,7 +1135,7 @@ check(
 
 // ═══ L9 — copy ═════════════════════════════════════════════════════════════
 // The register rules are the SECTION's, not one page's: they run over the
-// listing's own face AND the prose that moved to /ethereum/aave/vaults/info, so a
+// listing's own face AND the prose that moved to /ethereum/aave-v3/vaults/info, so a
 // forbidden word does not stop being the section's because it is one route
 // along.
 const body = `${dom.body} ${dom.info}`.trim();
@@ -1207,14 +1207,14 @@ async function linkOn(url) {
   await page.close();
   return hrefs;
 }
-// The roster is the VAULTS tab's landing page — /ethereum/aave/vaults —
+// The roster is the VAULTS tab's landing page — /ethereum/aave-v3/vaults —
 // the section rail — so its links are read there, with no click needed. The
 // assertion is the same one at the surface it moved to; `[data-roster-panel]`
 // is the same wrapper the drawer used, kept deliberately, so the row selector
 // under it did not change.
 async function rosterLinks() {
   const page = await context.newPage();
-  await page.goto(`${BASE}/ethereum/aave/vaults?show=all`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/ethereum/aave-v3/vaults?show=all`, { waitUntil: "networkidle" });
   await page.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 60000 });
   const hrefs = await page
     .locator('[data-roster-panel] [data-link="vault-positions"]')
@@ -1225,13 +1225,13 @@ async function rosterLinks() {
 const dirLinks = await rosterLinks();
 check(
   "L12a the roster page links every vault to the listing filtered to it",
-  dirLinks.length > 0 && dirLinks.includes(`/ethereum/aave/vaults/positions?vault=${F1_VAULT}`),
-  `${dirLinks.length} links on /ethereum/aave/vaults`,
+  dirLinks.length > 0 && dirLinks.includes(`/ethereum/aave-v3/vaults/positions?vault=${F1_VAULT}`),
+  `${dirLinks.length} links on /ethereum/aave-v3/vaults`,
 );
-const vaultLinks = await linkOn(`${BASE}/ethereum/aave/vaults/${F2_VAULT}`);
+const vaultLinks = await linkOn(`${BASE}/ethereum/aave-v3/vaults/${F2_VAULT}`);
 check(
   "L12b F2's vault page links to the listing filtered to it",
-  vaultLinks.includes(`/ethereum/aave/vaults/positions?vault=${F2_VAULT}`),
+  vaultLinks.includes(`/ethereum/aave-v3/vaults/positions?vault=${F2_VAULT}`),
   vaultLinks.join(", ") || "no link",
 );
 
@@ -1261,14 +1261,14 @@ check(
 // A file check is the whole of the claim: Next mounts `loading.tsx` by
 // convention, and what it must render is the shared listing shell rather than
 // a hand-rolled one.
-const loadingPath = path.join(ROOT, "app", "(app)", "ethereum", "aave", "vaults", "(views)", "loading.tsx");
+const loadingPath = path.join(ROOT, "app", "(app)", "ethereum", "aave-v3", "vaults", "(views)", "loading.tsx");
 const loadingSrc = fs.existsSync(loadingPath) ? fs.readFileSync(loadingPath, "utf8") : "";
 check(
   "L13f the listing route has a loading.tsx that renders ListingRouteLoading",
   /<ListingRouteLoading\s*\/>/.test(loadingSrc) &&
     /from "@\/components\/shared\/listing-route-loading"/.test(loadingSrc),
   loadingSrc
-    ? "app/(app)/ethereum/aave/vaults/(views)/loading.tsx → <ListingRouteLoading />"
+    ? "app/(app)/ethereum/aave-v3/vaults/(views)/loading.tsx → <ListingRouteLoading />"
     : "no loading.tsx in the listing's (views) group",
 );
 
@@ -1297,26 +1297,31 @@ const rail = await railPage.locator('nav[aria-label="Explorer sections"]').evalu
 const sectionRails = await railPage.locator('nav[aria-label="Section surfaces"]').count();
 const railLinks = rail[0] ?? [];
 const railStatus = [];
-// Followed, not manual: this explorer's (i) is a DOOR to the vault layer's own
-// about page rather than a second copy of it (0028 gives a page one address),
-// so it answers a 307 and the page behind it is what must be there.
+// Followed, so a tab that answers a redirect is judged by the page behind it.
 for (const l of railLinks) {
   const r = await fetch(`${BASE}${l.href}`, { redirect: "follow" });
   railStatus.push(`${l.href} ${r.status}`);
 }
-const wanted = ["/ethereum/aave/vaults", "/ethereum/aave/info"];
+// Aave V3's menu (ui-jobs 789): Positions, Markets, Vaults, Assets, About.
+const wanted = [
+  "/ethereum/aave-v3",
+  "/ethereum/aave-v3/markets",
+  "/ethereum/aave-v3/vaults",
+  "/ethereum/aave-v3/assets",
+  "/ethereum/aave-v3/info",
+];
 const infoTab = railLinks.find((l) => l.text === "About");
 const litTabs = railLinks.filter((l) => l.current === "page");
 check(
-  "L14c the listing draws ONE Aave vaults sections menu whose two links each resolve, with About named, VAULTS current, and no section rail anywhere",
+  "L14c the listing draws ONE Aave V3 sections menu whose links each resolve, with About named, VAULTS current, and no section rail anywhere",
   rail.length === 1 &&
     sectionRails === 0 &&
-    railLinks.length === 2 &&
+    railLinks.length === wanted.length &&
     wanted.every((w) => railLinks.some((l) => l.href === w)) &&
-    infoTab?.href === "/ethereum/aave/info" &&
+    infoTab?.href === "/ethereum/aave-v3/info" &&
     railStatus.every((s) => s.endsWith(" 200")) &&
     litTabs.length === 1 &&
-    litTabs[0].href === "/ethereum/aave/vaults",
+    litTabs[0].href === "/ethereum/aave-v3/vaults",
   `${rail.length} rail(s), ${sectionRails} section rail(s), ${railLinks.length} tabs · ${railStatus.join(", ")} · lit: ${litTabs.map((l) => l.href).join(",") || "none"}`,
 );
 await railPage.close();

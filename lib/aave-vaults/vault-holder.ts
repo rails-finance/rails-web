@@ -9,7 +9,7 @@
 //     resolved on mainnet through the Universal Resolver (lib/ens/resolve-ens.ts),
 //     or a TRANSACTION — a bare hash, or an `etherscan.io/tx/…` link — from
 //     which the holder address is found (lib/vaults/resolve-tx-holder.ts).
-//   • `/ethereum/aave/vaults/<vault>?holder=` — ONE VAULT. What does this address
+//   • `/ethereum/aave-v3/vaults/<vault>?holder=` — ONE VAULT. What does this address
 //     hold of it? An address or an ENS name, and nothing else: a transaction
 //     names a receipt whose logs may offer none, one or several addresses, and
 //     a page already fixed on one vault has nowhere to put "or one of these
