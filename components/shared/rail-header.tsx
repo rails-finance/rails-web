@@ -233,7 +233,7 @@ export function SectionsMenu({
           <span
             id={labelId}
             role="presentation"
-            className="block px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-rb-500"
+            className={`${OVERLAY_HEADING} block px-3 pb-1`}
           >
             Chain
           </span>
@@ -309,7 +309,7 @@ export function SectionsMenu({
         <MobileSheet
           label={label}
           onClose={close}
-          header={<div className={`${OVERLAY_HEADING} px-1 pb-2`}>Sections</div>}
+          header={<div className={`${OVERLAY_HEADING} px-3 pb-2`}>Sections</div>}
         >
           <div ref={sheet} role="menu" aria-label="Sections" data-sections-sheet="" className="py-1">
             {rowsFor(sheetChainLabelId)}
