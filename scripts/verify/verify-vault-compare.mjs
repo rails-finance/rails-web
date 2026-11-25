@@ -250,7 +250,7 @@ const index = {};
     check(
       `2c ${l.key} links its vault's page under its protocol`,
       l.linkKey === l.key &&
-        /^\/(ethereum|base)\/(morpho|aave|yearn|maple)\/(vaults|pools)\//.test(l.href ?? "") &&
+        /^\/(ethereum|base)\/(morpho|aave-v3|yearn|maple)\/(vaults|pools)\//.test(l.href ?? "") &&
         l.href === want,
       `${l.href} (roster ${want})`,
     );

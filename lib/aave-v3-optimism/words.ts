@@ -26,8 +26,7 @@ export const pctText = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%
 export const hfText = (x: number) => x.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 
 export const FRONT_DOOR = {
-  line: "A wallet's Aave V3 position on Optimism: what it supplies and borrows in dollars at Aave's oracle, its health factor and its interest over the last 30 days.",
-  links: { markets: "Market overview" },
+  links: { markets: "Markets" },
 };
 
 export const POSITION_PAGE = {
@@ -48,16 +47,21 @@ export const CARD_WORDS = {
     "Collateral counted at each asset's liquidation threshold, divided by debt, both at Aave's oracle. Below 1 the position can be liquidated.",
   noDebt: "no debt",
   room: "Room to borrow",
-  roomTip: "How much more the position can borrow in dollars before its collateral's loan-to-value is used up.",
-  supplyRow: (sym: string) => `${sym} supplied`,
-  debtRow: (sym: string) => `${sym} borrowed`,
+  roomTip:
+    "How much more the position can borrow in dollars before its collateral's loan-to-value is used up; in E-Mode, the category's loan-to-value.",
+  /** A row's label is the symbol, linked to its reserve page, then its side. */
+  supplySide: "supplied",
+  debtSide: "borrowed",
+  reserveHref: (asset: string) => `/optimism/aave-v3/markets/${asset.toLowerCase()}`,
   collateralFlag: "collateral",
   notCollateral: "not collateral",
   reserves: "Reserves",
   columns: { asset: "Asset", amount: "Amount", threshold: "Threshold", rate: "Rate", interest: "Interest, 30 days" },
-  rateTip: "The reserve's variable rate, a year, as an APR.",
+  thresholdTip:
+    "The asset's liquidation threshold, the share of its value the health factor counts; in E-Mode, the category's threshold.",
+  rateTip: "The reserve's current supply or borrow rate for a year, as an APR.",
   interestTip:
-    "Interest over 30 days: what the reserve's rate added to this balance since the UTC midnight 30 days back, from the balances at the two dates.",
+    "The interest the row earned or paid over the last 30 days, shown where nothing was supplied, withdrawn, borrowed or repaid on it in that time.",
   withheld: {
     opened: "opened inside the window",
     changed: "changed inside the window",
@@ -67,6 +71,24 @@ export const CARD_WORDS = {
   emode: (label: string) => `E-Mode: ${label}`,
   foot: "Dollar values use Aave's oracle at the same block.",
 };
+
+/** Where the collateral and the debt are one asset, a price move shifts both
+ *  sides together and interest is what moves the health factor: one sentence,
+ *  else none. */
+function priceTogether(p: OpPositionFigures): string[] {
+  const collateral = p.supplied.filter((x) => x.isCollateral);
+  if (!collateral.length || !p.borrowed.length) return [];
+  const both = [...collateral, ...p.borrowed];
+  if (new Set(both.map((x) => x.asset.toLowerCase())).size !== 1) return [];
+  // One asset on both sides: each side grows at its own rate, so the health factor falls where the
+  // borrow rate is above the supply rate, whatever the two amounts.
+  const which = `Its collateral and debt are both ${collateral[0].symbol}`;
+  return [
+    p.borrowed[0].borrowApr > collateral[0].supplyApr
+      ? `${which}, so a price move shifts both sides and interest owed outgrowing interest earned lowers the health factor.`
+      : `${which}, so a price move shifts both sides and interest is what moves the health factor.`,
+  ];
+}
 
 /** The (i) explanation's groups for one account. */
 export function cardExplainer(p: OpPositionFigures): { title: string; bullets: string[] }[] {
@@ -82,7 +104,7 @@ export function cardExplainer(p: OpPositionFigures): { title: string; bullets: s
           : "It borrows nothing.",
         ...(p.emode
           ? [
-              `It is in the ${p.emode.label} E-Mode category, which lends higher thresholds to the assets it counts and limits borrowing to the assets it allows.`,
+              `It is in the ${p.emode.label} E-Mode category, which gives the assets it counts higher thresholds and limits borrowing to the assets it allows.`,
             ]
           : []),
       ],
@@ -94,13 +116,14 @@ export function cardExplainer(p: OpPositionFigures): { title: string; bullets: s
       bullets: [
         `Its health factor is ${hfText(p.healthFactor)}: collateral at its liquidation thresholds is ${hfText(p.healthFactor)} times its debt.`,
         "If the health factor falls below 1, anyone can repay part of the debt and take collateral at a bonus.",
+        ...priceTogether(p),
       ],
     });
   groups.push({
     title: "Interest over 30 days",
     bullets: [
-      "The Pool holds each balance as a scaled amount that grows into tokens through the reserve's index. Where the scaled amount is the same at both dates, the interest is the balance now less the balance 30 days back.",
-      "Where the balance changed inside the 30 days, the figure is withheld.",
+      "The figure is the interest each row earned or paid over the last 30 days: its amount now less its amount 30 days back.",
+      "It is shown only where nothing was added to or taken from the row in that time; a supply, withdrawal, borrow or repay inside the 30 days hides it.",
     ],
   });
   return groups;

@@ -75,7 +75,13 @@ export interface ProseSeg<E extends string = string> {
   /** A transaction hash the page links to the explorer. */
   tx?: string;
   tone?: "manager" | "address" | "wallet";
+  /** A page inside Rails the words open, and the link's tooltip. */
+  href?: string;
+  title?: string;
 }
+
+/** The pages a sentence's placeholders open, by placeholder name. */
+export type ProseLinks = Record<string, { href: string; title?: string }>;
 
 export interface ProseSentence<E extends string = string> {
   sentence_id: string;

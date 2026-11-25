@@ -15,10 +15,22 @@ import { AaveV3OptimismPositionCard } from "@/components/protocol/aave-v3-optimi
 import { fetchAaveV3OptimismPosition } from "@/lib/api/fetch-aave-v3-optimism";
 import { isOpWallet, OP_ROUTE, OP_SESSION } from "@/lib/aave-v3-optimism/types";
 import { POSITION_PAGE } from "@/lib/aave-v3-optimism/words";
+import { opPosition } from "@/lib/aave-v3-optimism/position";
+import type { OpPositionRead } from "@/lib/aave-v3-optimism/types";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 
 /** One read per request: the metadata and the page share it. */
 export const loadAaveV3OptimismPosition = cache((wallet: string) => fetchAaveV3OptimismPosition(wallet));
+
+/** The Prices menu's list: each reserve the account supplies or borrows at
+ *  Aave's oracle price, in dollars, the price the card values it at. A reserve
+ *  with no oracle price is named with none. */
+function reservePrices(r: OpPositionRead): LatestPriceAsset[] {
+  return opPosition(r)
+    .reserves.filter((x) => x.supplied > 0 || x.debt > 0)
+    .map((x) => ({ symbol: x.symbol, address: x.asset, price: x.price ?? undefined }));
+}
 
 export async function AaveV3OptimismPositionPage({ wallet: raw }: { wallet: string }) {
   if (!isOpWallet(raw)) notFound();
@@ -31,6 +43,7 @@ export async function AaveV3OptimismPositionPage({ wallet: raw }: { wallet: stri
       session={session}
       fallbackHref={OP_ROUTE}
       showStamp={false}
+      assets={answer.kind === "ok" ? reservePrices(answer.data) : []}
       priceReason={ORACLE_USD_REASON[session]}
       owner={{ wallet, filterProtocol: null }}
       tools={false}

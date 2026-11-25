@@ -446,7 +446,7 @@ for (const k of KEYS.filter((k) => !k.startsWith("sbold:"))) {
     );
     check(
       `8b ?asset=${param}: the Morpho, Aave and Yearn roster links carry it`,
-      links.filter((h) => /\/(morpho|aave|yearn)\/vaults/.test(h)).every((h) => h.endsWith(`?asset=${param}`)) &&
+      links.filter((h) => /\/(morpho|aave-v3|yearn)\/vaults/.test(h)).every((h) => h.endsWith(`?asset=${param}`)) &&
         links.some((h) => h.endsWith(`?asset=${param}`)),
       links.join(", "),
     );

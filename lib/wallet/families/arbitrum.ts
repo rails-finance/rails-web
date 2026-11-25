@@ -182,8 +182,8 @@ export const morphoArbitrum: FamilyModule = {
         positionId: r.positionId,
         href: r.href,
         card: { kind: "morpho-arbitrum" as const, row },
-        // Decision 0046: another protocol's oracle, named; open point 7: shown
-        // on the card, outside the tiles.
+        // Decision 0046: another protocol's oracle, named on the card and on
+        // the totals' receipt.
         usdSource: "Aave V3 Arbitrum oracle at the visit's read",
       };
       if (r.status !== "open") return closedRow(row, base);
