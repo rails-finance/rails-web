@@ -21,6 +21,7 @@
 // reads the first card's as its position crumb.
 
 import type { PositionName } from "@/lib/shared/position-name";
+import type { Provenance } from "@/components/shared/provenance";
 import {
   createContext,
   useCallback,
@@ -39,7 +40,21 @@ export interface TrailStatus {
   word: string;
   tone: "open" | "muted" | "danger" | "caution";
   tip?: string;
+  /** The word's receipt, where the pill carried one (ui-jobs 747). */
+  prov?: Provenance;
 }
+
+/** What the position crumb hands the card's ⋮ menu to open it from the
+ *  trail: the trigger's content, the menu's accessible name and the rows
+ *  before the card's (the status row). */
+export interface CardMenuCrumb {
+  trigger: (open: boolean) => ReactNode;
+  label: string;
+  top?: ReactNode;
+}
+
+/** The card's ⋮ menu, drawn with a crumb's trigger. */
+export type CardMenuRender = (crumb: CardMenuCrumb) => ReactNode;
 
 interface StripStore {
   node: ReactNode;
@@ -48,11 +63,13 @@ interface StripStore {
   names: { id: string; name: PositionName; status: TrailStatus | null }[];
   /** The wallet headings whose trail names the page's position. */
   trails: string[];
+  /** The detail cards' menus, by the card's id. */
+  menus: Map<string, CardMenuRender>;
   listeners: Set<() => void>;
 }
 
 function createStore(): StripStore {
-  return { node: null, slots: [], names: [], trails: [], listeners: new Set() };
+  return { node: null, slots: [], names: [], trails: [], menus: new Map(), listeners: new Set() };
 }
 
 const notify = (s: StripStore) => s.listeners.forEach((l) => l());
@@ -128,7 +145,7 @@ export function PositionCardStripSlot({ children }: { children: (strip: ReactNod
 
 /** The detail card's half of the name: registers `name` and the card's
  *  lifecycle while the card is mounted, kept current as they change. */
-export function usePublishPositionCardName(name: PositionName | undefined, status: TrailStatus | null) {
+export function usePublishPositionCardName(name: PositionName | undefined, status: TrailStatus | null): string {
   const store = useContext(PositionCardStripContext);
   const id = useId();
   const text = name?.text;
@@ -147,6 +164,36 @@ export function usePublishPositionCardName(name: PositionName | undefined, statu
     // what change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, id, text, word, tone, tip]);
+  return id;
+}
+
+/** The detail card's menu, republished on every render (its closures are
+ *  new each time); null for none. */
+export function usePublishPositionCardMenu(id: string, render: CardMenuRender | null) {
+  const store = useContext(PositionCardStripContext);
+  useLayoutEffect(() => {
+    if (!store) return;
+    if (render) store.menus.set(id, render);
+    else if (!store.menus.delete(id)) return;
+    notify(store);
+  });
+  useEffect(() => {
+    if (!store) return;
+    return () => {
+      if (store.menus.delete(id)) notify(store);
+    };
+  }, [store, id]);
+}
+
+/** The wallet heading's half: the menu of the card the trail names. */
+export function usePositionCardMenu(): CardMenuRender | null {
+  const store = useContext(PositionCardStripContext);
+  const subscribe = useSubscribe(store);
+  return useSyncExternalStore(
+    subscribe,
+    () => (store ? (store.menus.get(store.names[0]?.id ?? "") ?? null) : null),
+    () => null,
+  );
 }
 
 /** The wallet heading's half: the first detail card's name and lifecycle,
@@ -179,9 +226,22 @@ export function useRegisterPositionTrail(on: boolean) {
   }, [store, id, on]);
 }
 
-/** The card's half: whether a wallet heading's trail names the position.
- *  False on the server and on a page with no wallet heading. */
-export function usePositionTrailNamed(): boolean {
+/** The card's half: whether a wallet heading's trail names this card's
+ *  position (the first detail card to name one). False on the server and on
+ *  a page with no wallet heading. */
+export function usePositionTrailNamed(id: string): boolean {
+  const store = useContext(PositionCardStripContext);
+  const subscribe = useSubscribe(store);
+  return useSyncExternalStore(
+    subscribe,
+    () => (store ? store.trails.length > 0 && store.names[0]?.id === id : false),
+    () => false,
+  );
+}
+
+/** Whether a wallet heading draws the trail on the page: the page's strip
+ *  then stands under the heading, and no card draws it. */
+export function usePositionTrailDrawn(): boolean {
   const store = useContext(PositionCardStripContext);
   const subscribe = useSubscribe(store);
   return useSyncExternalStore(

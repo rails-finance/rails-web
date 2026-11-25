@@ -229,7 +229,10 @@ export function DetailTopRow({
       </>
     ) : null,
   );
-  const inCard = claimed || card;
+  // With the trail drawn (a position page that knows its wallet), the strip
+  // stands in the row under the heading; no card holds it (ui-jobs 856).
+  const trailing = owner != null && !eventPage && !walletPage && !!owner.wallet;
+  const inCard = !trailing && (claimed || card);
   const page = eventPage ? "event" : walletPage ? "wallet" : "position";
   // The trail's protocol crumb goes where Back's fallback would: Back
   // goes. Where that rests on the summary read, Back stays out until the

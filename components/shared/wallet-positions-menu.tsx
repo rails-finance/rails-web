@@ -33,7 +33,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Activity, ChevronDown } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import type { TrailStatus } from "@/components/shared/position-card-strip";
+import type { CardMenuRender, TrailStatus } from "@/components/shared/position-card-strip";
+import { Prov } from "@/components/shared/provenance";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
@@ -132,6 +133,7 @@ export function WalletPositionsMenu({
   search: givenSearch,
   position,
   status,
+  cardMenu,
   onCrumb,
 }: {
   wallet: string;
@@ -144,6 +146,8 @@ export function WalletPositionsMenu({
   position?: string | null;
   /** The card's lifecycle, the pulse before the position crumb. */
   status?: TrailStatus | null;
+  /** The card's ⋮ menu, which the position crumb opens. */
+  cardMenu?: CardMenuRender | null;
   /** Told once the read settles whether the trail has a protocol crumb. */
   onCrumb?: (found: boolean) => void;
 }) {
@@ -403,21 +407,67 @@ export function WalletPositionsMenu({
             className="flex min-w-0 items-center gap-1 text-foreground"
             data-wallet-trail-position=""
           >
-            {status && statusTip && (
-              <RevealTip
-                tip={<span className="block max-w-72 whitespace-normal">{statusTip}</span>}
-                label={statusTip}
-                focusable
-                className="flex shrink-0 rounded-sm focus-ring"
-              >
-                <span className={`flex ${PULSE_TONE[status.tone]}`} data-wallet-trail-status={status.tone}>
-                  <Activity className="size-3.5 shrink-0" aria-hidden="true" />
+            {cardMenu ? (
+              // The card's ⋮ menu, opened from the crumb: the status row
+              // first (ui-jobs 856).
+              cardMenu({
+                trigger: (open) => (
+                  <>
+                    {status && (
+                      <span
+                        className={`flex shrink-0 ${PULSE_TONE[status.tone]}`}
+                        title={status.word}
+                        data-wallet-trail-status={status.tone}
+                      >
+                        <Activity className="size-3.5" aria-hidden="true" />
+                      </span>
+                    )}
+                    <span className="min-w-0 truncate">{named}</span>
+                    <ChevronDown
+                      className={`size-3.5 shrink-0 text-rb-500 transition-transform ${open ? "rotate-180" : ""}`}
+                      aria-hidden="true"
+                    />
+                  </>
+                ),
+                label: status ? `${named}, ${status.word}: position menu` : `${named}: position menu`,
+                top: status && (
+                  <>
+                    <div
+                      role="none"
+                      className="mx-1 my-0.5 flex items-start gap-2 px-3 py-1.5"
+                      data-trail-status-row=""
+                    >
+                      <Activity className={`mt-0.5 size-4 shrink-0 ${PULSE_TONE[status.tone]}`} aria-hidden="true" />
+                      <div className="min-w-0">
+                        <div className="text-sm text-foreground">
+                          {status.prov ? <Prov info={status.prov}>{status.word}</Prov> : status.word}
+                        </div>
+                        {status.tip && <p className="mt-0.5 text-xs leading-relaxed text-rb-500">{status.tip}</p>}
+                      </div>
+                    </div>
+                    {DIVIDER}
+                  </>
+                ),
+              })
+            ) : (
+              <>
+                {status && statusTip && (
+                  <RevealTip
+                    tip={<span className="block max-w-72 whitespace-normal">{statusTip}</span>}
+                    label={statusTip}
+                    focusable
+                    className="flex shrink-0 rounded-sm focus-ring"
+                  >
+                    <span className={`flex ${PULSE_TONE[status.tone]}`} data-wallet-trail-status={status.tone}>
+                      <Activity className="size-3.5 shrink-0" aria-hidden="true" />
+                    </span>
+                  </RevealTip>
+                )}
+                <span title={named} className="min-w-0 truncate">
+                  {named}
                 </span>
-              </RevealTip>
+              </>
             )}
-            <span title={named} className="min-w-0 truncate">
-              {named}
-            </span>
           </span>
         </>
       )}

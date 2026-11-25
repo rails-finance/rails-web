@@ -76,7 +76,11 @@ export type ExportMenuProps = {
   queued?: QueuedExportRequest;
   /** Where the shapes ride: the page's Tools menu, or the position card's ⋮
    *  menu (`ToolsMenu` variant). */
-  variant?: "tools" | "card";
+  variant?: "tools" | "card" | "crumb";
+  /** The `crumb` menu's trigger content and accessible name (`ToolsMenu`
+   *  trigger and label). */
+  trigger?: (open: boolean) => ReactNode;
+  label?: string;
   /** The card menu's rows above the shapes (`ToolsMenu` leading). */
   leading?: (close: () => void) => ReactNode;
   /** The family's unit in the rows and the menu's name ("Copy Position",
@@ -95,6 +99,8 @@ export function ExportMenu({
   variant,
   leading,
   noun = "position",
+  trigger,
+  label,
 }: ExportMenuProps) {
   const [copied, setCopied] = useState(false);
   const [preparing, setPreparing] = useState(false);
@@ -173,7 +179,15 @@ export function ExportMenu({
 
   return (
     <>
-      <ToolsMenu ariaLabel={ariaLabel} copied={copied} variant={variant} leading={leading} noun={noun}>
+      <ToolsMenu
+        ariaLabel={ariaLabel}
+        copied={copied}
+        variant={variant}
+        leading={leading}
+        noun={noun}
+        trigger={trigger}
+        label={label}
+      >
         {(close) => (
           <>
             <ToolsMenuItem

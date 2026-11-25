@@ -40,7 +40,11 @@ import { fetchAddressKind, type AddressKind } from "@/lib/api/fetch-address-kind
 import { ProtocolGlyph, ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { managerProv } from "@/lib/shared/manager-provenance";
-import { usePositionCardName, useRegisterPositionTrail } from "@/components/shared/position-card-strip";
+import {
+  usePositionCardMenu,
+  usePositionCardName,
+  useRegisterPositionTrail,
+} from "@/components/shared/position-card-strip";
 import { positionCrumb } from "@/lib/shared/position-name";
 import type { TrailPage } from "@/lib/wallet/summary-counts";
 
@@ -313,6 +317,7 @@ export function PositionWalletHeading({
   const plain = !owner.vault && !owner.href;
   // The detail card's name, as the trail's last crumb.
   const card = usePositionCardName();
+  const cardMenu = usePositionCardMenu();
   const position = card && owner.wallet ? positionCrumb(card.name, owner.wallet) : null;
   // The trail names the position on a position page: the card leaves it out.
   useRegisterPositionTrail(page === "position" && !!owner.wallet);
@@ -365,6 +370,7 @@ export function PositionWalletHeading({
             page={page}
             position={position}
             status={card?.status}
+            cardMenu={cardMenu}
             onCrumb={onCrumb}
           />
         ) : (

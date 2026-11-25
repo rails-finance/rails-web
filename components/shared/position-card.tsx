@@ -48,8 +48,11 @@ import { useContext, useId, useLayoutEffect, useRef, useState, type CSSPropertie
 import Link from "next/link";
 import {
   PositionCardStripSlot,
+  usePositionTrailDrawn,
   usePositionTrailNamed,
+  usePublishPositionCardMenu,
   usePublishPositionCardName,
+  type CardMenuCrumb,
 } from "@/components/shared/position-card-strip";
 import { PositionReadStamp } from "@/components/shared/position-read";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
@@ -856,11 +859,15 @@ function DetailMenu({
   identityText,
   name,
   ended,
+  crumb,
 }: {
   menu: PositionCardMenu;
   identityText: () => string;
   name?: string;
   ended?: SavedLink["ended"];
+  /** Opened from the wallet heading's position crumb (H13.4) in place of
+   *  the ⋮: its trigger, its name and the rows before the card's. */
+  crumb?: CardMenuCrumb;
 }) {
   useSavedEndedRefresh(ended);
   useSavedNameRefresh(name);
@@ -868,14 +875,23 @@ function DetailMenu({
   // (ui-jobs 530).
   const leading = (close: () => void) => (
     <>
+      {crumb?.top}
       {menu.leading?.(close)}
       <SavePositionRow identityText={identityText} name={name} ended={ended} noun={menu.noun} />
     </>
   );
+  const variant = crumb ? "crumb" : "card";
   return menu.exports ? (
-    <ExportMenu variant="card" leading={leading} {...menu.exports} noun={menu.noun} />
+    <ExportMenu
+      leading={leading}
+      {...menu.exports}
+      noun={menu.noun}
+      variant={variant}
+      trigger={crumb?.trigger}
+      label={crumb?.label}
+    />
   ) : (
-    <ToolsMenu variant="card" leading={leading} noun={menu.noun} />
+    <ToolsMenu variant={variant} leading={leading} noun={menu.noun} trigger={crumb?.trigger} label={crumb?.label} />
   );
 }
 
@@ -911,10 +927,10 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   // The wallet heading's trail names the position from here (H13.4).
   // The pill as the trail draws it: OPEN where the card has a lifecycle and
   // no status word.
-  usePublishPositionCardName(
+  const cardId = usePublishPositionCardName(
     detail ? slots.name : undefined,
     slots.status
-      ? { word: slots.status.word, tone: slots.status.tone, tip: slots.status.tip }
+      ? { word: slots.status.word, tone: slots.status.tone, tip: slots.status.tip, prov: slots.status.prov }
       : slots.lifecycle !== false
         ? { word: "Open", tone: "open" }
         : null,
@@ -922,7 +938,10 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   // Where the trail names the position, the detail card leaves its name (the
   // tag) and its pill out; the listing card and a page with no trail keep
   // them.
-  const trailNamed = usePositionTrailNamed();
+  const trailNamed = usePositionTrailNamed(cardId);
+  // With the trail drawn, the page's strip stands in the row under the
+  // heading (H7), not in a card.
+  const trailDrawn = usePositionTrailDrawn();
   const tag = detail && trailNamed ? null : slots.tag;
   const closed = slots.outcome != null;
   const { extra: countersExtra, ...meta } = slots.counters ?? {};
@@ -934,20 +953,25 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
     </span>
   ) : null;
   const headerRef = useRef<HTMLDivElement>(null);
-  const menu = detail
-    ? slots.menu && (
-        <DetailMenu
-          menu={slots.menu}
-          identityText={() => identityTextOf(headerRef.current)}
-          name={slots.name?.text}
-          ended={
-            slots.outcome
-              ? { word: slots.status?.word ?? slots.outcome.word, tone: slots.status?.tone ?? "muted" }
-              : undefined
-          }
-        />
-      )
-    : slots.menu;
+  const cardMenu = slots.surface === "detail" ? slots.menu : null;
+  const detailMenu = (crumb?: CardMenuCrumb) =>
+    cardMenu && (
+      <DetailMenu
+        menu={cardMenu}
+        identityText={() => identityTextOf(headerRef.current)}
+        name={slots.name?.text}
+        ended={
+          slots.outcome
+            ? { word: slots.status?.word ?? slots.outcome.word, tone: slots.status?.tone ?? "muted" }
+            : undefined
+        }
+        crumb={crumb}
+      />
+    );
+  // Where the trail names this card's position, its ⋮ menu opens from the
+  // position crumb (H13.4; ui-jobs 856).
+  usePublishPositionCardMenu(cardId, cardMenu ? (crumb) => detailMenu(crumb) : null);
+  const menu = detail ? (trailNamed ? null : detailMenu()) : slots.menu;
   const edge = useContext(PositionCardEdgeContext);
   const wallet = !detail && edge?.surface === "wallet";
   const identity = usePositionCardIdentity();
@@ -1007,7 +1031,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       // From md, a detail heading row with nothing in it goes, and the
       // figures start at the card's padding. Below md the protocol mark
       // (C20.1) holds it.
-      className={`flex items-start gap-2 mb-3 ${detail ? "md:[&:not(:has([data-card-head-part]))]:hidden" : ""}`}
+      className={`flex items-start gap-2 mb-3 ${detail ? "md:[&:not(:has([data-card-head-part]:not(:empty)))]:hidden" : ""}`}
       data-anatomy="C5"
       {...(detail ? { "data-card-header": "" } : {})}
     >
@@ -1018,6 +1042,10 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             takes no gap. */}
         {/* A detail card reads market or ID (and the status tag) at the left,
             then the recency stamp, the price strip and the ⋮ at the right.
+            Where the wallet heading's trail names the position (H13.4;
+            ui-jobs 856), the name, the pill and the ⋮ are the trail's, and
+            the strip stands in the row under the heading (H7): the row holds
+            the family's state labels, and from md goes when none are left.
             Below md the right group dissolves into the row, so the strip
             takes a line of its own under the mark and the identity, right-
             aligned (ui-jobs 430). */}
@@ -1064,18 +1092,28 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
                 {slots.stamp}
               </span>
             )}
-            <PositionCardStripSlot>
-              {(strip) => (
-                <span
-                  className="-my-1.5 flex shrink-0 items-center gap-1 max-md:order-last max-md:basis-full max-md:justify-end sm:gap-2"
-                  data-position-strip=""
-                  data-card-head-part=""
-                >
-                  {strip}
-                </span>
-              )}
-            </PositionCardStripSlot>
-            {chainPill && <span className={`${slots.stamp ? "" : "max-md:ml-auto "}${narrowOnly}`}>{chainPill}</span>}
+            {!trailDrawn && (
+              <PositionCardStripSlot>
+                {(strip) => (
+                  <span
+                    className="-my-1.5 flex shrink-0 items-center gap-1 max-md:order-last max-md:basis-full max-md:justify-end sm:gap-2"
+                    data-position-strip=""
+                    data-card-head-part=""
+                  >
+                    {strip}
+                  </span>
+                )}
+              </PositionCardStripSlot>
+            )}
+            {chainPill && (
+              <span
+                className={`${slots.stamp ? "" : "max-md:ml-auto "}${narrowOnly}`}
+                // A card with no sidebar names its chain here at every width.
+                data-card-head-part={barred ? undefined : ""}
+              >
+                {chainPill}
+              </span>
+            )}
           </span>
         ) : (
           ((wallet && edge?.stamp) || chainPill) && (
