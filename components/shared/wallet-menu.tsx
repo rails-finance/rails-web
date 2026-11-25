@@ -1,9 +1,10 @@
 "use client";
 
 // The owner's address on a position page, as the trigger of a menu (ui-jobs
-// 271): Copy the address, Bookmark it (the row reads as set or not), View
-// wallet (its wallet view, rails-ops decision 0051). The wallet view's heading
-// draws the same menu without View wallet (ui-jobs 430). A dropdown on desktop, a sheet below sm. The copy and bookmark
+// 271): Copy the address, Bookmark it (the row reads as set or not), Wallet
+// dashboard (its wallet view, rails-ops decision 0051; the positions menu's
+// name for it). The wallet view's heading draws the same menu without Wallet
+// dashboard (ui-jobs 430). A dropdown on desktop, a sheet below sm. The copy and bookmark
 // icons that sat beside the address on the wallet row are these rows now; a
 // bookmarked address shows a small filled Bookmark between its label and the
 // chevron.
@@ -39,7 +40,7 @@ export function WalletMenu({
   /** The trigger as the page's h1 (the wallet heading, H13): the name or
    *  address at heading type with no facehash. */
   heading?: boolean;
-  /** The View wallet row; false on the wallet view. */
+  /** The Wallet dashboard row; false on the wallet view. */
   view?: boolean;
 }) {
   const router = useRouter();
@@ -111,7 +112,7 @@ export function WalletMenu({
       {view && (
         <ToolsMenuItem
           icon={<Wallet size={16} />}
-          title="View wallet"
+          title="Wallet dashboard"
           subtitle="This wallet's activity on Rails"
           internal
           onClick={() => {

@@ -150,7 +150,7 @@ export function PendleWalletView({
   return (
     <ProvReceiptsScope registry={registry}>
       <div className="space-y-6 py-8">
-        <DetailTopRow session="pendle" wallet={wallet} owner={{ wallet }} assets={[]} tools />
+        <DetailTopRow walletPage session="pendle" wallet={wallet} owner={{ wallet }} assets={[]} tools />
         {failure && <PendleReadNotice failure={failure} />}
         {data && (
           <p className="text-xs text-rb-500" data-pendle-asof={data.block}>

@@ -20,6 +20,7 @@ import { Suspense, use, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
 import { WalletHeader } from "@/components/wallet/wallet-header";
+import { WalletPositionsMenu } from "@/components/shared/wallet-positions-menu";
 import { WalletFilterBar } from "@/components/wallet/wallet-filter-bar";
 import {
   walletProtocol,
@@ -514,9 +515,14 @@ export function WalletView({
         <WalletHeader
           address={address}
           ensName={ensName}
+          narrowed={chosen != null}
           lines={
             <>
-              {focused ? (
+              {chosen ? (
+                // Narrowed to one protocol, the line is the trail (H13.4): the
+                // positions menu, then the protocol as the page.
+                <WalletPositionsMenu wallet={address} page="wallet" search={`?protocol=${chosen.slug}`} />
+              ) : focused ? (
                 <ScopeNote scoped={scoped} noun={["position", "positions"]} />
               ) : (
                 read.total > 0 && (

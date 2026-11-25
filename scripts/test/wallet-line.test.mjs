@@ -12,7 +12,10 @@ import {
   rowIsPage,
   vaultProtocolOfHref,
   vaultRoot,
+  hrefIsPage,
   walletProtocolMenu,
+  walletProtocolRows,
+  walletTrailCrumb,
 } from "../../lib/wallet/summary-counts.ts";
 
 const W = "0x3df83ec9d2b62bb9bb83eba1218a202564bb67da";
@@ -237,4 +240,58 @@ test("menuKey splits vault rows by their href's root and leaves other families w
   assert.equal(menuKey(pos("aave-v3", "open", 1)), "ethereum:aave-v3");
   assert.equal(vaultRoot("/ethereum/aave-v3/0xabc"), undefined);
   assert.equal(vaultProtocolOfHref("/ethereum/yearn/vaults/0xv/0xh?x=1"), "Yearn V3");
+});
+
+// The trail's protocol crumb (H13.4).
+const trail = (positions, path, search, page) =>
+  walletTrailCrumb(
+    walletProtocolRows(positions, (p) => rowIsPage(p.href, path, search), protocolOf, DASHBOARD),
+    path,
+    search,
+    page,
+  );
+
+test("a href is the page where its path and every parameter it states match", () => {
+  assert.equal(hrefIsPage(`/wallet/${W}?protocol=liquity-v2`, `/wallet/${W}`, "?protocol=liquity-v2"), true);
+  assert.equal(hrefIsPage(`/wallet/${W}?protocol=liquity-v2`, `/wallet/${W}`, ""), false);
+  assert.equal(hrefIsPage(`/wallet/${W}`, `/wallet/${W}`, "?protocol=aave-v3"), true);
+});
+
+test("on a position page the crumb links to the protocol's listing searched by the wallet", () => {
+  const rows = [pos("aave-v3", "open", 1), pos("aave-v3", "closed", 2), pos("liquity-v2", "open", 3)];
+  const c = trail(rows, "/ethereum/aave-v3/1", "", "position");
+  assert.equal(c.row.name, "Aave V3");
+  assert.equal(c.href, `/ethereum/aave-v3?q=${W}`);
+  assert.equal(c.current, false);
+  // The page's position alone in its protocol: the listing still.
+  const alone = trail([pos("aave-v3", "open", 1)], "/ethereum/aave-v3/1", "", "event");
+  assert.equal(alone.href, `/ethereum/aave-v3?q=${W}`);
+});
+
+test("a row's one position above the page is the crumb's link", () => {
+  const wallet = { ...pos("morpho", "open", 1, "arbitrum"), href: `/arbitrum/morpho/${W}` };
+  const c = trail([wallet, pos("aave-v3", "open", 2)], `/arbitrum/morpho/${W}/0xabc`, "", "position");
+  assert.equal(c.href, `/arbitrum/morpho/${W}`);
+  assert.equal(c.current, false);
+});
+
+test("on a wallet page the crumb is the page", () => {
+  const rows = [pos("liquity-v2", "open", 1), pos("liquity-v2", "open", 2), pos("aave-v3", "open", 3)];
+  const listing = (p) => ({
+    ...protocolOf(p),
+    listing: p.family === "liquity-v2" ? `/wallet/${W}?protocol=liquity-v2` : null,
+  });
+  const r = walletProtocolRows(rows, () => false, listing, DASHBOARD);
+  const c = walletTrailCrumb(r, `/wallet/${W}`, "?protocol=liquity-v2", "wallet");
+  assert.equal(c.row.name, "Liquity V2");
+  assert.equal(c.current, true);
+  assert.equal(walletTrailCrumb(r, `/wallet/${W}`, "?protocol=pwn", "wallet"), null);
+  // A wallet page above its positions' pages.
+  const under = trail(
+    [{ ...pos("morpho", "open", 1, "base"), href: `/base/morpho/${W}/0x1` }],
+    `/base/morpho/${W}`,
+    "",
+    "wallet",
+  );
+  assert.equal(under.current, true);
 });

@@ -38,6 +38,7 @@ export async function CompoundV3OptimismWallet({ wallet: raw }: { wallet: string
     <div className="py-8" data-anatomy="U3" data-compound-v3-optimism-wallet={wallet}>
       <header className="mb-5">
         <DetailTopRow
+          walletPage
           session={session}
           fallbackHref={OPC_ROUTE}
           showStamp={false}

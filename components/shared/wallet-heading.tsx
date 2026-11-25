@@ -8,10 +8,11 @@
 // the right end.
 //
 // On a position page (`PositionWalletHeading`) the h1 is the address menu's
-// trigger, the address kind sits beside it, and under it the menu of the
-// wallet's positions on Rails (H13.2). The protocol is named by the
-// card's sidebar (decision 0052 point 2). Tools takes the right end where the
-// page passes it; on a page that draws no detail card the price strip and
+// trigger, the address kind sits beside it, and under it the trail (H13.4):
+// the menu of the wallet's positions on Rails (H13.2), the protocol, and the
+// position the card names. The facehash links to the wallet dashboard.
+// Tools takes the right end where the page passes it; on a page that draws
+// no detail card the price strip and
 // the recency stamp stand before it (ui-jobs 430), and below sm the strip
 // wraps under the name block, flush right. DOM order is address, strip, Tools.
 //
@@ -20,6 +21,7 @@
 // when the page knows it (an id-keyed page learns its owner from the read).
 
 import { FileCode2, KeyRound, type LucideIcon } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { Facehash } from "@/components/shared/facehash";
 import { RevealTip } from "@/components/shared/reveal-tip";
@@ -35,6 +37,9 @@ import { fetchAddressKind, type AddressKind } from "@/lib/api/fetch-address-kind
 import { ProtocolGlyph, ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { managerProv } from "@/lib/shared/manager-provenance";
+import { usePositionCardName } from "@/components/shared/position-card-strip";
+import { positionCrumb } from "@/lib/shared/position-name";
+import type { TrailPage } from "@/lib/wallet/summary-counts";
 
 /** The shell both surfaces draw. `title` is the name line (the h1 and what
  *  sits beside it), `lines` the text-xs lines under it, `end` the controls at
@@ -44,12 +49,16 @@ export function WalletHeading({
   title,
   lines,
   end,
+  dashboard,
   className = "",
   ...data
 }: {
   /** The wallet; unset while the page has not read it, which keeps the
    *  facehash's place. */
   address?: string | null;
+  /** The wallet dashboard, which the facehash links to; absent on the
+   *  dashboard. */
+  dashboard?: string;
   title: ReactNode;
   lines?: ReactNode;
   end?: ReactNode;
@@ -60,7 +69,18 @@ export function WalletHeading({
       {/* From md the 21px gap puts the name block on the cards' content edge:
           the 40px bar, the card's 1px border and its 20px padding. */}
       <div className="flex min-w-0 flex-auto basis-0 items-center gap-3 sm:basis-auto md:gap-[21px]">
-        {address ? (
+        {address && dashboard ? (
+          <Link
+            href={dashboard}
+            prefetch={false}
+            aria-label="Wallet dashboard"
+            title="Wallet dashboard"
+            className="flex shrink-0 rounded-[9px] focus-ring"
+            data-wallet-facehash-link=""
+          >
+            <Facehash address={address} size={40} />
+          </Link>
+        ) : address ? (
           <Facehash address={address} size={40} />
         ) : (
           <span className="block size-10 shrink-0 rounded-[9px] bg-rb-300/40 dark:bg-rb-700/40" aria-hidden />
@@ -250,8 +270,13 @@ export function PositionWalletHeading({
   session,
   tools,
   strip,
+  page = "position",
+  className,
 }: {
   owner: PositionOwner;
+  /** What the page is, for the trail (H13.4). */
+  page?: TrailPage;
+  className?: string;
   /** The page's explorer: the chain of the address kind, and the default for
    *  the listing link. Absent on a page no explorer owns (ui-jobs 765): the
    *  chain is `owner.chain` and the label links nowhere by default. */
@@ -269,6 +294,9 @@ export function PositionWalletHeading({
   // A wallet is its address menu (ui-jobs 271); a vault or a page that links
   // the address elsewhere (PWN's other side) keeps the pill.
   const plain = !owner.vault && !owner.href;
+  // The detail card's name, as the trail's last crumb.
+  const cardName = usePositionCardName();
+  const position = cardName && owner.wallet ? positionCrumb(cardName, owner.wallet) : null;
   const pill = owner.wallet ? (
     plain ? (
       <WalletMenu wallet={owner.wallet} ensName={owner.ensName ?? null} bookmark={bookmark} heading />
@@ -288,6 +316,8 @@ export function PositionWalletHeading({
   return (
     <WalletHeading
       address={owner.wallet}
+      dashboard={owner.wallet ? `/wallet/${owner.wallet.toLowerCase()}` : undefined}
+      className={className}
       data-anatomy="H13"
       data-position-wallet-row=""
       title={
@@ -311,7 +341,7 @@ export function PositionWalletHeading({
       // wallet, it stays empty.
       lines={
         owner.wallet ? (
-          <WalletPositionsMenu wallet={owner.wallet} />
+          <WalletPositionsMenu wallet={owner.wallet} page={page} position={position} />
         ) : (
           <div className="flex h-5 items-center" data-wallet-positions-held="">
             {owner.pending && <SkeletonBar width={72} />}

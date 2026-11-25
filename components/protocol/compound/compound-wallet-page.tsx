@@ -922,6 +922,7 @@ export function CompoundWalletView({
         <CometDeploymentProvider deployment={d.deployment}>
           <div className="py-8 space-y-6">
             <DetailTopRow
+              walletPage
               session={d.session}
               wallet={wallet}
               owner={{ wallet, chain: d.deployment.chainId }}

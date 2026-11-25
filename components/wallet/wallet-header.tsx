@@ -14,11 +14,15 @@ export function WalletHeader({
   ensName,
   lines,
   end,
+  narrowed = false,
 }: {
   /** Null for a name that resolves to no address: the heading is the name,
    *  with no address menu. */
   address: string | null;
   ensName: string | null;
+  /** The view is narrowed to one protocol: the facehash and the address
+   *  menu's Wallet dashboard open the whole view. */
+  narrowed?: boolean;
   lines?: ReactNode;
   end?: ReactNode;
 }) {
@@ -32,12 +36,14 @@ export function WalletHeader({
       </div>
       <WalletHeading
         address={address}
+        dashboard={narrowed && address ? `/wallet/${address}` : undefined}
         className="mt-6"
         // The address menu a position page draws (ui-jobs 430): Copy the
-        // address and Bookmark it; no View wallet on the wallet view.
+        // address and Bookmark it; Wallet dashboard only where one protocol
+        // narrows the view.
         title={
           address ? (
-            <WalletMenu wallet={address} ensName={ensName} heading view={false} />
+            <WalletMenu wallet={address} ensName={ensName} heading view={narrowed} />
           ) : (
             <h1 className={`${WALLET_HEADING_NAME} min-w-0 truncate`}>{ensName}</h1>
           )

@@ -46,7 +46,7 @@
 
 import { useContext, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
-import { PositionCardStripSlot } from "@/components/shared/position-card-strip";
+import { PositionCardStripSlot, usePublishPositionCardName } from "@/components/shared/position-card-strip";
 import { PositionReadStamp } from "@/components/shared/position-read";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { BreakdownOverlay, assetsWords } from "@/components/shared/stat-breakdown";
@@ -904,6 +904,8 @@ function overCap(slots: PositionCardSlots): string | null {
 export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const registry = useReceiptRegistry();
   const detail = slots.surface === "detail";
+  // The wallet heading's trail names the position from here (H13.4).
+  usePublishPositionCardName(detail ? slots.name : undefined);
   const closed = slots.outcome != null;
   const { extra: countersExtra, ...meta } = slots.counters ?? {};
   const counters = slots.counters ? (

@@ -15,6 +15,17 @@
 // one, so the heading never changes height. The popover is the address menu's (C7,
 // wallet-menu.tsx): a dropdown on desktop, a sheet below sm, closed by an
 // outside press and Escape; the rows take the Tools menu's keys.
+//
+// The menu is the first crumb of the trail under the address (H13.4; Miles,
+// 25 Nov 2026): "3 positions ⌄ / Aave V3 ⟠ / Core", slash-separated. The
+// protocol crumb is the menu's row for the page's protocol, its name and
+// chain glyph, linking where that row's listing does (`walletTrailCrumb`);
+// on a page that lists the wallet's positions in one protocol it is the page
+// and the trail ends there. On a position page the position crumb follows,
+// the detail card's name (`usePositionCardName`), as the page: the only
+// crumb that truncates. There the menu's row reads "this protocol"; on the
+// wallet page "this page". Where the page's position is the wallet's only
+// one the trail is the protocol and the position, with no menu.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -41,7 +52,9 @@ import {
   MENU_TESTNETS,
   rowIsPage,
   walletProtocolMenu,
-  type MenuProtocol,
+  walletProtocolRows,
+  walletTrailCrumb,
+  type TrailPage,
   type WalletCounts,
   type WalletCountsChain,
   type WalletCountsPosition,
@@ -74,11 +87,17 @@ function readCounts(address: string): Promise<WalletCounts | null> {
   return read;
 }
 
-type Menu = NonNullable<ReturnType<typeof walletProtocolMenu<WalletCountsPosition>>>;
+type Menu = ReturnType<typeof walletProtocolMenu<WalletCountsPosition>>;
+type Crumb = ReturnType<typeof walletTrailCrumb<WalletCountsPosition>>;
 
 const ROW = "mx-1 my-0.5 flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-left";
 const ROW_LINK = `${ROW} transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]`;
 const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />;
+const SLASH = (
+  <span className="shrink-0 px-1.5 text-rb-400 dark:text-rb-600" aria-hidden="true">
+    /
+  </span>
+);
 
 /** The protocol's and the chain's icons, each named for screen readers and on hover. */
 function ProtocolIcons({ p }: { p: WalletCountsPosition }) {
@@ -97,10 +116,25 @@ function ProtocolIcons({ p }: { p: WalletCountsPosition }) {
   );
 }
 
-export function WalletPositionsMenu({ wallet }: { wallet: string }) {
+export function WalletPositionsMenu({
+  wallet,
+  page = "position",
+  search: givenSearch,
+  position,
+}: {
+  wallet: string;
+  /** What the page is: the protocol crumb is the page on a wallet page. */
+  page?: TrailPage;
+  /** The page's query where the page knows it better than the URL read at
+   *  mount (the wallet view's chosen protocol, which it changes in place). */
+  search?: string;
+  /** The position crumb's words, on a position page whose card has named it. */
+  position?: string | null;
+}) {
   const pathname = usePathname();
   const address = wallet.toLowerCase();
   const [menu, setMenu] = useState<Menu | null>(null);
+  const [crumb, setCrumb] = useState<Crumb>(null);
   // The summary read has answered (or failed): the placeholder goes.
   const [settled, setSettled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -118,6 +152,7 @@ export function WalletPositionsMenu({ wallet }: { wallet: string }) {
   useEffect(() => {
     let live = true;
     setMenu(null);
+    setCrumb(null);
     setSettled(false);
     setOpen(false);
     if (!ADDRESS.test(address)) {
@@ -128,20 +163,19 @@ export function WalletPositionsMenu({ wallet }: { wallet: string }) {
       if (!live) return;
       setSettled(true);
       if (!c || c.error) return;
-      const search = window.location.search;
-      setMenu(
-        walletProtocolMenu(
-          c.positions,
-          (p) => rowIsPage(p.href, pathname, search),
-          (p) => menuProtocolOf(p, address),
-          `/wallet/${address}`,
-        ),
+      const search = givenSearch ?? window.location.search;
+      const isPage = (p: WalletCountsPosition) => rowIsPage(p.href, pathname, search);
+      const protocolOf = (p: WalletCountsPosition) => menuProtocolOf(p, address);
+      const dashboard = `/wallet/${address}`;
+      setMenu(walletProtocolMenu(c.positions, isPage, protocolOf, dashboard));
+      setCrumb(
+        walletTrailCrumb(walletProtocolRows(c.positions, isPage, protocolOf, dashboard), pathname, search, page),
       );
     });
     return () => {
       live = false;
     };
-  }, [address, pathname]);
+  }, [address, pathname, givenSearch, page]);
 
   // Outside press and Escape close the dropdown, as the address menu's do; the
   // sheet closes from its scrim and Escape, and its rows are portalled outside
@@ -175,29 +209,32 @@ export function WalletPositionsMenu({ wallet }: { wallet: string }) {
     return () => window.clearTimeout(t);
   }, [open, isPhone]);
 
-  if (!menu)
+  if (!menu && !crumb)
     return (
       <div className="flex h-5 items-center" data-wallet-positions-pending={settled ? undefined : ""}>
         {!settled && <SkeletonBar width={72} />}
       </div>
     );
   const dashboard = `/wallet/${address}`;
+  // On a wallet page the crumb's row is the page.
+  const here = (key: string) => page === "wallet" && crumb?.current === true && crumb.row.key === key;
 
-  const rows = (
+  const rows = menu && (
     <>
       {menu.rows.map((r) => {
         const hook = { "data-wallet-protocol-row": r.key, "data-family": r.first.family };
+        const mark = here(r.key) ? "this page" : r.page ? (page === "wallet" ? "this page" : "this protocol") : null;
         const body = (
           <>
             <ProtocolIcons p={r.first} />
             <span className="min-w-0 truncate">{r.name}</span>
             <span className="ml-auto flex shrink-0 items-baseline gap-2 pl-3 text-xs text-rb-500 tabular-nums">
-              {r.page && <span data-wallet-protocol-page="">this page ·</span>}
+              {mark && <span data-wallet-protocol-page="">{mark} ·</span>}
               <span data-wallet-protocol-counts="">{r.counts}</span>
             </span>
           </>
         );
-        return r.current ? (
+        return r.current || here(r.key) ? (
           <div
             key={r.key}
             role="menuitem"
@@ -240,10 +277,10 @@ export function WalletPositionsMenu({ wallet }: { wallet: string }) {
     </>
   );
 
-  return (
+  const dropdown = menu && (
     <div
       ref={ref}
-      className="reveal-in relative flex min-w-0"
+      className="relative flex shrink-0"
       data-anatomy="H13.2"
       data-wallet-positions-menu=""
       data-wallet-elsewhere={menu.pageCounted ? "others" : "all"}
@@ -296,5 +333,64 @@ export function WalletPositionsMenu({ wallet }: { wallet: string }) {
           </div>
         ))}
     </div>
+  );
+
+  // The chain glyph after the name, as the explorer's title row draws it (H3.2).
+  const chain = crumb && chainMeta(CHAIN_ID[crumb.row.first.chain]).name;
+  const protocolBody = crumb && (
+    <>
+      <span className="whitespace-nowrap">{crumb.row.name}</span>
+      <span role="img" aria-label={`on ${chain}`} title={chain ?? undefined} className="flex">
+        <ChainGlyph id={CHAIN_ID[crumb.row.first.chain]} className="size-3.5 shrink-0" />
+      </span>
+    </>
+  );
+  const named = page === "position" && crumb && !crumb.current && position;
+  return (
+    <nav
+      aria-label="Breadcrumb"
+      className="reveal-in flex h-5 min-w-0 max-w-full items-center text-xs"
+      data-anatomy="H13.4"
+      data-prov-chrome=""
+      data-wallet-trail=""
+    >
+      {dropdown}
+      {crumb && (
+        <>
+          {dropdown && SLASH}
+          {crumb.current ? (
+            <span
+              aria-current="page"
+              className="flex shrink-0 items-center gap-1 text-foreground"
+              data-wallet-trail-protocol={crumb.row.key}
+            >
+              {protocolBody}
+            </span>
+          ) : (
+            <Link
+              href={crumb.href}
+              prefetch={false}
+              className="relative -mx-1 flex h-5 shrink-0 items-center gap-1 rounded-md px-1 text-rb-500 transition-colors hover:text-foreground focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']"
+              data-wallet-trail-protocol={crumb.row.key}
+            >
+              {protocolBody}
+            </Link>
+          )}
+        </>
+      )}
+      {named && (
+        <>
+          {SLASH}
+          <span
+            aria-current="page"
+            title={position}
+            className="min-w-0 truncate text-foreground"
+            data-wallet-trail-position=""
+          >
+            {position}
+          </span>
+        </>
+      )}
+    </nav>
   );
 }

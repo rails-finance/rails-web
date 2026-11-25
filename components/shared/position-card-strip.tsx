@@ -15,7 +15,12 @@
 //
 // One store object for the layout's life, read with `useSyncExternalStore`:
 // the row republishes on every render and only the slot re-renders.
+//
+// The same store carries the other way the position's name (H13.4): each
+// detail card registers its `PositionName`, and the wallet heading's trail
+// reads the first card's as its position crumb.
 
+import type { PositionName } from "@/lib/shared/position-name";
 import {
   createContext,
   useCallback,
@@ -31,11 +36,13 @@ import {
 interface StripStore {
   node: ReactNode;
   slots: string[];
+  /** The detail cards' names, in mount order. */
+  names: { id: string; name: PositionName }[];
   listeners: Set<() => void>;
 }
 
 function createStore(): StripStore {
-  return { node: null, slots: [], listeners: new Set() };
+  return { node: null, slots: [], names: [], listeners: new Set() };
 }
 
 const notify = (s: StripStore) => s.listeners.forEach((l) => l());
@@ -107,4 +114,35 @@ export function PositionCardStripSlot({ children }: { children: (strip: ReactNod
     () => null,
   );
   return node ? children(node) : null;
+}
+
+/** The detail card's half of the name: registers `name` while the card is
+ *  mounted, kept current as its text changes. */
+export function usePublishPositionCardName(name: PositionName | undefined) {
+  const store = useContext(PositionCardStripContext);
+  const id = useId();
+  const text = name?.text;
+  useLayoutEffect(() => {
+    if (!store || !name) return;
+    store.names = [...store.names.filter((n) => n.id !== id), { id, name }];
+    notify(store);
+    return () => {
+      store.names = store.names.filter((n) => n.id !== id);
+      notify(store);
+    };
+    // The name is a new object each render; its text is what changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store, id, text]);
+}
+
+/** The wallet heading's half: the first detail card's name, or null while
+ *  none is mounted (and on the server). */
+export function usePositionCardName(): PositionName | null {
+  const store = useContext(PositionCardStripContext);
+  const subscribe = useSubscribe(store);
+  return useSyncExternalStore(
+    subscribe,
+    () => store?.names[0]?.name ?? null,
+    () => null,
+  );
 }

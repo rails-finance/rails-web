@@ -138,35 +138,37 @@ export interface WalletProtocolRow<P extends WalletCountsPosition> {
   name: string;
   /** Any one of its positions, for its chain and family. */
   first: P;
+  positions: P[];
   open: number;
   closed: number;
   /** Passed to another wallet (ui-jobs 705); never open or closed. */
   moved: number;
   /** "1 open", "2 closed", "1 open · 2 closed", "1 open · 1 moved". */
   counts: string;
-  /** The one position's page; past one, the listing searched by the wallet,
-   *  else the wallet view. */
+  /** The one position's page; past one, `listing`. */
   href: string;
+  /** The protocol's listing searched by the wallet, else the wallet view. */
+  listing: string;
+  /** `listing` is the protocol's, not the wallet view. */
+  listed: boolean;
   /** The page's position is one of the row's. */
   page: boolean;
   /** The row's href is the page: the row is not a link. */
   current: boolean;
 }
 
-/** The positions menu under the wallet heading (H13.2; Miles 17 Nov 2026,
- *  ui-jobs 701): one row per protocol and chain the wallet holds positions
- *  in (each vault protocol its own, `menuKey`), those with an open position first, each group in roster order; closed
- *  counts closed, liquidated and redeemed, as the counts do, and moved (a
- *  position passed to another wallet, ui-jobs 705) is counted apart. Null when the
- *  wallet holds nothing besides the page's position. */
-export function walletProtocolMenu<P extends WalletCountsPosition>(
+/** One row per protocol and chain the wallet holds positions in (each vault
+ *  protocol its own, `menuKey`), those with an open position first, each
+ *  group in roster order; closed counts closed, liquidated and redeemed, as
+ *  the counts do, and moved (a position passed to another wallet, ui-jobs
+ *  705) is counted apart. The positions menu (H13.2) and the trail's
+ *  protocol crumb (H13.4) read them. */
+export function walletProtocolRows<P extends WalletCountsPosition>(
   positions: P[],
   isPage: (p: P) => boolean,
   protocolOf: (p: P) => MenuProtocol | undefined,
   dashboard: string,
-): { trigger: string; rows: WalletProtocolRow<P>[]; pageCounted: boolean } | null {
-  const page = positions.filter(isPage);
-  if (positions.length === page.length) return null;
+): WalletProtocolRow<P>[] {
   const groups = new Map<string, { protocol: MenuProtocol | undefined; positions: P[] }>();
   for (const p of positions) {
     const key = menuKey(p);
@@ -188,15 +190,19 @@ export function walletProtocolMenu<P extends WalletCountsPosition>(
       closed > 0 && `${closed.toLocaleString("en-US")} closed`,
       moved > 0 && `${moved.toLocaleString("en-US")} moved`,
     ];
+    const listing = g.protocol?.listing ?? dashboard;
     return {
       key,
       name: g.protocol?.name ?? g.positions[0].family,
       first: g.positions[0],
+      positions: g.positions,
       open,
       closed,
       moved,
       counts: parts.filter(Boolean).join(" · "),
-      href: (one ? g.positions[0].href : null) ?? g.protocol?.listing ?? dashboard,
+      href: (one ? g.positions[0].href : null) ?? listing,
+      listing,
+      listed: g.protocol?.listing != null,
       page: onPage,
       current: one && onPage,
     };
@@ -204,9 +210,63 @@ export function walletProtocolMenu<P extends WalletCountsPosition>(
   rows.sort(
     (a, b) => Number(b.open > 0) - Number(a.open > 0) || order(a.key) - order(b.key) || a.key.localeCompare(b.key),
   );
+  return rows;
+}
+
+/** The positions menu under the wallet heading (H13.2; Miles 17 Nov 2026,
+ *  ui-jobs 701): the trigger and `walletProtocolRows`. Null when the wallet
+ *  holds nothing besides the page's position. */
+export function walletProtocolMenu<P extends WalletCountsPosition>(
+  positions: P[],
+  isPage: (p: P) => boolean,
+  protocolOf: (p: P) => MenuProtocol | undefined,
+  dashboard: string,
+): { trigger: string; rows: WalletProtocolRow<P>[]; pageCounted: boolean } | null {
+  const page = positions.filter(isPage);
+  if (positions.length === page.length) return null;
   return {
     trigger: count(positions.length, "position"),
-    rows,
+    rows: walletProtocolRows(positions, isPage, protocolOf, dashboard),
     pageCounted: page.length > 0,
   };
+}
+
+/** What the page under the wallet heading is: a position, an event of one,
+ *  or a page listing the wallet's positions in one protocol. */
+export type TrailPage = "position" | "event" | "wallet";
+
+/** Whether `href` is the page at `pathname` + `search`: the same path, and
+ *  each query parameter the href states the same on the page. */
+export function hrefIsPage(href: string, pathname: string, search: string): boolean {
+  const [rawPath, rawQuery = ""] = href.split("?");
+  if (pagePath(rawPath) !== pagePath(pathname)) return false;
+  const page = new URLSearchParams(search);
+  for (const [k, v] of new URLSearchParams(rawQuery))
+    if ((page.get(k) ?? "").toLowerCase() !== v.toLowerCase()) return false;
+  return true;
+}
+
+/** The trail's protocol crumb (H13.4): the row of the page's protocol, where
+ *  it links, and whether it is the page. On a position or an event page it
+ *  links where the menu's row does: the protocol's listing searched by the
+ *  wallet, or, where the row's one position is a page above this one (Morpho
+ *  Blue Arbitrum's wallet page over its per-market page), that page. On a
+ *  wallet page it is the page. Null where no row is the page's. */
+export function walletTrailCrumb<P extends WalletCountsPosition>(
+  rows: WalletProtocolRow<P>[],
+  pathname: string,
+  search: string,
+  page: TrailPage,
+): { row: WalletProtocolRow<P>; href: string; current: boolean } | null {
+  const here = pagePath(pathname);
+  const under = (href: string | null) => href != null && pagePath(href.split("?")[0]).startsWith(`${here}/`);
+  const row =
+    rows.find((r) => r.page) ??
+    rows.find((r) => r.listed && hrefIsPage(r.listing, pathname, search)) ??
+    (page === "wallet" ? rows.find((r) => r.positions.some((p) => under(p.href))) : undefined);
+  if (!row) return null;
+  if (page === "wallet") return { row, href: row.listing, current: true };
+  const above = (href: string | null) => href != null && here.startsWith(`${pagePath(href.split("?")[0])}/`);
+  const href = row.positions.length === 1 && above(row.first.href) ? row.first.href! : row.listing;
+  return { row, href, current: hrefIsPage(href, pathname, search) };
 }

@@ -110,6 +110,7 @@ export async function MorphoAtBlockWallet({ dep, wallet: raw }: { dep: MorphoAtB
     <div className="py-8" data-anatomy="U3" {...hook("wallet", wallet)}>
       <header className="mb-5">
         <DetailTopRow
+          walletPage
           session={session}
           fallbackHref={dep.route}
           showStamp={false}

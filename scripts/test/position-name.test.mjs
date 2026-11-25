@@ -4,9 +4,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { shortPositionId, listingTagId, marketPair, spacePair, positionName, positionTitle } = await import(
-  "../../lib/shared/position-name.ts"
-);
+const { shortPositionId, listingTagId, marketPair, spacePair, positionName, positionTitle, positionCrumb } =
+  await import("../../lib/shared/position-name.ts");
 
 test("a decimal id of up to ten digits reads #n", () => {
   assert.equal(shortPositionId("31245"), "#31245");
@@ -87,4 +86,11 @@ test("the tab title is the explorer, then the name", () => {
   // No market, no empty piece.
   assert.equal(t3, "Aave V3 on Arbitrum · Position 0x2012…98db");
   assert.equal(positionTitle("Fluid", { market: "", noun: "Position", id: 7682 }), "Fluid · Position #7682");
+});
+
+test("the trail's crumb leaves out an id that is the wallet", () => {
+  const w = "0x3dF83ec9d2b62bb9bb83eba1218a202564bb67da";
+  assert.equal(positionCrumb(positionName({ market: "Core", noun: "Position", id: w.toLowerCase() }), w), "Core");
+  assert.equal(positionCrumb(positionName({ noun: "Position", id: w }), w), "Position");
+  assert.equal(positionCrumb(positionName({ market: "WETH", noun: "Trove", id: "31245" }), w), "WETH · Trove #31245");
 });

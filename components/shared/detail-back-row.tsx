@@ -128,7 +128,14 @@ export function closingPricesAt<E extends { blockNumber: number; timestamp: numb
  *
  *  An event page (a route with `eventId`) is about one event: its heading
  *  draws no prices, no recency stamp and no Tools (ui-jobs 236's design
- *  round, 6 Nov 2026); the event's ⋮ beside its h1 carries the actions. */
+ *  round, 6 Nov 2026); the event's ⋮ beside its h1 carries the actions.
+ *
+ *  The heading's trail (H13.4; Miles, 25 Nov 2026) replaces Back on a
+ *  position page with an owner whose Back would land on the wallet's listing
+ *  in the protocol (no `fallbackHref`): the trail's protocol crumb links
+ *  there, and the heading takes Back's row. Back stays on an event page,
+ *  whose parent is the position; on a wallet page (`walletPage`); and where
+ *  the page names a `fallbackHref`, a listing the trail does not hold. */
 export function DetailTopRow({
   session,
   wallet,
@@ -142,6 +149,7 @@ export function DetailTopRow({
   tools = true,
   fallbackHref,
   card = false,
+  walletPage = false,
   children,
 }: {
   /** The page's explorer; absent on a page no explorer owns (sBOLD's holder
@@ -173,6 +181,9 @@ export function DetailTopRow({
    *  so the server's paint does not stand it in the heading for the card to
    *  take after hydration (below sm a line of the heading's height). */
   card?: boolean;
+  /** The page lists the wallet's positions in one protocol: the trail's
+   *  protocol crumb is the page. */
+  walletPage?: boolean;
   children?: ReactNode;
 }) {
   const eventPage = useParams<{ eventId?: string }>()?.eventId != null;
@@ -214,6 +225,36 @@ export function DetailTopRow({
     ) : null,
   );
   const inCard = claimed || card;
+  const page = eventPage ? "event" : walletPage ? "wallet" : "position";
+  // The trail's protocol crumb goes where Back's fallback would.
+  const back = !(owner && page === "position" && fallbackHref == null);
+  const heading = owner && (
+    // In the row's scope: a holder can carry a receipt (Polaris). With
+    // no card to hold them, the price and the chain's recency ride the
+    // heading's right end, price first (ui-jobs 272).
+    <ProvReceiptsScope registry={registry}>
+      <PositionWalletHeading
+        owner={owner}
+        session={session}
+        page={page}
+        // Without Back the heading is the column's first row, clear of the
+        // profile control (H20) at the top right from md.
+        className={back ? undefined : PROFILE_CLEARANCE}
+        tools={tools && !eventPage ? children : false}
+        strip={
+          !inCard && (priced || stamped) ? (
+            <>
+              {priced}
+              {stamped && <RecencyStamp />}
+            </>
+          ) : undefined
+        }
+      />
+      {/* A closing or closed explorer's state under the heading (H24.1; ui-jobs 621). */}
+      {lifecycleId && <LifecycleLine id={lifecycleId} className="mt-2" />}
+    </ProvReceiptsScope>
+  );
+  if (!back) return <div className="mb-4">{heading}</div>;
   return (
     // With the heading, the gap to the card (16px, in place of the page's
     // space-y-6 margin) is smaller than the gap above the heading (24px), so
@@ -237,31 +278,7 @@ export function DetailTopRow({
         {/* The page's Tools menu, once the caller has export shapes to give. */}
         {!owner && !eventPage && children}
       </div>
-      {owner && (
-        <div className="mt-6">
-          {/* In the row's scope: a holder can carry a receipt (Polaris). With
-              no card to hold them, the price and the chain's recency ride the
-              heading's right end, price first (ui-jobs 272); Back stays alone
-              above. */}
-          <ProvReceiptsScope registry={registry}>
-            <PositionWalletHeading
-              owner={owner}
-              session={session}
-              tools={tools && !eventPage ? children : false}
-              strip={
-                !inCard && (priced || stamped) ? (
-                  <>
-                    {priced}
-                    {stamped && <RecencyStamp />}
-                  </>
-                ) : undefined
-              }
-            />
-            {/* A closing or closed explorer's state under the heading (H24.1; ui-jobs 621). */}
-            {lifecycleId && <LifecycleLine id={lifecycleId} className="mt-2" />}
-          </ProvReceiptsScope>
-        </div>
-      )}
+      {owner && <div className="mt-6">{heading}</div>}
     </div>
   );
 }

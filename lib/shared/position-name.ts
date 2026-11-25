@@ -76,3 +76,12 @@ export function positionTitle(
 ): string {
   return `${explorer} · ${positionName(parts).text}`;
 }
+
+/** The position's crumb in the wallet heading's trail (H13.4): the name
+ *  without an id that is the wallet's address, which the heading names
+ *  ("Core" for an Aave V3 account, "Position" with no market), else the
+ *  whole name ("WETH · Trove #31245"). */
+export function positionCrumb(name: PositionName, wallet: string): string {
+  if (name.id.toLowerCase() !== shortPositionId(wallet).toLowerCase()) return name.text;
+  return name.market ?? name.noun;
+}
