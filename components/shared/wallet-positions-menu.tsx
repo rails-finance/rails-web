@@ -33,7 +33,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Activity, ChevronDown } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import type { CardMenuRender, TrailStatus } from "@/components/shared/position-card-strip";
+import type { CardMenuRender, TrailMark, TrailStatus } from "@/components/shared/position-card-strip";
 import { Prov } from "@/components/shared/provenance";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
@@ -133,6 +133,7 @@ export function WalletPositionsMenu({
   search: givenSearch,
   position,
   status,
+  mark,
   cardMenu,
   onCrumb,
 }: {
@@ -146,6 +147,8 @@ export function WalletPositionsMenu({
   position?: string | null;
   /** The card's lifecycle, the pulse before the position crumb. */
   status?: TrailStatus | null;
+  /** The card's protocol and chain, drawn before the protocol on a phone. */
+  mark?: TrailMark | null;
   /** The card's ⋮ menu, which the position crumb opens. */
   cardMenu?: CardMenuRender | null;
   /** Told once the read settles whether the trail has a protocol crumb. */
@@ -364,7 +367,24 @@ export function WalletPositionsMenu({
     </div>
   );
 
-  const protocolBody = crumb && <span className="whitespace-nowrap">{crumb.row.name}</span>;
+  // On a phone, where the card's sidebar is a bare strip, the card's
+  // protocol mark and chain glyph lead the protocol (ui-jobs 856).
+  const markNode = mark && (
+    <span className="flex shrink-0 items-center gap-1 md:hidden" data-wallet-trail-mark="">
+      <span role="img" aria-label={mark.protocolName} title={mark.protocolName} className="flex">
+        <ProtocolIcon id={mark.protocolId} className="size-3.5 shrink-0" />
+      </span>
+      <span role="img" aria-label={mark.chainName} title={mark.chainName} className="flex text-rb-500">
+        <ChainGlyph id={mark.chainId} className="size-3.5 shrink-0" />
+      </span>
+    </span>
+  );
+  const protocolBody = crumb && (
+    <>
+      {markNode}
+      <span className="whitespace-nowrap">{crumb.row.name}</span>
+    </>
+  );
   // The pulse's words: the pill's, with its read-more where it has one.
   const statusTip = status && (status.tip ? `${status.word}. ${status.tip}` : status.word);
   return (
@@ -402,6 +422,7 @@ export function WalletPositionsMenu({
       {named && (
         <>
           {(dropdown || crumb || !settled) && SLASH}
+          {!crumb && markNode && <span className="mr-1 flex">{markNode}</span>}
           <span
             aria-current="page"
             className="flex min-w-0 items-center gap-1 text-foreground"

@@ -106,7 +106,16 @@ export function WalletHeading({
 
 /** The row under the wallet heading (H7): `start` (Back) at the left,
  *  `end` (the recency and prices) at the right, held at 38px when empty. */
-export function HeadingRow({ start, end }: { start?: ReactNode; end?: ReactNode }) {
+export function HeadingRow({
+  start,
+  end,
+  endFirstOnPhone = false,
+}: {
+  start?: ReactNode;
+  end?: ReactNode;
+  /** Below 768px `end` stands at the row's left (the trail's recency). */
+  endFirstOnPhone?: boolean;
+}) {
   return (
     <div
       className="mt-2 flex min-h-[38px] flex-wrap items-center justify-between gap-x-2 gap-y-1"
@@ -114,7 +123,13 @@ export function HeadingRow({ start, end }: { start?: ReactNode; end?: ReactNode 
       data-heading-row=""
     >
       <div className="flex min-w-0 items-center">{start}</div>
-      {end && <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">{end}</div>}
+      {end && (
+        <div
+          className={`ml-auto flex shrink-0 items-center gap-1 sm:gap-2 ${endFirstOnPhone ? "max-md:order-first max-md:ml-0" : ""}`}
+        >
+          {end}
+        </div>
+      )}
     </div>
   );
 }
@@ -370,6 +385,7 @@ export function PositionWalletHeading({
             page={page}
             position={position}
             status={card?.status}
+            mark={card?.mark}
             cardMenu={cardMenu}
             onCrumb={onCrumb}
           />

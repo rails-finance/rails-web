@@ -927,6 +927,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   // The wallet heading's trail names the position from here (H13.4).
   // The pill as the trail draws it: OPEN where the card has a lifecycle and
   // no status word.
+  const cardIdentity = usePositionCardIdentity();
   const cardId = usePublishPositionCardName(
     detail ? slots.name : undefined,
     slots.status
@@ -934,6 +935,15 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       : slots.lifecycle !== false
         ? { word: "Open", tone: "open" }
         : null,
+    // A card with a sidebar hands the trail its phone mark (C20.1, C20.2).
+    cardIdentity && slots.sidebar !== false
+      ? {
+          protocolId: cardIdentity.protocol.id,
+          protocolName: cardIdentity.protocol.name,
+          chainId: cardIdentity.chain.id,
+          chainName: cardIdentity.chain.name,
+        }
+      : null,
   );
   // Where the trail names the position, the detail card leaves its name (the
   // tag) and its pill out; the listing card and a page with no trail keep
@@ -974,14 +984,16 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const menu = detail ? (trailNamed ? null : detailMenu()) : slots.menu;
   const edge = useContext(PositionCardEdgeContext);
   const wallet = !detail && edge?.surface === "wallet";
-  const identity = usePositionCardIdentity();
+  const identity = cardIdentity;
   // A card with a sidebar: below md its protocol and chain stand in the
   // heading row (C20.1, C20.2), from md the panel carries them. A card with
   // none (`sidebar: false`): a detail card's chain glyph at every width.
   const barred = identity != null && slots.sidebar !== false;
   const narrowOnly = barred ? "md:hidden" : "";
+  // Where the trail names this card's position, the protocol mark and the
+  // chain glyph a phone drew here stand in the trail (H13.4; ui-jobs 856).
   const chainPill =
-    identity && (barred || detail) ? (
+    identity && (barred || detail) && !(trailNamed && barred) ? (
       <span className={`flex items-center ${narrowOnly}`}>
         {/* Outside the row's quiet tips: the glyph's tip names the chain. */}
         <QuietTipsContext.Provider value={false}>
@@ -1002,7 +1014,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   // On a detail card the name is the link to the explorer (C20.1).
   const markHref = detail ? identity?.protocol.href : undefined;
   const protocolMark =
-    barred && identity ? (
+    barred && identity && !trailNamed ? (
       <span
         className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-zone md:hidden"
         data-card-protocol={identity.protocol.id}
@@ -1031,7 +1043,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       // From md, a detail heading row with nothing in it goes, and the
       // figures start at the card's padding. Below md the protocol mark
       // (C20.1) holds it.
-      className={`flex items-start gap-2 mb-3 ${detail ? "md:[&:not(:has([data-card-head-part]:not(:empty)))]:hidden" : ""}`}
+      className={`flex items-start gap-2 mb-3 ${detail ? (trailNamed ? "[&:not(:has([data-card-head-part]:not(:empty)))]:hidden" : "md:[&:not(:has([data-card-head-part]:not(:empty)))]:hidden") : ""}`}
       data-anatomy="C5"
       {...(detail ? { "data-card-header": "" } : {})}
     >
@@ -1211,14 +1223,27 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             <SectionExplainer
               slot={slots.explainer}
               rowExtra={
-                slots.readStatus || counters ? (
-                  <span className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-3 self-center">
+                slots.readStatus || counters || trailDrawn ? (
+                  // With the trail drawn, the page's price stands before the
+                  // counts (ui-jobs 856); on a phone it wraps above them.
+                  <span
+                    className={`ml-auto flex min-w-0 flex-1 flex-wrap items-center justify-end ${trailDrawn ? "gap-x-2" : "gap-x-3"} gap-y-1 self-center`}
+                  >
                     {slots.readStatus && (
                       // Below sm the status wraps, so its last words stay
                       // readable; from sm it holds one line.
                       <span className="min-w-0 text-right text-xs text-rb-500 sm:truncate" data-card-status-line="">
                         {slots.readStatus}
                       </span>
+                    )}
+                    {trailDrawn && (
+                      <PositionCardStripSlot>
+                        {(strip) => (
+                          <span className="flex shrink-0 items-center gap-1 sm:gap-2" data-position-strip="">
+                            {strip}
+                          </span>
+                        )}
+                      </PositionCardStripSlot>
                     )}
                     {counters && <span className="flex shrink-0 items-center gap-2">{counters}</span>}
                   </span>

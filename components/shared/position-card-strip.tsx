@@ -21,6 +21,7 @@
 // reads the first card's as its position crumb.
 
 import type { PositionName } from "@/lib/shared/position-name";
+import type { ChainId } from "@/lib/shared/chains";
 import type { Provenance } from "@/components/shared/provenance";
 import {
   createContext,
@@ -53,6 +54,15 @@ export interface CardMenuCrumb {
   top?: ReactNode;
 }
 
+/** The card's protocol and chain, which the trail draws on a phone where
+ *  the card's sidebar is a bare strip (C20.1, C20.2). */
+export interface TrailMark {
+  protocolId: string;
+  protocolName: string;
+  chainId: ChainId;
+  chainName: string;
+}
+
 /** The card's ⋮ menu, drawn with a crumb's trigger. */
 export type CardMenuRender = (crumb: CardMenuCrumb) => ReactNode;
 
@@ -60,7 +70,7 @@ interface StripStore {
   node: ReactNode;
   slots: string[];
   /** The detail cards' names, in mount order. */
-  names: { id: string; name: PositionName; status: TrailStatus | null }[];
+  names: { id: string; name: PositionName; status: TrailStatus | null; mark: TrailMark | null }[];
   /** The wallet headings whose trail names the page's position. */
   trails: string[];
   /** The detail cards' menus, by the card's id. */
@@ -145,7 +155,11 @@ export function PositionCardStripSlot({ children }: { children: (strip: ReactNod
 
 /** The detail card's half of the name: registers `name` and the card's
  *  lifecycle while the card is mounted, kept current as they change. */
-export function usePublishPositionCardName(name: PositionName | undefined, status: TrailStatus | null): string {
+export function usePublishPositionCardName(
+  name: PositionName | undefined,
+  status: TrailStatus | null,
+  mark: TrailMark | null = null,
+): string {
   const store = useContext(PositionCardStripContext);
   const id = useId();
   const text = name?.text;
@@ -154,7 +168,7 @@ export function usePublishPositionCardName(name: PositionName | undefined, statu
   const tip = status?.tip;
   useLayoutEffect(() => {
     if (!store || !name) return;
-    store.names = [...store.names.filter((n) => n.id !== id), { id, name, status }];
+    store.names = [...store.names.filter((n) => n.id !== id), { id, name, status, mark }];
     notify(store);
     return () => {
       store.names = store.names.filter((n) => n.id !== id);
@@ -163,7 +177,7 @@ export function usePublishPositionCardName(name: PositionName | undefined, statu
     // The name and status are new objects each render; their words are
     // what change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store, id, text, word, tone, tip]);
+  }, [store, id, text, word, tone, tip, mark?.protocolId, mark?.chainId]);
   return id;
 }
 
@@ -198,7 +212,11 @@ export function usePositionCardMenu(): CardMenuRender | null {
 
 /** The wallet heading's half: the first detail card's name and lifecycle,
  *  or null while none is mounted (and on the server). */
-export function usePositionCardName(): { name: PositionName; status: TrailStatus | null } | null {
+export function usePositionCardName(): {
+  name: PositionName;
+  status: TrailStatus | null;
+  mark: TrailMark | null;
+} | null {
   const store = useContext(PositionCardStripContext);
   const subscribe = useSubscribe(store);
   return useSyncExternalStore(

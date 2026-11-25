@@ -220,19 +220,24 @@ export function DetailTopRow({
     );
   const priced = prices(true);
   const stamped = showStamp && !closed && !eventPage;
+  // With the trail drawn (a position page that knows its wallet; ui-jobs
+  // 856), the card takes the price alone, into its footer row before the
+  // counts, and the recency stays in the row under the heading (H7).
+  const trailing = owner != null && !eventPage && !walletPage && !!owner.wallet;
   const claimed = usePublishPositionCardStrip(
     // In the card the stamp stands before the price, next to the ⋮.
     owner && (priced || stamped) ? (
-      <>
-        {stamped && <RecencyStamp />}
-        {priced}
-      </>
+      trailing ? (
+        priced || null
+      ) : (
+        <>
+          {stamped && <RecencyStamp />}
+          {priced}
+        </>
+      )
     ) : null,
   );
-  // With the trail drawn (a position page that knows its wallet), the strip
-  // stands in the row under the heading; no card holds it (ui-jobs 856).
-  const trailing = owner != null && !eventPage && !walletPage && !!owner.wallet;
-  const inCard = !trailing && (claimed || card);
+  const inCard = claimed || card;
   const page = eventPage ? "event" : walletPage ? "wallet" : "position";
   // The trail's protocol crumb goes where Back's fallback would: Back
   // goes. Where that rests on the summary read, Back stays out until the
@@ -274,8 +279,21 @@ export function DetailTopRow({
             </span>
           )
         }
+        // On a phone the trail's recency stands at the row's left.
+        endFirstOnPhone={trailing}
         end={
-          !inCard && (priced || stamped) ? (
+          trailing ? (
+            (stamped || (!inCard && priced)) && (
+              <>
+                {!inCard && priced && (
+                  <span className="flex items-center gap-1 sm:gap-2" data-position-strip="">
+                    {priced}
+                  </span>
+                )}
+                {stamped && <RecencyStamp />}
+              </>
+            )
+          ) : !inCard && (priced || stamped) ? (
             <span className="flex items-center gap-1 sm:gap-2" data-position-strip="">
               {priced}
               {stamped && <RecencyStamp />}
