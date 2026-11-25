@@ -10,7 +10,10 @@
 // roster's sub-pages in order (Markets, Branches, System, …), then About, the
 // info page. On a sub-page the current section is the one whose route holds
 // the pathname, so a sub-page's nested routes (Morpho's markets/[loanToken])
-// mark their parent. A listing draws the recency stamp on a row under it.
+// mark their parent. Under the sections, where the version is launched on
+// more than one chain, the chain row: "Chain" and a glyph per chain, the
+// current one on a raised tile (ui-jobs 854). A listing draws the recency
+// stamp on a row under it.
 //
 // A POSITION PAGE DRAWS NO RAIL HEADER (rails-ops decisions/0052): the
 // wallet heading is its frame, with a line naming the protocol and linking
@@ -22,7 +25,13 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { SessionProtocol } from "@/lib/shared/sessions";
-import { explorerSections, protocolForSession, subPageForPathname } from "@/lib/shared/protocols";
+import {
+  explorerChains,
+  explorerSections,
+  protocolForSession,
+  subPageForPathname,
+  type ExplorerChain,
+} from "@/lib/shared/protocols";
 import { ProtocolIdentity } from "@/components/shared/protocol-identity";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
@@ -86,6 +95,12 @@ export const TAB_IDLE = `${TAB_BASE} border-transparent text-rb-500 transition-c
 const SECTION_ITEM =
   "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-left text-[15px] text-foreground outline-none transition-colors hover:text-blue-600 focus-visible:text-blue-600 focus-visible:ring-[1.5px] focus-visible:ring-blue-500 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]";
 
+/** A glyph in the chain row: a 44px tile, muted at rest, link blue on hover
+ *  and keyboard focus as SECTION_ITEM; the current chain on the chooser's
+ *  raised tile (H4). */
+const CHAIN_ITEM =
+  "flex size-11 cursor-pointer items-center justify-center rounded-lg outline-none transition-colors hover:text-blue-600 focus-visible:text-blue-600 focus-visible:ring-[1.5px] focus-visible:ring-blue-500 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]";
+
 const ITEMS = '[role="menuitem"]';
 
 export interface Section {
@@ -102,12 +117,17 @@ export interface Section {
  *  Keyboard as the profile menu (H20): the current row takes focus on
  *  opening; the arrow keys, Home and End move through the rows; Escape closes
  *  it and returns focus to the trigger; Tab, a press outside and a
- *  navigation close it. The /vaults head draws it too (ui-jobs 776). */
+ *  navigation close it. The /vaults head draws it too (ui-jobs 776), with
+ *  no chain row. `chains` (explorerChains) draws the chain row under the
+ *  sections, its glyphs menu items after them in the arrow-key order
+ *  (ui-jobs 854); fewer than two draw none. */
 export function SectionsMenu({
   sections,
+  chains = [],
   label = "Explorer sections",
 }: {
   sections: Section[];
+  chains?: ExplorerChain[];
   /** The nav's accessible name; /vaults names its own (ui-jobs 776). */
   label?: string;
 }) {
@@ -118,6 +138,7 @@ export function SectionsMenu({
   const menu = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const triggerId = useId();
+  const chainLabelId = useId();
   const current = sections.find((s) => s.current);
 
   const close = useCallback((refocus = true) => {
@@ -227,6 +248,39 @@ export function SectionsMenu({
             {s.current && <Check className="size-4 shrink-0" strokeWidth={2.5} aria-hidden="true" />}
           </Link>
         ))}
+        {chains.length > 1 && (
+          <>
+            <div role="separator" className="mx-1 my-2 border-t border-rb-200 dark:border-rb-800" />
+            <span
+              id={chainLabelId}
+              role="presentation"
+              className="block px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-rb-500"
+            >
+              Chain
+            </span>
+            <div role="group" aria-labelledby={chainLabelId} className="flex flex-wrap gap-1" data-sections-chains="">
+              {chains.map((c) => {
+                const chain = CHAINS[c.chainId];
+                return (
+                  <Link
+                    key={c.chainId}
+                    href={c.href}
+                    role="menuitem"
+                    tabIndex={-1}
+                    aria-label={chain.name}
+                    aria-current={c.current ? "true" : undefined}
+                    title={chain.name}
+                    onClick={() => close(false)}
+                    data-sections-chain={chain.slug}
+                    className={`${CHAIN_ITEM} ${c.current ? "bg-rb-200 text-foreground dark:bg-rb-700" : "text-rb-500"}`}
+                  >
+                    <ChainGlyph chainId={c.chainId} className="h-5 w-5" />
+                  </Link>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
     </nav>
   );
@@ -259,16 +313,16 @@ export function RailHeader({
         : undefined;
   // The menu's entries (explorerSections, lib/shared/protocols.ts): a front
   // door is never current, as it draws no rail header.
-  const sections: Section[] = explorerSections(entry).map((x) => ({
-    href: x.href,
-    name: x.name,
-    current:
-      x.kind === "listing"
-        ? venue === "listing"
-        : x.kind === "info"
-          ? venue === "info"
-          : x.kind === "subPage" && x.sub === litSubPage,
-  }));
+  const all = explorerSections(entry);
+  const isCurrent = (x: (typeof all)[number]) =>
+    x.kind === "listing"
+      ? venue === "listing"
+      : x.kind === "info"
+        ? venue === "info"
+        : x.kind === "subPage" && x.sub === litSubPage;
+  const sections: Section[] = all.map((x) => ({ href: x.href, name: x.name, current: isCurrent(x) }));
+  // The same protocol on its other launched chains (ui-jobs 854).
+  const chains = explorerChains(entry, all.find(isCurrent));
   return (
     <div className="flex flex-col gap-2">
       {/* The page's largest type (rails-ops TO-DO-ui-jobs 67), set in
@@ -283,7 +337,7 @@ export function RailHeader({
         </div>
         <ChainLabel chainId={entry.chainId} />
         {/* An explorer with one section (About alone) draws no menu. */}
-        {sections.length > 1 && <SectionsMenu sections={sections} />}
+        {sections.length > 1 && <SectionsMenu sections={sections} chains={chains} />}
       </div>
       {/* A closing or closed explorer says so on every venue (H24.1; ui-jobs 612, 621). */}
       <LifecycleLine id={entry.id} />

@@ -1602,6 +1602,34 @@ export function explorerSections(entry: ProtocolEntry): ExplorerSection[] {
   ];
 }
 
+/** One chain in H5's chain row (ui-jobs 854). */
+export interface ExplorerChain {
+  chainId: ChainId;
+  href: string;
+  current: boolean;
+}
+
+/** The chains an explorer's version is launched on, for H5's chain row
+ *  (ui-jobs 854): the entry's own chain (marked current) and each launched
+ *  entry sharing its `protocolKey` on another chain, in the chooser's chain
+ *  order (`launchedChains`). Each other chain links to the same section where
+ *  its entry has it (the same kind; a sub-page by its segment), else to its
+ *  first section. One chain alone comes back as an empty list: no row. */
+export function explorerChains(entry: ProtocolEntry, at: ExplorerSection | undefined): ExplorerChain[] {
+  const key = entry.protocolKey ?? entry.id;
+  const others = LAUNCHED_PROTOCOLS.filter((p) => p !== entry && (p.protocolKey ?? p.id) === key);
+  if (others.length === 0) return [];
+  const hrefOn = (to: ProtocolEntry): string => {
+    const there = explorerSections(to);
+    const same = at && there.find((s) => s.kind === at.kind && s.sub?.segment === at.sub?.segment);
+    return (same ?? there[0]).href;
+  };
+  const order = launchedChains().map((c) => c.id);
+  return [entry, ...others]
+    .sort((a, b) => order.indexOf(a.chainId) - order.indexOf(b.chainId))
+    .map((p) => ({ chainId: p.chainId, href: p === entry ? (at?.href ?? p.href) : hrefOn(p), current: p === entry }));
+}
+
 /** The explorer's name for a TEXT-ONLY surface — a tab title, an aria-label,
  *  a sentence — where the chain mark cannot go. On screen the chain is a mark
  *  beside the label (ChainMark), never a suffix on the name; where only words
