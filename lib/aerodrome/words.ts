@@ -247,7 +247,6 @@ export function readoutTable(p: AeroPosition): PoolTable {
   const Q = p.quote.symbol;
   const R = p.site.reward.symbol;
   const closed = BigInt(p.liquidity) === BigInt(0);
-  const minted = p.window.kind === "minted";
   const why = windowNote(p);
   const a = p.aero;
 
@@ -346,7 +345,11 @@ export function readoutTable(p: AeroPosition): PoolTable {
       // Said once: the fees row carries the same reason where it has it.
       p.holdsThen === null && p.priceThen !== null && why !== WINDOW_NOTE.minted ? WINDOW_NOTE.minted : undefined,
     ),
-    ...daysRow(closed ? null : p.daysInRange, minted ? "minted" : null),
+    // The start as a date, as Uniswap's row states it (ui-jobs 835): the first daily read that has the NFT.
+    ...daysRow(
+      closed ? null : p.daysInRange,
+      p.window.kind === "minted" && p.window.firstSeen !== null ? day(p.window.firstSeen) : null,
+    ),
     earned,
     ...against,
     ...open,
@@ -491,6 +494,7 @@ export function readoutExplainer(p: AeroPosition): ExplainGroupWords[] {
 
 /** The front door's and the wallet page's words on a site. */
 export const frontDoorWords = (site: SlipstreamSite) => ({
+  /** Aerodrome's door line; Velodrome's door has none (ui-jobs 578). */
   line: `A wallet's ${site.label} Slipstream positions on ${site.chainName}, staked or not, each with its range, fees or ${site.reward.symbol} and pool over the last 30 days.`,
   heading: `${site.label} positions`,
   none: `This address holds no ${site.label} Slipstream position with liquidity in it.`,

@@ -125,11 +125,11 @@ export function opcCollateralProv(key: OpcCollateralFigure, c: OpcReceiptContext
 
 export type OpcBaseFigure = "amount" | "usd" | "rate" | "interest" | "usd-interest";
 
-/** The wallet card's Lent headline (decision 0071): its receipt, with the
- *  figure the wallet total sums for the account, the collateral posted to the
- *  Comet, stated as "Collateral $X". With a collateral unpriced the total sums
- *  nothing for the account and the receipt states no collateral. */
-export function opcWalletLentProv(c: OpcReceiptContext): Provenance {
+/** The wallet card's Lent or Owed headline (decision 0071): its receipt, with
+ *  the figure the wallet total sums for the account, the collateral posted to
+ *  the Comet, stated as "Collateral $X". With a collateral unpriced the total
+ *  sums nothing for the account and the receipt states no collateral. */
+export function opcWalletBaseProv(c: OpcReceiptContext): Provenance {
   const { f } = c;
   if (f.unpriced.length > 0 || f.collateralUsd == null) return opcBaseProv("usd", c);
   const collateral = `$${fig(f.collateralUsd)}`;

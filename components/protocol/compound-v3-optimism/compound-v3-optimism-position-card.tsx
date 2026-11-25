@@ -23,6 +23,8 @@ import {
   DataTableRow,
 } from "@/components/shared/data-table/data-table";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { TokenFigure } from "@/components/shared/token-figure";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { PoolReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
@@ -75,11 +77,20 @@ function CollateralTable({ c }: { c: OpcReceiptContext }) {
   const p = c.p!;
   if (!p.collateral.length) return null;
   return (
-    <DataTable label={CARD_WORDS.collateral} stacked anatomy="C21" className="mt-4" data-reserves-table="">
+    // overflow-visible: a heading tip opens above the frame, which would clip
+    // it; the table draws only from lg, where it fits the card.
+    <DataTable
+      label={CARD_WORDS.collateral}
+      stacked
+      stackBelow="lg"
+      anatomy="C21"
+      className="mt-4 overflow-visible!"
+      data-reserves-table=""
+    >
       <DataTableHead>
         <DataTableHeader label={COLS.asset} />
         <DataTableHeader label={COLS.amount} align="right" />
-        <DataTableHeader label={COLS.factors} align="right" />
+        <DataTableHeader label={<HeadingTip text={COLS.factors} tip={CARD_WORDS.factorsTip} />} align="right" />
       </DataTableHead>
       <DataTableBody>
         {p.collateral.map((x) => (
@@ -99,10 +110,13 @@ function baseRow(c: OpcReceiptContext): PositionPanelRow | null {
     id: lend ? "lent" : "borrowed",
     label: CARD_WORDS.baseRow(p.baseSymbol, lend),
     tip: CARD_WORDS.rateTip,
-    asset: { symbol: p.baseSymbol, address: p.baseToken },
+    // The token badge follows the amount alone: on the row it would stand
+    // after the rate and interest lines and read as their unit.
     value: (
       <span data-figure={lend ? "lent" : "borrowed"}>
-        <Prov info={opcBaseProv("amount", c)}>{amount(lend ? p.supplied : p.borrowed, p.baseSymbol)}</Prov>
+        <TokenFigure symbol={p.baseSymbol} address={p.baseToken}>
+          <Prov info={opcBaseProv("amount", c)}>{amount(lend ? p.supplied : p.borrowed, p.baseSymbol)}</Prov>
+        </TokenFigure>
         <span className="text-rb-500">
           {" · "}
           {(lend ? p.suppliedUsd : p.borrowedUsd) == null ? (
@@ -117,7 +131,8 @@ function baseRow(c: OpcReceiptContext): PositionPanelRow | null {
         </span>
         {i && (
           <span className="mt-0.5 block text-xs text-rb-500">
-            {CARD_WORDS.interest30}{" "}
+            <HeadingTip text={CARD_WORDS.interest30} tip={CARD_WORDS.interestTip} />
+            {": "}
             {i.state !== "ok" ? (
               <span data-interest-withheld={i.state}>{CARD_WORDS.withheld[i.state]}</span>
             ) : (

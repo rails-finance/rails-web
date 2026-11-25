@@ -114,6 +114,71 @@ test("the wallet total sums what states dollars and names what it leaves out (wa
   assert.equal(walletTotal(none, "collateral").gap, "No wallet total: Morpho Blue states no dollars");
 });
 
+test("dollars at another protocol's oracle or a feed, named on the row, count in the totals (844 A)", () => {
+  const src = "Aave V3 Optimism's oracle for the loan asset";
+  const s = walletSections(
+    [
+      pos("aave-v3", { collateralUsd: 142500, debtUsd: 133900 }),
+      pos("morpho", { chain: 10, usdOwnOracle: false, usdSource: src, collateralUsd: 88000, debtUsd: 82000 }),
+      pos("morpho", { chain: 8453, status: "closed", history: { closedAt: 5 } }),
+    ],
+    { bands: true },
+  );
+  const coll = walletTotal(s, "collateral");
+  const debt = walletTotal(s, "debt");
+  assert.equal(coll.figure.usd, 230500);
+  assert.equal(coll.of, 2);
+  assert.equal(coll.leaves, undefined);
+  assert.equal(debt.figure.usd, 215900);
+  // The section's receipt names the feed on the position's row.
+  const morpho = s.find((x) => x.slug === "morpho");
+  assert.ok(
+    morpho.collateral.prov.inputs.some((i) => i.note.includes(src)),
+    JSON.stringify(morpho.collateral.prov),
+  );
+  // An open position stating no dollars still keeps its section out, whatever its siblings state.
+  const mixed = walletSections(
+    [
+      pos("morpho", { usdOwnOracle: false, usdSource: src, collateralUsd: 88000, debtUsd: 82000 }),
+      pos("morpho", { usdOwnOracle: false, chain: 8453 }),
+    ],
+    { bands: true },
+  );
+  assert.equal(walletTotal(mixed, "collateral").gap, "No wallet total: Morpho Blue states no dollars");
+});
+
+test("Morpho Arbitrum's stored rows, at Aave's oracle, stay out as not read at the chain head, with dated subtotals", () => {
+  const at = Date.UTC(2026, 10, 20) / 1000;
+  const s = walletSections(
+    [
+      pos("aave-v3", { collateralUsd: 1000, debtUsd: 100 }),
+      pos("morpho", {
+        chain: 42161,
+        usdOwnOracle: false,
+        usdSource: "Aave V3 Arbitrum oracle at the visit's read",
+        headRead: "stored",
+        readAt: at,
+        collateralUsd: 50,
+        debtUsd: 20,
+      }),
+    ],
+    { bands: true },
+  );
+  const coll = walletTotal(s, "collateral");
+  assert.equal(coll.figure.usd, 1000);
+  assert.equal(coll.leaves, "Leaves out Morpho Blue (not read at the chain head).");
+  const morpho = s.find((x) => x.slug === "morpho");
+  assert.equal(morpho.collateral, undefined);
+  // The band states the stored figures as dated subtotals, as Aave V3 Arbitrum's does.
+  assert.deepEqual(
+    morpho.band.legs.map((l) => [l.label, l.figure.usd, l.footnote?.text]),
+    [
+      ["Collateral subtotal", 50, "as read on 20 Nov 2026"],
+      ["Debt subtotal", 20, "as read on 20 Nov 2026"],
+    ],
+  );
+});
+
 test("a section with an open position not read at head states no figure, and the wallet total leaves it out", () => {
   const s = walletSections(
     [
