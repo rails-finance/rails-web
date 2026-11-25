@@ -114,6 +114,39 @@ test("the wallet total sums what states dollars and names what it leaves out (wa
   assert.equal(walletTotal(none, "collateral").gap, "No wallet total: Morpho Blue states no dollars");
 });
 
+test("dollars at another protocol's oracle or a feed, named on the row, count in the totals (844 A)", () => {
+  const src = "Aave V3 Optimism's oracle for the loan asset";
+  const s = walletSections(
+    [
+      pos("aave-v3", { collateralUsd: 142500, debtUsd: 133900 }),
+      pos("morpho", { chain: 10, usdOwnOracle: false, usdSource: src, collateralUsd: 88000, debtUsd: 82000 }),
+      pos("morpho", { chain: 8453, status: "closed", history: { closedAt: 5 } }),
+    ],
+    { bands: true },
+  );
+  const coll = walletTotal(s, "collateral");
+  const debt = walletTotal(s, "debt");
+  assert.equal(coll.figure.usd, 230500);
+  assert.equal(coll.of, 2);
+  assert.equal(coll.leaves, undefined);
+  assert.equal(debt.figure.usd, 215900);
+  // The section's receipt names the feed on the position's row.
+  const morpho = s.find((x) => x.slug === "morpho");
+  assert.ok(
+    morpho.collateral.prov.inputs.some((i) => i.note.includes(src)),
+    JSON.stringify(morpho.collateral.prov),
+  );
+  // An open position stating no dollars still keeps its section out, whatever its siblings state.
+  const mixed = walletSections(
+    [
+      pos("morpho", { usdOwnOracle: false, usdSource: src, collateralUsd: 88000, debtUsd: 82000 }),
+      pos("morpho", { usdOwnOracle: false, chain: 8453 }),
+    ],
+    { bands: true },
+  );
+  assert.equal(walletTotal(mixed, "collateral").gap, "No wallet total: Morpho Blue states no dollars");
+});
+
 test("a section with an open position not read at head states no figure, and the wallet total leaves it out", () => {
   const s = walletSections(
     [

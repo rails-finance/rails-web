@@ -191,9 +191,14 @@ const dollarsOf = (p: WalletPosition, field: "collateralUsd" | "debtUsd") =>
 const owesNothingUnread = (p: WalletPosition) =>
   (p.kind === "deposits" || p.kind === "stakes") && p.headRead !== "read" && p.debtUsd == null;
 
-/** The position states its dollars in the field at the protocol's oracle. */
+/** The position's dollars count toward the totals: at the protocol's oracle, or at another
+ *  protocol's oracle or a price feed its row names (decision 0046; Miles, "844 A", 25 Nov 2026). */
+export const countsDollars = (p: Pick<WalletPosition, "usdOwnOracle" | "usdSource">): boolean =>
+  p.usdOwnOracle === true || p.usdSource != null;
+
+/** The position states its dollars in the field at a source the totals count. */
 const stated = (p: WalletPosition, field: "collateralUsd" | "debtUsd") =>
-  p.usdOwnOracle === true && dollarsOf(p, field) != null;
+  countsDollars(p) && dollarsOf(p, field) != null;
 
 /** The label a receipt row gives one position: its market, or its id. */
 const positionLabel = (p: WalletPosition) => {
