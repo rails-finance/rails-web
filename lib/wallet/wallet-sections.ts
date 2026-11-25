@@ -5,7 +5,8 @@
 // wallet read alone (lib/wallet/read-wallet.ts).
 //
 // A section's dollars count in the totals only where every open position in it
-// states its dollars at the protocol's oracle (decision 0050, open point 7).
+// states dollars at a source the totals count (`countsDollars`: the protocol's
+// oracle, or another one named on the row; decisions 0046 and 0050).
 // The wallet total sums the sections that state both figures and names the
 // ones it leaves out under the row (Miles, 24 Nov 2026, "wallet total b";
 // rails-ops infra item 37). Liquity V1's and V2's

@@ -222,9 +222,9 @@ export interface WalletPosition {
   debtUsd?: number;
   /** Whose oracle the dollars are at (decision 0046). */
   usdSource?: string;
-  /** The dollars are the family's own oracle's. Dollars at another source
+  /** The dollars are at the family's oracle. Dollars at another source
    *  (Morpho's, at Aave's oracle or a Chainlink feed) set this false and name
-   *  the source in `usdSource`; the totals sum both (`countsDollars`). */
+   *  the source in `usdSource`; the totals count both (`countsDollars`). */
   usdOwnOracle?: boolean;
   /** The collateral price move, as a fraction, that starts liquidation;
    *  negative past it; undefined where the family cannot state it. A sort
