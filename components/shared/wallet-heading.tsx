@@ -272,8 +272,11 @@ export function PositionWalletHeading({
   strip,
   page = "position",
   className,
+  onCrumb,
 }: {
   owner: PositionOwner;
+  /** Told whether the trail found the page's protocol (H13.4). */
+  onCrumb?: (found: boolean) => void;
   /** What the page is, for the trail (H13.4). */
   page?: TrailPage;
   className?: string;
@@ -341,7 +344,7 @@ export function PositionWalletHeading({
       // wallet, it stays empty.
       lines={
         owner.wallet ? (
-          <WalletPositionsMenu wallet={owner.wallet} page={page} position={position} />
+          <WalletPositionsMenu wallet={owner.wallet} page={page} position={position} onCrumb={onCrumb} />
         ) : (
           <div className="flex h-5 items-center" data-wallet-positions-held="">
             {owner.pending && <SkeletonBar width={72} />}

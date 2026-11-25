@@ -257,7 +257,7 @@ export function walletTrailCrumb<P extends WalletCountsPosition>(
   pathname: string,
   search: string,
   page: TrailPage,
-): { row: WalletProtocolRow<P>; href: string; current: boolean } | null {
+): { row: WalletProtocolRow<P>; href: string; current: boolean; keys: string[] } | null {
   const here = pagePath(pathname);
   const under = (href: string | null) => href != null && pagePath(href.split("?")[0]).startsWith(`${here}/`);
   const row =
@@ -265,8 +265,13 @@ export function walletTrailCrumb<P extends WalletCountsPosition>(
     rows.find((r) => r.listed && hrefIsPage(r.listing, pathname, search)) ??
     (page === "wallet" ? rows.find((r) => r.positions.some((p) => under(p.href))) : undefined);
   if (!row) return null;
-  if (page === "wallet") return { row, href: row.listing, current: true };
+  // On a wallet page, the rows the page lists: each chain's row of a
+  // protocol the wallet view narrows to.
+  if (page === "wallet") {
+    const keys = rows.filter((r) => r.listed && hrefIsPage(r.listing, pathname, search)).map((r) => r.key);
+    return { row, href: row.listing, current: true, keys: keys.length ? keys : [row.key] };
+  }
   const above = (href: string | null) => href != null && here.startsWith(`${pagePath(href.split("?")[0])}/`);
   const href = row.positions.length === 1 && above(row.first.href) ? row.first.href! : row.listing;
-  return { row, href, current: hrefIsPage(href, pathname, search) };
+  return { row, href, current: hrefIsPage(href, pathname, search), keys: [] };
 }

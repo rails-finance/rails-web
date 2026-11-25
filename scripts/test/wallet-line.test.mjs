@@ -295,3 +295,12 @@ test("on a wallet page the crumb is the page", () => {
   );
   assert.equal(under.current, true);
 });
+
+test("on the wallet view narrowed to a protocol every chain's row is the page", () => {
+  const rows = [pos("aave-v3", "open", 1), pos("aave-v3", "open", 2, "arbitrum"), pos("liquity-v2", "open", 3)];
+  const narrowed = (p) => ({ ...protocolOf(p), listing: `/wallet/${W}?protocol=${p.family}` });
+  const r = walletProtocolRows(rows, () => false, narrowed, DASHBOARD);
+  const c = walletTrailCrumb(r, `/wallet/${W}`, "?protocol=aave-v3", "wallet");
+  assert.equal(c.row.name, "Aave V3");
+  assert.deepEqual(c.keys.sort(), ["arbitrum:aave-v3", "ethereum:aave-v3"]);
+});

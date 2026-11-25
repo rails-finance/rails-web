@@ -17,12 +17,13 @@
 // outside press and Escape; the rows take the Tools menu's keys.
 //
 // The menu is the first crumb of the trail under the address (H13.4; Miles,
-// 25 Nov 2026): "3 positions ⌄ / Aave V3 ⟠ / Core", slash-separated. The
-// protocol crumb is the menu's row for the page's protocol, its name and
-// chain glyph, linking where that row's listing does (`walletTrailCrumb`);
-// on a page that lists the wallet's positions in one protocol it is the page
-// and the trail ends there. On a position page the position crumb follows,
-// the detail card's name (`usePositionCardName`), as the page: the only
+// 25 Nov 2026): "3 positions ⌄ / Aave V3 / Core ⟠", slash-separated. The
+// protocol crumb is the menu's row for the page's protocol, linking where
+// that row's listing does (`walletTrailCrumb`): the wallet view narrowed to
+// the protocol, which spans its chains. On a page that lists the wallet's
+// positions in one protocol it is the page and the trail ends there. On a
+// position page the position crumb follows, the detail card's name
+// (`usePositionCardName`) with its chain's glyph, as the page: the only
 // crumb that truncates. There the menu's row reads "this protocol"; on the
 // wallet page "this page". Where the page's position is the wallet's only
 // one the trail is the protocol and the position, with no menu.
@@ -121,6 +122,7 @@ export function WalletPositionsMenu({
   page = "position",
   search: givenSearch,
   position,
+  onCrumb,
 }: {
   wallet: string;
   /** What the page is: the protocol crumb is the page on a wallet page. */
@@ -130,11 +132,15 @@ export function WalletPositionsMenu({
   search?: string;
   /** The position crumb's words, on a position page whose card has named it. */
   position?: string | null;
+  /** Told once the read settles whether the trail has a protocol crumb. */
+  onCrumb?: (found: boolean) => void;
 }) {
   const pathname = usePathname();
   const address = wallet.toLowerCase();
   const [menu, setMenu] = useState<Menu | null>(null);
   const [crumb, setCrumb] = useState<Crumb>(null);
+  const crumbRef = useRef(onCrumb);
+  crumbRef.current = onCrumb;
   // The summary read has answered (or failed): the placeholder goes.
   const [settled, setSettled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -157,12 +163,16 @@ export function WalletPositionsMenu({
     setOpen(false);
     if (!ADDRESS.test(address)) {
       setSettled(true);
+      crumbRef.current?.(false);
       return;
     }
     readCounts(address).then((c) => {
       if (!live) return;
       setSettled(true);
-      if (!c || c.error) return;
+      if (!c || c.error) {
+        crumbRef.current?.(false);
+        return;
+      }
       const search = givenSearch ?? window.location.search;
       const isPage = (p: WalletCountsPosition) => rowIsPage(p.href, pathname, search);
       const protocolOf = (p: WalletCountsPosition) => menuProtocolOf(p, address);
@@ -217,7 +227,7 @@ export function WalletPositionsMenu({
     );
   const dashboard = `/wallet/${address}`;
   // On a wallet page the crumb's row is the page.
-  const here = (key: string) => page === "wallet" && crumb?.current === true && crumb.row.key === key;
+  const here = (key: string) => page === "wallet" && crumb?.current === true && crumb.keys.includes(key);
 
   const rows = menu && (
     <>
@@ -335,16 +345,9 @@ export function WalletPositionsMenu({
     </div>
   );
 
-  // The chain glyph after the name, as the explorer's title row draws it (H3.2).
+  const protocolBody = crumb && <span className="whitespace-nowrap">{crumb.row.name}</span>;
+  // The position's chain after its name, as the explorer's title row draws it (H3.2).
   const chain = crumb && chainMeta(CHAIN_ID[crumb.row.first.chain]).name;
-  const protocolBody = crumb && (
-    <>
-      <span className="whitespace-nowrap">{crumb.row.name}</span>
-      <span role="img" aria-label={`on ${chain}`} title={chain ?? undefined} className="flex">
-        <ChainGlyph id={CHAIN_ID[crumb.row.first.chain]} className="size-3.5 shrink-0" />
-      </span>
-    </>
-  );
   const named = page === "position" && crumb && !crumb.current && position;
   return (
     <nav
@@ -378,16 +381,25 @@ export function WalletPositionsMenu({
           )}
         </>
       )}
-      {named && (
+      {named && crumb && (
         <>
           {SLASH}
           <span
             aria-current="page"
-            title={position}
-            className="min-w-0 truncate text-foreground"
+            className="flex min-w-0 items-center gap-1 text-foreground"
             data-wallet-trail-position=""
           >
-            {position}
+            <span title={position} className="min-w-0 truncate">
+              {position}
+            </span>
+            <span
+              role="img"
+              aria-label={`on ${chain}`}
+              title={chain ?? undefined}
+              className="flex shrink-0 text-rb-500"
+            >
+              <ChainGlyph id={CHAIN_ID[crumb.row.first.chain]} className="size-3.5 shrink-0" />
+            </span>
           </span>
         </>
       )}

@@ -8,13 +8,14 @@
 // branches) instead of re-rolling the row.
 
 import { LifecycleLine } from "@/components/shared/lifecycle-line";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { ArrowLeft } from "lucide-react";
 import { NAV_BUTTON, PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { listingHrefForWallet, protocolForSession } from "@/lib/shared/protocols";
+import { walletProtocol } from "@/lib/wallet/wallet-filters";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { LatestPrices, type LatestPriceAsset, type PricesAt } from "@/components/shared/latest-prices";
 import { usePublishTodayPrices } from "@/components/shared/price-basis";
@@ -131,11 +132,15 @@ export function closingPricesAt<E extends { blockNumber: number; timestamp: numb
  *  round, 6 Nov 2026); the event's ⋮ beside its h1 carries the actions.
  *
  *  The heading's trail (H13.4; Miles, 25 Nov 2026) replaces Back on a
- *  position page with an owner whose Back would land on the wallet's listing
- *  in the protocol (no `fallbackHref`): the trail's protocol crumb links
- *  there, and the heading takes Back's row. Back stays on an event page,
- *  whose parent is the position; on a wallet page (`walletPage`); and where
- *  the page names a `fallbackHref`, a listing the trail does not hold. */
+ *  position page with an owner whose protocol the wallet view reads
+ *  (`walletProtocol`), where Back would land on the wallet's positions in
+ *  the protocol: no `fallbackHref` (the listing searched by the wallet), or
+ *  one naming the wallet (the family's wallet page). The trail's protocol
+ *  crumb opens the wallet view narrowed to the protocol, and the heading
+ *  takes Back's row. Back returns where the summary has no row for the page
+ *  (`onCrumb`). It stays on an event page, whose parent is the position; on
+ *  a wallet page (`walletPage`); and where `fallbackHref` is a listing the
+ *  trail does not hold. */
 export function DetailTopRow({
   session,
   wallet,
@@ -227,7 +232,16 @@ export function DetailTopRow({
   const inCard = claimed || card;
   const page = eventPage ? "event" : walletPage ? "wallet" : "position";
   // The trail's protocol crumb goes where Back's fallback would.
-  const back = !(owner && page === "position" && fallbackHref == null);
+  const [crumbless, setCrumbless] = useState(false);
+  const ownerWallet = owner?.wallet?.toLowerCase();
+  const trailed =
+    owner != null &&
+    page === "position" &&
+    entry != null &&
+    walletProtocol(entry.slug) != null &&
+    (fallbackHref == null || (ownerWallet != null && fallbackHref.toLowerCase().includes(ownerWallet)));
+  const unowned = owner != null && !owner.wallet && !owner.pending;
+  const back = !trailed || crumbless || unowned;
   const heading = owner && (
     // In the row's scope: a holder can carry a receipt (Polaris). With
     // no card to hold them, the price and the chain's recency ride the
@@ -237,6 +251,7 @@ export function DetailTopRow({
         owner={owner}
         session={session}
         page={page}
+        onCrumb={(found) => setCrumbless(!found)}
         // Without Back the heading is the column's first row, clear of the
         // profile control (H20) at the top right from md.
         className={back ? undefined : PROFILE_CLEARANCE}

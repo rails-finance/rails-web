@@ -10,7 +10,7 @@ import {
   type MenuProtocol,
   type WalletCountsPosition,
 } from "@/lib/wallet/summary-counts";
-import { walletProtocolHref } from "@/lib/wallet/wallet-filters";
+import { walletProtocol, walletProtocolHref } from "@/lib/wallet/wallet-filters";
 
 type Entry = (typeof PROTOCOLS)[number];
 
@@ -28,11 +28,12 @@ export function protocolLabelOf(p: Pick<WalletCountsPosition, "chain" | "family"
   return vaultProtocolOfHref(p.href) ?? protocolEntryOf(p)?.label ?? p.family;
 }
 
-/** A position's explorer on the roster: its name, its place, and its listing
- *  searched by the wallet (every wallet family's listing reads `q`). A
- *  vault-share row names its vault protocol and opens the holder listing of
- *  the explorer's Vaults tab, where it has one; Yearn V3 has none, so its row
- *  opens the wallet view narrowed to the vault shares. */
+/** A position's explorer on the roster: its name, its place, and the page of
+ *  the wallet's positions in it: the wallet view narrowed to the protocol
+ *  where the view reads it (Miles, 25 Nov 2026), else its listing searched by
+ *  the wallet. A vault-share row names its vault protocol and opens the
+ *  holder listing of the explorer's Vaults tab, where it has one; Yearn V3
+ *  has none, so its row opens the wallet view narrowed to the vault shares. */
 export function menuProtocolOf(p: WalletCountsPosition, address: string): MenuProtocol | undefined {
   const entry = protocolEntryOf(p);
   if (!entry) return undefined;
@@ -42,6 +43,8 @@ export function menuProtocolOf(p: WalletCountsPosition, address: string): MenuPr
     order: PROTOCOLS.indexOf(entry),
     listing: vault
       ? (listingHrefForWallet(entry.session, address, "vaults") ?? walletProtocolHref(address, VAULT_SHARES_FAMILY))
-      : listingHrefForWallet(entry.session, address),
+      : walletProtocol(p.family)
+        ? walletProtocolHref(address, p.family)
+        : listingHrefForWallet(entry.session, address),
   };
 }
