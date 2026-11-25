@@ -274,6 +274,9 @@ export interface WalletPosition {
    *  the wallet read no longer finds): the head read's block.
    *  The card keeps the sweep's figures and its stamp says so. */
   closedSince?: { block: number };
+  /** Read from the chain at this visit by a module with no store behind it
+   *  (lib/wallet/families/visit.ts): its stamp says so (decision 0073 point 3). */
+  readAtVisit?: true;
   headRead: HeadRead;
   readAtBlock?: number;
   /** Unix seconds. */

@@ -96,7 +96,7 @@ export async function readVisitFamilies(
     if (s.status === "fulfilled") {
       const { m, ms, positions } = s.value;
       if (positions.length === 0) continue;
-      out.positions.push(...positions);
+      out.positions.push(...positions.map((p) => ({ ...p, readAtVisit: true as const })));
       out.families.push({
         id: m.id,
         name: m.name,

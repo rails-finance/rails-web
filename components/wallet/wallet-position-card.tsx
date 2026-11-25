@@ -99,6 +99,8 @@ import { MorphoAtBlockWalletCard } from "@/components/protocol/morpho-at-block/m
 import { FluidBaseWalletCard } from "@/components/protocol/fluid-base/fluid-base-wallet-card";
 import { LidoWalletCard } from "@/components/protocol/lido/lido-wallet-card";
 import { ReadStamp } from "@/components/wallet/read-stamp";
+import { HISTORY_NONE } from "@/lib/shared/history-tier";
+import { READ_AT_VISIT } from "@/lib/wallet/wallet-sections";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { unreadEdge } from "@/lib/wallet/unread-edge";
 import type { WalletCard, WalletPosition } from "@/lib/wallet/types";
@@ -402,14 +404,23 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
       p.status === "open" &&
       !p.card.kind.endsWith("-arbitrum") &&
       !(p.card.kind === "vault" && p.card.lane === "stored") &&
-      (p.readAtBlock != null || p.readAt != null) && (
+      (p.readAtBlock != null || p.readAt != null) &&
+      (p.readAtVisit ? (
+        // A read at visit says so beside its stamp (decision 0073 point 3).
+        <span className="inline-flex items-center gap-1">
+          <span className="text-[11px] font-medium text-rb-500" title={READ_AT_VISIT} data-wallet-read-at-visit="">
+            {HISTORY_NONE.name}
+          </span>
+          <ReadStamp block={p.readAtBlock} at={p.readAt} inLink />
+        </span>
+      ) : (
         <ReadStamp
           block={p.readAtBlock}
           at={p.readAt}
           inLink
           label={p.card.kind === "vault" && p.card.lane === "census" ? "Census" : undefined}
         />
-      )
+      ))
     ),
   };
   return (

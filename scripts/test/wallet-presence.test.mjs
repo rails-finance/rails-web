@@ -228,3 +228,38 @@ test("the Uniswap-family checks ask each chain's position managers, and PancakeS
     assert.match(checks.LIQUIDITY_PRESENCE[k].why, /gauge/);
   }
 });
+
+test("a position read at visit is marked so its stamp says so (0073 point 3)", async () => {
+  const { readVisitFamilies } = await import("../../lib/wallet/families/visit.ts");
+  const module = {
+    id: "test-visit",
+    name: "Test",
+    chain: 10,
+    chainName: "Optimism",
+    family: "test",
+    on: true,
+    presence: { kind: "none", why: "test" },
+    path: () => "/api/at-block/test-visit/wallet",
+    shape: () => [
+      {
+        chain: 10,
+        family: "test",
+        familyName: "Test",
+        positionId: "t1",
+        href: null,
+        status: "open",
+        card: { kind: "test" },
+        headRead: "read",
+      },
+    ],
+  };
+  const prior = globalThis.fetch;
+  globalThis.fetch = async () => new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+  try {
+    const r = await readVisitFamilies([module], W, 2_000);
+    assert.equal(r.positions.length, 1);
+    assert.equal(r.positions[0].readAtVisit, true);
+  } finally {
+    globalThis.fetch = prior;
+  }
+});
