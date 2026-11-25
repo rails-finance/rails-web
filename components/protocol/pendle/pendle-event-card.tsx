@@ -10,7 +10,7 @@
 
 import Link from "next/link";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
-import { PendleTokenIcon, type PendleTokenKind } from "@/components/protocol/pendle/pendle-token-icon";
+import { KIND_RING, PendleTokenIcon, type PendleTokenKind } from "@/components/protocol/pendle/pendle-token-icon";
 import { pendleWalletHref } from "@/lib/pendle/routes";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
@@ -67,7 +67,7 @@ export function eventLabel(row: Pick<PendleTimelineRow, "kind" | "event">): stri
   return /KeepYt$/.test(row.event) ? "Add liquidity, keep YT" : KIND_LABEL[row.kind];
 }
 
-const STAMP: Record<string, string> = { pt: "PT", yt: "YT", lp: "LP", sy: "SY" };
+const KIND_UNIT: Record<string, string> = { pt: "PT", yt: "YT", lp: "LP", sy: "SY" };
 
 export function PendleEventCard({
   row,
@@ -97,7 +97,8 @@ export function PendleEventCard({
 
   const spineRows: SpineTokenRow[] = legs.slice(0, 3).map(({ l, tok }) => {
     const n = units(l.amount.replace(/^-/, ""), tok.decimals);
-    // A market token wears the yield token's mark, its kind as the unit.
+    // A market token wears the yield token's mark, its kind as the unit; a PT
+    // or YT also wears its ring.
     const own = l.leg !== "token" && tokens;
     return {
       symbol: tok.symbol ?? "",
@@ -106,7 +107,8 @@ export function PendleEventCard({
       direction: l.amount.startsWith("-") ? "right" : "left",
       popover: true,
       value: n ?? undefined,
-      unit: own ? STAMP[l.leg] : (tok.symbol ?? undefined),
+      unit: own ? KIND_UNIT[l.leg] : (tok.symbol ?? undefined),
+      ring: own ? KIND_RING[l.leg as PendleTokenKind] : undefined,
     };
   });
   const spine: SpineColumnProps = { tokens: spineRows, isLast };

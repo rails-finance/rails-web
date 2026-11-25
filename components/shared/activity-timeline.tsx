@@ -66,6 +66,7 @@ export function SpineVal({
   decimals = 4,
   max,
   unit,
+  unitClass,
   full,
   text,
 }: {
@@ -73,6 +74,8 @@ export function SpineVal({
   side: "left" | "right";
   /** A symbol printed after the figure, smaller and muted. */
   unit?: string;
+  /** The unit's colour in place of the muted rb-500 (a Pendle PT or YT's hue). */
+  unitClass?: string;
   /** Whole units below a million instead of "8.8K" (fmtSpine's `full`). */
   full?: boolean;
   /** The figure as shown, in place of fmtSpine's (a family's own precision). */
@@ -95,7 +98,7 @@ export function SpineVal({
   return (
     <span className={`text-base font-semibold whitespace-nowrap ${sideClass}`}>
       {txt}
-      {unit ? <span className="ml-1 text-xs font-normal text-rb-500">{unit}</span> : null}
+      {unit ? <span className={`ml-1 text-xs font-normal ${unitClass ?? "text-rb-500"}`}>{unit}</span> : null}
     </span>
   );
 }
