@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { KindStamp, STAMP_UNIT_CLASS, type TokenKindStamp } from "@/components/shared/token-kind-stamp";
+import { KindRing, RING_UNIT_CLASS, kindRingInner, type TokenKindRing } from "@/components/shared/token-kind-ring";
 import { AssetPopover } from "@/components/shared/asset-popover";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { DelegateRatePillShell, GavelGlyph, RatePillShell, UserGlyph } from "@/components/shared/rate-pill";
@@ -177,10 +177,10 @@ export interface SpineTokenRow {
    *  swap mark on a flow: a withdraw and swap, whose value left the position
    *  (rails-ops TO-DO-ui-jobs §15, D3). */
   badge?: "check" | "cross" | "send" | "swap";
-  /** A market token's kind (Pendle's PT, YT, LP, SY), stamped top-right of
-   *  the icon (KindStamp): the one corner the actor badge and `badge` leave
-   *  free. A PT or YT stamp also tints the flank unit in its hue. */
-  stamp?: TokenKindStamp;
+  /** A Pendle PT or YT: the icon wears KindRing in Pendle's PT green or YT
+   *  blue inside its box, under the corner badges, and the flank unit takes
+   *  the same hue. */
+  ring?: TokenKindRing;
   /** The icon opens the asset's panel (AssetPopover): its contract and, where
    *  the asset has a Rails page, the price row and the link to it. Opt-in per
    *  row; unset draws the bare icon. */
@@ -1306,15 +1306,22 @@ export function SpineColumn({
   const rateLegBadged = !(rows.length && rowActor !== "owner" && rowActor === rateActor);
   const tokenRows = bottomUp(rows).map((row, i) => {
     const rowBadge: SpineActor = i === 0 ? rowActor : "owner";
-    const icon = (
+    const mark = (
       <TokenChipIcon
         symbol={row.symbol}
         iconOverride={row.iconSymbol}
         address={row.address}
-        size={T}
+        size={row.ring ? kindRingInner(T) : T}
         filterable={!rowTarget && !row.popover}
         untitled={row.popover}
       />
+    );
+    const icon = row.ring ? (
+      <KindRing ring={row.ring} size={T}>
+        {mark}
+      </KindRing>
+    ) : (
+      mark
     );
     const chip = row.popover ? (
       <AssetPopover
@@ -1338,7 +1345,7 @@ export function SpineColumn({
               decimals={row.valueDecimals}
               max={row.valueMax}
               unit={row.unit}
-              unitClass={row.stamp && STAMP_UNIT_CLASS[row.stamp]}
+              unitClass={row.ring && RING_UNIT_CLASS[row.ring]}
               full={row.fullValue}
               text={row.display}
             />
@@ -1349,10 +1356,9 @@ export function SpineColumn({
           // The row's own badge (Aave V4's collateral toggle, an order, a
           // transfer) bottom-right, on every row it belongs to; who acted
           // top-left, on the top row alone.
-          row.badge || row.stamp || rowBadge !== "owner" ? (
+          row.badge || rowBadge !== "owner" ? (
             <div className="relative">
               {chip}
-              {row.stamp && <KindStamp stamp={row.stamp} size={T} />}
               {row.badge === "check" ? (
                 <CheckBadge size={T} />
               ) : row.badge === "cross" ? (
@@ -1378,7 +1384,7 @@ export function SpineColumn({
               decimals={row.valueDecimals}
               max={row.valueMax}
               unit={row.unit}
-              unitClass={row.stamp && STAMP_UNIT_CLASS[row.stamp]}
+              unitClass={row.ring && RING_UNIT_CLASS[row.ring]}
               full={row.fullValue}
               text={row.display}
             />

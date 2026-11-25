@@ -22,10 +22,10 @@
 
   /* Pendle's PT green and YT blue, the hues the Pendle app gives its two
      tokens, so a reader coming from there sees the same split
-     (components/shared/token-kind-stamp.tsx). Both are light: the stamp fills
-     with the hue under slate-950 letters (11.7:1 PT, 9.2:1 YT), and in light
-     mode its ring and the spine's flank unit take the -ink shade, the same hue
-     darkened to 5.5:1 (PT) and 5.7:1 (YT) on white. */
+     (components/shared/token-kind-ring.tsx). Dark mode draws the ring and the
+     spine's flank unit in the hue. Both hues are pale on white (1.6:1 PT,
+     2.1:1 YT), so light mode takes the -ink shade, the same hue darkened to
+     5.5:1 (PT) and 5.7:1 (YT) on white. */
   --color-pendle-pt: #1be3c2;
   --color-pendle-yt: #7ab7ff;
   --color-pendle-pt-ink: #0e7765;
