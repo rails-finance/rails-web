@@ -36,7 +36,7 @@ import { ProtocolIdentity } from "@/components/shared/protocol-identity";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
-import { OVERLAY_HEADING, TAB_BASE } from "@/lib/shared/ui-grammar";
+import { TAB_BASE } from "@/lib/shared/ui-grammar";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 
@@ -123,7 +123,8 @@ export interface Section {
  *  no chain row. `chains` (explorerChains) draws the chain row under the
  *  sections, its glyphs menu items after them in the arrow-key order
  *  (ui-jobs 854); fewer than two draw none. Below sm it opens as the
- *  shared sheet (MobileSheet), titled "Sections", as the Positions menu does
+ *  shared sheet (MobileSheet), as the Positions menu does, with no visible
+ *  heading: the sheet and its menu are named for a screen reader alone
  *  (ui-jobs 855); the closed menu stays in the page there too, and Back is
  *  left to the page, as the rows navigate. */
 export function SectionsMenu({
@@ -230,7 +231,11 @@ export function SectionsMenu({
       {chains.length > 1 && (
         <>
           <div role="separator" className="mx-1 my-2 border-t border-rb-200 dark:border-rb-800" />
-          <span id={labelId} role="presentation" className={`${OVERLAY_HEADING} block px-3 pb-1`}>
+          <span
+            id={labelId}
+            role="presentation"
+            className="block px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-rb-500"
+          >
             Chain
           </span>
           <div role="group" aria-labelledby={labelId} className="flex flex-wrap gap-1" data-sections-chains="">
@@ -302,11 +307,7 @@ export function SectionsMenu({
         {rowsFor(chainLabelId)}
       </div>
       {open && isPhone && (
-        <MobileSheet
-          label={label}
-          onClose={close}
-          header={<div className={`${OVERLAY_HEADING} px-3 pb-2`}>Sections</div>}
-        >
+        <MobileSheet label={label} onClose={close}>
           <div ref={sheet} role="menu" aria-label="Sections" data-sections-sheet="" className="py-1">
             {rowsFor(sheetChainLabelId)}
           </div>
