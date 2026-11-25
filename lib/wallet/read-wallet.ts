@@ -67,6 +67,8 @@ import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
+import { explorerName, PROTOCOLS } from "@/lib/shared/protocols";
+import { LIQUIDITY_SOURCES } from "@/lib/wallet/liquidity/sources";
 import { apiHop, inChain, inWalletRead } from "@/lib/wallet/api-hop";
 import { kindOfRow, WALLET_PROTOCOLS } from "@/lib/wallet/wallet-filters";
 
@@ -160,6 +162,32 @@ export function walletFamiliesLine(): string {
 /** The families read at each visit, by chain, for the empty state: "Aave V3,
  *  Compound V3 and Morpho Blue on Optimism"; empty while none is on. */
 export const walletVisitLine = (): string => visitFamiliesLine(WALLET_VISIT_FAMILIES);
+
+/** A launched explorer the page does not read, linked at the wallet. */
+export interface UnreadExplorer {
+  id: string;
+  /** "Fluid on Base", "Lido" (`explorerName`). */
+  name: string;
+  href: string;
+}
+
+/** The launched explorers with no index that no wallet read takes (decision 0073 point 4): a
+ *  roster entry with `history: "none"` that no family module, visit module or liquidity source
+ *  reads, in roster order, each linked to its wallet route at `address`. Read at each call, so an
+ *  entry joins at its launch and leaves with the change that reads it. */
+export function walletUnreadExplorers(address: string): UnreadExplorer[] {
+  const read = new Set<string>([
+    ...WALLET_FAMILIES.filter((f) => f.summaryChain !== "arc" || ARC_ON_WALLET).map((f) => f.id),
+    ...WALLET_VISIT_FAMILIES.map((m) => m.id),
+    ...LIQUIDITY_SOURCES.flatMap((s) => s.explorers),
+  ]);
+  const wallet = address.toLowerCase();
+  return PROTOCOLS.filter((p) => !p.unlaunched && p.history === "none" && !read.has(p.id)).map((p) => ({
+    id: p.id,
+    name: explorerName(p),
+    href: `${p.href}/${wallet}`,
+  }));
+}
 
 /** A listing read that did not answer, or answered part of the wallet: its
  *  module's part of the answer says so, and no total stands while it does. */

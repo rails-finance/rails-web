@@ -78,6 +78,7 @@ import {
   WhenLiquidityEmpty,
 } from "@/components/wallet/wallet-liquidity";
 import type { WalletLiquidity } from "@/lib/wallet/types";
+import type { UnreadExplorer } from "@/lib/wallet/read-wallet";
 
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
 const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
@@ -348,6 +349,7 @@ export function WalletView({
   read,
   cow,
   liquidity,
+  notRead,
   back,
   kinds: initialKinds = [],
   status: initialStatus,
@@ -367,6 +369,9 @@ export function WalletView({
   status?: WalletStatus;
   /** The explorer the reader came from, for the empty state's link back. */
   back: { href: string; name: string } | null;
+  /** The launched explorers no wallet read takes (`walletUnreadExplorers`); empty where one
+   *  protocol is chosen. */
+  notRead: UnreadExplorer[];
 }) {
   // AIM (ui-jobs 557): the positions naming an AIM asset (lib/wallet/aim-assets.ts),
   // the reader's own wallet included.
@@ -589,6 +594,7 @@ export function WalletView({
                   ) : (
                     noPositions
                   )}
+                  {!chosen && notRead.length > 0 && <NotReadLine explorers={notRead} />}
                   {back && (
                     <p className="text-sm">
                       <Link
@@ -652,6 +658,25 @@ export function WalletView({
           (lib/shared/prov-preference-routes.ts). */}
       <ProvInspectorLayer />
     </ProvReceiptsScope>
+  );
+}
+
+/** The empty state's line naming the launched explorers the page does not read (decision 0073
+ *  point 4), each linked to its page for the wallet. */
+function NotReadLine({ explorers }: { explorers: UnreadExplorer[] }) {
+  return (
+    <p className="text-sm text-foreground/80" data-wallet-not-read={explorers.map((e) => e.id).join(",")}>
+      This page does not yet read{" "}
+      {explorers.map((e, i) => (
+        <span key={e.id}>
+          {i > 0 && (i === explorers.length - 1 ? " or " : ", ")}
+          <Link href={e.href} prefetch={false} className={`underline-offset-2 ${INLINE_LINK}`}>
+            {e.name}
+          </Link>
+        </span>
+      ))}
+      .
+    </p>
   );
 }
 

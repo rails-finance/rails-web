@@ -19,6 +19,9 @@ export interface LiquiditySource {
   name: string;
   /** The explorer's wallet page under the chain ("/base/uniswap-v3"); `<route>/<wallet>` lists every position. */
   route: string;
+  /** The roster ids of the explorers it reads (lib/shared/protocols.ts), so the empty state names
+   *  the launched explorers no read takes (decision 0073 point 4). */
+  explorers: readonly string[];
 }
 
 const src = (
@@ -28,21 +31,30 @@ const src = (
   chainName: string,
   name: string,
   route: string,
-): LiquiditySource => ({ key: `${protocol}:${chainId}`, kind, protocol, chainId, chainName, name, route });
+  explorers: readonly string[],
+): LiquiditySource => ({ key: `${protocol}:${chainId}`, kind, protocol, chainId, chainName, name, route, explorers });
 
 /** In the page's order: Uniswap's chains, PancakeSwap's, the two Slipstream sites, Balancer's. */
 export const LIQUIDITY_SOURCES: readonly LiquiditySource[] = [
-  src("uniswap", "uniswap", 1, "Ethereum", "Uniswap V3 and V4", "/ethereum/uniswap-v3"),
-  src("uniswap", "uniswap", 8453, "Base", "Uniswap V3", "/base/uniswap-v3"),
-  src("uniswap", "uniswap", 42161, "Arbitrum", "Uniswap V3 and V4", "/arbitrum/uniswap-v3"),
-  src("uniswap", "uniswap", 10, "Optimism", "Uniswap V3 and V4", "/optimism/uniswap-v3"),
-  src("uniswap", "uniswap", 5042, "Arc", "Uniswap V3 and V4", "/arc/uniswap-v3"),
-  src("uniswap", "pancakeswap", 8453, "Base", "PancakeSwap V3", "/base/pancakeswap-v3"),
-  src("uniswap", "pancakeswap", 42161, "Arbitrum", "PancakeSwap V3", "/arbitrum/pancakeswap-v3"),
-  src("slipstream", "aerodrome", 8453, "Base", "Aerodrome", "/base/aerodrome"),
-  src("slipstream", "velodrome", 10, "Optimism", "Velodrome", "/optimism/velodrome"),
-  src("balancer", "balancer", 1, "Ethereum", "Balancer V3", "/ethereum/balancer-v3"),
-  src("balancer", "balancer", 42161, "Arbitrum", "Balancer V3", "/arbitrum/balancer-v3"),
+  src("uniswap", "uniswap", 1, "Ethereum", "Uniswap V3 and V4", "/ethereum/uniswap-v3", ["uniswap-v3", "uniswap-v4"]),
+  src("uniswap", "uniswap", 8453, "Base", "Uniswap V3", "/base/uniswap-v3", ["uniswap-v3-base"]),
+  src("uniswap", "uniswap", 42161, "Arbitrum", "Uniswap V3 and V4", "/arbitrum/uniswap-v3", [
+    "uniswap-v3-arbitrum",
+    "uniswap-v4-arbitrum",
+  ]),
+  src("uniswap", "uniswap", 10, "Optimism", "Uniswap V3 and V4", "/optimism/uniswap-v3", [
+    "uniswap-v3-optimism",
+    "uniswap-v4-optimism",
+  ]),
+  src("uniswap", "uniswap", 5042, "Arc", "Uniswap V3 and V4", "/arc/uniswap-v3", ["uniswap-v3-arc", "uniswap-v4-arc"]),
+  src("uniswap", "pancakeswap", 8453, "Base", "PancakeSwap V3", "/base/pancakeswap-v3", ["pancakeswap-v3-base"]),
+  src("uniswap", "pancakeswap", 42161, "Arbitrum", "PancakeSwap V3", "/arbitrum/pancakeswap-v3", [
+    "pancakeswap-v3-arbitrum",
+  ]),
+  src("slipstream", "aerodrome", 8453, "Base", "Aerodrome", "/base/aerodrome", ["aerodrome"]),
+  src("slipstream", "velodrome", 10, "Optimism", "Velodrome", "/optimism/velodrome", ["velodrome"]),
+  src("balancer", "balancer", 1, "Ethereum", "Balancer V3", "/ethereum/balancer-v3", ["balancer-v3"]),
+  src("balancer", "balancer", 42161, "Arbitrum", "Balancer V3", "/arbitrum/balancer-v3", ["balancer-v3-arbitrum"]),
 ];
 
 /** How many of an answer's rows the Uniswap-family and Slipstream routes read at the head (the
