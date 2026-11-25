@@ -249,7 +249,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
                 </li>
                 <li>
                   <Link href="/ethereum/morpho/vaults/info" className={INLINE_LINK}>
-                    The vault layer&apos;s about page
+                    About the Vaults section
                   </Link>{" "}
                   explains how Rails builds the roster and that listing.
                 </li>
@@ -351,7 +351,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
                 </li>
                 <li>
                   <Link href="/base/morpho/vaults/info" className={INLINE_LINK}>
-                    The vault layer&apos;s about page
+                    About the Vaults section
                   </Link>{" "}
                   explains how Rails builds the roster and that listing.
                 </li>

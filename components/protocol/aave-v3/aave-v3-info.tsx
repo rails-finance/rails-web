@@ -142,7 +142,7 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
                 </li>
                 <li>
                   <Link href={`${ethereumVaultRosterHref()}/info`} className={INLINE_LINK}>
-                    The vault layer&apos;s about page
+                    About the Vaults section
                   </Link>{" "}
                   explains how Rails builds the roster and that listing.
                 </li>
