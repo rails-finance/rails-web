@@ -1,0 +1,58 @@
+{
+  "25934997-190-0": {
+    "family": "aave-v3",
+    "market": "core",
+    "wallet": "0x650e0262d165bcfcbd6fb78cedf083089bcbee14",
+    "swapKey": "transfer_in:0x4d5f47fa6a74757f35c14fd3a6ef8e3c9bc514e8:0xff98b829f61d8d3bd006d92147d905448051f2dd7bde1014829e3637137fce9d:38",
+    "kind": "supply_from_swap"
+  },
+  "26491728-61-2": {
+    "family": "aave-v3",
+    "market": "core",
+    "wallet": "0xb14e31f27e9fbdec84143db4b401964952bd83c8",
+    "swapKey": "transfer_out:0x23878914efe38d27c4d67ab83ed1b93a74d4086a:0xe4858c5b1746c4d895e65c53df609fdc65c79da6a513fdf6909544623a712246:8",
+    "kind": "collateral_swap"
+  },
+  "26483351-112-3": {
+    "family": "aave-v3",
+    "market": "core",
+    "wallet": "0xb14e31f27e9fbdec84143db4b401964952bd83c8",
+    "swapKey": "transfer_out:0x23878914efe38d27c4d67ab83ed1b93a74d4086a:0xbf3d2d721576d6e74f8812cd55680538cc4f2eb01e936687fa22ee37613ffef0:9",
+    "kind": "collateral_swap"
+  },
+  "26469900-116-4": {
+    "family": "aave-v3",
+    "market": "core",
+    "wallet": "0xb14e31f27e9fbdec84143db4b401964952bd83c8",
+    "swapKey": "transfer_out:0x4d5f47fa6a74757f35c14fd3a6ef8e3c9bc514e8:0x317d82331598911ff0a73e3967c7bf987f7b320612150c75a598454f7c23d341:10",
+    "kind": "collateral_swap"
+  },
+  "25940535-192-3": {
+    "family": "aave-v3",
+    "market": "core",
+    "wallet": "0xb14e31f27e9fbdec84143db4b401964952bd83c8",
+    "swapKey": "transfer_out:0x4d5f47fa6a74757f35c14fd3a6ef8e3c9bc514e8:0x5f448157bc6f10775042e4100f873085b579ac8a69e7ca1d2142451d17645612:9",
+    "kind": "collateral_swap"
+  },
+  "24353872-5-2": {
+    "family": "aave-v3",
+    "market": "core",
+    "wallet": "0xb14e31f27e9fbdec84143db4b401964952bd83c8",
+    "swapKey": "transfer_out:0x4d5f47fa6a74757f35c14fd3a6ef8e3c9bc514e8:0x51ecbc25d74eafb795a6b0e02d3097f8a346fc0711f154a50acc96bb191c633f:8",
+    "kind": "collateral_swap"
+  },
+  "26492207-24-6": {
+    "family": "aave-v3",
+    "market": "core",
+    "wallet": "0xddc24851215f73df1322674b9edaa5975439be55",
+    "swapKey": "repay:0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2:0x14ffcae70afe9d9fc670cadd6473c5cc34d3fde3a15578ea57ae87de5dd148fd:38",
+    "kind": "debt_swap"
+  },
+  "26492945-136-6": {
+    "family": "aave-v4",
+    "market": "main",
+    "wallet": "0x0e8c5bf3247c5b9821c557bf24188985fa7e5b9a",
+    "swapKey": "0x580d468fa4396d30204141da06af5c4fb13b1cde83bdb8867d95d00ad4f5016b_0x94e7a5dcbe816e498b89ab752661904e2f56c485_19",
+    "kind": "debt_swap"
+  }
+}

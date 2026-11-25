@@ -26,7 +26,7 @@ export const usd = (x: number) =>
 export const pctText = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%`;
 
 export const FRONT_DOOR = {
-  links: { markets: "Market overview" },
+  links: { markets: "Markets" },
 };
 
 export const WALLET_PAGE = {

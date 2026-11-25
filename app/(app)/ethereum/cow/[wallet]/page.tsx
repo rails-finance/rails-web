@@ -5,10 +5,12 @@ import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { CowReadError, parseCowTradesQuery, readCowTokens, readCowTrades } from "@/lib/sources/api/cow";
 import { CowWalletView } from "@/components/protocol/cow/cow-wallet-view";
+import { parseCowLanding } from "@/lib/cow/landing";
 
 // A wallet's CoW trades, from rails-server's Sieve-backed routes at the
 // checkpoint block each answer names. The tokens and the first page of trades
 // (with the URL's ?token= filter) are read here; the client pages and narrows.
+// A `?at=` landing (lib/cow/landing.ts) reads the page that starts at its trade.
 
 interface Props {
   params: Promise<{ wallet: string }>;
@@ -35,10 +37,11 @@ export default async function CowWalletPage({ params, searchParams }: Props) {
     if (typeof v === "string") usp.set(k, v);
   }
   const query = parseCowTradesQuery(usp);
+  const landing = parseCowLanding(typeof sp.at === "string" ? sp.at : null);
   const ip = readerIpFromRequest({ headers: await headers() });
   const [tokens, trades] = await Promise.allSettled([
     readCowTokens(wallet, ip),
-    readCowTrades(wallet, { ...query, limit: 50 }, ip),
+    readCowTrades(wallet, { ...query, before: landing?.cursor, limit: 50 }, ip),
   ]);
   const failed = (r: PromiseSettledResult<unknown>) =>
     r.status === "rejected" ? (r.reason instanceof CowReadError ? r.reason.status : 500) : null;
@@ -49,6 +52,7 @@ export default async function CowWalletPage({ params, searchParams }: Props) {
       tokens={tokens.status === "fulfilled" ? tokens.value : null}
       initial={trades.status === "fulfilled" ? trades.value : null}
       initialQuery={{ tokens: query.tokens, pair: query.pair }}
+      landing={landing}
       readFailed={failed(tokens) ?? failed(trades)}
     />
   );

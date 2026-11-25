@@ -26,7 +26,7 @@ export const pctText = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%
 export const hfText = (x: number) => x.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 
 export const FRONT_DOOR = {
-  links: { markets: "Market overview" },
+  links: { markets: "Markets" },
 };
 
 export const POSITION_PAGE = {
@@ -80,13 +80,13 @@ function priceTogether(p: OpPositionFigures): string[] {
   if (!collateral.length || !p.borrowed.length) return [];
   const both = [...collateral, ...p.borrowed];
   if (new Set(both.map((x) => x.asset.toLowerCase())).size !== 1) return [];
-  const earned = collateral.reduce((a, x) => a + (x.suppliedUsd ?? 0) * x.supplyApr, 0);
-  const owed = p.borrowed.reduce((a, x) => a + (x.debtUsd ?? 0) * x.borrowApr, 0);
+  // One asset on both sides: each side grows at its own rate, so the health factor falls where the
+  // borrow rate is above the supply rate, whatever the two amounts.
   const which = `Its collateral and debt are both ${collateral[0].symbol}`;
   return [
-    owed > earned
-      ? `${which}, so a price move changes both sides together, and the interest owed growing faster than the interest earned is what lowers the health factor.`
-      : `${which}, so a price move changes both sides together, and interest is what moves the health factor.`,
+    p.borrowed[0].borrowApr > collateral[0].supplyApr
+      ? `${which}, so a price move shifts both sides and interest owed outgrowing interest earned lowers the health factor.`
+      : `${which}, so a price move shifts both sides and interest is what moves the health factor.`,
   ];
 }
 
