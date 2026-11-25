@@ -4,14 +4,21 @@
 // with a small stamp naming what it is (PT, YT, LP, SY) from 20px up. No CDN
 // hosts a mark for a market's own tokens, and the shared chip's letter glyph
 // under a "PT" stamp read as overlapping letters; where the yield token has no
-// mark either, a plain disc stands in, so the stamp is the one text.
+// mark either, a plain disc stands in, so the stamp is the one text. The stamp
+// is the spine's (KindStamp), PT and YT in Pendle's hues.
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { KindStamp, type TokenKindStamp } from "@/components/shared/token-kind-stamp";
 import type { PendleMarketTokens } from "@/lib/pendle/types";
 
 export type PendleTokenKind = "pt" | "yt" | "lp" | "sy" | "yield";
 
-const STAMP: Record<Exclude<PendleTokenKind, "yield">, string> = { pt: "PT", yt: "YT", lp: "LP", sy: "SY" };
+export const STAMP: Record<Exclude<PendleTokenKind, "yield">, TokenKindStamp> = {
+  pt: "PT",
+  yt: "YT",
+  lp: "LP",
+  sy: "SY",
+};
 
 export function PendleTokenIcon({
   kind,
@@ -42,19 +49,7 @@ export function PendleTokenIcon({
         untitled
         fallback={disc}
       />
-      {stamp && (
-        <span
-          className="absolute -top-px -right-px inline-flex items-center justify-center rounded-[3px] bg-background font-semibold leading-none text-rb-600 ring-1 ring-rb-300 dark:text-rb-300 dark:ring-rb-600"
-          style={{
-            height: Math.round(size * 0.44),
-            paddingInline: Math.max(1, Math.round(size * 0.07)),
-            fontSize: Math.round(size * 0.3),
-          }}
-          aria-hidden
-        >
-          {stamp}
-        </span>
-      )}
+      {stamp && <KindStamp stamp={stamp} size={size} />}
     </span>
   );
 }

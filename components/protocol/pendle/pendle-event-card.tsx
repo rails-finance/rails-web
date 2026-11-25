@@ -10,7 +10,7 @@
 
 import Link from "next/link";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
-import { PendleTokenIcon, type PendleTokenKind } from "@/components/protocol/pendle/pendle-token-icon";
+import { PendleTokenIcon, STAMP, type PendleTokenKind } from "@/components/protocol/pendle/pendle-token-icon";
 import { pendleWalletHref } from "@/lib/pendle/routes";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
@@ -67,8 +67,6 @@ export function eventLabel(row: Pick<PendleTimelineRow, "kind" | "event">): stri
   return /KeepYt$/.test(row.event) ? "Add liquidity, keep YT" : KIND_LABEL[row.kind];
 }
 
-const STAMP: Record<string, string> = { pt: "PT", yt: "YT", lp: "LP", sy: "SY" };
-
 export function PendleEventCard({
   row,
   tokens,
@@ -97,8 +95,10 @@ export function PendleEventCard({
 
   const spineRows: SpineTokenRow[] = legs.slice(0, 3).map(({ l, tok }) => {
     const n = units(l.amount.replace(/^-/, ""), tok.decimals);
-    // A market token wears the yield token's mark, its kind as the unit.
-    const own = l.leg !== "token" && tokens;
+    // A market token wears the yield token's mark, its kind stamped on the
+    // icon and printed as the unit.
+    const stamp = l.leg !== "token" && tokens ? STAMP[l.leg] : undefined;
+    const own = stamp && tokens;
     return {
       symbol: tok.symbol ?? "",
       iconSymbol: own ? (tokens.yieldToken.symbol ?? undefined) : undefined,
@@ -106,7 +106,8 @@ export function PendleEventCard({
       direction: l.amount.startsWith("-") ? "right" : "left",
       popover: true,
       value: n ?? undefined,
-      unit: own ? STAMP[l.leg] : (tok.symbol ?? undefined),
+      unit: stamp ?? tok.symbol ?? undefined,
+      stamp,
     };
   });
   const spine: SpineColumnProps = { tokens: spineRows, isLast };
