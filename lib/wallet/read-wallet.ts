@@ -171,7 +171,7 @@ export interface UnreadExplorer {
   href: string;
 }
 
-/** The launched explorers with no index that no wallet read takes (decision 0073 point 4): a
+/** The launched explorers with no index that no wallet read covers (decision 0073 point 4): a
  *  roster entry with `history: "none"` that no family module, visit module or liquidity source
  *  reads, in roster order, each linked to its wallet route at `address`. Read at each call, so an
  *  entry joins at its launch and leaves with the change that reads it. */

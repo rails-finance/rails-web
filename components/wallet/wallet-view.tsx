@@ -445,15 +445,19 @@ export function WalletView({
       </Suspense>
     </LiquidityBoundary>
   );
-  // The empty wallet's sentence (W3).
+  // The empty wallet's sentence (W3) and, under it, the launched explorers the page does not
+  // read: drawn together, so the line never stands without the sentence.
   const noPositions = (
-    <p className="text-sm text-foreground/80" data-wallet-reads="">
-      Rails found no positions for this wallet on the{" "}
-      <Link href="/coverage" className={`underline-offset-2 ${INLINE_LINK}`} data-wallet-coverage="">
-        protocols and chains it covers
-      </Link>
-      .
-    </p>
+    <>
+      <p className="text-sm text-foreground/80" data-wallet-reads="">
+        Rails found no positions for this wallet on the{" "}
+        <Link href="/coverage" className={`underline-offset-2 ${INLINE_LINK}`} data-wallet-coverage="">
+          protocols and chains it covers
+        </Link>
+        .
+      </p>
+      {notRead.length > 0 && <NotReadLine explorers={notRead} />}
+    </>
   );
   const filterBar = read.held.length > 0 && (
     <WalletFilterBar
@@ -593,8 +597,7 @@ export function WalletView({
                     </LiquidityBoundary>
                   ) : (
                     noPositions
-                  )}
-                  {!chosen && notRead.length > 0 && <NotReadLine explorers={notRead} />}
+                  )}{" "}
                   {back && (
                     <p className="text-sm">
                       <Link

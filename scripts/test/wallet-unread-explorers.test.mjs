@@ -43,7 +43,7 @@ const { ARC_ON_WALLET } = await import("../../lib/wallet/families/aave-v4.ts");
 const W = "0xC2aee730530AE26571d868743c4e1ad401F30f22";
 const UNINDEXED = PROTOCOLS.filter((p) => p.history === "none").map((p) => p.id);
 const FLAGS = Object.fromEntries(UNINDEXED.map((id) => [id, protocolForSession(id)?.unlaunched === true]));
-/** Every unindexed entry launched, or the roster's own flags back. */
+/** Every unindexed entry launched, or restore the roster's flags. */
 function launchAll(on) {
   for (const id of UNINDEXED) {
     const e = protocolForSession(id);
@@ -53,7 +53,7 @@ function launchAll(on) {
 }
 test.after(() => launchAll(false));
 
-test("with every unindexed explorer launched, the page names the two no read takes, linked at the wallet", () => {
+test("the page names the explorers no read takes, linked at the wallet", () => {
   launchAll(true);
   // Aave V4 on Arc's rows are read once its explorer is launched at module load (ARC_ON_WALLET).
   const arc = ARC_ON_WALLET
