@@ -176,8 +176,8 @@ type SubPageSpec = {
    *  census exists (TO-DO-infra-and-backend §5.4), so a link formed for it
    *  would 404. And where a rail owns TWO listings of one address — Aave V3
    *  on Ethereum lists accounts at `/ethereum/aave-v3` and vault holdings
-   *  here, Morpho Blue Base Blue borrower positions at `/base/morpho` and
-   *  MetaMorpho holdings here — it names the second one, so a bookmark taken
+   *  here, and Morpho Blue Base lists Blue borrower positions at
+   *  `/base/morpho` and MetaMorpho holdings here — it names the second one, so a bookmark taken
    *  on the vault listing reopens the vault listing (§42 item 1).
    *
    *  Declared per sub-page rather than inferred from `positionListing` because

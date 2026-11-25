@@ -753,12 +753,16 @@ check(
 await page.locator(`${CHOOSER} [role='tab'][aria-label='Ethereum']`).click();
 // "View all" opens /protocols on Ethereum (ui-jobs 781). Aave's vaults are Aave
 // V3's Vaults section (ui-jobs 789): no row opens /ethereum/aave, and Aave V3's
-// row links its Vaults section.
+// row links its Vaults section. The row draws its sections twice (the phone
+// card and the desktop cell), so the count takes the visible copy, as
+// verify-protocols-index.mjs does.
 await page.locator(`${CHOOSER} [data-chooser-view-all]`).click();
 await page.waitForSelector("[data-protocol-row]", { timeout: 60_000 }).catch(() => {});
 const retiredRows = await page.locator("[data-protocol-row] a[data-protocol-hub][href='/ethereum/aave']").count();
 const aaveV3VaultsLinks = await page
-  .locator("[data-protocol-row] a[data-protocol-section][href='/ethereum/aave-v3/vaults']")
+  .locator(
+    "[data-protocol-row] td [data-protocol-sections] a[data-protocol-section][href='/ethereum/aave-v3/vaults']:visible",
+  )
   .count();
 check(
   "11b …and Aave's vaults are Aave V3's Vaults section on the chooser's View all",

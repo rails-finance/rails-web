@@ -48,7 +48,7 @@ import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 
 /** The page's metadata; the route exports it. */
 export const AAVE_VAULTS_INFO_METADATA = listingMetadata({
-  title: "About the Vaults section on Ethereum",
+  title: "About Aave vaults on Ethereum",
   canonicalPath: "/ethereum/aave-v3/vaults/info",
   description:
     "What Aave's three vault families are and how Rails lists them on Ethereum: the roster read from Aave's enumerators at one block, what is outside it and what its figures leave out; then the vault position listing: membership from a whole-Transfer census proven complete by Σ balanceOf, the one priced figure and the block it was priced at, the vaults nobody has ever held, and what the search does and does not do.",
