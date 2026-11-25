@@ -37,6 +37,7 @@ import {
 } from "@/lib/shared/chains";
 import { KindRing, kindRingInner } from "@/components/shared/token-kind-ring";
 import { getLocalTokenIcon } from "@/lib/shared/local-token-icons";
+import { isPendlePt } from "@/lib/morpho/pendle-pt";
 import { PT_UNDERLYING_BASE, PT_UNDERLYING_MAINNET } from "@/lib/shared/pt-underlying";
 import { getTokenAddress } from "@/lib/shared/token-addresses";
 
@@ -182,9 +183,9 @@ export function TokenChipIcon({
         : PT_UNDERLYING_MAINNET;
   const ptUnderlying = address ? ptTable[address.toLowerCase()] : undefined;
   const isPt = /^PT-/i.test(rawLookup);
-  // A Pendle PT from 20px wears Pendle's PT ring (PtMark below); the mark
-  // shrinks to sit inside it.
-  const ring = isPt && size >= 20 && !SPECTRA_MATURITY.test(rawLookup);
+  // A Pendle PT (isPendlePt: "PT-<asset>-<DMMMYYYY>") from 20px wears
+  // Pendle's PT ring (PtMark below); the mark shrinks to sit inside it.
+  const ring = size >= 20 && isPendlePt(rawLookup);
   const markSize = ring ? kindRingInner(size) : size;
   // Resolve as though the caller had asked for the underlying — symbol AND
   // address, so the local-PNG tiers get their chance too. The PT's own address
@@ -255,26 +256,21 @@ export function TokenChipIcon({
   );
 }
 
-/** Spectra's maturity forms: Spectra mints PTs under Pendle's "PT-" naming
- *  with a unix timestamp or a slashed date for the maturity where Pendle
- *  writes "27MAR2025" (scripts/generate-pt-underlying.mjs). Every other PT,
- *  an undated symbol included, is taken as Pendle's. */
-const SPECTRA_MATURITY = /-(\d{9,}|\d+(\/\d+)+)$/;
-
 /** What marks a principal token's chip as a claim — the underlying's mark
- *  says what the claim is on, this says it is a claim and not the asset
- *  itself. That distinction is load-bearing where both appear together, which
- *  on a Morpho market is the normal case: PT-sUSDE-27MAR2025 collateral
- *  against a USDe loan, beside a plain sUSDe market on the same listing.
+ *  says what the claim is on, this says it is a claim, not the asset. That
+ *  distinction is load-bearing where both appear together, which on a Morpho
+ *  market is the normal case: PT-sUSDE-27MAR2025 collateral against a USDe
+ *  loan, beside a plain sUSDe market on the same listing.
  *
  *  A Pendle PT wears Pendle's PT ring (KindRing), the green Aave draws round
  *  PT collateral and the Pendle explorer's spine draws round a PT, the mark
- *  shrunk inside it. A Spectra PT keeps a neutral "PT" stamp top-right: the
- *  green is Pendle's. The stamp takes the top-right because the bottom-right
- *  holds the spine's corner badges.
+ *  shrunk inside it. Any other PT keeps a neutral "PT" stamp: a Spectra PT
+ *  (a unix-timestamp or slashed-date maturity), an undated symbol, another
+ *  protocol's. The green is Pendle's. The stamp takes the top-right because
+ *  the bottom-right holds the spine's corner badges.
  *
  *  Below 20px neither is drawn. Every chip that small in this codebase (the
- *  tower's 12s and 14s, the event flows' 16s) renders with the token's own
+ *  tower's 12s and 14s, the event flows' 16s) renders with the token's
  *  symbol beside it — text that already begins "PT-" and carries the maturity
  *  besides. The sizes that DO get the mark are the ones that need it: the
  *  28px headline chip in <AssetAmount>, and <InlineAssetCluster>, which draws
