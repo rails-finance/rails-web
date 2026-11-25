@@ -6,8 +6,12 @@
 // the read starts just past the target: the trade itself is the page's first
 // row, or for the order form among the block's trades at its top.
 
-const TRADE_ID = /^(\d+)-(\d+)-(\d+)$/;
-const ORDER = /^(\d+)-(0x[0-9a-f]{112})$/;
+// Twelve digits a part keeps the +1 below 2^53, so the cursor stays digits.
+const TRADE_ID = /^(\d{1,12})-(\d{1,12})-(\d{1,12})$/;
+const ORDER = /^(\d{1,12})-(0x[0-9a-f]{112})$/;
+/** The trades route's cursor shape (lib/sources/api/cow.ts): a cursor that
+ *  fails it is dropped there, and the read would start at the newest trade. */
+const CURSOR = /^\d+-\d+-\d+$/;
 
 export interface CowLanding {
   /** The read's `before`: the first page holds the target. */
@@ -20,10 +24,13 @@ export function parseCowLanding(at: string | undefined | null): CowLanding | nul
   if (!at) return null;
   const v = at.trim().toLowerCase();
   const t = TRADE_ID.exec(v);
-  if (t) return { cursor: `${t[1]}-${t[2]}-${Number(t[3]) + 1}`, match: { id: v } };
-  const o = ORDER.exec(v);
-  if (o) return { cursor: `${Number(o[1]) + 1}-0-0`, match: { block: Number(o[1]), orderUid: o[2] } };
-  return null;
+  const o = t ? null : ORDER.exec(v);
+  const landing: CowLanding | null = t
+    ? { cursor: `${t[1]}-${t[2]}-${Number(t[3]) + 1}`, match: { id: v } }
+    : o
+      ? { cursor: `${Number(o[1]) + 1}-0-0`, match: { block: Number(o[1]), orderUid: o[2] } }
+      : null;
+  return landing && CURSOR.test(landing.cursor) ? landing : null;
 }
 
 /** Whether a trade is the landing's target. */

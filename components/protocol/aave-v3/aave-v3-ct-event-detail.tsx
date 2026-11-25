@@ -169,7 +169,7 @@ const ROW_SHEET_WORDS = {
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
 /** A decimal string without its sign, digits as the index gave them. */
-const unsigned = (human?: string): string => (human ?? "0").replace(/^[-+]/, "");
+const unsigned = (human: string): string => human.replace(/^[-+]/, "");
 
 /** A row behind a ParaSwap swap card, by the index action it was. */
 const SWAP_ROW_LABEL: Record<AaveV3SwapPoolEvent["action"], string> = {
@@ -537,8 +537,13 @@ export function useAaveV3EventBody({
             label: s.kind === "supply_from_swap" ? "Sold" : "Bought",
             // A line's `value` is the receipt's exact decimal, which the line
             // compacts; `display` is the figure at the position block's precision.
-            value: unsigned(s.receivedAmount),
-            display: fmtPositionAmount(Math.abs(Number(s.receivedAmount ?? "0"))),
+            // An amount the index could not scale (its decimals unread) reads "—".
+            ...(s.receivedAmount == null
+              ? { value: "—" }
+              : {
+                  value: unsigned(s.receivedAmount),
+                  display: fmtPositionAmount(Math.abs(Number(s.receivedAmount))),
+                }),
             symbol: rSym,
             address: s.receivedAsset,
             prov: swapLegProv(rSym, "trade", coords, s.raw.receivedAmount, undefined, s.kind, undefined, s),
@@ -574,8 +579,9 @@ export function useAaveV3EventBody({
     if (netted)
       extras.push({
         label: "Sold, net",
-        value: unsigned(ctx.amount),
-        display: fmtPositionAmount(Math.abs(Number(ctx.amount ?? "0"))),
+        ...(ctx.amount == null
+          ? { value: "—" }
+          : { value: unsigned(ctx.amount), display: fmtPositionAmount(Math.abs(Number(ctx.amount))) }),
         symbol: sym,
         address: ctx.reserve,
         prov: swapLegProv(
