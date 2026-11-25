@@ -21,7 +21,7 @@ import { LatestPrices, type LatestPriceAsset, type PricesAt } from "@/components
 import { usePublishTodayPrices } from "@/components/shared/price-basis";
 import { usePublishPositionCardStrip } from "@/components/shared/position-card-strip";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
-import { PositionWalletHeading, type PositionOwner } from "@/components/shared/wallet-heading";
+import { HeadingRow, PositionWalletHeading, type PositionOwner } from "@/components/shared/wallet-heading";
 import { usePublishHeadingWallet } from "@/components/shared/event-page-aside";
 
 /** The one back affordance on every detail page. NAV_BUTTON pill + ArrowLeft(14)
@@ -232,8 +232,8 @@ export function DetailTopRow({
   const inCard = claimed || card;
   const page = eventPage ? "event" : walletPage ? "wallet" : "position";
   // The trail's protocol crumb goes where Back's fallback would: Back
-  // goes. Until the summary read says the trail found the page's
-  // protocol, Back's place is held, invisible, so nothing moves.
+  // goes. Where that rests on the summary read, Back stays out until the
+  // read settles and lands in the row held under the heading (HeadingRow).
   const [crumb, setCrumb] = useState<"pending" | "found" | "none">("pending");
   const ownerWallet = owner?.wallet?.toLowerCase();
   const trailed =
@@ -244,18 +244,9 @@ export function DetailTopRow({
     (fallbackHref == null || (ownerWallet != null && fallbackHref.toLowerCase().includes(ownerWallet)));
   const unowned = owner != null && !owner.wallet && !owner.pending;
   // A wallet page is the trail's protocol crumb: no Back.
-  const back: "shown" | "held" | "none" =
-    page === "wallet"
-      ? "none"
-      : !trailed || unowned || crumb === "none"
-        ? "shown"
-        : crumb === "pending"
-          ? "held"
-          : "none";
+  const back = page !== "wallet" && (!trailed || unowned || crumb === "none");
   const heading = owner && (
-    // In the row's scope: a holder can carry a receipt (Polaris). With
-    // no card to hold them, the price and the chain's recency ride the
-    // heading's right end, price first (ui-jobs 272).
+    // In the row's scope: a holder can carry a receipt (Polaris).
     <ProvReceiptsScope registry={registry}>
       <PositionWalletHeading
         owner={owner}
@@ -263,33 +254,32 @@ export function DetailTopRow({
         page={page}
         onCrumb={(found) => setCrumb(found ? "found" : "none")}
         // The heading is the column's first row, clear of the profile
-        // control (H20) at the top right from md; Back, where it stays,
-        // stands at its right end.
+        // control (H20) at the top right from md.
         className={PROFILE_CLEARANCE}
-        back={
-          back === "none" ? undefined : (
-            <span
-              className={`flex ${back === "held" ? "invisible" : ""}`}
-              aria-hidden={back === "held" || undefined}
-              data-anatomy="H7"
-              data-back-row=""
-            >
+        tools={tools && !eventPage ? children : false}
+      />
+      {/* A closing or closed explorer's state under the heading (H24.1; ui-jobs 621). */}
+      {lifecycleId && <LifecycleLine id={lifecycleId} className="mt-2" />}
+      {/* The row under the heading (H7), held on every page: Back where the
+          page keeps it, and with no card to hold them the price and the
+          chain's recency, price first (ui-jobs 272). */}
+      <HeadingRow
+        start={
+          back && (
+            <span className="flex" data-back-row="">
               <DetailBackButton session={session} wallet={wallet} fallbackHref={fallbackHref} compact />
             </span>
           )
         }
-        tools={tools && !eventPage ? children : false}
-        strip={
+        end={
           !inCard && (priced || stamped) ? (
-            <>
+            <span className="flex items-center gap-1 sm:gap-2" data-position-strip="">
               {priced}
               {stamped && <RecencyStamp />}
-            </>
+            </span>
           ) : undefined
         }
       />
-      {/* A closing or closed explorer's state under the heading (H24.1; ui-jobs 621). */}
-      {lifecycleId && <LifecycleLine id={lifecycleId} className="mt-2" />}
     </ProvReceiptsScope>
   );
   if (heading) return <div className="mb-4">{heading}</div>;

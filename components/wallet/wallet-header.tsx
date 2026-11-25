@@ -6,7 +6,7 @@
 // positions menu.
 
 import type { ReactNode } from "react";
-import { WalletHeading } from "@/components/shared/wallet-heading";
+import { HeadingRow, WalletHeading } from "@/components/shared/wallet-heading";
 import { WalletMenu } from "@/components/shared/wallet-menu";
 import { PROFILE_CLEARANCE, WALLET_HEADING_NAME } from "@/lib/shared/ui-grammar";
 
@@ -28,7 +28,9 @@ export function WalletHeader({
   end?: ReactNode;
 }) {
   return (
-    <header data-anatomy="W1">
+    // The view's gap-7 less 12px: the heading stands the position page's
+    // distance from the content (its row and 16px).
+    <header data-anatomy="W1" className="-mb-3">
       <WalletHeading
         address={address}
         dashboard={narrowed && address ? `/wallet/${address}` : undefined}
@@ -44,8 +46,10 @@ export function WalletHeader({
           )
         }
         lines={lines}
-        end={end}
       />
+      {/* The row held under the heading on every page (H7): the read's
+          recency at its right. */}
+      <HeadingRow end={end} />
     </header>
   );
 }

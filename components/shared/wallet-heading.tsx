@@ -11,10 +11,13 @@
 // trigger, the address kind sits beside it, and under it the trail (H13.4):
 // the menu of the wallet's positions on Rails (H13.2), the protocol, and the
 // position the card names. The facehash links to the wallet dashboard.
-// Tools takes the right end where the page passes it; on a page that draws
-// no detail card the price strip and
-// the recency stamp stand before it (ui-jobs 430), and below sm the strip
-// wraps under the name block, flush right. DOM order is address, strip, Tools.
+// Tools takes the right end where the page passes it.
+//
+// Under the heading every page holds one row (`HeadingRow`, H7; Miles, 25
+// Nov 2026, ui-jobs 856), 38px tall whether or not anything stands in it,
+// so the heading sits the same distance from the content on every page
+// type: Back at its left where the page keeps one, the recency and the
+// price strip at its right where the page draws no detail card.
 //
 // The heading draws before the position loads, with Tools in place, so the
 // inspector is reachable on a view that never resolves; the wallet joins it
@@ -93,6 +96,21 @@ export function WalletHeading({
         </div>
       </div>
       {end}
+    </div>
+  );
+}
+
+/** The row under the wallet heading (H7): `start` (Back) at the left,
+ *  `end` (the recency and prices) at the right, held at 38px when empty. */
+export function HeadingRow({ start, end }: { start?: ReactNode; end?: ReactNode }) {
+  return (
+    <div
+      className="mt-2 flex min-h-[38px] flex-wrap items-center justify-between gap-x-2 gap-y-1"
+      data-anatomy="H7"
+      data-heading-row=""
+    >
+      <div className="flex min-w-0 items-center">{start}</div>
+      {end && <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">{end}</div>}
     </div>
   );
 }
@@ -269,14 +287,10 @@ export function PositionWalletHeading({
   owner,
   session,
   tools,
-  strip,
   page = "position",
   className,
   onCrumb,
-  back,
 }: {
-  /** Back, where the page keeps it: at the right end, before Tools. */
-  back?: ReactNode;
   owner: PositionOwner;
   /** Told whether the trail found the page's protocol (H13.4). */
   onCrumb?: (found: boolean) => void;
@@ -290,9 +304,6 @@ export function PositionWalletHeading({
   /** The Tools menu with the page's export shapes; absent or false for none
    *  (a page whose card carries the menu, ui-jobs 270). */
   tools?: ReactNode;
-  /** The price and recency strip, before Tools (ui-jobs 272), on a page that
-   *  draws no detail card (ui-jobs 430). */
-  strip?: ReactNode;
 }) {
   const filterProtocol = owner.filterProtocol === null ? undefined : (owner.filterProtocol ?? session);
   const bookmark = owner.bookmark !== false;
@@ -354,25 +365,7 @@ export function PositionWalletHeading({
           </div>
         )
       }
-      end={
-        <>
-          {strip && (
-            <span
-              className="order-last flex min-h-7 basis-full shrink-0 items-center justify-end gap-1 sm:order-none sm:ml-auto sm:basis-auto sm:gap-2"
-              data-position-strip=""
-            >
-              {strip}
-            </span>
-          )}
-          {/* Packed right, so Back's place going leaves Tools where it is. */}
-          {(back || tools) && (
-            <span className="ml-auto flex min-h-7 shrink-0 items-center gap-1 sm:gap-2">
-              {back}
-              {tools}
-            </span>
-          )}
-        </>
-      }
+      end={<>{tools && <span className="ml-auto flex min-h-7 shrink-0 items-center">{tools}</span>}</>}
     />
   );
 }
