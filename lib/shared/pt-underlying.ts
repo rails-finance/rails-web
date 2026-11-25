@@ -3,9 +3,9 @@
 //
 // Principal token → [underlying address, underlying symbol], read from each
 // PT's own SY().yieldToken() (Pendle) or getIBT() (Spectra). A PT is a dated
-// claim on the underlying, so the chip draws the underlying's mark and stamps
-// a "PT" badge over it: the mark answers "a claim on what", the badge and the
-// symbol answer "a claim".
+// claim on the underlying, so the chip draws the underlying's mark and marks
+// it as a claim (Pendle's PT ring, or a "PT" stamp on a Spectra PT): the mark
+// answers "a claim on what", the ring or stamp and the symbol answer "a claim".
 //
 // Keyed by the PT's lowercased address, because the address is the identity —
 // "PT-sUSDE" names seven different tokens across seven maturities, and the

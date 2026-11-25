@@ -29,6 +29,22 @@ export interface CowTrade {
   validTo: number | null;
   /** The settlement transaction's trades, this one included. */
   settlementTrades: number;
+  /** The Aave position swap this trade served; null where it served none. Absent from an
+   *  answer made before rails-server served it, and read as null. */
+  aave?: CowTradeAaveSwap | null;
+}
+
+/** An Aave position swap a CoW trade served, keyed as the swap listings key it
+ *  (lib/cow/aave-totals.ts `cowSwapEventHref`). */
+export interface CowTradeAaveSwap {
+  family: "aave-v3" | "aave-v4";
+  /** The V3 market key, or the V4 spoke key. */
+  market: string;
+  /** The position's owner: on an adapter's or a clone's order, not the trade's owner. */
+  wallet: string;
+  swapKey: string;
+  /** The swap's kind (`collateral_swap`, `supply_from_swap`, …). */
+  kind: string;
 }
 
 export interface CowTokenScale {

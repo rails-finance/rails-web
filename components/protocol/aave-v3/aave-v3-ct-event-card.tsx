@@ -178,11 +178,28 @@ export function AaveV3CtEventCard({
     !!feeOf ||
     (kind === "transfer_out" && getProtocolContract(ctx.counterparty, chainId ?? MAINNET_CHAIN_ID)?.kind === "gateway");
   const reserveAddress = soleFlowAddress(event.flows, ctx.reserveSymbol);
+  // The Trade's other side, on the same flank under the position's row: a
+  // withdraw and swap's bought token, a supply from a swap's sold token. Either
+  // can be any ERC-20, so its icon resolves by the record's address.
+  const tradeLegAmount = Math.abs(Number(ctx.swap?.receivedAmount ?? "0")) || 0;
+  const tradeLeg =
+    (isWithdrawSwap || isSupplySwap) && tradeLegAmount !== 0 && ctx.swap?.receivedSymbol
+      ? {
+          symbol: ctx.swap.receivedSymbol,
+          address: ctx.swap.receivedAsset,
+          direction: isSupplySwap ? ("right" as const) : ("left" as const),
+          value: tradeLegAmount,
+          verb: isSupplySwap ? V3_HEAD_WORDS.legSold : V3_HEAD_WORDS.legBought,
+        }
+      : undefined;
   const tokens =
     isLoss || (isSwap && !isFlowSwap) || mag === 0
       ? undefined
       : isFlowSwap
         ? [
+            // The spine draws a flank's rows last-first, so the trade's leg,
+            // listed first, stands under the position's row.
+            ...(tradeLeg ? [tradeLeg] : []),
             {
               symbol: ctx.reserveSymbol ?? "?",
               address: reserveAddress,

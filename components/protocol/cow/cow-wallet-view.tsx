@@ -4,7 +4,10 @@
 // narrowed by the shared AssetChooser. The chosen tokens and the pair switch
 // live in the URL (?token=0x…,0x…&pair=1); a change replaces the URL and reads
 // the first page again through the trades proxy, and "Show more" reads the
-// next page below the last row.
+// next page below the last row. A `?at=` landing (lib/cow/landing.ts) starts
+// the list at its trade, scrolls that row to the middle of the view and rings
+// it as the shared timeline's landing does; "Show the newest trades" reads the
+// first page again.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -20,7 +23,8 @@ import { CowAccountCard } from "@/components/protocol/cow/cow-account-card";
 import { CowTradeCard } from "@/components/protocol/cow/cow-trade-card";
 import { formatDate } from "@/lib/date";
 import { COW_CHAIN_ID, checkpointProv, type CowTokenLabel } from "@/lib/cow/trade";
-import { COW_FILLS_SENTENCE, COW_TERMS } from "@/lib/cow/terms";
+import { COW_FILLS_SENTENCE, COW_LANDING_WORDS, COW_TERMS } from "@/lib/cow/terms";
+import { isCowLandingTrade, type CowLanding } from "@/lib/cow/landing";
 import type { CowTrade, CowTradesPage, CowWalletTokens } from "@/lib/cow/types";
 import { SECTION_HEADING, CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import { useAssetScope } from "@/lib/shared/asset-scope";
@@ -51,12 +55,15 @@ export function CowWalletView({
   tokens,
   initial,
   initialQuery,
+  landing: initialLanding,
   readFailed,
 }: {
   wallet: string;
   tokens: CowWalletTokens | null;
   initial: CowTradesPage | null;
   initialQuery: { tokens: string[]; pair: boolean };
+  /** The trade the page opened at; the server's page starts there. */
+  landing: CowLanding | null;
   readFailed: number | null;
 }) {
   const router = useRouter();
@@ -70,6 +77,10 @@ export function CowWalletView({
   const [loading, setLoading] = useState<"filter" | "more" | null>(null);
   const [failed, setFailed] = useState(false);
   const reqId = useRef(0);
+  // The landing holds until a read of the first page drops it.
+  const [landing, setLanding] = useState<CowLanding | null>(initialLanding);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const landed = useRef(false);
   // The trade rows' receipts scope; each card holds its own inside it.
   const registry = useReceiptRegistry();
 
@@ -117,10 +128,12 @@ export function CowWalletView({
     [tokens, labels],
   );
 
+  // `before` with `append` reads the next page below the last row; without
+  // it, a page starting there replaces the list (a landing's re-read).
   const read = useCallback(
-    async (nextTokens: string[], nextPair: boolean, before?: string) => {
+    async (nextTokens: string[], nextPair: boolean, before?: string, append = !!before) => {
       const id = ++reqId.current;
-      setLoading(before ? "more" : "filter");
+      setLoading(append ? "more" : "filter");
       setFailed(false);
       try {
         const qs = queryString(nextTokens, nextPair, before);
@@ -128,9 +141,9 @@ export function CowWalletView({
         const body = (await res.json()) as CowTradesPage & { success: boolean };
         if (id !== reqId.current) return;
         if (!res.ok || !body.success) throw new Error(String(res.status));
-        setTrades((prev) => (before ? [...prev, ...body.trades] : body.trades));
+        setTrades((prev) => (append ? [...prev, ...body.trades] : body.trades));
         setNext(body.next);
-        if (!before) setMatched(body.matched);
+        if (!append) setMatched(body.matched);
         setLabels((prev) => ({ ...prev, ...body.tokens }));
       } catch {
         if (id === reqId.current) setFailed(true);
@@ -145,6 +158,7 @@ export function CowWalletView({
     const p = nextPair && nextTokens.length === 2;
     setSelected(nextTokens);
     setPair(p);
+    setLanding(null);
     const qs = queryString(nextTokens, p);
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     void read(filterOf(nextTokens), p);
@@ -167,21 +181,54 @@ export function CowWalletView({
       setLoading(null);
       return;
     }
-    void read(filterOf(selected), pair);
+    void read(filterOf(selected), pair, landing?.cursor, false);
     // A read follows the focus and Show all; the chooser reads on its own.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope.ready, want, tokens]);
+
+  // The landing, once the list it reads is drawn: the target row to the middle
+  // of the view, ringed for two seconds (none under reduced motion), and `at`
+  // dropped from the address, as the shared timeline does.
+  const listReady = scope.ready && readFor === want && loading == null;
+  useEffect(() => {
+    if (!landing || landed.current || !listReady) return;
+    landed.current = true;
+    const target = trades.find((t) => isCowLandingTrade(landing, t));
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("at");
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      /* the address keeps `at` */
+    }
+    const el = target && document.getElementById(`event-${target.id}`);
+    if (!target || !el) return;
+    let reduced = false;
+    try {
+      reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch {
+      /* matchMedia unavailable: no preference */
+    }
+    el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
+    if (reduced) return;
+    setHighlightId(target.id);
+    setTimeout(() => setHighlightId(null), 2000);
+  }, [landing, listReady, trades]);
 
   const summary = tokens?.summary ?? null;
   const asOf = tokens?.asOf ?? initial?.asOf ?? null;
   const total = summary?.trades ?? null;
   const filtered = selected.length > 0 || focused;
+  // A page read from a cursor (a landing's) carries no match count; unfiltered,
+  // the wallet's total stands.
   const countLine =
-    matched == null || total == null
+    total == null
       ? null
-      : filtered
-        ? `${n(matched)} of ${n(total)} trades`
-        : `${n(total)} ${total === 1 ? "trade" : "trades"}`;
+      : !filtered
+        ? `${n(total)} ${total === 1 ? "trade" : "trades"}`
+        : matched == null
+          ? null
+          : `${n(matched)} of ${n(total)} trades`;
 
   const explanation =
     summary && summary.trades > 0 && summary.firstTimestamp != null ? (
@@ -276,6 +323,19 @@ export function CowWalletView({
               anatomy="L1.11"
             />
           </div>
+          {landing && (
+            <div className={CARD_INSET_START}>
+              <button
+                type="button"
+                onClick={() => apply(selected, pair)}
+                disabled={loading != null}
+                className="inline-flex h-8 items-center rounded-full border border-teal-500/60 px-3 text-xs font-semibold text-teal-600 transition-colors hover:bg-teal-500/10 disabled:opacity-50 dark:text-teal-400"
+                data-cow-newest=""
+              >
+                {COW_LANDING_WORDS.newest}
+              </button>
+            </div>
+          )}
           {/* The rows' receipts; the toolbar's counts carry none until the
                 chooser's receipts land with the stored order reads. */}
           <ProvReceiptsScope registry={registry}>
@@ -292,8 +352,15 @@ export function CowWalletView({
                   key={t.id}
                   value={datePrefix(t.timestamp, i > 0 ? trades[i - 1].timestamp : null)}
                 >
-                  <SpineTipContext.Provider value={i === 0 && !filtered ? "above" : null}>
-                    <div id={`event-${t.id}`} data-event-id={t.id} data-row-at={t.timestamp}>
+                  <SpineTipContext.Provider value={i === 0 && !filtered && !landing ? "above" : null}>
+                    <div
+                      id={`event-${t.id}`}
+                      data-event-id={t.id}
+                      data-row-at={t.timestamp}
+                      className={`rounded-xl transition-shadow duration-[2000ms] ${
+                        highlightId === t.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
+                      }`}
+                    >
                       <CowTradeCard
                         trade={t}
                         sell={labelOf(t.sellToken)}

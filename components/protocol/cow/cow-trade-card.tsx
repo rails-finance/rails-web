@@ -7,10 +7,12 @@
 // executed price, the fee where the log carries one, the settlement
 // transaction and its block; once the card opens and its settlement is read,
 // the surplus and fee lines (T2.3) and, on a settlement with other trades, the
-// settlement panel (T2.2; both cow-settlement-panel.tsx); T3 the trade in words. No USD: phase 1 reads no
+// settlement panel (T2.2; both cow-settlement-panel.tsx); T3 the trade in words, and where the
+// trade served an Aave position swap, a sentence whose phrase opens that swap's event. No USD: phase 1 reads no
 // oracle at a trade's block, so the slot stays empty (rails-ops chain-truth
 // charter §3).
 
+import Link from "next/link";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
@@ -35,7 +37,9 @@ import {
   tradeAmountProv,
   type CowTokenLabel,
 } from "@/lib/cow/trade";
-import { COW_TERMS, cowFeeSentence } from "@/lib/cow/terms";
+import { COW_AAVE_SWAP_WORDS, COW_TERMS, cowFeeSentence } from "@/lib/cow/terms";
+import { cowSwapEventHref } from "@/lib/cow/aave-totals";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { executedPriceNone } from "@/lib/cow/price";
 import { useCowSettlementOpened } from "@/components/protocol/cow/cow-settlement-panel";
 
@@ -186,6 +190,7 @@ export function CowTradeCard({
   const soldWords = `${amountText(trade.sellAmount, sell)} ${tokenText(sell)}`;
   const boughtWords = `${amountText(trade.buyAmount, buy)} ${tokenText(buy)}`;
   const others = trade.settlementTrades - 1;
+  const aave = trade.aave ?? null;
 
   const slots: EventCardSlots = {
     event: {
@@ -221,6 +226,21 @@ export function CowTradeCard({
           <li>
             This wallet&rsquo;s order sold {soldWords} and bought {boughtWords} through{" "}
             {COW_TERMS.settlement.replace(/'/g, "’")}.
+            {aave && (
+              <>
+                {" "}
+                {COW_AAVE_SWAP_WORDS.lead}
+                <Link
+                  href={cowSwapEventHref(aave.family, aave)}
+                  title={COW_AAVE_SWAP_WORDS.title}
+                  className={INLINE_LINK}
+                  data-cow-aave-swap
+                >
+                  {COW_AAVE_SWAP_WORDS.phrase(aave.kind, aave.family)}
+                </Link>
+                .
+              </>
+            )}
           </li>
           {price && (
             <li>
