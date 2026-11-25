@@ -46,7 +46,11 @@
 
 import { useContext, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
-import { PositionCardStripSlot, usePublishPositionCardName } from "@/components/shared/position-card-strip";
+import {
+  PositionCardStripSlot,
+  usePositionTrailNamed,
+  usePublishPositionCardName,
+} from "@/components/shared/position-card-strip";
 import { PositionReadStamp } from "@/components/shared/position-read";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { BreakdownOverlay, assetsWords } from "@/components/shared/stat-breakdown";
@@ -905,7 +909,21 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const registry = useReceiptRegistry();
   const detail = slots.surface === "detail";
   // The wallet heading's trail names the position from here (H13.4).
-  usePublishPositionCardName(detail ? slots.name : undefined);
+  // The pill as the trail draws it: OPEN where the card has a lifecycle and
+  // no status word.
+  usePublishPositionCardName(
+    detail ? slots.name : undefined,
+    slots.status
+      ? { word: slots.status.word, tone: slots.status.tone, tip: slots.status.tip }
+      : slots.lifecycle !== false
+        ? { word: "Open", tone: "open" }
+        : null,
+  );
+  // Where the trail names the position, the detail card leaves its name (the
+  // tag) and its pill out; the listing card and a page with no trail keep
+  // them.
+  const trailNamed = usePositionTrailNamed();
+  const tag = detail && trailNamed ? null : slots.tag;
   const closed = slots.outcome != null;
   const { extra: countersExtra, ...meta } = slots.counters ?? {};
   const counters = slots.counters ? (
@@ -986,7 +1004,10 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const header = (
     <div
       ref={headerRef}
-      className="flex items-start gap-2 mb-3"
+      // From md, a detail heading row with nothing in it goes, and the
+      // figures start at the card's padding. Below md the protocol mark
+      // (C20.1) holds it.
+      className={`flex items-start gap-2 mb-3 ${detail ? "md:[&:not(:has([data-card-head-part]))]:hidden" : ""}`}
       data-anatomy="C5"
       {...(detail ? { "data-card-header": "" } : {})}
     >
@@ -1007,11 +1028,19 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
           {detail ? (
             <>
               {/* A card with no lifecycle draws no OPEN; a status word stands. */}
-              {(slots.status || slots.lifecycle !== false) && <DetailPill status={slots.status} />}
+              {!trailNamed && (slots.status || slots.lifecycle !== false) && (
+                <span className="contents" data-card-head-part="">
+                  <DetailPill status={slots.status} />
+                </span>
+              )}
               {/* `contents`: the wrapper names the identity for a saved
                   position's default name without taking part in the row. */}
-              <span className="contents" data-card-identity="">
-                {slots.tag}
+              <span
+                className="contents"
+                data-card-identity=""
+                data-card-head-part={tag || slots.identity ? "" : undefined}
+              >
+                {tag}
                 {slots.identity}
               </span>
               {/* The block and time of the read behind the figures (ui-jobs 512). */}
@@ -1031,7 +1060,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
                     430), handed over by DetailTopRow. The negative margin keeps
                     the row at its text height. */}
             {slots.stamp && (
-              <span className="flex shrink-0 items-center max-md:ml-auto" data-card-stamp="">
+              <span className="flex shrink-0 items-center max-md:ml-auto" data-card-stamp="" data-card-head-part="">
                 {slots.stamp}
               </span>
             )}
@@ -1040,6 +1069,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
                 <span
                   className="-my-1.5 flex shrink-0 items-center gap-1 max-md:order-last max-md:basis-full max-md:justify-end sm:gap-2"
                   data-position-strip=""
+                  data-card-head-part=""
                 >
                   {strip}
                 </span>
@@ -1061,7 +1091,11 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       </div>
       {/* The card's ⋮ at the top right of the header, whatever wraps beside it,
           centred on the heading's first line. */}
-      {menu && <span className="-mb-1 -mt-1.5 flex shrink-0 items-center">{menu}</span>}
+      {menu && (
+        <span className="-mb-1 -mt-1.5 flex shrink-0 items-center" data-card-head-part="">
+          {menu}
+        </span>
+      )}
     </div>
   );
 

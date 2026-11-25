@@ -40,7 +40,7 @@ import { fetchAddressKind, type AddressKind } from "@/lib/api/fetch-address-kind
 import { ProtocolGlyph, ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { managerProv } from "@/lib/shared/manager-provenance";
-import { usePositionCardName } from "@/components/shared/position-card-strip";
+import { usePositionCardName, useRegisterPositionTrail } from "@/components/shared/position-card-strip";
 import { positionCrumb } from "@/lib/shared/position-name";
 import type { TrailPage } from "@/lib/wallet/summary-counts";
 
@@ -312,8 +312,10 @@ export function PositionWalletHeading({
   // the address elsewhere (PWN's other side) keeps the pill.
   const plain = !owner.vault && !owner.href;
   // The detail card's name, as the trail's last crumb.
-  const cardName = usePositionCardName();
-  const position = cardName && owner.wallet ? positionCrumb(cardName, owner.wallet) : null;
+  const card = usePositionCardName();
+  const position = card && owner.wallet ? positionCrumb(card.name, owner.wallet) : null;
+  // The trail names the position on a position page: the card leaves it out.
+  useRegisterPositionTrail(page === "position" && !!owner.wallet);
   const pill = owner.wallet ? (
     plain ? (
       <WalletMenu wallet={owner.wallet} ensName={owner.ensName ?? null} bookmark={bookmark} heading />
@@ -358,7 +360,13 @@ export function PositionWalletHeading({
       // wallet, it stays empty.
       lines={
         owner.wallet ? (
-          <WalletPositionsMenu wallet={owner.wallet} page={page} position={position} onCrumb={onCrumb} />
+          <WalletPositionsMenu
+            wallet={owner.wallet}
+            page={page}
+            position={position}
+            status={card?.status}
+            onCrumb={onCrumb}
+          />
         ) : (
           <div className="flex h-5 items-center" data-wallet-positions-held="">
             {owner.pending && <SkeletonBar width={72} />}

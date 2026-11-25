@@ -31,7 +31,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { Activity, ChevronDown } from "lucide-react";
+import { RevealTip } from "@/components/shared/reveal-tip";
+import type { TrailStatus } from "@/components/shared/position-card-strip";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
@@ -94,8 +96,15 @@ type Crumb = ReturnType<typeof walletTrailCrumb<WalletCountsPosition>>;
 const ROW = "mx-1 my-0.5 flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-left";
 const ROW_LINK = `${ROW} transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]`;
 const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />;
+/** The pulse's colour for each pill tone: the pill's text colour. */
+const PULSE_TONE: Record<TrailStatus["tone"], string> = {
+  open: "text-positive",
+  muted: "text-rb-500",
+  danger: "text-red-500",
+  caution: "text-tone-caution",
+};
 const SLASH = (
-  <span className="shrink-0 px-1.5 text-rb-400 dark:text-rb-600" aria-hidden="true">
+  <span className="shrink-0 px-1.5 text-rb-500" aria-hidden="true">
     /
   </span>
 );
@@ -122,6 +131,7 @@ export function WalletPositionsMenu({
   page = "position",
   search: givenSearch,
   position,
+  status,
   onCrumb,
 }: {
   wallet: string;
@@ -132,6 +142,8 @@ export function WalletPositionsMenu({
   search?: string;
   /** The position crumb's words, on a position page whose card has named it. */
   position?: string | null;
+  /** The card's lifecycle, the pulse before the position crumb. */
+  status?: TrailStatus | null;
   /** Told once the read settles whether the trail has a protocol crumb. */
   onCrumb?: (found: boolean) => void;
 }) {
@@ -219,7 +231,10 @@ export function WalletPositionsMenu({
     return () => window.clearTimeout(t);
   }, [open, isPhone]);
 
-  if (!menu && !crumb)
+  // The position crumb stands whatever the summary read answers: the card
+  // leaves its name to it.
+  const named = page === "position" && !crumb?.current && position ? position : null;
+  if (!menu && !crumb && !named)
     return (
       <div className="flex h-5 items-center" data-wallet-positions-pending={settled ? undefined : ""}>
         {!settled && <SkeletonBar width={72} />}
@@ -346,9 +361,8 @@ export function WalletPositionsMenu({
   );
 
   const protocolBody = crumb && <span className="whitespace-nowrap">{crumb.row.name}</span>;
-  // The position's chain after its name, as the explorer's title row draws it (H3.2).
-  const chain = crumb && chainMeta(CHAIN_ID[crumb.row.first.chain]).name;
-  const named = page === "position" && crumb && !crumb.current && position;
+  // The pulse's words: the pill's, with its read-more where it has one.
+  const statusTip = status && (status.tip ? `${status.word}. ${status.tip}` : status.word);
   return (
     <nav
       aria-label="Breadcrumb"
@@ -357,7 +371,7 @@ export function WalletPositionsMenu({
       data-prov-chrome=""
       data-wallet-trail=""
     >
-      {dropdown}
+      {dropdown ?? (!settled && <SkeletonBar width={72} />)}
       {crumb && (
         <>
           {dropdown && SLASH}
@@ -381,24 +395,28 @@ export function WalletPositionsMenu({
           )}
         </>
       )}
-      {named && crumb && (
+      {named && (
         <>
-          {SLASH}
+          {(dropdown || crumb || !settled) && SLASH}
           <span
             aria-current="page"
             className="flex min-w-0 items-center gap-1 text-foreground"
             data-wallet-trail-position=""
           >
-            <span title={position} className="min-w-0 truncate">
-              {position}
-            </span>
-            <span
-              role="img"
-              aria-label={`on ${chain}`}
-              title={chain ?? undefined}
-              className="flex shrink-0 text-rb-500"
-            >
-              <ChainGlyph id={CHAIN_ID[crumb.row.first.chain]} className="size-3.5 shrink-0" />
+            {status && statusTip && (
+              <RevealTip
+                tip={<span className="block max-w-72 whitespace-normal">{statusTip}</span>}
+                label={statusTip}
+                focusable
+                className="flex shrink-0 rounded-sm focus-ring"
+              >
+                <span className={`flex ${PULSE_TONE[status.tone]}`} data-wallet-trail-status={status.tone}>
+                  <Activity className="size-3.5 shrink-0" aria-hidden="true" />
+                </span>
+              </RevealTip>
+            )}
+            <span title={named} className="min-w-0 truncate">
+              {named}
             </span>
           </span>
         </>

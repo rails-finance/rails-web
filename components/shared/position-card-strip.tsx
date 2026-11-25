@@ -33,16 +33,26 @@ import {
   type ReactNode,
 } from "react";
 
+/** The card's lifecycle as the trail draws it (H13.4): the pill's word and
+ *  tone, "open" for the OPEN pill. */
+export interface TrailStatus {
+  word: string;
+  tone: "open" | "muted" | "danger" | "caution";
+  tip?: string;
+}
+
 interface StripStore {
   node: ReactNode;
   slots: string[];
   /** The detail cards' names, in mount order. */
-  names: { id: string; name: PositionName }[];
+  names: { id: string; name: PositionName; status: TrailStatus | null }[];
+  /** The wallet headings whose trail names the page's position. */
+  trails: string[];
   listeners: Set<() => void>;
 }
 
 function createStore(): StripStore {
-  return { node: null, slots: [], names: [], listeners: new Set() };
+  return { node: null, slots: [], names: [], trails: [], listeners: new Set() };
 }
 
 const notify = (s: StripStore) => s.listeners.forEach((l) => l());
@@ -116,33 +126,67 @@ export function PositionCardStripSlot({ children }: { children: (strip: ReactNod
   return node ? children(node) : null;
 }
 
-/** The detail card's half of the name: registers `name` while the card is
- *  mounted, kept current as its text changes. */
-export function usePublishPositionCardName(name: PositionName | undefined) {
+/** The detail card's half of the name: registers `name` and the card's
+ *  lifecycle while the card is mounted, kept current as they change. */
+export function usePublishPositionCardName(name: PositionName | undefined, status: TrailStatus | null) {
   const store = useContext(PositionCardStripContext);
   const id = useId();
   const text = name?.text;
+  const word = status?.word;
+  const tone = status?.tone;
+  const tip = status?.tip;
   useLayoutEffect(() => {
     if (!store || !name) return;
-    store.names = [...store.names.filter((n) => n.id !== id), { id, name }];
+    store.names = [...store.names.filter((n) => n.id !== id), { id, name, status }];
     notify(store);
     return () => {
       store.names = store.names.filter((n) => n.id !== id);
       notify(store);
     };
-    // The name is a new object each render; its text is what changes.
+    // The name and status are new objects each render; their words are
+    // what change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store, id, text]);
+  }, [store, id, text, word, tone, tip]);
 }
 
-/** The wallet heading's half: the first detail card's name, or null while
- *  none is mounted (and on the server). */
-export function usePositionCardName(): PositionName | null {
+/** The wallet heading's half: the first detail card's name and lifecycle,
+ *  or null while none is mounted (and on the server). */
+export function usePositionCardName(): { name: PositionName; status: TrailStatus | null } | null {
   const store = useContext(PositionCardStripContext);
   const subscribe = useSubscribe(store);
   return useSyncExternalStore(
     subscribe,
-    () => store?.names[0]?.name ?? null,
+    () => store?.names[0] ?? null,
     () => null,
+  );
+}
+
+/** The wallet heading's half of the hand-over the other way: while `on`, the
+ *  heading's trail names the page's position and its lifecycle, so a detail
+ *  card leaves its name (the tag) and its pill out of its heading row
+ *  (ui-jobs 856). */
+export function useRegisterPositionTrail(on: boolean) {
+  const store = useContext(PositionCardStripContext);
+  const id = useId();
+  useLayoutEffect(() => {
+    if (!store || !on) return;
+    store.trails = [...store.trails, id];
+    notify(store);
+    return () => {
+      store.trails = store.trails.filter((t) => t !== id);
+      notify(store);
+    };
+  }, [store, id, on]);
+}
+
+/** The card's half: whether a wallet heading's trail names the position.
+ *  False on the server and on a page with no wallet heading. */
+export function usePositionTrailNamed(): boolean {
+  const store = useContext(PositionCardStripContext);
+  const subscribe = useSubscribe(store);
+  return useSyncExternalStore(
+    subscribe,
+    () => (store ? store.trails.length > 0 : false),
+    () => false,
   );
 }
