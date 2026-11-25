@@ -273,7 +273,10 @@ export function PositionWalletHeading({
   page = "position",
   className,
   onCrumb,
+  back,
 }: {
+  /** Back, where the page keeps it: at the right end, before Tools. */
+  back?: ReactNode;
   owner: PositionOwner;
   /** Told whether the trail found the page's protocol (H13.4). */
   onCrumb?: (found: boolean) => void;
@@ -361,7 +364,13 @@ export function PositionWalletHeading({
               {strip}
             </span>
           )}
-          {tools && <span className="ml-auto flex min-h-7 shrink-0 items-center">{tools}</span>}
+          {/* Packed right, so Back's place going leaves Tools where it is. */}
+          {(back || tools) && (
+            <span className="ml-auto flex min-h-7 shrink-0 items-center gap-1 sm:gap-2">
+              {back}
+              {tools}
+            </span>
+          )}
         </>
       }
     />

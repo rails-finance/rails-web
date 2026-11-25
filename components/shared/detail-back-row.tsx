@@ -231,8 +231,10 @@ export function DetailTopRow({
   );
   const inCard = claimed || card;
   const page = eventPage ? "event" : walletPage ? "wallet" : "position";
-  // The trail's protocol crumb goes where Back's fallback would.
-  const [crumbless, setCrumbless] = useState(false);
+  // The trail's protocol crumb goes where Back's fallback would: Back
+  // goes. Until the summary read says the trail found the page's
+  // protocol, Back's place is held, invisible, so nothing moves.
+  const [crumb, setCrumb] = useState<"pending" | "found" | "none">("pending");
   const ownerWallet = owner?.wallet?.toLowerCase();
   const trailed =
     owner != null &&
@@ -241,7 +243,15 @@ export function DetailTopRow({
     walletProtocol(entry.slug) != null &&
     (fallbackHref == null || (ownerWallet != null && fallbackHref.toLowerCase().includes(ownerWallet)));
   const unowned = owner != null && !owner.wallet && !owner.pending;
-  const back = !trailed || crumbless || unowned;
+  // A wallet page is the trail's protocol crumb: no Back.
+  const back: "shown" | "held" | "none" =
+    page === "wallet"
+      ? "none"
+      : !trailed || unowned || crumb === "none"
+        ? "shown"
+        : crumb === "pending"
+          ? "held"
+          : "none";
   const heading = owner && (
     // In the row's scope: a holder can carry a receipt (Polaris). With
     // no card to hold them, the price and the chain's recency ride the
@@ -251,10 +261,23 @@ export function DetailTopRow({
         owner={owner}
         session={session}
         page={page}
-        onCrumb={(found) => setCrumbless(!found)}
-        // Without Back the heading is the column's first row, clear of the
-        // profile control (H20) at the top right from md.
-        className={back ? undefined : PROFILE_CLEARANCE}
+        onCrumb={(found) => setCrumb(found ? "found" : "none")}
+        // The heading is the column's first row, clear of the profile
+        // control (H20) at the top right from md; Back, where it stays,
+        // stands at its right end.
+        className={PROFILE_CLEARANCE}
+        back={
+          back === "none" ? undefined : (
+            <span
+              className={`flex ${back === "held" ? "invisible" : ""}`}
+              aria-hidden={back === "held" || undefined}
+              data-anatomy="H7"
+              data-back-row=""
+            >
+              <DetailBackButton session={session} wallet={wallet} fallbackHref={fallbackHref} compact />
+            </span>
+          )
+        }
         tools={tools && !eventPage ? children : false}
         strip={
           !inCard && (priced || stamped) ? (
@@ -269,31 +292,24 @@ export function DetailTopRow({
       {lifecycleId && <LifecycleLine id={lifecycleId} className="mt-2" />}
     </ProvReceiptsScope>
   );
-  if (!back) return <div className="mb-4">{heading}</div>;
+  if (heading) return <div className="mb-4">{heading}</div>;
+  // A page without the heading: Back's row, with the strip and Tools.
   return (
-    // With the heading, the gap to the card (16px, in place of the page's
-    // space-y-6 margin) is smaller than the gap above the heading (24px), so
-    // the heading reads with the card.
-    <div className={owner ? "mb-4" : undefined}>
+    <div>
       <div
         className={`flex min-h-[38px] flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2 ${PROFILE_CLEARANCE}`}
         data-anatomy="H7"
         data-back-row
       >
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-          <DetailBackButton session={session} wallet={wallet} fallbackHref={fallbackHref} compact={!owner} />
+          <DetailBackButton session={session} wallet={wallet} fallbackHref={fallbackHref} compact />
           {/* A page without a heading keeps the strip beside Back. */}
-          {!owner && (
-            <>
-              {stamped && <RecencyStamp compact />}
-              <ProvReceiptsScope registry={registry}>{prices(false)}</ProvReceiptsScope>
-            </>
-          )}
+          {stamped && <RecencyStamp compact />}
+          <ProvReceiptsScope registry={registry}>{prices(false)}</ProvReceiptsScope>
         </div>
         {/* The page's Tools menu, once the caller has export shapes to give. */}
-        {!owner && !eventPage && children}
+        {!eventPage && children}
       </div>
-      {owner && <div className="mt-6">{heading}</div>}
     </div>
   );
 }
