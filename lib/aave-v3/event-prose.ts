@@ -21,6 +21,7 @@ import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import type { EventProseCore } from "@/lib/shared/event-prose/types";
 import type { ChainId } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
+import { aaveSwapCowTradeHref } from "@/lib/cow/landing";
 import { poolCallerContract, withdrawRecipient } from "@/lib/aave-v3/event-label";
 import { legAmount } from "@/lib/shared/tx-legs";
 import { externalActor } from "@/lib/shared/external-actor";
@@ -57,6 +58,8 @@ export interface AaveV3ProseInput {
   /** The last row of the previous transaction, and this event's time. */
   previousEvent?: AaveV3TimelineEvent;
   timestamp?: number;
+  /** The event's block: a swap's CoW trade opens on the wallet's CoW page at it. */
+  blockNumber?: number;
 }
 
 const num = (s: string | undefined | null): number | null => {
@@ -399,6 +402,9 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
       v.r_symbol = s.receivedSymbol ?? "";
       v.venue = para ? V3_WORDS.venue_paraswap : V3_WORDS.venue_cow;
       const legs = { given: "given", received: "received" } as const;
+      // An order the wallet owns names its CoW settlement as a link to the trade.
+      const tradeHref = aaveSwapCowTradeHref(s, owner, input.blockNumber, chainId);
+      const cowTrade = tradeHref ? { venue: { href: tradeHref, title: V3_WORDS.cow_trade_link } } : undefined;
       // What a ParaSwap adapter returned unused (server mig 248).
       const back = s.events?.find((e) => e.leftover);
       if (variant === "debt_swap") {
@@ -419,11 +425,11 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
           sp.say("swap.repay_net", { back: "back" });
         }
       } else if (variant === "supply_from_swap") {
-        sp.say("swap.supply_from", legs);
+        sp.say("swap.supply_from", legs, cowTrade);
         sp.say("swap.supply_wallet");
         break;
       } else if (variant === "withdraw_and_swap") {
-        sp.say("swap.withdraw", legs);
+        sp.say("swap.withdraw", legs, cowTrade);
         sp.say(para ? "swap.withdraw_wallet" : "swap.withdraw_receiver");
       } else sp.say("swap.collateral", legs);
       if (variant !== "debt_swap" && switchedOff()) sp.say("swap.off");

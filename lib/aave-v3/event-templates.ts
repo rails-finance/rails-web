@@ -87,7 +87,6 @@ export const V3_HEAD_WORDS: AaveFamilyHeadTable = {
   legReceived: V3_WORDS.t1_leg_received,
   legBought: V3_WORDS.t1_leg_bought,
   legSold: V3_WORDS.t1_leg_sold,
-  cowTradeLink: V3_WORDS.t1_cow_trade_link,
   treasury: V3_WORDS.t1_treasury,
 };
 

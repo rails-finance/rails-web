@@ -40,8 +40,6 @@ export interface AaveFamilyHeadTable {
    *  family without them reads by direction. */
   legBought?: string;
   legSold?: string;
-  /** The "via CoW" chip's link title, where the order's owner is the wallet. */
-  cowTradeLink?: string;
   /** The protocol's treasury, a liquidation fee's recipient. */
   treasury: string;
   /** The family's WETH gateway, where no registry names it (SparkLend). */

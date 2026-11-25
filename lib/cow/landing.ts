@@ -39,3 +39,20 @@ export function isCowLandingTrade(
 export function cowTradeHref(wallet: string, block: number, orderUid: string): string {
   return `/ethereum/cow/${wallet.toLowerCase()}?at=${block}-${orderUid.toLowerCase()}`;
 }
+
+/** Where an Aave position swap's CoW trade opens on the wallet's CoW page: an
+ *  order the wallet owns (a withdraw and swap, a supply from a swap) on
+ *  Ethereum, the page's one chain. An order Aave's one-order adapter owns is
+ *  not on that page: undefined, as for ParaSwap. */
+export function aaveSwapCowTradeHref(
+  swap: { kind: string; route: string; orderUid?: string; tradeOwner?: string } | null | undefined,
+  wallet: string | undefined,
+  block: number | undefined,
+  chainId: number | null | undefined,
+): string | undefined {
+  if (!swap || swap.route === "paraswap" || !swap.orderUid || !wallet || block == null || chainId !== 1)
+    return undefined;
+  if (swap.kind !== "withdraw_and_swap" && swap.kind !== "supply_from_swap") return undefined;
+  if (swap.tradeOwner?.toLowerCase() !== wallet.toLowerCase()) return undefined;
+  return cowTradeHref(wallet, block, swap.orderUid);
+}

@@ -27,7 +27,6 @@
 //      it pairs with per-axis delta labels (each axis' own verb) so the CDP
 //      openers read the same as V2 — `Open  Deposit 6 ◊  Borrow 10K ♭`.
 
-import Link from "next/link";
 import { ProtocolGlyph } from "@/components/icons/protocol-glyphs";
 import { BarSubjectTile } from "@/components/shared/bar-subject-mark";
 import { barSubjectOf } from "@/lib/shared/known-infrastructure";
@@ -230,10 +229,6 @@ export interface ChainTruthRowSpec {
      *  chip makes). Opt-in: a row whose charter refuses names leaves it off. A
      *  registry `name` still wins over ENS. */
     ens?: boolean;
-    /** The chip's name links here (a page in the app), `linkTitle` its
-     *  tooltip: a CoW swap's venue opening the trade on the wallet's CoW page. */
-    href?: string;
-    linkTitle?: string;
   };
   /** A CUSTODY move — the receipt token was transferred to or from another
    *  account, so nothing entered or left the protocol. The header then reads
@@ -1145,23 +1140,13 @@ export function PartyChip({
           />
         )
       )}
-      {!markOnly &&
-        (party.href ? (
-          <Link
-            href={party.href}
-            title={party.linkTitle}
-            className="font-medium text-foreground underline decoration-rb-500/50 underline-offset-2 hover:decoration-current"
-            data-party-link=""
-          >
-            {shown}
-          </Link>
-        ) : (
-          <span
-            className={`font-medium ${party.tone === "party" ? "text-pink-600 dark:text-pink-400" : "text-foreground"}`}
-          >
-            {shown}
-          </span>
-        ))}
+      {!markOnly && (
+        <span
+          className={`font-medium ${party.tone === "party" ? "text-pink-600 dark:text-pink-400" : "text-foreground"}`}
+        >
+          {shown}
+        </span>
+      )}
     </Prov>
   );
 }

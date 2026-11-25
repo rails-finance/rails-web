@@ -54,7 +54,6 @@ import { protocolIconSrc } from "@/lib/shared/protocols";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { legAmount } from "@/lib/shared/tx-legs";
-import { cowTradeHref } from "@/lib/cow/landing";
 
 /** The primary reserve amount signed by direction: supply/borrow/transfer_in
  *  increase their side (+), withdraw/repay/transfer_out decrease it (−). A
@@ -305,19 +304,6 @@ export function useAaveV3HeadSpec({
   // A swap names its venue, "via CoW" or "via ParaSwap" — never a CoW
   // order's one-order adapter.
   const venue = ctx.swap ? swapVenueParty(ctx.swap, coords.chainId ?? MAINNET_CHAIN_ID) : undefined;
-  // A CoW order the wallet owns (a withdraw and swap, a supply from a swap) is a
-  // trade on the wallet's CoW page, which reads Ethereum: the chip opens it there.
-  // An order Aave's one-order adapter owns is not on that page and stays unlinked.
-  const cowTrade = ctx.swap?.route !== "paraswap" ? ctx.swap : undefined;
-  const cowHref =
-    cowTrade?.orderUid &&
-    wallet &&
-    blockNumber != null &&
-    coords.chainId === MAINNET_CHAIN_ID &&
-    (cowTrade.kind === "withdraw_and_swap" || cowTrade.kind === "supply_from_swap") &&
-    cowTrade.tradeOwner?.toLowerCase() === wallet.toLowerCase()
-      ? cowTradeHref(wallet, blockNumber, cowTrade.orderUid)
-      : undefined;
   const party =
     ctx.swap && venue
       ? {
@@ -327,7 +313,6 @@ export function useAaveV3HeadSpec({
           icon: venue.protocolIcon ? protocolIconSrc(venue.protocolIcon) : undefined,
           glyph: venue.protocolGlyph,
           prov: swapVenueProv(coords, ctx.swap),
-          ...(cowHref ? { href: cowHref, linkTitle: V3_HEAD_WORDS.cowTradeLink } : {}),
         }
       : ctx.counterparty != null
         ? {
