@@ -305,7 +305,8 @@ export function useAaveV3EventBody({
   /** The row's own balance, before → after (the chain's where the index valued it). */
   const rowStat = (a: Axis): ChainTruthStat => ({
     label: a.label,
-    value: fmt(a.principalAfter),
+    // The exact decimal: the cell compacts it, and its USD reads a unit price from it.
+    value: a.principalAfter == null ? "—" : unsigned(a.principalAfter),
     symbol: a.symbol,
     ...(a.chain ? { address: a.reserve } : {}),
     prov: a.chain
