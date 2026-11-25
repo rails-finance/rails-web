@@ -98,11 +98,15 @@ function fake(answer = nothing) {
 }
 
 const W = "0x00000000000000000000000000000000000000a1";
-const lido = { id: "lido", presence: checks.LIDO_PRESENCE };
 
 test("a wallet holding nothing costs one multicall per chain, inside the wallet row", async () => {
   launchAll();
-  const entries = [...walletPresenceEntries(), lido];
+  const entries = walletPresenceEntries();
+  for (const id of ["fluid-base", "lido"])
+    assert.ok(
+      entries.some((e) => e.id === id),
+      id,
+    );
   const f = fake();
   const answers = await readPresence(entries, W, f.multicall);
   const chains = new Set(entries.filter((e) => e.presence?.kind === "check").map((e) => e.presence.chainId));
@@ -118,6 +122,10 @@ test("a wallet holding nothing costs one multicall per chain, inside the wallet 
 
 test("every visit module and liquidity source has an entry; Morpho Blue and Balancer V3 say why they have no check", () => {
   for (const m of WALLET_VISIT_FAMILIES) assert.ok(m.presence, m.id);
+  const ids = WALLET_VISIT_FAMILIES.map((m) => m.id);
+  assert.ok(ids.includes("fluid-base") && ids.includes("lido"));
+  assert.equal(WALLET_VISIT_FAMILIES.find((m) => m.id === "fluid-base").presence, checks.FLUID_BASE_PRESENCE);
+  assert.equal(WALLET_VISIT_FAMILIES.find((m) => m.id === "lido").presence, checks.LIDO_PRESENCE);
   for (const s of LIQUIDITY_SOURCES) assert.ok(checks.LIQUIDITY_PRESENCE[s.key], s.key);
   assert.equal(checks.MORPHO_BLUE_PRESENCE.kind, "none");
   assert.match(checks.LIQUIDITY_PRESENCE["balancer:1"].why, /no one call/);
@@ -130,11 +138,28 @@ test("a balance in any read holds", async () => {
     [checks.COMPOUND_V3_OPTIMISM_PRESENCE, () => [BigInt(-5), ZERO, ZERO, 0, 0]],
     [checks.COMPOUND_V3_OPTIMISM_PRESENCE, () => [ZERO, ZERO, ZERO, 4, 0]],
     [checks.LIDO_PRESENCE, (c) => (c.address.toLowerCase().startsWith("0x7f39") ? one : ZERO)],
+    [checks.FLUID_BASE_PRESENCE, () => BigInt(2)],
   ];
   for (const [presence, answer] of cases) {
     const a = await readPresence([{ id: "x", presence }], W, fake(answer).multicall);
     assert.equal(a.get("x"), "held");
   }
+});
+
+test("Fluid on Base asks balanceOf(owner) on its VaultFactory, and holds nothing on 0", async () => {
+  const { FLUID_BASE_CONTRACTS } = await import("../../lib/fluid-base/types.ts");
+  const p = checks.FLUID_BASE_PRESENCE;
+  assert.equal(p.kind, "check");
+  assert.equal(p.chainId, 8453);
+  const calls = p.calls(W);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].address.toLowerCase(), FLUID_BASE_CONTRACTS.vaultFactory.toLowerCase());
+  assert.equal(calls[0].functionName, "balanceOf");
+  assert.deepEqual(calls[0].args, [W]);
+  const empty = await readPresence([{ id: "fluid", presence: p }], W, fake(() => ZERO).multicall);
+  assert.equal(empty.get("fluid"), "empty");
+  const held = await readPresence([{ id: "fluid", presence: p }], W, fake(() => BigInt(1)).multicall);
+  assert.equal(held.get("fluid"), "held");
 });
 
 test("a check that fails, or one call in it, reads as before", async () => {

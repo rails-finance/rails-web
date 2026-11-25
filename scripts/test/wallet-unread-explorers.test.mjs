@@ -1,7 +1,8 @@
 // The empty wallet page's list of launched explorers it does not read (rails-ops decision 0073
 // point 4; walletUnreadExplorers in lib/wallet/read-wallet.ts): drawn from the roster, the family
 // modules, the visit modules and the liquidity sources, so an explorer joins at its launch and
-// leaves with the change that reads it. The launch flags are flipped in memory on the roster's
+// leaves with the change that reads it. Fluid on Base's and Lido's modules are switched off in
+// memory where a test needs an explorer no read takes. The launch flags are flipped in memory on the roster's
 // entries (protocolForSession), never in lib/shared/protocols.ts; the modules import through
 // `@/`, resolved as wallet-visit-families.test.mjs does.
 // Run: npm test
@@ -53,17 +54,43 @@ function launchAll(on) {
 }
 test.after(() => launchAll(false));
 
+/** Fluid on Base's and Lido's visit modules switched off in memory while `fn` runs, so their
+ *  explorers stand for a launched explorer no read takes. */
+function withoutModules(ids, fn) {
+  const saved = ids.map((id) => {
+    const m = WALLET_VISIT_FAMILIES.find((x) => x.id === id);
+    const own = Object.getOwnPropertyDescriptor(m, "on");
+    Object.defineProperty(m, "on", { get: () => false, configurable: true });
+    return [m, own];
+  });
+  try {
+    return fn();
+  } finally {
+    for (const [m, own] of saved) Object.defineProperty(m, "on", own);
+  }
+}
+const UNREAD = ["fluid-base", "lido"];
+
 test("the page names the explorers no read takes, linked at the wallet", () => {
   launchAll(true);
   // Aave V4 on Arc's rows are read once its explorer is launched at module load (ARC_ON_WALLET).
   const arc = ARC_ON_WALLET
     ? []
     : [{ id: "aave-v4-arc", name: "Aave V4 on Arc", href: `/arc/aave-v4/${W.toLowerCase()}` }];
-  assert.deepEqual(walletUnreadExplorers(W), [
-    ...arc,
-    { id: "fluid-base", name: "Fluid on Base", href: `/base/fluid/${W.toLowerCase()}` },
-    { id: "lido", name: "Lido", href: `/ethereum/lido/${W.toLowerCase()}` },
-  ]);
+  assert.deepEqual(
+    withoutModules(UNREAD, () => walletUnreadExplorers(W)),
+    [
+      ...arc,
+      { id: "fluid-base", name: "Fluid on Base", href: `/base/fluid/${W.toLowerCase()}` },
+      { id: "lido", name: "Lido", href: `/ethereum/lido/${W.toLowerCase()}` },
+    ],
+  );
+});
+
+test("Fluid on Base and Lido leave the list once their modules read them", () => {
+  launchAll(true);
+  const named = walletUnreadExplorers(W).map((e) => e.id);
+  for (const id of UNREAD) assert.ok(!named.includes(id), id);
 });
 
 test("an unlaunched explorer is not named", () => {
@@ -74,7 +101,7 @@ test("an unlaunched explorer is not named", () => {
   delete protocolForSession("lido").unlaunched;
   protocolForSession("fluid-base").unlaunched = true;
   assert.deepEqual(
-    walletUnreadExplorers(W)
+    withoutModules(UNREAD, () => walletUnreadExplorers(W))
       .map((e) => e.id)
       .filter((id) => id !== "aave-v4-arc"),
     ["lido"],

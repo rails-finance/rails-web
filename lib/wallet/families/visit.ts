@@ -1,6 +1,6 @@
-// The families with no store, read at visit (rails-ops decision 0071, group 4;
-// SERVER-ONLY by use): Aave V3, Compound V3 and Morpho Blue on Optimism, and
-// Morpho Blue on Arc. Nothing is written to wallet_positions for them. Each
+// The families with no store, read at visit (rails-ops decision 0071, group 4,
+// and 0073; SERVER-ONLY by use): Aave V3, Compound V3 and Morpho Blue on
+// Optimism, Morpho Blue on Arc, Fluid on Base and Lido. Nothing is written to wallet_positions for them. Each
 // module calls its explorer's per-wallet head route once per visit, through
 // the wallet read's limiter (`apiHop`), and only once the summary and listing
 // reads have settled (readWalletUncached starts them after `readSummary`).

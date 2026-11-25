@@ -60,6 +60,8 @@ import type { VaultPositionRow } from "@/lib/aave-vaults/vault-position";
 import type { OpPositionRead } from "@/lib/aave-v3-optimism/types";
 import type { OpcWalletRead } from "@/lib/compound-v3-optimism/types";
 import type { MorphoAtBlockWalletRead } from "@/lib/morpho-at-block/types";
+import type { FluidBasePositionsRead } from "@/lib/fluid-base/types";
+import type { LidoStakeRead } from "@/lib/lido/types";
 
 /** "redeemed" is in the type for the families that end a position by
  *  redemption; no store states it as an ending yet (a fully redeemed Liquity
@@ -171,7 +173,10 @@ export type WalletCard =
    *  Optimism or Arc holding one market. */
   | { kind: "aave-v3-optimism"; read: OpPositionRead }
   | { kind: "compound-v3-optimism"; read: OpcWalletRead }
-  | { kind: "morpho-at-block"; dep: "optimism" | "arc"; read: MorphoAtBlockWalletRead };
+  | { kind: "morpho-at-block"; dep: "optimism" | "arc"; read: MorphoAtBlockWalletRead }
+  /** The wallet read holding this position alone. */
+  | { kind: "fluid-base"; read: FluidBasePositionsRead }
+  | { kind: "lido"; read: LidoStakeRead };
 
 /** A closed position's row in the History table: what the store states, each
  *  field absent where it states nothing. */

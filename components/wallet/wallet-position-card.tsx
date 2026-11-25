@@ -96,6 +96,8 @@ import { VaultPositionCard } from "@/components/vaults/vault-position-card";
 import { AaveV3OptimismWalletCard } from "@/components/protocol/aave-v3-optimism/aave-v3-optimism-wallet-card";
 import { CompoundV3OptimismWalletCard } from "@/components/protocol/compound-v3-optimism/compound-v3-optimism-wallet-card";
 import { MorphoAtBlockWalletCard } from "@/components/protocol/morpho-at-block/morpho-at-block-wallet-card";
+import { FluidBaseWalletCard } from "@/components/protocol/fluid-base/fluid-base-wallet-card";
+import { LidoWalletCard } from "@/components/protocol/lido/lido-wallet-card";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { unreadEdge } from "@/lib/wallet/unread-edge";
@@ -324,6 +326,10 @@ function FamilyCard({ card, state }: { card: WalletCard; state: BranchShutdownSt
       return <CompoundV3OptimismWalletCard read={card.read} />;
     case "morpho-at-block":
       return <MorphoAtBlockWalletCard dep={card.dep} read={card.read} />;
+    case "fluid-base":
+      return <FluidBaseWalletCard read={card.read} />;
+    case "lido":
+      return <LidoWalletCard read={card.read} />;
   }
 }
 

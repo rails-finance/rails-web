@@ -40,6 +40,8 @@ import { moonwellBase, moonwellEthereum } from "@/lib/wallet/families/moonwell";
 import { eulerV2Arbitrum, eulerV2Base } from "@/lib/wallet/families/euler";
 import { aaveV3Optimism, compoundV3Optimism } from "@/lib/wallet/families/optimism";
 import { morphoArc, morphoOptimism } from "@/lib/wallet/families/morpho-at-block";
+import { fluidBase } from "@/lib/wallet/families/fluid-base";
+import { lido } from "@/lib/wallet/families/lido";
 import { readVisitFamilies, visitFamiliesLine, type VisitModule, type VisitRead } from "@/lib/wallet/families/visit";
 import { skySavings } from "@/lib/wallet/families/sky-savings";
 import { llamalend } from "@/lib/wallet/families/llamalend";
@@ -141,7 +143,14 @@ export const WALLET_FAMILIES: FamilyModule[] = [
 /** The families read at visit, with no store (lib/wallet/families/visit.ts),
  *  in the decision's order. Each makes no call while its explorer is
  *  unlaunched. */
-export const WALLET_VISIT_FAMILIES: VisitModule[] = [aaveV3Optimism, compoundV3Optimism, morphoOptimism, morphoArc];
+export const WALLET_VISIT_FAMILIES: VisitModule[] = [
+  aaveV3Optimism,
+  compoundV3Optimism,
+  morphoOptimism,
+  morphoArc,
+  fluidBase,
+  lido,
+];
 
 /** The families the page reads, by chain, in one sentence for the empty
  *  state: "Aave V3, … and Asymmetry on Ethereum; … on Base; …". A module whose

@@ -451,10 +451,12 @@ test("a wallet holding nothing on a family draws no section and names no failure
 
 test("with today's flags every module is off", () => {
   for (const s of SESSIONS) assert.equal(FLAGS[s], true, `${s} is unlaunched in protocols.ts`);
+  // Fluid on Base's and Lido's modules (decision 0073), off with their explorers.
+  for (const s of ["fluid-base", "lido"]) assert.equal(protocolForSession(s)?.unlaunched, true, s);
   reset({ launched: [] });
   assert.deepEqual(
     WALLET_VISIT_FAMILIES.map((m) => [m.id, m.on]),
-    SESSIONS.map((s) => [s, false]),
+    [...SESSIONS, "fluid-base", "lido"].map((s) => [s, false]),
   );
 });
 
@@ -628,7 +630,7 @@ test("one protocol chosen: every launched module is read for the pills, and only
 test("the empty state names the launched families read at visit by chain, and none while none is", () => {
   assert.deepEqual(
     WALLET_VISIT_FAMILIES.map((m) => m.id),
-    SESSIONS,
+    [...SESSIONS, "fluid-base", "lido"],
   );
   reset({ launched: [] });
   assert.equal(walletVisitLine(), "");

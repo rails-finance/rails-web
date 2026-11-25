@@ -5,8 +5,9 @@
 import { parseAbi } from "viem";
 import { AAVE_V3_OPTIMISM_CONTRACTS } from "@/lib/aave-v3-optimism/types";
 import { COMPOUND_OPTIMISM_DEPLOYMENT } from "@/lib/compound-v3-optimism/asset-catalog";
+import { FLUID_BASE_CONTRACTS } from "@/lib/fluid-base/types";
 import { STETH, WITHDRAWAL_QUEUE, WSTETH } from "@/lib/lido/types";
-import { MAINNET_CHAIN_ID, OPTIMISM_CHAIN_ID } from "@/lib/shared/chains";
+import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, OPTIMISM_CHAIN_ID } from "@/lib/shared/chains";
 import { positive, type Presence } from "@/lib/wallet/presence";
 import { UNI_DEPLOYMENTS, type UniDeployment } from "@/lib/uniswap/deployments";
 
@@ -63,7 +64,7 @@ export const MORPHO_BLUE_PRESENCE: Presence = {
   why: "Morpho Blue states a position one market at a time; no call answers for every market",
 };
 
-/** Lido on Ethereum, for its module (ui-jobs 852 step 3): stETH, wstETH and the withdrawal
+/** Lido on Ethereum: stETH, wstETH and the withdrawal
  *  queue's NFTs, three balanceOf calls. */
 export const LIDO_PRESENCE: Presence = {
   kind: "check",
@@ -76,6 +77,22 @@ export const LIDO_PRESENCE: Presence = {
       args: [owner],
     })),
   held: (results) => results.some(positive),
+};
+
+/** Fluid on Base: its positions are the VaultFactory's NFTs, so one balanceOf call. An NFT
+ *  counts whatever it holds; the read behind it skips an empty one. */
+export const FLUID_BASE_PRESENCE: Presence = {
+  kind: "check",
+  chainId: BASE_CHAIN_ID,
+  calls: (owner) => [
+    {
+      address: FLUID_BASE_CONTRACTS.vaultFactory as `0x${string}`,
+      abi: BALANCE_ABI,
+      functionName: "balanceOf",
+      args: [owner],
+    },
+  ],
+  held: ([n]) => positive(n),
 };
 
 /** Uniswap V3 and V4, or PancakeSwap V3, on one chain: balanceOf(owner) on the V3 position
