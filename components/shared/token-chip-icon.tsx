@@ -35,7 +35,9 @@ import {
   OPTIMISM_CHAIN_ID,
   ROBINHOOD_CHAIN_ID,
 } from "@/lib/shared/chains";
+import { KindRing, kindRingInner } from "@/components/shared/token-kind-ring";
 import { getLocalTokenIcon } from "@/lib/shared/local-token-icons";
+import { isPendlePt } from "@/lib/morpho/pendle-pt";
 import { PT_UNDERLYING_BASE, PT_UNDERLYING_MAINNET } from "@/lib/shared/pt-underlying";
 import { getTokenAddress } from "@/lib/shared/token-addresses";
 
@@ -54,8 +56,8 @@ const LOGO_ADDRESS_OVERRIDES: Record<string, string> = {
   sfrxUSD: "0x853d955aCEf822Db058eb8505911ED77F175b99e",
   // Pendle PTs used to sit here as two hand-written keys. They no longer do:
   // a PT's underlying is now read from the PT contract itself and the chip
-  // wears a "PT" badge over the mark (PT_UNDERLYING below, PtBadge at the
-  // foot of this file). The two keys were also both dead against real data —
+  // marks the mark as a claim (PT_UNDERLYING below, PtMark at the foot of
+  // this file). The two keys were also both dead against real data —
   // "PT-sUSDE" and "PT-USDe-7MAY2026" are undated and mis-dated forms of
   // symbols the chain actually spells "PT-sUSDE-27MAR2025", "PT-sUSDE-7MAY2026"
   // and so on, one per maturity. Two entries could never have covered 149 of
@@ -181,6 +183,10 @@ export function TokenChipIcon({
         : PT_UNDERLYING_MAINNET;
   const ptUnderlying = address ? ptTable[address.toLowerCase()] : undefined;
   const isPt = /^PT-/i.test(rawLookup);
+  // A Pendle PT (isPendlePt: "PT-<asset>-<DMMMYYYY>") from 20px wears
+  // Pendle's PT ring (PtMark below); the mark shrinks to sit inside it.
+  const ring = size >= 20 && isPendlePt(rawLookup);
+  const markSize = ring ? kindRingInner(size) : size;
   // Resolve as though the caller had asked for the underlying — symbol AND
   // address, so the local-PNG tiers get their chance too. The PT's own address
   // must not survive into `onChain`; the ?? order is what drops it.
@@ -224,7 +230,7 @@ export function TokenChipIcon({
         <>{fallback}</>
       ) : (
         <UnknownTokenSvg
-          size={size}
+          size={markSize}
           symbol={symbol}
           clickProps={clickProps}
           clickClass={clickClass}
@@ -235,7 +241,7 @@ export function TokenChipIcon({
       <FallbackTokenIcon
         symbol={symbol}
         srcs={srcs}
-        size={size}
+        size={markSize}
         clickClass={clickClass}
         clickProps={clickProps}
         untitled={untitled}
@@ -244,46 +250,64 @@ export function TokenChipIcon({
     );
   if (!isPt) return chip;
   return (
-    <PtBadge size={size} underlying={ptUnderlying?.[1]}>
+    <PtMark size={size} underlying={ptUnderlying?.[1]} ring={ring}>
       {chip}
-    </PtBadge>
+    </PtMark>
   );
 }
 
-/** The "PT" stamp over a principal token's chip — the underlying's mark says
- *  what the claim is on, this says it is a claim and not the asset itself.
- *  That distinction is load-bearing where both appear together, which on a
- *  Morpho market is the normal case: PT-sUSDE-27MAR2025 collateral against a
- *  USDe loan, beside a plain sUSDe market on the same listing.
+/** What marks a principal token's chip as a claim — the underlying's mark
+ *  says what the claim is on, this says it is a claim, not the asset. That
+ *  distinction is load-bearing where both appear together, which on a Morpho
+ *  market is the normal case: PT-sUSDE-27MAR2025 collateral against a USDe
+ *  loan, beside a plain sUSDe market on the same listing.
  *
- *  Below 20px the badge is dropped rather than shrunk. The two letters stop
- *  being letters somewhere around 5px, and every chip that small in this
- *  codebase (the tower's 12s and 14s, the event flows' 16s) renders with the
- *  token's own symbol beside it — text that already begins "PT-" and carries
- *  the maturity besides. An illegible smudge there would be decoration, not
- *  information. The sizes that DO get the badge are the ones that need it: the
+ *  A Pendle PT wears Pendle's PT ring (KindRing), the green Aave draws round
+ *  PT collateral and the Pendle explorer's spine draws round a PT, the mark
+ *  shrunk inside it. Any other PT keeps a neutral "PT" stamp: a Spectra PT
+ *  (a unix-timestamp or slashed-date maturity), an undated symbol, another
+ *  protocol's. The green is Pendle's. The stamp takes the top-right because
+ *  the bottom-right holds the spine's corner badges.
+ *
+ *  Below 20px neither is drawn. Every chip that small in this codebase (the
+ *  tower's 12s and 14s, the event flows' 16s) renders with the token's
+ *  symbol beside it — text that already begins "PT-" and carries the maturity
+ *  besides. The sizes that DO get the mark are the ones that need it: the
  *  28px headline chip in <AssetAmount>, and <InlineAssetCluster>, which draws
  *  icons alone with no label anywhere near them. */
-function PtBadge({ size, underlying, children }: { size: number; underlying?: string; children: React.ReactNode }) {
+function PtMark({
+  size,
+  underlying,
+  ring,
+  children,
+}: {
+  size: number;
+  underlying?: string;
+  ring: boolean;
+  children: React.ReactNode;
+}) {
   if (size < 20) return <>{children}</>;
-  const height = Math.round(size * 0.44);
+  const title = underlying
+    ? `Principal token \u2014 a dated claim on ${underlying}`
+    : "Principal token \u2014 a dated claim";
+  if (ring)
+    return (
+      <span className="relative inline-flex shrink-0" style={{ width: size, height: size }} title={title}>
+        <KindRing ring="pt" size={size}>
+          {children}
+        </KindRing>
+      </span>
+    );
   return (
-    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
+    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }} title={title}>
       {children}
       <span
-        // Top-right, because bottom-right is spoken for: the spine's external
-        // actor / party glyph anchors there on every explorer (four sites in
-        // spine-column.tsx, all "-bottom-0.5 -right-0.5"), and an Add Collateral
-        // by a third party into a PT market puts both on one chip. Stacked
-        // there they occluded each other; the two corners keep both readable.
-        //
-        // Neutral by construction: this is a fact about the instrument, not a
-        // status, so it takes the rb greys rather than any signalling hue.
         className="absolute -top-px -right-px inline-flex items-center justify-center rounded-[3px] bg-background font-semibold leading-none text-rb-600 ring-1 ring-rb-300 dark:text-rb-300 dark:ring-rb-600"
-        style={{ height, paddingInline: Math.max(1, Math.round(size * 0.07)), fontSize: Math.round(size * 0.3) }}
-        title={
-          underlying ? `Principal token \u2014 a dated claim on ${underlying}` : "Principal token \u2014 a dated claim"
-        }
+        style={{
+          height: Math.round(size * 0.44),
+          paddingInline: Math.max(1, Math.round(size * 0.07)),
+          fontSize: Math.round(size * 0.3),
+        }}
       >
         PT
       </span>
