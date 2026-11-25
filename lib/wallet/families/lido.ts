@@ -10,7 +10,7 @@ import type { LidoStakeRead } from "@/lib/lido/types";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { protocolForSession } from "@/lib/shared/protocols";
 import { LIDO_PRESENCE } from "@/lib/wallet/presence-checks";
-import { explorerLaunched, type VisitModule } from "./visit";
+import { visitOn, type VisitModule } from "./visit";
 
 export const lido: VisitModule = {
   id: "lido",
@@ -19,7 +19,7 @@ export const lido: VisitModule = {
   chainName: "Ethereum",
   family: "lido",
   get on() {
-    return explorerLaunched("lido");
+    return visitOn("lido");
   },
   presence: LIDO_PRESENCE,
   path: (address) => `/api/at-block/lido/stake?${new URLSearchParams({ owner: address.toLowerCase() })}`,

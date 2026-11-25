@@ -1151,7 +1151,7 @@ const PAGES = [
   // Step 7: each vault kind's share price.
   {
     id: "aave sgho holder 0x1676",
-    path: "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x1676d23711186076fa74aa53511dda750a1f0d9a",
+    path: "/ethereum/aave-v3/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x1676d23711186076fa74aa53511dda750a1f0d9a",
     lwOnly: true,
     unit: "token",
     valueLine: /^the claim's value in GHO$/,
@@ -1160,13 +1160,13 @@ const PAGES = [
   },
   {
     id: "aave umbrella stkwaEthUSDC holder 0x5a2a",
-    path: "/ethereum/aave/vaults/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6/0x5a2a98d3c9720734c2fca8d5ec808b073c047ccd",
+    path: "/ethereum/aave-v3/vaults/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6/0x5a2a98d3c9720734c2fca8d5ec808b073c047ccd",
     lwOnly: true,
     family: { kind: "vault" },
   },
   {
     id: "aave stata waEthUSDC holder 0xab67",
-    path: "/ethereum/aave/vaults/0xd4fa2d31b7968e448877f69a96de69f5de8cd23e/0xab6752ad54f05fb40c7eccee4fb11a78a322e34b",
+    path: "/ethereum/aave-v3/vaults/0xd4fa2d31b7968e448877f69a96de69f5de8cd23e/0xab6752ad54f05fb40c7eccee4fb11a78a322e34b",
     lwOnly: true,
     family: { kind: "vault" },
   },

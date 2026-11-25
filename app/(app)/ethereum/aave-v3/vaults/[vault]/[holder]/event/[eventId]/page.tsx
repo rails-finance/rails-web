@@ -1,4 +1,4 @@
-// ONE EVENT — /ethereum/aave/vaults/<vault>/<holder>/event/<id>.
+// ONE EVENT — /ethereum/aave-v3/vaults/<vault>/<holder>/event/<id>.
 // ----------------------------------------------------------------------------
 // A vault event is a log the vault emitted about one address, and until now it
 // was the only kind of event in Rails a reader could not link to. This route is
@@ -81,14 +81,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         })
       : null;
   return eventMetadata({
-    session: "aave-vaults",
+    session: "aave-v3",
     subject: ADDRESS.test(who) ? who : decodeURIComponent(holder),
     canonicalPath: `${ethereumVaultHref(address, holder)}/event/${encodeURIComponent(decoded)}`,
     // The head's words (decision 0045). The Explanation's first sentence names
     // the share token, which this metadata does not read (see above).
     event: event ? { actionLabel: vaultT1Kind(event.kind), timestamp: event.timestamp } : null,
     description: event
-      ? vaultEventPageDescription("aave-vaults", "ethereum", null, address, who, event.timestamp)
+      ? vaultEventPageDescription("aave-v3", "ethereum", null, address, who, event.timestamp)
       : undefined,
   });
 }

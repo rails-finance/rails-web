@@ -81,10 +81,10 @@ const ROSTER = {
     lead: "/ethereum/morpho/vaults/info",
   },
   "aave:1": {
-    href: "/ethereum/aave/vaults",
-    info: "/ethereum/aave/vaults/info",
+    href: "/ethereum/aave-v3/vaults",
+    info: "/ethereum/aave-v3/vaults/info",
     figure: "directory-catalogue",
-    lead: "/ethereum/aave/vaults/info",
+    lead: "/ethereum/aave-v3/vaults/info",
   },
   "yearn:1": {
     href: "/ethereum/yearn/vaults",
@@ -160,13 +160,15 @@ await page.waitForSelector("[data-overview-row]", { timeout: 120_000 });
 const MENU = ["/vaults", "/vaults/products", "/vaults/fronts", "/vaults/compare"];
 const readMenu = async (p) => {
   await p.locator("[data-vault-index-head] [data-sections-trigger]").click();
-  const entries = await p.locator('[data-vault-index-head] [data-sections-menu] [role="menuitem"]').evaluateAll((els) =>
-    els.map((el) => ({
-      href: el.getAttribute("href"),
-      name: el.textContent.trim(),
-      current: el.getAttribute("aria-current"),
-    })),
-  );
+  const entries = await p
+    .locator('[data-vault-index-head] [data-sections-menu] [role="menuitem"]:not([data-sections-chain])')
+    .evaluateAll((els) =>
+      els.map((el) => ({
+        href: el.getAttribute("href"),
+        name: el.textContent.trim(),
+        current: el.getAttribute("aria-current"),
+      })),
+    );
   await p.keyboard.press("Escape");
   return entries;
 };
@@ -444,7 +446,7 @@ for (const k of KEYS.filter((k) => !k.startsWith("sbold:"))) {
     );
     check(
       `8b ?asset=${param}: the Morpho, Aave and Yearn roster links carry it`,
-      links.filter((h) => /\/(morpho|aave|yearn)\/vaults/.test(h)).every((h) => h.endsWith(`?asset=${param}`)) &&
+      links.filter((h) => /\/(morpho|aave-v3|yearn)\/vaults/.test(h)).every((h) => h.endsWith(`?asset=${param}`)) &&
         links.some((h) => h.endsWith(`?asset=${param}`)),
       links.join(", "),
     );

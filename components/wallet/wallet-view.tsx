@@ -55,6 +55,7 @@ import type { WalletFamilyRead, WalletRead } from "@/lib/wallet/types";
 import { WALLET_COUNTS_SCOPE } from "@/lib/wallet/summary-counts";
 import {
   closestToLiquidation,
+  countsDollars,
   DUST_USD,
   unreadAtHead,
   walletNet,
@@ -137,7 +138,7 @@ function Totals({
   const owing = sections
     .filter((s) => !s.testnet && s.collateral != null && s.debt != null)
     .flatMap((s) => s.open)
-    .filter((p) => p.usdOwnOracle && !unreadAtHead(p) && (p.debtUsd ?? 0) > 0);
+    .filter((p) => countsDollars(p) && !unreadAtHead(p) && (p.debtUsd ?? 0) > 0);
   const rated = owing.filter((p) => p.debtRate != null);
   const ratedUsd = rated.reduce((s, p) => s + p.debtUsd!, 0);
   const rate = ratedUsd > 0 ? rated.reduce((s, p) => s + p.debtUsd! * p.debtRate!, 0) / ratedUsd : null;

@@ -287,9 +287,13 @@ words:
   side_borrow: |-
     borrow
   venue_paraswap: |-
-    a ParaSwap adapter
+    ParaSwap adapter
   venue_cow: |-
-    a CoW settlement
+    CoW settlement
+  # The CoW settlement's link where the wallet owns the order: it opens the
+  # trade on the wallet's CoW page.
+  cow_trade_link: |-
+    Opens this trade on the wallet's CoW page
   and: |-
     and
   assets: |-
@@ -369,6 +373,12 @@ words:
     transferred out
   t1_leg_received: |-
     transferred in
+  # The Trade's other side on a withdraw and swap's or a supply from a swap's
+  # spine: the token bought, the token sold.
+  t1_leg_bought: |-
+    bought
+  t1_leg_sold: |-
+    sold
   t1_treasury: |-
     Aave treasury
 
@@ -1103,22 +1113,22 @@ templates:
         when: |-
           debt_swap
         text: |-
-          Repaid {given} {symbol} of debt and took on {received} {r_symbol} of debt in its place, through {venue}.
+          Repaid {given} {symbol} of debt and took on {received} {r_symbol} of debt in its place, through a {venue}.
       swap.repay:
         when: |-
           repay_with_collateral
         text: |-
-          Repaid {received} {r_symbol} of debt with {given} {symbol} of supplied collateral, through {venue}.
+          Repaid {received} {r_symbol} of debt with {given} {symbol} of supplied collateral, through a {venue}.
       swap.supply_from:
         when: |-
           supply_from_swap
         text: |-
-          Sold {received} {r_symbol} from the wallet for {given} {symbol}, supplied to this position through {venue}.
+          Sold {received} {r_symbol} from the wallet for {given} {symbol}, supplied to this position through a {venue}.
       swap.withdraw:
         when: |-
           withdraw_and_swap
         text: |-
-          Withdrew {given} {symbol} of supply and swapped it for {received} {r_symbol}, through {venue}.
+          Withdrew {given} {symbol} of supply and swapped it for {received} {r_symbol}, through a {venue}.
       swap.withdraw_wallet:
         when: |-
           withdraw_and_swap through a ParaSwap adapter
@@ -1133,7 +1143,7 @@ templates:
         when: |-
           collateral_swap
         text: |-
-          Swapped {given} {symbol} of supply for {received} {r_symbol} of supply, through {venue}.
+          Swapped {given} {symbol} of supply for {received} {r_symbol} of supply, through a {venue}.
       swap.off:
         when: |-
           withdraw_and_swap, repay_with_collateral or collateral_swap that took the last of a collateral supply

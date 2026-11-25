@@ -163,3 +163,21 @@ test("30-day interest where the scaled balance held, withheld where it moved", (
   );
   assert.equal(interestOf("debt", { ...r, past: null }, 1).state, "unread", "no past read");
 });
+
+test("one asset on both sides: the health factor falls where the borrow rate is above the supply rate", async () => {
+  const { cardExplainer } = await import("../../lib/aave-v3-optimism/words.ts");
+  const row = { asset: "0x4200000000000000000000000000000000000006", symbol: "WETH", isCollateral: true };
+  // $100 supplied at 2% against $50 borrowed at 3%: less interest owed in dollars, yet the ratio falls.
+  const p = (supplyApr, borrowApr) => ({
+    supplied: [{ ...row, supplied: 1, suppliedUsd: 100, supplyApr }],
+    borrowed: [{ ...row, debt: 0.5, debtUsd: 50, borrowApr }],
+    emode: null,
+    healthFactor: 1.6,
+  });
+  const line = (f) =>
+    cardExplainer(f)
+      .flatMap((g) => g.bullets)
+      .find((b) => b.startsWith("Its collateral and debt"));
+  assert.match(line(p(0.02, 0.03)), /outgrowing interest earned lowers the health factor\.$/);
+  assert.match(line(p(0.03, 0.02)), /interest is what moves the health factor\.$/);
+});

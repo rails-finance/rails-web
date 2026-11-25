@@ -153,9 +153,7 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
   // A vault is still never a row in the matrix — but the PROTOCOL whose factory
   // deployed it is, and that is where the vaults live now (rails-ops decision
   // 0028). So this page has no Vaults section beneath the matrix: Morpho Blue
-  // on Base and Aave vaults on Ethereum each carry their own row, with the
-  // capabilities a vault layer can have stated on it and the two risk columns
-  // ruled out with a `why` rather than left reading "not yet".
+  // on Base and Aave V3 on Ethereum carry them in their own rows.
 
   return (
     <div className="min-h-screen">

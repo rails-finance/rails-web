@@ -40,7 +40,7 @@ import type {
   VaultWithheldBasis,
 } from "@/lib/shared/vault-holder-timeline";
 
-const LANE = "live Ethereum chain reads (/ethereum/aave/vaults)";
+const LANE = "live Ethereum chain reads (/ethereum/aave-v3/vaults)";
 
 /** A row's own coordinates — the shared shape, with the block and transaction
  *  moved to the ROW's, so every receipt inside a card names the moment that

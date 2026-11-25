@@ -89,6 +89,13 @@ type ProtocolSpec = {
    *  sub-page. Omitted means it has one; `false` is the only other value,
    *  because "has a listing" needs no declaring. */
   positionListing?: false;
+  /** Which of the explorer's own pages redirect: `route` its route (to the first sub-page), `info`
+   *  its /info page. The sitemap and llms.txt leave a redirect out, since it is no page to crawl.
+   *  Omitted means neither redirects. Checked against the page files in
+   *  scripts/test/explorer-redirects.test.mjs. */
+  redirects?: readonly ("route" | "info")[];
+  /** The explorer draws no /info page (CoW), so `infoHref` is not served. */
+  noInfoPage?: true;
   /** The explorer's own route is a front door (a wallet field and links to
    *  its pages), and its position listing is at `<route>/positions`: the
    *  position-first Arbitrum explorers (rails-ops TO-DO-arbitrum-scoping.md
@@ -168,17 +175,17 @@ type SubPageSpec = {
   label: string;
   tab: string;
   /** This sub-page has a `positions` route of its own that reads `q` —
-   *  `/ethereum/aave/vaults/positions` and `/base/morpho/vaults/positions`.
+   *  `/ethereum/aave-v3/vaults/positions` and `/base/morpho/vaults/positions`.
    *
    *  It answers two questions for `listingHrefForWallet`. Where an explorer
    *  is `positionListing: false` it has to send the wallet filter somewhere it
-   *  LANDS: Aave's vault layer lists every `(vault, holder)` pair, so it has
-   *  such a route; Yearn V3 does not and will not until the share-ledger
+   *  LANDS: Yearn V3 has no such route and will not until the share-ledger
    *  census exists (TO-DO-infra-and-backend §5.4), so a link formed for it
-   *  would 404. And where a rail owns TWO listings of one address — Morpho
-   *  Blue Base lists Blue borrower positions at `/base/morpho` and MetaMorpho
-   *  holdings here — it names the second one, so a bookmark taken on the vault
-   *  listing reopens the vault listing (§42 item 1).
+   *  would 404. And where a rail owns TWO listings of one address — Aave V3
+   *  on Ethereum lists accounts at `/ethereum/aave-v3` and vault holdings
+   *  here, and Morpho Blue Base lists Blue borrower positions at
+   *  `/base/morpho` and MetaMorpho holdings here — it names the second one, so a bookmark taken
+   *  on the vault listing reopens the vault listing (§42 item 1).
    *
    *  Declared per sub-page rather than inferred from `positionListing` because
    *  the two are different facts: one says the EXPLORER's own route lists
@@ -227,8 +234,11 @@ const SPECS: ProtocolSpec[] = [
     type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Single-pool lending on Ethereum: one cross-collateralised account per wallet, valued at Aave's oracle, with every liquidation traced",
+    // Aave's vaults (static aTokens, Umbrella stake tokens, savings GHO) are
+    // its Vaults section, as MetaMorpho's are Morpho Blue's (ui-jobs 789).
     subPages: [
       { segment: "markets", label: "Market overview", tab: "Markets" },
+      { segment: "vaults", label: "Vaults overview", tab: "Vaults", holderListing: true },
       { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },
@@ -287,7 +297,7 @@ const SPECS: ProtocolSpec[] = [
   {
     // Morpho Blue on Optimism (rails-ops ui-jobs 578), Arc's pages on
     // Optimism's deployment, fed by rails-server's /api/at-block/morpho-optimism
-    // routes. Unlaunched while Miles reads it.
+    // routes.
     id: "morpho-optimism",
     session: "morpho-optimism",
     label: "Morpho Blue",
@@ -299,7 +309,6 @@ const SPECS: ProtocolSpec[] = [
     desc: "Morpho Blue on Optimism: a wallet's positions across every market, each with its collateral, debt and LTV against the market's line, and 30 days of interest",
     positionListing: false,
     history: "none",
-    unlaunched: true,
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
@@ -367,7 +376,7 @@ const SPECS: ProtocolSpec[] = [
     // chain when a page opens. A front door taking a wallet, its account at
     // `<route>/<wallet>`, and the market overview and reserve pages that
     // Ethereum, Base and Arbitrum draw, fed by rails-server's
-    // /api/at-block/aave-v3-optimism routes. Unlaunched while Miles reads it.
+    // /api/at-block/aave-v3-optimism routes.
     id: "aave-v3-optimism",
     session: "aave-v3-optimism",
     label: "Aave V3",
@@ -379,29 +388,7 @@ const SPECS: ProtocolSpec[] = [
     desc: "Aave V3 on Optimism: a wallet's account on the Pool, its balances in dollars at Aave's oracle, its health factor and 30 days of interest",
     positionListing: false,
     history: "none",
-    unlaunched: true,
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
-  },
-  {
-    // Aave's VAULT LAYER, and a third Aave row on Ethereum beside the two pool
-    // explorers — intended (rails-ops decision 0028 point 5). The door is
-    // unstamped because savings GHO and Umbrella stake tokens are Aave-wide
-    // rather than V3's, and a version in the URL of a contract that has none
-    // would be false. `aave-v3`, `aave-v3-base` and `aave-v4` are untouched.
-    id: "aave-vaults",
-    session: "aave-vaults",
-    label: "Aave vaults",
-    chainId: 1,
-    slug: "aave",
-    brand: 339,
-    type: "vaults",
-    tags: ["Vaults", "Savings"],
-    desc: "Aave's vaults (savings GHO, Umbrella stake tokens and static aTokens): each vault's size and share price, and every address that holds one",
-    // No position listing: a holder's share in a vault is not a position in the
-    // roster's sense (rails-ops decision 0027 call 2), so the rail's first tab
-    // is this sub-page and `/ethereum/aave` opens on it.
-    positionListing: false,
-    subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults", holderListing: true }],
   },
   {
     // Aerodrome Slipstream on Base (rails-ops ui-jobs 566), Uniswap's door 1
@@ -584,7 +571,7 @@ const SPECS: ProtocolSpec[] = [
     // the chain when a page opens. A front door taking a wallet, its Comets at
     // `<route>/<wallet>`, one Comet's account at `<route>/<comet>/<wallet>`, and
     // the Markets pages Ethereum, Base and Arbitrum draw, fed by rails-server's
-    // /api/at-block/compound-v3-optimism routes. Unlaunched while Miles reads it.
+    // /api/at-block/compound-v3-optimism routes.
     id: "compound-v3-optimism",
     session: "compound-v3-optimism",
     label: "Compound V3",
@@ -596,7 +583,6 @@ const SPECS: ProtocolSpec[] = [
     desc: "Compound V3 on Optimism: a wallet's account in each of three Comets, its balances at each Comet's price feeds, its borrowing limit and 30 days of interest",
     positionListing: false,
     history: "none",
-    unlaunched: true,
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
@@ -605,7 +591,6 @@ const SPECS: ProtocolSpec[] = [
     // positions at `<route>/<wallet>`, each opening
     // `<route>/position/<deployment>/<id>` (ids overlap across the two position
     // managers). Reads come from rails-server's /api/at-block/velodrome routes.
-    // Unlaunched while Miles reads it.
     id: "velodrome",
     session: "velodrome",
     label: "Velodrome",
@@ -619,7 +604,6 @@ const SPECS: ProtocolSpec[] = [
     desc: "Concentrated liquidity on Optimism, staked or not: a position's range, fees or VELO and pool over the last 30 days",
     positionListing: false,
     history: "none",
-    unlaunched: true,
     subPages: [],
   },
   {
@@ -1052,6 +1036,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Fixed yield", "Yield trading"],
     desc: "A wallet's principal, yield and liquidity tokens in each Pendle market, valued at Pendle's oracle and read at one block",
     positionListing: false,
+    redirects: ["route"],
     subPages: [
       { segment: "markets", label: "Markets overview", tab: "Markets" },
       { segment: "assets", label: "Assets", tab: "Assets" },
@@ -1143,6 +1128,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Trades"],
     desc: "Every trade a wallet settled through CoW Protocol, read from the settlement contract's logs and chosen by token",
     positionListing: false,
+    noInfoPage: true,
     subPages: [],
   },
   {
@@ -1246,8 +1232,7 @@ const SPECS: ProtocolSpec[] = [
   },
   {
     // Uniswap V3 and V4 on Optimism (rails-ops ui-jobs 578), on the same pages
-    // as Arbitrum's, read from the chain when a page opens. Unlaunched while
-    // Miles reads it.
+    // as Arbitrum's, read from the chain when a page opens.
     id: "uniswap-v3-optimism",
     session: "uniswap-v3-optimism",
     label: "Uniswap V3",
@@ -1258,7 +1243,6 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Uniswap V3 on Optimism: a position's range, fees and pool over the last 30 days",
     positionListing: false,
-    unlaunched: true,
     history: "none",
     subPages: [],
   },
@@ -1273,7 +1257,6 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Uniswap's singleton pools on Optimism, hooks included: a position's range, fees and pool over the last 30 days",
     positionListing: false,
-    unlaunched: true,
     history: "none",
     subPages: [],
   },
@@ -1299,6 +1282,7 @@ const SPECS: ProtocolSpec[] = [
     // (rails-ops decision 0027 call 2), so the rail's first tab is this
     // sub-page and `/ethereum/yearn` opens on it.
     positionListing: false,
+    redirects: ["route", "info"],
     subPages: [
       { segment: "vaults", label: "Vaults overview", tab: "Vaults" },
       { segment: "assets", label: "Assets", tab: "Assets" },
@@ -1508,11 +1492,6 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "aave-v3": "Position",
   "aave-v3-base": "Position",
   "aave-v3-arbitrum": "Position",
-  // A holder's reading of one vault. It names no headline position — the vault
-  // layer is in NOT_POSITION_EXPLORERS — and the rail never prints it either,
-  // because that explorer draws no position tab; the entry exists because this
-  // map is keyed on the closed session union.
-  "aave-vaults": "Holding",
   // Alchemix calls the NFT a position, and so do its getters and its events.
   alchemix: "Position",
   "alchemix-base": "Position",
@@ -1623,6 +1602,34 @@ export function explorerSections(entry: ProtocolEntry): ExplorerSection[] {
     ...entry.subPages.map((sub) => ({ kind: "subPage" as const, href: sub.href, name: sub.tab, sub })),
     { kind: "info" as const, href: entry.infoHref, name: "About" },
   ];
+}
+
+/** One chain in H5's chain row (ui-jobs 854). */
+export interface ExplorerChain {
+  chainId: ChainId;
+  href: string;
+  current: boolean;
+}
+
+/** The chains an explorer's version is launched on, for H5's chain row
+ *  (ui-jobs 854): the entry's chain (marked current) and each launched
+ *  entry sharing its `protocolKey` on another chain, in the chooser's chain
+ *  order (`launchedChains`). Each other chain links to the same section where
+ *  its entry has it (the same kind; a sub-page by its segment), else to its
+ *  first section. One chain alone comes back as an empty list: no row. */
+export function explorerChains(entry: ProtocolEntry, at: ExplorerSection | undefined): ExplorerChain[] {
+  const key = entry.protocolKey ?? entry.id;
+  const others = LAUNCHED_PROTOCOLS.filter((p) => p !== entry && (p.protocolKey ?? p.id) === key);
+  if (others.length === 0) return [];
+  const hrefOn = (to: ProtocolEntry): string => {
+    const there = explorerSections(to);
+    const same = at && there.find((s) => s.kind === at.kind && s.sub?.segment === at.sub?.segment);
+    return (same ?? there[0]).href;
+  };
+  const order = launchedChains().map((c) => c.id);
+  return [entry, ...others]
+    .sort((a, b) => order.indexOf(a.chainId) - order.indexOf(b.chainId))
+    .map((p) => ({ chainId: p.chainId, href: p === entry ? (at?.href ?? p.href) : hrefOn(p), current: p === entry }));
 }
 
 /** The explorer's name for a TEXT-ONLY surface — a tab title, an aria-label,

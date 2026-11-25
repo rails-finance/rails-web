@@ -32,8 +32,9 @@ interface Props {
 export default async function Image({ params }: Props) {
   const { vault, holder } = await params;
   return positionImage({
-    // No `session`: the Vaults section has no roster entry and no static card
-    // of its own, so a failed render falls back to the home card.
+    // No `session`: a failed render falls back to the home card. The Vaults
+    // section sits in Aave V3's roster entry, whose card the event route
+    // names; this route has not taken it.
     load: async () => {
       const typed = decodeURIComponent(holder);
       if (!ADDRESS.test(vault) || !ADDRESS.test(typed)) return null;

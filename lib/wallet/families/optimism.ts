@@ -13,7 +13,7 @@ import { hfLabelV3 } from "@/lib/aave-v3/position-state";
 import { OPTIMISM_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { bufferFromHealth } from "@/lib/wallet/summary-row";
-import { explorerLaunched, visitKind, type VisitModule } from "./visit";
+import { visitKind, visitOn, type VisitModule } from "./visit";
 import { AAVE_V3_OPTIMISM_PRESENCE, COMPOUND_V3_OPTIMISM_PRESENCE } from "@/lib/wallet/presence-checks";
 
 const outside = (what: string) => new Error(`the ${what} read answered outside its shape`);
@@ -25,7 +25,7 @@ export const aaveV3Optimism: VisitModule = {
   chainName: "Optimism",
   family: "aave-v3",
   get on() {
-    return explorerLaunched("aave-v3-optimism");
+    return visitOn("aave-v3-optimism");
   },
   presence: AAVE_V3_OPTIMISM_PRESENCE,
   path: (address) =>
@@ -78,7 +78,7 @@ export const compoundV3Optimism: VisitModule = {
   chainName: "Optimism",
   family: "compound-v3",
   get on() {
-    return explorerLaunched("compound-v3-optimism");
+    return visitOn("compound-v3-optimism");
   },
   presence: COMPOUND_V3_OPTIMISM_PRESENCE,
   path: (address) =>

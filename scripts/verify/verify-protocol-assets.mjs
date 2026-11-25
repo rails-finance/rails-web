@@ -55,7 +55,7 @@ const status = async (path) => (await fetch(`${BASE}${path}`, { redirect: "manua
 const header = (page) =>
   page.evaluate(() => {
     const id = document.querySelector("[data-anatomy='H3'] [data-rail-identity]");
-    const menu = [...document.querySelectorAll("[data-sections-menu] [role='menuitem']")];
+    const menu = [...document.querySelectorAll("[data-sections-menu] [role='menuitem']:not([data-sections-chain])")];
     return {
       identityTag: id?.tagName ?? null,
       identityLinks: id ? id.querySelectorAll("a").length + (id.closest("a") ? 1 : 0) : -1,
@@ -77,8 +77,8 @@ check(
   `${h.identityTag}, ${h.identityLinks} links`,
 );
 check(
-  "1b H5 on Aave V3: Positions, Markets, Assets, About; Assets current",
-  h.entries.join("|") === "Positions|Markets|Assets|About" && h.current === "Assets",
+  "1b H5 on Aave V3: Positions, Markets, Vaults, Assets, About; Assets current",
+  h.entries.join("|") === "Positions|Markets|Vaults|Assets|About" && h.current === "Assets",
   `${h.entries.join("|")}; current ${h.current}`,
 );
 const h1 = await page.$$eval("h1", (hs) =>

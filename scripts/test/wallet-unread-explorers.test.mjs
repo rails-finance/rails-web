@@ -40,17 +40,22 @@ const { PROTOCOLS, protocolForSession } = await import("../../lib/shared/protoco
 const { walletUnreadExplorers, WALLET_VISIT_FAMILIES } = await import("../../lib/wallet/read-wallet.ts");
 const { LIQUIDITY_SOURCES } = await import("../../lib/wallet/liquidity/sources.ts");
 const { ARC_ON_WALLET } = await import("../../lib/wallet/families/aave-v4.ts");
+const { VISIT_HELD_OFF } = await import("../../lib/wallet/families/visit.ts");
+const HELD = [...VISIT_HELD_OFF];
 
 const W = "0xC2aee730530AE26571d868743c4e1ad401F30f22";
 const UNINDEXED = PROTOCOLS.filter((p) => p.history === "none").map((p) => p.id);
 const FLAGS = Object.fromEntries(UNINDEXED.map((id) => [id, protocolForSession(id)?.unlaunched === true]));
-/** Every unindexed entry launched, or restore the roster's flags. */
+/** Every unindexed entry launched and no module held off, or restore the roster's flags and
+ *  visit.ts's held-off set. */
 function launchAll(on) {
   for (const id of UNINDEXED) {
     const e = protocolForSession(id);
     if (on || !FLAGS[id]) delete e.unlaunched;
     else e.unlaunched = true;
   }
+  VISIT_HELD_OFF.clear();
+  if (!on) for (const id of HELD) VISIT_HELD_OFF.add(id);
 }
 test.after(() => launchAll(false));
 
@@ -124,6 +129,12 @@ test("a launched explorer whose visit module is switched off is named", () => {
   } finally {
     Object.defineProperty(morpho, "on", own);
   }
+});
+
+test("today: Morpho Blue on Optimism, launched and held off, is named", () => {
+  launchAll(false);
+  assert.ok(HELD.includes("morpho-optimism"));
+  assert.ok(walletUnreadExplorers(W).some((e) => e.id === "morpho-optimism"));
 });
 
 test("every liquidity source names roster entries on its chain", () => {

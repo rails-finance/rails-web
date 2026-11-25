@@ -12,7 +12,7 @@ import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { protocolForSession } from "@/lib/shared/protocols";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { FLUID_BASE_PRESENCE } from "@/lib/wallet/presence-checks";
-import { explorerLaunched, type VisitModule } from "./visit";
+import { visitOn, type VisitModule } from "./visit";
 
 export const fluidBase: VisitModule = {
   id: "fluid-base",
@@ -21,7 +21,7 @@ export const fluidBase: VisitModule = {
   chainName: "Base",
   family: "fluid",
   get on() {
-    return explorerLaunched("fluid-base");
+    return visitOn("fluid-base");
   },
   presence: FLUID_BASE_PRESENCE,
   path: (address) => `/api/at-block/fluid-base/positions?${new URLSearchParams({ owner: address.toLowerCase() })}`,

@@ -6,7 +6,7 @@
 // Each module is on while its explorer is launched (morpho-optimism,
 // morpho-arc; a cold Arc wallet read is about 160 chain calls). Dollars are at a Chainlink
 // feed, or Aave's oracle on Optimism, for the loan asset (decision 0046):
-// shown on the card and kept out of the tiles, as Morpho Arbitrum's are.
+// shown on the card and summed in the totals with the source named on the receipt.
 
 import { morphoAtBlockWalletPositions } from "@/lib/morpho-at-block/position";
 import {
@@ -17,7 +17,7 @@ import {
 } from "@/lib/morpho-at-block/types";
 import { pairName } from "@/lib/morpho-at-block/words";
 import type { WalletPosition } from "@/lib/wallet/types";
-import { explorerLaunched, visitKind, type VisitModule } from "./visit";
+import { visitKind, visitOn, type VisitModule } from "./visit";
 import { MORPHO_BLUE_PRESENCE } from "@/lib/wallet/presence-checks";
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
@@ -30,7 +30,7 @@ function usdSourceOf(dep: MorphoAtBlockDeployment, source: "chainlink" | "aave-o
     : `Chainlink USD feed on ${dep.chain} for the loan asset`;
 }
 
-/** `on`: fixed, for a test; unset, the explorer's launch flag at each call. */
+/** `on`: fixed, for a test; unset, `visitOn` at each call. */
 export function morphoAtBlockModule(dep: MorphoAtBlockDeployment, on?: boolean): VisitModule {
   return {
     id: dep.session,
@@ -39,7 +39,7 @@ export function morphoAtBlockModule(dep: MorphoAtBlockDeployment, on?: boolean):
     chainName: dep.chain,
     family: "morpho",
     get on() {
-      return on ?? explorerLaunched(dep.session);
+      return on ?? visitOn(dep.session);
     },
     presence: MORPHO_BLUE_PRESENCE,
     path: (address) => `/api/at-block/${dep.api}/wallet?${new URLSearchParams({ owner: address.toLowerCase() })}`,

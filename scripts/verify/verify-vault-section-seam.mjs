@@ -87,8 +87,8 @@
 //
 //  B  THE BACK ROW FELL BACK TO THE MARKET VIEW — `fallbackHref=
 //     {ethereumVaultHref(address)}` on the Ethereum page. 78/80.
-//     FAIL S2c·E-UMB — "landed …/ethereum/aave/vaults/0x6bf1…8aa6, expected
-//                       …/ethereum/aave/vaults"
+//     FAIL S2c·E-UMB — "landed …/ethereum/aave-v3/vaults/0x6bf1…8aa6, expected
+//                       …/ethereum/aave-v3/vaults"
 //     FAIL S2c·E-SAV — likewise on that fixture's vault.
 //     🔑 S2a and S2b stayed green, and rightly: the button and its label were
 //     untouched. Where a button GOES and what it SAYS are separate claims.
@@ -238,7 +238,7 @@ const assetText = (raw, decimals) => {
 /** Where a chain's vaults live, since rails-ops decision 0028 put each one
  *  under the protocol whose factory deployed it: Base's MetaMorpho vaults are
  *  Morpho Blue's, Ethereum's are Aave's vault layer's. */
-const vaultRoot = (chain) => (chain === 8453 ? "/base/morpho/vaults" : "/ethereum/aave/vaults");
+const vaultRoot = (chain) => (chain === 8453 ? "/base/morpho/vaults" : "/ethereum/aave-v3/vaults");
 
 /** components/vaults/aave-vault-format.ts `utcInstant` — en-GB, UTC, stated. */
 const utcInstant = (unixSeconds) =>

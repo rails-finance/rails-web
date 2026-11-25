@@ -27,8 +27,8 @@ export interface VisitModule {
   chainName: string;
   /** The explorer slug: the protocol section and the Protocol pill. */
   family: string;
-  /** Whether the page reads the module: while its explorer is launched
-   *  (`explorerLaunched`). */
+  /** Whether the page reads the module: while its explorer is launched and
+   *  the module is not held off (`visitOn`). */
   readonly on: boolean;
   /** The head route for the wallet, under RAILS_API_URL. */
   path(address: string): string;
@@ -66,6 +66,15 @@ async function readOne(m: VisitModule, address: string, budgetMs: number, reader
 /** Whether an explorer is launched: a module read at visit is on from the
  *  change that takes its explorer's `unlaunched` flag off. Read at each call. */
 export const explorerLaunched = (session: SessionProtocol): boolean => !protocolForSession(session)?.unlaunched;
+
+/** The modules held off while their explorer is launched (Miles, 25 Nov 2026, "optimism launch: a"):
+ *  no wallet page reads them until they have a presence check (decision 0073 point 2). Morpho Blue
+ *  on Optimism has none: Morpho Blue states a position one market at a time. The one switch for
+ *  each module. */
+export const VISIT_HELD_OFF = new Set<SessionProtocol>(["morpho-optimism"]);
+
+/** Whether a module is read at visit: its explorer launched, and the module not held off. */
+export const visitOn = (session: SessionProtocol): boolean => explorerLaunched(session) && !VISIT_HELD_OFF.has(session);
 
 export interface VisitRead {
   positions: WalletPosition[];
