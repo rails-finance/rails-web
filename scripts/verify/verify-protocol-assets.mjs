@@ -55,7 +55,7 @@ const status = async (path) => (await fetch(`${BASE}${path}`, { redirect: "manua
 const header = (page) =>
   page.evaluate(() => {
     const id = document.querySelector("[data-anatomy='H3'] [data-rail-identity]");
-    const menu = [...document.querySelectorAll("[data-sections-menu] [role='menuitem']")];
+    const menu = [...document.querySelectorAll("[data-sections-menu] [role='menuitem']:not([data-sections-chain])")];
     return {
       identityTag: id?.tagName ?? null,
       identityLinks: id ? id.querySelectorAll("a").length + (id.closest("a") ? 1 : 0) : -1,

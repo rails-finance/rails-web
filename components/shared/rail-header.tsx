@@ -195,8 +195,17 @@ export function SectionsMenu({
       } else if (e.key === "End") {
         e.preventDefault();
         go(items.length - 1);
-      } else if (e.key === "Tab" && !isPhone) {
-        close(false);
+      } else if (e.key === "Tab") {
+        // The drop closes on Tab. The sheet holds it: its rows sit out of the
+        // tab order, so Tab moves through them as the arrows do. The sheet's
+        // trap also wraps at the ends; the move waits for the press to
+        // finish, so whichever handler runs first, focus moves once.
+        if (!isPhone) close(false);
+        else if (!e.defaultPrevented) {
+          e.preventDefault();
+          const to = at + (e.shiftKey ? -1 : 1);
+          window.setTimeout(() => go(to));
+        }
       }
     };
     document.addEventListener("pointerdown", onPointer);
@@ -209,7 +218,7 @@ export function SectionsMenu({
   }, [open, close, isPhone]);
 
   // The rows, drawn in the drop (in the page, `hidden` while closed) and in
-  // the sheet below sm while open; each copy names its own chain label.
+  // the sheet below sm while open; each copy gives its chain label a separate id.
   const rowsFor = (labelId: string) => (
     <>
       {sections.map((s) => (
@@ -272,7 +281,8 @@ export function SectionsMenu({
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-controls={menuId}
+        // The drop is hidden below sm, where the sheet stands in for it.
+        aria-controls={isPhone ? undefined : menuId}
         onClick={() => setOpen((v) => !v)}
         onKeyDown={(e) => {
           if (e.key === "ArrowDown" && !open) {

@@ -1610,7 +1610,7 @@ export interface ExplorerChain {
 }
 
 /** The chains an explorer's version is launched on, for H5's chain row
- *  (ui-jobs 854): the entry's own chain (marked current) and each launched
+ *  (ui-jobs 854): the entry's chain (marked current) and each launched
  *  entry sharing its `protocolKey` on another chain, in the chooser's chain
  *  order (`launchedChains`). Each other chain links to the same section where
  *  its entry has it (the same kind; a sub-page by its segment), else to its

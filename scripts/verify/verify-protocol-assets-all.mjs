@@ -64,11 +64,11 @@ for (const e of explorers) {
     list.status === 200 && lines.length > 0,
     `${list.status}, ${lines.length} lines`,
   );
-  // The sections menu stays in the page while closed: its entries in order.
+  // The sections menu stays in the page while closed: its entries in order,
+  // up to the chain row (ui-jobs 854), whose glyphs carry no text.
   const menu = list.html.slice(list.html.indexOf("data-sections-menu"));
-  const entries = attrs(menu.slice(0, menu.indexOf("</nav>")), /role="menuitem"[^>]*>(?:<[^>]+>)*([^<]+)</g).map((s) =>
-    s.trim(),
-  );
+  const end = menu.search(/data-sections-chains|<\/nav>/);
+  const entries = attrs(menu.slice(0, end), /role="menuitem"[^>]*>(?:<[^>]+>)*([^<]+)</g).map((s) => s.trim());
   check(`${e.id} b. the menu ends Assets, About`, entries.slice(-2).join("|") === "Assets|About", entries.join("|"));
   if (!lines.length) continue;
   const token = lines[0];
