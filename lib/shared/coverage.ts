@@ -858,27 +858,9 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     views: true,
     verification: true,
   }),
-  // Aave's vault layer (rails-ops decision 0028). The row states what is built
-  // and rules the two risk columns out rather than leaving them reading "not
-  // yet" (decision 0027 call 2): neither is a capability this subject can gain.
-  // `dashboard` is the holder's reading of one vault — shares, claim, what is
-  // redeemable now, read live from the vault's own contract; `views` is the
-  // roster of vaults, a chain read at one block it names; `verification` is
-  // scripts/verify/verify-ethereum-vault{s,-page,-position-page,-timeline}.mjs,
-  // which re-derive the roster, the factsheet and a holder's whole history from
-  // the contracts. No event explainers and no LLM copy on a vault timeline yet.
-  "aave-vaults": explorerDepth({
-    dashboard: true,
-    verification: true,
-    views: true,
-    oracleUsd: { why: ORACLE_USD_REASON["aave-vaults"] },
-    forensics: {
-      why: "nobody in a vault holds a loan: there is no threshold to breach and nothing to seize, so there is no liquidation to trace",
-    },
-  }),
   // Yearn V3 (rails-ops decisions 0027 and 0028). A vault-native subject, so
-  // the two risk columns are ruled out with a `why` the way Aave's vault layer
-  // has them — neither is a capability this subject can gain. `views` is the
+  // the two risk columns are ruled out with a `why`: neither is a capability
+  // this subject can gain. `views` is the
   // roster of every vault the five V3 factories made, a chain read at one block
   // it names, with endorsement read per vault beside the totals; `verification`
   // is scripts/verify/verify-ethereum-yearn-vaults.mjs, which re-derives the
@@ -1794,8 +1776,6 @@ export const VIEW_NOTES: Record<string, string> = {
     "Every vault the IPOR Fusion factory made, with its totals and share price read from the contracts at one block the page names, and a factsheet per vault: fees, supply cap and the fuses it acts through.",
   yearn:
     "Every vault the five V3 factories made, endorsed or not, grouped by the token each takes, with its totals, share price and endorsement read from the contracts at one block the page names.",
-  "aave-vaults":
-    "Every vault Aave's three families deploy (savings GHO, the Umbrella stake tokens and the static aTokens), grouped by family, each row with its totals, share price and mechanic read from the contracts at one block the page names.",
   seamless:
     "The full reserve roster of a market that is closing: eighteen reserves, every one carrying the frozen bit, with the sizes, rates and risk parameters the Pool still enforces on what is left.",
   "aave-v3-base":
@@ -1809,7 +1789,7 @@ export const VIEW_NOTES: Record<string, string> = {
   "aave-v3-arbitrum":
     "The Arbitrum Pool's full reserve roster (sizes, rates, risk configuration and oracle prices), with every risk parameter decoded from the reserve's configuration.",
   "aave-v3":
-    "The Core Pool's full reserve roster (sizes, rates, risk configuration and oracle prices), read live from the Pool and its oracle.",
+    "The Core Pool's full reserve roster (sizes, rates, risk configuration and oracle prices), read live from the Pool and its oracle. The Vaults section lists every vault Aave's three families deploy (savings GHO, the Umbrella stake tokens and the static aTokens), grouped by family, each row with its totals, share price and mechanic read from the contracts at one block the page names.",
   spark: "The SparkLend Pool's reserve roster read live, on the surface Aave V3's uses.",
   makerdao:
     "The Vat's balance sheet decomposed by ilk: Vat.debt = Σ(Art × rate) + vice asserted live, with every ilk on the terms governance set for it.",
@@ -1875,8 +1855,8 @@ const eulerNote = (indexed: boolean) =>
   ].join(" ");
 
 export const COVERAGE_NOTES: Record<string, string> = {
-  "aave-vaults":
-    "Each vault position's timeline replays that wallet's whole share-transfer history live from the vault's logs on every request, and checks it wei-exact against the vault's balance before drawing anything: a mismatch means no rows. The roster of holders comes from a daily sweep of every vault's whole history (Aave's enumerators for its vaults, the two MetaMorpho factories for those), proven complete against each vault's total supply; a sweep that can't prove complete isn't published. The page shows the flows and share prices as they happened, with no USD, APY or yield figure.",
+  "aave-v3":
+    "In the Vaults section, each vault position's timeline replays that wallet's whole share-transfer history live from the vault's logs on every request, and checks it wei-exact against the vault's balance before drawing anything: a mismatch means no rows. The roster of holders comes from a daily sweep of every vault's whole history (Aave's enumerators for its vaults, the two MetaMorpho factories for those), proven complete against each vault's total supply; a sweep that can't prove complete isn't published. The page shows the flows and share prices as they happened, with no USD, APY or yield figure.",
   "ipor-fusion":
     "An IPOR Fusion vault takes one token and its curator moves it into other protocols through fuses; nobody in it borrows, so there is no threshold to breach and no liquidation to trace. The roster is every vault the factory made, found from its creation events and censused at a block the page names. It is a floor: a vault deployed by hand or by an earlier factory emits no creation event and appears on no list. Every figure stays in its vault's asset, with no USD. A vault's roles are found in its access manager's grant logs and each holder is confirmed at the page's block; a vault's positions in the protocols Rails covers are those explorers' rows, under the vault's address.",
   "ipor-fusion-arbitrum":

@@ -701,7 +701,7 @@ const SHEET_SUBJECTS = {
   "aave-vaults": [
     {
       label: "0x7bc3…/0x6348…",
-      path: "/ethereum/aave/vaults/0x7bc3485026ac48b6cf9baf0a377477fff5703af8/0x634826fb67d4eb9633f0011fae8e23cf99acd6f0",
+      path: "/ethereum/aave-v3/vaults/0x7bc3485026ac48b6cf9baf0a377477fff5703af8/0x634826fb67d4eb9633f0011fae8e23cf99acd6f0",
       // 20 Jun 2026, a Withdrawal (the Deposit after it starts from nothing,
       // so it draws no carry rows). Yearn, the Aave vaults and MetaMorpho share
       // vault-sheet.tsx.
@@ -2568,14 +2568,14 @@ async function verifyVaultOwn(name, subject, { runPath = null } = {}) {
 // and the static aTokens — all sit under one listing of `(vault, holder)`
 // pairs, and a row's href IS the position page.
 const aaveVaultSubject = await verifyFamily("aave-vaults", {
-  listingPath: "/ethereum/aave/vaults/positions",
-  rowHrefRe: /^\/ethereum\/aave\/vaults\/0x[0-9a-fA-F]{40}\/0x[0-9a-fA-F]{40}$/,
+  listingPath: "/ethereum/aave-v3/vaults/positions",
+  rowHrefRe: /^\/ethereum\/aave-v3\/vaults\/0x[0-9a-fA-F]{40}\/0x[0-9a-fA-F]{40}$/,
 });
 // V2's stand-in: an sGHO holder (an EOA) whose 23 rows hold a closed group
 // of transfers (6 Nov 2026).
 await verifyVaultOwn("aave-vaults", aaveVaultSubject, {
   runPath:
-    "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x756281ae56c3d51bcdb0f46518ba1d148282af18",
+    "/ethereum/aave-v3/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x756281ae56c3d51bcdb0f46518ba1d148282af18",
 });
 await verifySheet("aave-vaults");
 

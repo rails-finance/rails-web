@@ -1,10 +1,11 @@
-// focus: the explorer's explainer; the shell's gate stands over the explorer
-// How Aave's vault layer on Ethereum is built — /ethereum/aave/vaults/info.
+// How Aave's vault layer on Ethereum is built — /ethereum/aave-v3/vaults/info,
+// the page app/(app)/ethereum/aave-v3/vaults/(views)/info/page.tsx draws, as
+// the MetaMorpho pages draw components/vaults/metamorpho-vaults-info.tsx.
 // ----------------------------------------------------------------------------
-// The (i) in the section rail. The first paragraphs are the roster's words and
-// its catalogue count, which left the roster's head (ui-jobs 771: the roster
-// opens on its read stamp alone), and Aave's pages; the rest were the
-// listing's "How this listing is built" drawer.
+// Linked from the Vaults section of Aave V3's About page. The first paragraphs
+// are the roster's words and its catalogue count, which left the roster's head
+// (ui-jobs 771: the roster opens on its read stamp alone), and Aave's pages;
+// the rest were the listing's "How this listing is built" drawer.
 //
 // THE CATALOGUE COUNT IS A CHAIN READ: what Aave's enumerators answer at a
 // block. The page asks the roster's loader, which caches a good read for five
@@ -18,6 +19,8 @@
 // and each names the block the sweep ran to. A census that does not answer
 // leaves those three unstated rather than stated emptily; the rest of the page
 // is about the section's rules and stands either way.
+//
+// SERVER-ONLY.
 
 import Link from "next/link";
 import { INFO_H2, INFO_UL, VaultsInfoPage } from "@/components/vaults/vaults-info-page";
@@ -38,11 +41,10 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { protocolForHref } from "@/lib/shared/protocols";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 
-export const dynamic = "force-dynamic";
-
-export const metadata = listingMetadata({
+/** The page's metadata; the route exports it. */
+export const AAVE_VAULTS_INFO_METADATA = listingMetadata({
   title: "About the Vaults section on Ethereum",
-  canonicalPath: "/ethereum/aave/vaults/info",
+  canonicalPath: "/ethereum/aave-v3/vaults/info",
   description:
     "What Aave's three vault families are and how Rails lists them on Ethereum: the roster read from Aave's enumerators at one block, what is outside it and what its figures leave out; then the vault position listing: membership from a whole-Transfer census proven complete by Σ balanceOf, the one priced figure and the block it was priced at, the vaults nobody has ever held, and what the search does and does not do.",
 });
@@ -66,7 +68,7 @@ async function loadCensus(): Promise<VaultCensusRow[]> {
   }
 }
 
-export default async function EthereumVaultsInfoPage() {
+export async function AaveVaultsInfo() {
   const [census, data] = await Promise.all([loadCensus(), loadAaveEthereumVaultDirectory()]);
   const coords = { blockNumber: data.blockNumber || undefined, readBy: serverReadOf(data) };
   const censusBlock = census.length > 0 ? Math.max(...census.map((c) => c.censusBlock)) : null;
@@ -74,7 +76,7 @@ export default async function EthereumVaultsInfoPage() {
   const unproven = census.filter((c) => !c.sumMatches);
 
   return (
-    <VaultsInfoPage chainId={MAINNET_CHAIN_ID} protocol={protocolForHref("/ethereum/aave")!}>
+    <VaultsInfoPage chainId={MAINNET_CHAIN_ID} protocol={protocolForHref("/ethereum/aave-v3")!}>
       <p>
         {AAVE_VAULTS_LEAD} The{" "}
         <Link href={ethereumVaultsListingHref()} className={INLINE_LINK} prefetch={false}>

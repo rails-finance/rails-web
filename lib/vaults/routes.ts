@@ -14,14 +14,13 @@
 //   /base/morpho/vaults/<vault>              one vault's market view
 //   /base/morpho/vaults/<vault>/<holder>     one position — card, flows, timeline
 //
-// Aave's three families are Aave's own deployments, and the door is unstamped
-// because savings GHO and the Umbrella stake tokens carry no version:
+// Aave's three families are Aave V3's Vaults section on Ethereum (ui-jobs 789):
 //
-//   /ethereum/aave/vaults                    the roster of vaults, read from chain
-//   /ethereum/aave/vaults/positions          every (vault, holder) position, as cards
-//   /ethereum/aave/vaults/info               how the vault layer is built, in words
-//   /ethereum/aave/vaults/<vault>            one vault's market view
-//   /ethereum/aave/vaults/<vault>/<holder>   one position — card, flows, timeline
+//   /ethereum/aave-v3/vaults                    the roster of vaults, read from chain
+//   /ethereum/aave-v3/vaults/positions          every (vault, holder) position, as cards
+//   /ethereum/aave-v3/vaults/info               how the vault layer is built, in words
+//   /ethereum/aave-v3/vaults/<vault>            one vault's market view
+//   /ethereum/aave-v3/vaults/<vault>/<holder>   one position — card, flows, timeline
 //
 // Yearn V3's whole product is vaults, so its explorer IS the vault layer. It
 // keeps the `vaults` segment all the same — one rule everywhere, and the short
@@ -68,8 +67,8 @@ function vaultsSubPageHref(explorerHref: string): string {
 const BASE_VAULTS = vaultsSubPageHref("/base/morpho");
 /** Morpho Blue on Ethereum — MetaMorpho's root there (ui-jobs 486). */
 const ETHEREUM_MORPHO_VAULTS = vaultsSubPageHref("/ethereum/morpho");
-/** Aave's vault layer on Ethereum — its explorer's one sub-page. */
-const ETHEREUM_VAULTS = vaultsSubPageHref("/ethereum/aave");
+/** Aave's vault layer on Ethereum — Aave V3's Vaults sub-page. */
+const ETHEREUM_VAULTS = vaultsSubPageHref("/ethereum/aave-v3");
 /** Yearn V3 on Ethereum — its explorer's one sub-page. */
 const YEARN_VAULTS = vaultsSubPageHref("/ethereum/yearn");
 
@@ -167,15 +166,15 @@ export function metaMorphoVaultsListingHref(
 // and their listings carry different facets, so the helpers stay per explorer
 // and only the `vaults` segment is shared, off each roster entry.
 
-/** Aave's vault layer on Ethereum (`/ethereum/aave/vaults`) — the roster, and
+/** Aave's vault layer on Ethereum (`/ethereum/aave-v3/vaults`) — the roster, and
  *  the parent of every vault page under it. */
 export function ethereumVaultRosterHref(): string {
   return ETHEREUM_VAULTS;
 }
 
-/** One Aave vault's MARKET VIEW (`/ethereum/aave/vaults/<vault>`), or — given a
- *  holder — that pair's POSITION PAGE
- *  (`/ethereum/aave/vaults/<vault>/<holder>`).
+/** One Aave vault's MARKET VIEW (`/ethereum/aave-v3/vaults/<vault>`), or —
+ *  given a holder — that pair's POSITION PAGE
+ *  (`/ethereum/aave-v3/vaults/<vault>/<holder>`).
  *
  *  A position is the pair `(vault, holder)` and it has a path of its own, the
  *  way a trove does: the holder is a segment, never a query. The vault's own
@@ -196,7 +195,7 @@ export function ethereumVaultHref(vault: string, holder?: string): string {
 }
 
 /** The position listing under the Ethereum roster
- *  (`/ethereum/aave/vaults/positions`), optionally opened on a filter.
+ *  (`/ethereum/aave-v3/vaults/positions`), optionally opened on a filter.
  *
  *  It lists every position the census knows, live and closed, as cards. A link
  *  built from this helper always resolves, whatever the filter names: a vault

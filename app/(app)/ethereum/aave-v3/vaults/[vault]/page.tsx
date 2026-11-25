@@ -1,4 +1,4 @@
-// One Aave vault's page — /ethereum/aave/vaults/<vault>.
+// One Aave vault's page — /ethereum/aave-v3/vaults/<vault>.
 // ----------------------------------------------------------------------------
 // The vault card (V2) and the grid of tiles under it (V13; rails-ops ui-jobs
 // 407, 584), drawn by components/vaults/aave-ethereum-vault-page.tsx from one
@@ -21,12 +21,11 @@
 // narrower set than a sibling surface already served for the same address, and
 // catalogue membership is the whole test here. Every other address 404s.
 //
-// WHERE IT LIVES. Under the chain's Vaults section (rails-ops decision 0017),
-// not under an explorer: a vault is a fund factsheet, the chain is the path's
-// first segment, and the venue is a header fact stated under the H1. No rail
-// header and no ChainProvider, for the reasons `app/(app)/ethereum/layout.tsx`
-// gives: chain 1 is the render layer's default, so every explorer link under
-// /ethereum/… resolves to Etherscan with no extra wiring.
+// WHERE IT LIVES. Under Aave V3's Vaults section (ui-jobs 789), with Aave
+// V3's rail and its VAULTS tab lit. No ChainProvider, for the reasons
+// `app/(app)/ethereum/layout.tsx` gives: chain 1 is the render layer's
+// default, so every explorer link under /ethereum/… resolves to Etherscan
+// with no extra wiring.
 
 import { cache, Suspense } from "react";
 import type { Metadata } from "next";
@@ -118,7 +117,7 @@ export default async function AaveEthereumVaultRoute({ params, searchParams }: P
       <div className="min-h-screen">
         <div className="py-8">
           <header className="mb-5" data-skel-section="page-header">
-            <RailHeader session="aave-vaults" venue="subPage" />
+            <RailHeader session="aave-v3" venue="subPage" />
           </header>
 
           {data.chainStale ? (

@@ -506,8 +506,8 @@ check(
   vaultsRowBase.length === 0 && vaultsRowBaseTab.length === 0,
   `selected "${baseSelected?.trim()}", rows ${JSON.stringify(vaultsRowBase)}`,
 );
-// Ethereum's Vaults section went the same way on 2026-09-20 — Aave's layer is a
-// roster entry at /ethereum/aave now — so no chain draws this row. Sepolia never
+// Ethereum's Vaults section went the same way on 2026-09-20 — Aave's layer is
+// Aave V3's Vaults section now — so no chain draws this row. Sepolia never
 // had one.
 await page.locator(`${CHOOSER} [role='tab'][aria-label='Ethereum']`).click();
 const vaultsRowEth = await page

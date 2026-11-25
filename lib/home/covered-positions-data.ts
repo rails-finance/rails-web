@@ -283,13 +283,9 @@ async function fetchRosterCount(id: string, path: string, deadline: AbortSignal)
  * safe failure (the guard trips and the figure disappears, loudly).
  */
 const NOT_POSITION_EXPLORERS = new Set<string>([
-  // Aave's vault layer. Not "no listing yet" but the other kind: a holder's
-  // share in a vault carries no debt and no threshold to breach, so it is not a
-  // position in the sense the headline counts (rails-ops decisions 0014 and
-  // 0027 call 2). It has no LISTING_ENDPOINT and must never gain one.
-  "aave-vaults",
-  // Yearn V3, here for the same reason and permanently: its whole product is
-  // vaults, so every one of its rows would be a share rather than a position.
+  // Yearn V3, permanently: its whole product is vaults, and a holder's share in
+  // a vault carries no debt and no threshold to breach, so it is not a position
+  // in the sense the headline counts (rails-ops decisions 0014 and 0027 call 2).
   "yearn",
   // CoW: trades, not positions (ui-jobs 489); it has no listing or census to
   // count, and the headline counts positions.

@@ -2,7 +2,7 @@
 
 // The roster: every vault Aave's own enumerators name on Ethereum, at one block.
 // ----------------------------------------------------------------------------
-// The VAULTS tab of the Aave vaults rail (/ethereum/aave/vaults). One table row
+// The VAULTS tab of the Aave vaults rail (/ethereum/aave-v3/vaults). One table row
 // (V6) per vault, through the shared roster (components/vaults/vault-roster.tsx;
 // ui-jobs 605). The family is a facet and the Kind cell on the row: a reader
 // narrowing to one asset still sees which rows are a slashable stake and which

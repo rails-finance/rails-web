@@ -14,7 +14,7 @@ import type { VaultExplorer } from "@/lib/vaults/families";
 export type VaultFamilyKey = VaultExplorer;
 
 const FAMILY_NOUN: Record<VaultFamilyKey, string> = {
-  "aave-vaults": "Aave vault",
+  "aave-v3": "Aave vault",
   yearn: "Yearn V3 vault",
   "morpho-base": "MetaMorpho vault",
   morpho: "MetaMorpho vault",
@@ -83,7 +83,7 @@ export const vaultExplorer: ExplorerAdapter<VaultEventPageInput> = {
           listingHrefForWallet(
             family,
             holder,
-            family === "morpho-base" || family === "morpho" ? "vaults" : undefined,
+            family === "morpho-base" || family === "morpho" || family === "aave-v3" ? "vaults" : undefined,
           ) ?? undefined,
       },
     ],

@@ -249,7 +249,7 @@ export function RailHeader({
   const entry = protocolForSession(session);
   if (!entry) return null;
   // An explorer with no position listing redirects its own route to its first
-  // sub-page (/ethereum/aave, /ethereum/yearn), so that sub-page is current
+  // sub-page (/ethereum/yearn), so that sub-page is current
   // while the redirect lands.
   const litSubPage =
     venue === "subPage"

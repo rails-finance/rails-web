@@ -6,7 +6,7 @@
 // 57 file-convention `opengraph-image.tsx` routes (54 at the sweep; the
 // Polaris event route joined 2026-09-17, the two vault EVENT routes
 // 2026-09-20, and the two vault position routes moved under their explorers'
-// own segments — `/ethereum/aave/vaults`, `/base/morpho/vaults`). The count
+// own segments — `/ethereum/aave-v3/vaults`, `/base/morpho/vaults`). The count
 // is no longer written down: check 0b reads it off the filesystem and holds
 // the census to it. A repeated URL is answered
 // from the edge for five minutes; a DISTINCT URL is a cache miss, and a bot
@@ -855,7 +855,7 @@ check(
 // The census is hand-written, so the filesystem is what holds it honest: a
 // route ADDED, MOVED or RENAMED must fail here by name rather than quietly
 // leaving the count behind (2026-09-20: the two vault position routes had
-// moved under `/ethereum/aave` and `/base/morpho` and their event twins were
+// moved under `/ethereum/aave` (Aave V3's `/ethereum/aave-v3` since ui-jobs 789) and `/base/morpho` and their event twins were
 // new, and the census still named the retired paths).
 const APP_DIR = path.join(REPO, "app", "(app)");
 const walkOg = (dir) =>

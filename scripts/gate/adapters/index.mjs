@@ -37,10 +37,10 @@ export const EXPORT_ADAPTERS = [
 /** Approach 2: page pattern → the routes its loader reads. */
 export const ROUTES = [
   {
-    // app/(app)/ethereum/aave/vaults/[vault]/[holder]/page.tsx reads the
+    // app/(app)/ethereum/aave-v3/vaults/[vault]/[holder]/page.tsx reads the
     // vault, the holder and the holder's whole history in one route.
     id: "aave-vaults",
-    match: /^\/ethereum\/aave\/vaults\/(0x[0-9a-fA-F]{40})\/(0x[0-9a-fA-F]{40})\/?$/,
+    match: /^\/ethereum\/aave-v3\/vaults\/(0x[0-9a-fA-F]{40})\/(0x[0-9a-fA-F]{40})\/?$/,
     routes: ([, vault, holder]) => [`/api/chain/aave-vaults/vault?vault=${vault}&holder=${holder}`],
   },
   {

@@ -4,7 +4,7 @@
 // `ChainTruthTimeline` finds `eventId` on the route params and draws ONE card
 // with its detail open, plus "View in timeline →" back to
 // `<position>?at=<id>`. See the Ethereum Aave twin of this file
-// (app/(app)/ethereum/aave/vaults/…/event/[eventId]/page.tsx) for the full
+// (app/(app)/ethereum/aave-v3/vaults/…/event/[eventId]/page.tsx) for the full
 // statement of the shape.
 //
 // THE ID IS A CHAIN COORDINATE — `txHash:logIndex`, percent-encoded into one

@@ -81,10 +81,10 @@ const ROSTER = {
     lead: "/ethereum/morpho/vaults/info",
   },
   "aave:1": {
-    href: "/ethereum/aave/vaults",
-    info: "/ethereum/aave/vaults/info",
+    href: "/ethereum/aave-v3/vaults",
+    info: "/ethereum/aave-v3/vaults/info",
     figure: "directory-catalogue",
-    lead: "/ethereum/aave/vaults/info",
+    lead: "/ethereum/aave-v3/vaults/info",
   },
   "yearn:1": {
     href: "/ethereum/yearn/vaults",

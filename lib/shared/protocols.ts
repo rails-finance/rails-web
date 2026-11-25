@@ -168,17 +168,17 @@ type SubPageSpec = {
   label: string;
   tab: string;
   /** This sub-page has a `positions` route of its own that reads `q` —
-   *  `/ethereum/aave/vaults/positions` and `/base/morpho/vaults/positions`.
+   *  `/ethereum/aave-v3/vaults/positions` and `/base/morpho/vaults/positions`.
    *
    *  It answers two questions for `listingHrefForWallet`. Where an explorer
    *  is `positionListing: false` it has to send the wallet filter somewhere it
-   *  LANDS: Aave's vault layer lists every `(vault, holder)` pair, so it has
-   *  such a route; Yearn V3 does not and will not until the share-ledger
+   *  LANDS: Yearn V3 has no such route and will not until the share-ledger
    *  census exists (TO-DO-infra-and-backend §5.4), so a link formed for it
-   *  would 404. And where a rail owns TWO listings of one address — Morpho
-   *  Blue Base lists Blue borrower positions at `/base/morpho` and MetaMorpho
-   *  holdings here — it names the second one, so a bookmark taken on the vault
-   *  listing reopens the vault listing (§42 item 1).
+   *  would 404. And where a rail owns TWO listings of one address — Aave V3
+   *  on Ethereum lists accounts at `/ethereum/aave-v3` and vault holdings
+   *  here, Morpho Blue Base Blue borrower positions at `/base/morpho` and
+   *  MetaMorpho holdings here — it names the second one, so a bookmark taken
+   *  on the vault listing reopens the vault listing (§42 item 1).
    *
    *  Declared per sub-page rather than inferred from `positionListing` because
    *  the two are different facts: one says the EXPLORER's own route lists
@@ -227,8 +227,11 @@ const SPECS: ProtocolSpec[] = [
     type: "lending",
     tags: ["Lend", "Borrow"],
     desc: "Single-pool lending on Ethereum: one cross-collateralised account per wallet, valued at Aave's oracle, with every liquidation traced",
+    // Aave's vaults (static aTokens, Umbrella stake tokens, savings GHO) are
+    // its Vaults section, as MetaMorpho's are Morpho Blue's (ui-jobs 789).
     subPages: [
       { segment: "markets", label: "Market overview", tab: "Markets" },
+      { segment: "vaults", label: "Vaults overview", tab: "Vaults", holderListing: true },
       { segment: "assets", label: "Assets", tab: "Assets" },
     ],
   },
@@ -381,27 +384,6 @@ const SPECS: ProtocolSpec[] = [
     history: "none",
     unlaunched: true,
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
-  },
-  {
-    // Aave's VAULT LAYER, and a third Aave row on Ethereum beside the two pool
-    // explorers — intended (rails-ops decision 0028 point 5). The door is
-    // unstamped because savings GHO and Umbrella stake tokens are Aave-wide
-    // rather than V3's, and a version in the URL of a contract that has none
-    // would be false. `aave-v3`, `aave-v3-base` and `aave-v4` are untouched.
-    id: "aave-vaults",
-    session: "aave-vaults",
-    label: "Aave vaults",
-    chainId: 1,
-    slug: "aave",
-    brand: 339,
-    type: "vaults",
-    tags: ["Vaults", "Savings"],
-    desc: "Aave's vaults (savings GHO, Umbrella stake tokens and static aTokens): each vault's size and share price, and every address that holds one",
-    // No position listing: a holder's share in a vault is not a position in the
-    // roster's sense (rails-ops decision 0027 call 2), so the rail's first tab
-    // is this sub-page and `/ethereum/aave` opens on it.
-    positionListing: false,
-    subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults", holderListing: true }],
   },
   {
     // Aerodrome Slipstream on Base (rails-ops ui-jobs 566), Uniswap's door 1
@@ -1508,11 +1490,6 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "aave-v3": "Position",
   "aave-v3-base": "Position",
   "aave-v3-arbitrum": "Position",
-  // A holder's reading of one vault. It names no headline position — the vault
-  // layer is in NOT_POSITION_EXPLORERS — and the rail never prints it either,
-  // because that explorer draws no position tab; the entry exists because this
-  // map is keyed on the closed session union.
-  "aave-vaults": "Holding",
   // Alchemix calls the NFT a position, and so do its getters and its events.
   alchemix: "Position",
   "alchemix-base": "Position",

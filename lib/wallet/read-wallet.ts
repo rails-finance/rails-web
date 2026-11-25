@@ -63,7 +63,13 @@ import {
   ebisuDeposits,
 } from "@/lib/wallet/families/liquity-forks";
 import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
-import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
+import {
+  countedRow,
+  servedSummaryRow,
+  withBudget,
+  type WalletSummaryAnswer,
+  type WalletSummaryRow,
+} from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
@@ -329,7 +335,7 @@ export async function readSummary(address: string, signal: AbortSignal, readerIp
   for (let offset = 0; offset < MAX_ROWS; offset += PAGE) {
     const page = offset === 0 ? await firstPage : await pageAt(offset);
     first ??= page;
-    rows.push(...page.rows);
+    rows.push(...page.rows.map(servedSummaryRow));
     if (rows.length >= page.total || page.rows.length < PAGE) break;
   }
   const extra = await listing;

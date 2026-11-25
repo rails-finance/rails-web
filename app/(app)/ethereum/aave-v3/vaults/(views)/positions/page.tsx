@@ -1,4 +1,4 @@
-// Every Aave vault position on Ethereum — /ethereum/aave/vaults/positions.
+// Every Aave vault position on Ethereum — /ethereum/aave-v3/vaults/positions.
 // ----------------------------------------------------------------------------
 // Every position in Aave's vault layer as a card, live and closed, on the same
 // shared listing driver every explorer's positions ride (memory
@@ -6,11 +6,11 @@
 // V2 grammar.
 //
 // WHERE THE OTHER SURFACES ARE. The VAULTS tab lands on the roster,
-// /ethereum/aave/vaults, read from chain at one block it names; this listing
+// /ethereum/aave-v3/vaults, read from chain at one block it names; this listing
 // sits one segment under it, because a listing is a way of reaching a vault
 // page and never a second home for it (rails-ops decision 0028 point 8). How
-// the vault layer is built, in words, is at /ethereum/aave/vaults/info. A
-// position has a path of its own, /ethereum/aave/vaults/<vault>/<holder>.
+// the vault layer is built, in words, is at /ethereum/aave-v3/vaults/info. A
+// position has a path of its own, /ethereum/aave-v3/vaults/<vault>/<holder>.
 //
 // A POSITION IS `(vault, holder)`. A holder of three vaults is three positions,
 // the way a trove is `(branch, id)`.
@@ -26,11 +26,9 @@
 // own /api/vaults/positions proxy (which adds the live overlay), and hands the
 // rows plus the census header to the client half as SSR first-paint data.
 //
-// THE SECTION'S OWN RAIL HEADER, NOT A PROTOCOL'S. A vault is not an explorer
-// (rails-ops decisions 0014, 0017), so `protocolForHref` finds no roster entry
-// for this path; the client half hands the driver the section's own rail
-// (components/vaults/vaults-rail-header.tsx) in the `identity` slot instead,
-// and the h1 goes sr-only under it the way every protocol listing's does.
+// AAVE V3'S RAIL HEADER. The client half hands the driver Aave V3's rail, with
+// VAULTS lit, in the `identity` slot, and the h1 goes sr-only under it the way
+// every protocol listing's does.
 
 import { VaultPositionsListing } from "./vault-positions-listing";
 import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
@@ -49,7 +47,7 @@ export const maxDuration = 30;
 
 export const metadata = listingMetadata({
   title: "Vault positions on Ethereum",
-  canonicalPath: "/ethereum/aave/vaults/positions",
+  canonicalPath: "/ethereum/aave-v3/vaults/positions",
   description:
     "Every address that holds (or has ever held) a share of one of Aave's ERC-4626 vaults on Ethereum, live and closed, as position cards. Filter by vault, family, status and what the holding address is; shares, claim and share of the vault read from chain at one block.",
 });

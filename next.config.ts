@@ -92,11 +92,6 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/aave-v4", "/ethereum/aave-v4"],
   // Aave V4 on Base never had a pre-0016 path; the row is for check:routes.
   ["/aave-v4-base", "/base/aave-v4"],
-  // Aave's vault layer never had a pre-0016 path; the row exists because
-  // check:routes wants every explorer forwarded from its bare slug. It cannot
-  // be a bare `/aave` — that is the guess a reader looking for the POOL makes,
-  // and sending them to the vault layer would answer a different question.
-  ["/aave-vaults", "/ethereum/aave"],
   // Alchemix never had a pre-0016 path; the row exists because check:routes
   // wants every explorer forwarded from its bare slug, and a bare /alchemix is
   // the address anyone will guess.
