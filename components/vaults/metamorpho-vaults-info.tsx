@@ -262,7 +262,7 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
   return (
     <ProtocolInfoPage
       session={chainId === 1 ? "morpho" : "morpho-base"}
-      layer={{ title: "About the Vaults section", menu }}
+      layer={{ title: "About MetaMorpho vaults", menu }}
       tracks={
         <>
           {metaMorphoLead(chainId)} The{" "}

@@ -279,7 +279,7 @@ export async function AaveVaultsInfo() {
   return (
     <ProtocolInfoPage
       session="aave-v3"
-      layer={{ title: "About the Vaults section", menu: MENU }}
+      layer={{ title: "About Aave vaults", menu: MENU }}
       tracks={
         <>
           {AAVE_VAULTS_LEAD} The{" "}
