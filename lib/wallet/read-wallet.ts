@@ -221,13 +221,14 @@ export interface UnreadExplorer {
 }
 
 /** The launched explorers with no index that no wallet read covers (decision 0073 point 4): a
- *  roster entry with `history: "none"` that no family module, visit module or liquidity source
- *  reads, in roster order, each linked to its wallet route at `address`. Read at each call, so an
+ *  roster entry with `history: "none"` that no switched-on family or visit module and no liquidity
+ *  source reads, in roster order, each linked to its wallet route at `address`. Read at each call, so an
  *  entry joins at its launch and leaves with the change that reads it. */
 export function walletUnreadExplorers(address: string): UnreadExplorer[] {
   const read = new Set<string>([
     ...WALLET_FAMILIES.filter((f) => f.summaryChain !== "arc" || ARC_ON_WALLET).map((f) => f.id),
-    ...WALLET_VISIT_FAMILIES.map((m) => m.id),
+    // A switched-off module reads nothing, so its explorer is named.
+    ...WALLET_VISIT_FAMILIES.filter((m) => m.on).map((m) => m.id),
     ...LIQUIDITY_SOURCES.flatMap((s) => s.explorers),
   ]);
   const wallet = address.toLowerCase();

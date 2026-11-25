@@ -36,7 +36,7 @@ register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 process.env.RAILS_API_URL = "http://box.test";
 
 const { PROTOCOLS, protocolForSession } = await import("../../lib/shared/protocols.ts");
-const { walletUnreadExplorers } = await import("../../lib/wallet/read-wallet.ts");
+const { walletUnreadExplorers, WALLET_VISIT_FAMILIES } = await import("../../lib/wallet/read-wallet.ts");
 const { LIQUIDITY_SOURCES } = await import("../../lib/wallet/liquidity/sources.ts");
 const { ARC_ON_WALLET } = await import("../../lib/wallet/families/aave-v4.ts");
 
@@ -79,6 +79,24 @@ test("an unlaunched explorer is not named", () => {
       .filter((id) => id !== "aave-v4-arc"),
     ["lido"],
   );
+});
+
+test("a launched explorer whose visit module is switched off is named", () => {
+  launchAll(true);
+  const morpho = WALLET_VISIT_FAMILIES.find((m) => m.id === "morpho-optimism");
+  assert.ok(morpho.on);
+  assert.ok(!walletUnreadExplorers(W).some((e) => e.id === "morpho-optimism"));
+  // The module's switch, off in memory while its explorer stays launched.
+  const own = Object.getOwnPropertyDescriptor(morpho, "on");
+  Object.defineProperty(morpho, "on", { get: () => false, configurable: true });
+  try {
+    assert.deepEqual(
+      walletUnreadExplorers(W).find((e) => e.id === "morpho-optimism"),
+      { id: "morpho-optimism", name: "Morpho Blue on Optimism", href: `/optimism/morpho/${W.toLowerCase()}` },
+    );
+  } finally {
+    Object.defineProperty(morpho, "on", own);
+  }
 });
 
 test("every liquidity source names roster entries on its chain", () => {
