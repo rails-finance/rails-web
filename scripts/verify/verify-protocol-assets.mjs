@@ -77,8 +77,8 @@ check(
   `${h.identityTag}, ${h.identityLinks} links`,
 );
 check(
-  "1b H5 on Aave V3: Positions, Markets, Assets, About; Assets current",
-  h.entries.join("|") === "Positions|Markets|Assets|About" && h.current === "Assets",
+  "1b H5 on Aave V3: Positions, Markets, Vaults, Assets, About; Assets current",
+  h.entries.join("|") === "Positions|Markets|Vaults|Assets|About" && h.current === "Assets",
   `${h.entries.join("|")}; current ${h.current}`,
 );
 const h1 = await page.$$eval("h1", (hs) =>

@@ -68,7 +68,7 @@ export default async function VaultPositionsPage({ searchParams }: { searchParam
     defaults: VAULT_POSITION_LIST_DEFAULTS,
     filters,
     page,
-    label: "Ethereum vault positions",
+    label: "Ethereum Aave vault positions",
     fetchPage: (baseUrl, signal, headers) =>
       fetchVaultPositions({ ...vaultPositionFiltersToFetchParams(filters, page), baseUrl, signal, headers }).then(
         (r) => {

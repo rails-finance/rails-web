@@ -1789,7 +1789,7 @@ export const VIEW_NOTES: Record<string, string> = {
   "aave-v3-arbitrum":
     "The Arbitrum Pool's full reserve roster (sizes, rates, risk configuration and oracle prices), with every risk parameter decoded from the reserve's configuration.",
   "aave-v3":
-    "The Core Pool's full reserve roster (sizes, rates, risk configuration and oracle prices), read live from the Pool and its oracle. The Vaults section lists every vault Aave's three families deploy (savings GHO, the Umbrella stake tokens and the static aTokens), grouped by family, each row with its totals, share price and mechanic read from the contracts at one block the page names.",
+    "The Core Pool's full reserve roster (sizes, rates, risk configuration and oracle prices), read live from the Pool and its oracle. The Vaults section lists every vault Aave's three families deploy (savings GHO, the Umbrella stake tokens and the static aTokens), each row with its kind, totals and share price read from the contracts at one block the page names.",
   spark: "The SparkLend Pool's reserve roster read live, on the surface Aave V3's uses.",
   makerdao:
     "The Vat's balance sheet decomposed by ilk: Vat.debt = Σ(Art × rate) + vice asserted live, with every ilk on the terms governance set for it.",

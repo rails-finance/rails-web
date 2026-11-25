@@ -179,7 +179,7 @@ const STATIC_QS = [
 // key `vaults` is not a session: it is the Ethereum vault POSITION route,
 // which passes no `session` at all — that surface has no roster card of its
 // own, so `staticFallback(undefined)` answers the home card. Its event route
-// and both Base vault routes DO name one (`aave-vaults`, `morpho-base`).
+// and both Base vault routes DO name one (`aave-v3`, `morpho-base`).
 const STATIC_FILE = {
   polaris: "explore-polaris.png",
   "liquity-v2": "explore-liquity.png",
@@ -195,7 +195,6 @@ const STATIC_FILE = {
   "compound-v3-arbitrum": "explore-compound-v3-arbitrum.png",
   "morpho-arbitrum": "explore-morpho-arbitrum.png",
   "aave-v4": "explore-aave-v4.png",
-  "aave-vaults": "explore-aave-vaults.png",
   compound: "explore-compound.png",
   "compound-base": "explore-compound-base.png",
   "compound-v2": "explore-compound-v2.png",
@@ -721,7 +720,7 @@ const CENSUS = [
   // the four vault routes: vault + holder in the route file (added 2026-09-10
   // — the card asked the census proxy with whatever the path said). The two
   // POSITION routes moved under their explorers' segments and the two EVENT
-  // routes joined them, so the paths below are `ethereum/aave/vaults` and
+  // routes joined them, so the paths below are `ethereum/aave-v3/vaults` and
   // `base/morpho/vaults`, not the retired `{ethereum,base}/vaults`.
   //
   // Ethereum, position — `load()` line 39 of the route: `!ADDRESS.test(vault)
@@ -730,14 +729,14 @@ const CENSUS = [
   // proxy nor a host lookup is reached. No `session`: the home card.
   {
     id: "vaults ethereum · bad vault",
-    file: F("ethereum/aave/vaults/[vault]/[holder]"),
+    file: F("ethereum/aave-v3/vaults/[vault]/[holder]"),
     session: "vaults",
     gate: "route ADDRESS on the vault + ADDRESS on the holder, before vaultShareCardModel",
     params: { vault: "hello", holder: ADDR_OK },
   },
   {
     id: "vaults ethereum · bad holder",
-    file: F("ethereum/aave/vaults/[vault]/[holder]"),
+    file: F("ethereum/aave-v3/vaults/[vault]/[holder]"),
     session: "vaults",
     gate: "route ADDRESS on the vault + ADDRESS on the holder, before vaultShareCardModel",
     params: { vault: ADDR_OK, holder: "hello" },
@@ -745,18 +744,18 @@ const CENSUS = [
   // Ethereum, event — `load()` line 45: the same two ADDRESS tests, on the
   // lowercased vault and holder, BEFORE `ssrOrigin()`, `vaultUnitsFromCensus`
   // (the census proxy) and `vaultEventCardModel` (the stored tail). Falls back
-  // to Aave's vault-layer roster card (rails-ops decision 0028).
+  // to Aave V3's roster card, the explorer that holds the Vaults section.
   {
     id: "vaults ethereum event · bad vault",
-    file: F("ethereum/aave/vaults/[vault]/[holder]/event/[eventId]"),
-    session: "aave-vaults",
+    file: F("ethereum/aave-v3/vaults/[vault]/[holder]/event/[eventId]"),
+    session: "aave-v3",
     gate: "route ADDRESS on the vault + ADDRESS on the holder, before vaultUnitsFromCensus and vaultEventCardModel",
     params: { vault: "hello", holder: ADDR_OK, eventId: "e" },
   },
   {
     id: "vaults ethereum event · bad holder",
-    file: F("ethereum/aave/vaults/[vault]/[holder]/event/[eventId]"),
-    session: "aave-vaults",
+    file: F("ethereum/aave-v3/vaults/[vault]/[holder]/event/[eventId]"),
+    session: "aave-v3",
     gate: "route ADDRESS on the vault + ADDRESS on the holder, before vaultUnitsFromCensus and vaultEventCardModel",
     params: { vault: ADDR_OK, holder: "hello", eventId: "e" },
   },
