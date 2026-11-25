@@ -36,7 +36,9 @@ import { ProtocolIdentity } from "@/components/shared/protocol-identity";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
-import { TAB_BASE } from "@/lib/shared/ui-grammar";
+import { OVERLAY_HEADING, TAB_BASE } from "@/lib/shared/ui-grammar";
+import { MobileSheet } from "@/components/shared/mobile-sheet";
+import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 
 /** The explorer's chain, muted, a label and not a control. On the title row
  *  its glyph alone follows the protocol's name (Miles, 6 Nov 2026, ui-jobs
@@ -120,7 +122,10 @@ export interface Section {
  *  navigation close it. The /vaults head draws it too (ui-jobs 776), with
  *  no chain row. `chains` (explorerChains) draws the chain row under the
  *  sections, its glyphs menu items after them in the arrow-key order
- *  (ui-jobs 854); fewer than two draw none. */
+ *  (ui-jobs 854); fewer than two draw none. Below sm it opens as the
+ *  shared sheet (MobileSheet), titled "Sections", as the Positions menu does
+ *  (ui-jobs 855); the closed menu stays in the page there too, and Back is
+ *  left to the page, as the rows navigate. */
 export function SectionsMenu({
   sections,
   chains = [],
@@ -139,6 +144,9 @@ export function SectionsMenu({
   const menuId = useId();
   const triggerId = useId();
   const chainLabelId = useId();
+  const sheetChainLabelId = useId();
+  const isPhone = useMediaQuery(PHONE_QUERY);
+  const sheet = useRef<HTMLDivElement>(null);
   const current = sections.find((s) => s.current);
 
   const close = useCallback((refocus = true) => {
@@ -150,21 +158,28 @@ export function SectionsMenu({
 
   useEffect(() => {
     if (!open) return;
-    const first = requestAnimationFrame(() => {
-      const items = menu.current?.querySelectorAll<HTMLElement>(ITEMS);
-      (menu.current?.querySelector<HTMLElement>('[aria-current="page"]') ?? items?.[0])?.focus();
+    // The open rows: the sheet's below sm, the drop's from sm.
+    const rows = () => (isPhone ? sheet.current : menu.current);
+    // A timeout, not a frame: the sheet's rows mount after this effect runs.
+    const first = window.setTimeout(() => {
+      const items = rows()?.querySelectorAll<HTMLElement>(ITEMS);
+      (rows()?.querySelector<HTMLElement>('[aria-current="page"]') ?? items?.[0])?.focus({ preventScroll: true });
     });
+    // The sheet closes from its scrim and Escape, and holds Tab; its rows are
+    // portalled outside `wrap`.
     const onPointer = (e: PointerEvent) => {
-      if (!wrap.current?.contains(e.target as Node)) close(false);
+      if (!isPhone && !wrap.current?.contains(e.target as Node)) close(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        if (isPhone) return;
         e.preventDefault();
         close();
         return;
       }
-      if (!menu.current) return;
-      const items = Array.from(menu.current.querySelectorAll<HTMLElement>(ITEMS));
+      const box = rows();
+      if (!box) return;
+      const items = Array.from(box.querySelectorAll<HTMLElement>(ITEMS));
       const at = items.indexOf(document.activeElement as HTMLElement);
       const go = (i: number) => items[(i + items.length) % items.length]?.focus();
       if (e.key === "ArrowDown") {
@@ -179,18 +194,74 @@ export function SectionsMenu({
       } else if (e.key === "End") {
         e.preventDefault();
         go(items.length - 1);
-      } else if (e.key === "Tab") {
+      } else if (e.key === "Tab" && !isPhone) {
         close(false);
       }
     };
     document.addEventListener("pointerdown", onPointer);
     document.addEventListener("keydown", onKey);
     return () => {
-      cancelAnimationFrame(first);
+      window.clearTimeout(first);
       document.removeEventListener("pointerdown", onPointer);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open, close]);
+  }, [open, close, isPhone]);
+
+  // The rows, drawn in the drop (in the page, `hidden` while closed) and in
+  // the sheet below sm while open; each copy names its own chain label.
+  const rowsFor = (labelId: string) => (
+    <>
+      {sections.map((s) => (
+        <Link
+          key={s.href}
+          href={s.href}
+          role="menuitem"
+          // Out of the tab order: the arrow keys move between the rows,
+          // and Tab leaves the menu.
+          tabIndex={-1}
+          aria-current={s.current ? "page" : undefined}
+          onClick={() => close(false)}
+          className={`${SECTION_ITEM} ${s.current ? "font-semibold" : ""}`}
+        >
+          <span className="min-w-0 flex-1 truncate">{s.name}</span>
+          {s.current && <Check className="size-4 shrink-0" strokeWidth={2.5} aria-hidden="true" />}
+        </Link>
+      ))}
+      {chains.length > 1 && (
+        <>
+          <div role="separator" className="mx-1 my-2 border-t border-rb-200 dark:border-rb-800" />
+          <span
+            id={labelId}
+            role="presentation"
+            className="block px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-rb-500"
+          >
+            Chain
+          </span>
+          <div role="group" aria-labelledby={labelId} className="flex flex-wrap gap-1" data-sections-chains="">
+            {chains.map((c) => {
+              const chain = CHAINS[c.chainId];
+              return (
+                <Link
+                  key={c.chainId}
+                  href={c.href}
+                  role="menuitem"
+                  tabIndex={-1}
+                  aria-label={chain.name}
+                  aria-current={c.current ? "true" : undefined}
+                  title={chain.name}
+                  onClick={() => close(false)}
+                  data-sections-chain={chain.slug}
+                  className={`${CHAIN_ITEM} ${c.current ? "bg-rb-200 text-foreground dark:bg-rb-700" : "text-rb-500"}`}
+                >
+                  <ChainGlyph chainId={c.chainId} className="h-5 w-5" />
+                </Link>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </>
+  );
 
   return (
     <nav ref={wrap} aria-label={label} className="relative shrink-0" data-anatomy="H5">
@@ -226,62 +297,25 @@ export function SectionsMenu({
         id={menuId}
         role="menu"
         aria-labelledby={triggerId}
-        hidden={!open}
+        hidden={!open || isPhone}
         data-sections-menu=""
         // Under the trigger: its left edge on the trigger's from sm, its right
         // edge on the trigger's below sm, so it stays inside a phone's width.
         className="profile-drop absolute right-0 top-full sm:right-auto sm:left-0 z-[var(--z-dropdown)] mt-2 w-52 rounded-xl border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 dark:bg-rb-900"
       >
-        {sections.map((s) => (
-          <Link
-            key={s.href}
-            href={s.href}
-            role="menuitem"
-            // Out of the tab order: the arrow keys move between the rows,
-            // and Tab leaves the menu.
-            tabIndex={-1}
-            aria-current={s.current ? "page" : undefined}
-            onClick={() => close(false)}
-            className={`${SECTION_ITEM} ${s.current ? "font-semibold" : ""}`}
-          >
-            <span className="min-w-0 flex-1 truncate">{s.name}</span>
-            {s.current && <Check className="size-4 shrink-0" strokeWidth={2.5} aria-hidden="true" />}
-          </Link>
-        ))}
-        {chains.length > 1 && (
-          <>
-            <div role="separator" className="mx-1 my-2 border-t border-rb-200 dark:border-rb-800" />
-            <span
-              id={chainLabelId}
-              role="presentation"
-              className="block px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-rb-500"
-            >
-              Chain
-            </span>
-            <div role="group" aria-labelledby={chainLabelId} className="flex flex-wrap gap-1" data-sections-chains="">
-              {chains.map((c) => {
-                const chain = CHAINS[c.chainId];
-                return (
-                  <Link
-                    key={c.chainId}
-                    href={c.href}
-                    role="menuitem"
-                    tabIndex={-1}
-                    aria-label={chain.name}
-                    aria-current={c.current ? "true" : undefined}
-                    title={chain.name}
-                    onClick={() => close(false)}
-                    data-sections-chain={chain.slug}
-                    className={`${CHAIN_ITEM} ${c.current ? "bg-rb-200 text-foreground dark:bg-rb-700" : "text-rb-500"}`}
-                  >
-                    <ChainGlyph chainId={c.chainId} className="h-5 w-5" />
-                  </Link>
-                );
-              })}
-            </div>
-          </>
-        )}
+        {rowsFor(chainLabelId)}
       </div>
+      {open && isPhone && (
+        <MobileSheet
+          label={label}
+          onClose={close}
+          header={<div className={`${OVERLAY_HEADING} px-1 pb-2`}>Sections</div>}
+        >
+          <div ref={sheet} role="menu" aria-label="Sections" data-sections-sheet="" className="py-1">
+            {rowsFor(sheetChainLabelId)}
+          </div>
+        </MobileSheet>
+      )}
     </nav>
   );
 }
