@@ -174,3 +174,32 @@ test("a module whose check finds nothing makes no read; one that holds reads its
   assert.ok(urls.some((p) => p.includes("compound-v3-optimism")));
   assert.ok(!urls.some((p) => p.includes("aave-v3-optimism")));
 });
+
+test("the Uniswap-family checks ask each chain's position managers, and PancakeSwap's farm", async () => {
+  const { UNI_DEPLOYMENTS } = await import("../../lib/uniswap/deployments.ts");
+  for (const d of UNI_DEPLOYMENTS) {
+    const p = checks.LIQUIDITY_PRESENCE[`${d.protocol}:${d.chainId}`];
+    assert.equal(p.kind, "check", `${d.protocol}:${d.chainId}`);
+    assert.equal(p.chainId, d.chainId);
+    const want = [d.v3Npm, d.v4PositionManager, d.masterChef].filter(Boolean).map((a) => a.toLowerCase());
+    const calls = p.calls(W);
+    assert.deepEqual(
+      calls.map((c) => c.address.toLowerCase()),
+      want,
+    );
+    assert.ok(calls.every((c) => c.functionName === "balanceOf" && c.args[0] === W));
+  }
+  // A position staked in MasterChefV3 holds, with nothing in the owner's own NFTs.
+  const farm = UNI_DEPLOYMENTS.find((d) => d.masterChef);
+  const staked = await readPresence(
+    [{ id: "farm", presence: checks.LIQUIDITY_PRESENCE[`${farm.protocol}:${farm.chainId}`] }],
+    W,
+    fake((c) => (c.address.toLowerCase() === farm.masterChef.toLowerCase() ? BigInt(1) : ZERO)).multicall,
+  );
+  assert.equal(staked.get("farm"), "held");
+  // Slipstream's staked positions sit in each pool's gauge: no check, and a reason.
+  for (const k of ["aerodrome:8453", "velodrome:10"]) {
+    assert.equal(checks.LIQUIDITY_PRESENCE[k].kind, "none", k);
+    assert.match(checks.LIQUIDITY_PRESENCE[k].why, /gauge/);
+  }
+});

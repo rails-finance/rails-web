@@ -8,6 +8,7 @@ import { COMPOUND_OPTIMISM_DEPLOYMENT } from "@/lib/compound-v3-optimism/asset-c
 import { STETH, WITHDRAWAL_QUEUE, WSTETH } from "@/lib/lido/types";
 import { MAINNET_CHAIN_ID, OPTIMISM_CHAIN_ID } from "@/lib/shared/chains";
 import { positive, type Presence } from "@/lib/wallet/presence";
+import { UNI_DEPLOYMENTS, type UniDeployment } from "@/lib/uniswap/deployments";
 
 const UI_POOL_ABI = parseAbi([
   "struct UserReserveData { address underlyingAsset; uint256 scaledATokenBalance; bool usageAsCollateralEnabledOnUser; uint256 scaledVariableDebt; }",
@@ -77,33 +78,55 @@ export const LIDO_PRESENCE: Presence = {
   held: (results) => results.some(positive),
 };
 
-/** A liquidity source whose check the uniswap session writes (decision 0073, Consequences):
- *  until it lands, the source reads as before. */
-const UNISWAP_SESSION_SLOT = (what: string): Presence => ({
-  kind: "none",
-  why: `${what}: the check is the uniswap session's to add`,
-});
+/** Uniswap V3 and V4, or PancakeSwap V3, on one chain: balanceOf(owner) on the V3 position
+ *  manager, on the V4 one where the chain has V4, and on PancakeSwap's MasterChefV3, which holds
+ *  a farmed position's NFT and counts it for its staker. A position NFT counts whatever its
+ *  liquidity; the read behind it decides what it draws. */
+function uniPresence(d: UniDeployment): Presence {
+  const managers = [d.v3Npm, d.v4PositionManager, d.masterChef].filter((a): a is string => a != null);
+  return {
+    kind: "check",
+    chainId: d.chainId,
+    calls: (owner) =>
+      managers.map((address) => ({
+        address: address as `0x${string}`,
+        abi: BALANCE_ABI,
+        functionName: "balanceOf",
+        args: [owner],
+      })),
+    held: (results) => results.some(positive),
+  };
+}
 
-/** One entry per LIQUIDITY_SOURCES key (lib/wallet/liquidity/sources.ts).
- *  THE UNISWAP SESSION'S SLOTS: each `UNISWAP_SESSION_SLOT` is replaced by a `kind: "check"`
- *  entry, for example `balanceOf(owner)` on the chain's position-manager NFTs (Uniswap V3 and V4,
- *  PancakeSwap V3, Slipstream's), every call for one chain in the same multicall. */
+const uni = (protocol: UniDeployment["protocol"], chainId: UniDeployment["chainId"]): Presence => {
+  const d = UNI_DEPLOYMENTS.find((x) => x.protocol === protocol && x.chainId === chainId);
+  if (!d) throw new Error(`no ${protocol} deployment on chain ${chainId}`);
+  return uniPresence(d);
+};
+
+/** Slipstream (Aerodrome, Velodrome): a staked position's NFT sits in its pool's gauge, which
+ *  names its staker only to a call on that gauge, so no call answers for every pool. */
+const SLIPSTREAM_NONE: Presence = {
+  kind: "none",
+  why: "a staked Slipstream position sits in its pool's gauge; no one call answers for every gauge",
+};
+
+const BALANCER_NONE: Presence = {
+  kind: "none",
+  why: "Balancer V3 pool shares are each pool's own token; no one call answers for every pool",
+};
+
+/** One entry per LIQUIDITY_SOURCES key (lib/wallet/liquidity/sources.ts). */
 export const LIQUIDITY_PRESENCE: Record<string, Presence> = {
-  "uniswap:1": UNISWAP_SESSION_SLOT("Uniswap V3 and V4 on Ethereum"),
-  "uniswap:8453": UNISWAP_SESSION_SLOT("Uniswap V3 on Base"),
-  "uniswap:42161": UNISWAP_SESSION_SLOT("Uniswap V3 and V4 on Arbitrum"),
-  "uniswap:10": UNISWAP_SESSION_SLOT("Uniswap V3 and V4 on Optimism"),
-  "uniswap:5042": UNISWAP_SESSION_SLOT("Uniswap V3 and V4 on Arc"),
-  "pancakeswap:8453": UNISWAP_SESSION_SLOT("PancakeSwap V3 on Base"),
-  "pancakeswap:42161": UNISWAP_SESSION_SLOT("PancakeSwap V3 on Arbitrum"),
-  "aerodrome:8453": UNISWAP_SESSION_SLOT("Aerodrome's Slipstream on Base"),
-  "velodrome:10": UNISWAP_SESSION_SLOT("Velodrome's Slipstream on Optimism"),
-  "balancer:1": {
-    kind: "none",
-    why: "Balancer V3 pool shares are each pool's own token; no one call answers for every pool",
-  },
-  "balancer:42161": {
-    kind: "none",
-    why: "Balancer V3 pool shares are each pool's own token; no one call answers for every pool",
-  },
+  "uniswap:1": uni("uniswap", 1),
+  "uniswap:8453": uni("uniswap", 8453),
+  "uniswap:42161": uni("uniswap", 42161),
+  "uniswap:10": uni("uniswap", 10),
+  "uniswap:5042": uni("uniswap", 5042),
+  "pancakeswap:8453": uni("pancakeswap", 8453),
+  "pancakeswap:42161": uni("pancakeswap", 42161),
+  "aerodrome:8453": SLIPSTREAM_NONE,
+  "velodrome:10": SLIPSTREAM_NONE,
+  "balancer:1": BALANCER_NONE,
+  "balancer:42161": BALANCER_NONE,
 };
