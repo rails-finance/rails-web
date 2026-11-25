@@ -259,8 +259,10 @@ export function ToolsMenu({
           // the button without moving the strip.
           className={
             crumb
-              ? // The crumb's words: a 20px row with a 36px press area.
-                `relative -mx-1 flex h-5 min-w-0 max-w-full cursor-pointer items-center gap-1 rounded-md px-1 text-left text-foreground transition-colors focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']`
+              ? // The crumb's words: a 20px row with a 36px press area. No
+                // max-w-full: the -mx-1 makes the wrapper 8px narrower than
+                // the button, and a 100% cap cut the name by that much.
+                `relative -mx-1 flex h-5 min-w-0 cursor-pointer items-center gap-1 rounded-md px-1 text-left text-foreground transition-colors focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']`
               : variant === "view"
                 ? // The listing's ⋮ as a neutral pill button, beside the sort
                   // (ui-jobs 735).
