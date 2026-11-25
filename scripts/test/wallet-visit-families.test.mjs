@@ -1,12 +1,13 @@
 // The wallet read's families with no store, read at visit (rails-ops decision 0071, group 4;
 // lib/wallet/families/visit.ts): Aave V3, Compound V3 and Morpho Blue on Optimism, Morpho Blue on
-// Arc, each on while its explorer is launched; and Euler V2 on Arbitrum beside Base
+// Arc, each on while its explorer is launched and the module is not held off (VISIT_HELD_OFF); and Euler V2 on Arbitrum beside Base
 // (lib/wallet/families/euler.ts). Each module's read, a failed read, no position, a module whose
 // explorer is unlaunched making no call and drawing nothing, the shared limiter, and the reads
 // starting only once the summary and listing reads have settled; the Optimism cards' receipts stating
 // the collateral the total sums, an unpriced Comet with no health factor, and a narrowed read keeping
 // every launched module's pill. The launch flags are flipped in
-// memory on the roster's entries (protocolForSession), never in lib/shared/protocols.ts. The backend is a
+// memory on the roster's entries (protocolForSession), never in lib/shared/protocols.ts, and the
+// held-off set is emptied for the tests that read a module and restored after. The backend is a
 // stubbed fetch; the modules import through `@/`, resolved as wallet-listing-reads.test.mjs does.
 // Run: npm test
 import test from "node:test";
@@ -205,6 +206,7 @@ const SESSIONS = ["aave-v3-optimism", "compound-v3-optimism", "morpho-optimism",
 const OPTIMISM = SESSIONS.slice(0, 3);
 /** The sessions launched for a test; the others are flagged off. */
 let launched = OPTIMISM;
+/** `held`: the modules held off for a test; none unless named. */
 const reset = (opts = {}) => {
   launched = opts.launched ?? OPTIMISM;
   for (const s of SESSIONS) {
@@ -212,6 +214,8 @@ const reset = (opts = {}) => {
     if (launched.includes(s)) delete e.unlaunched;
     else e.unlaunched = true;
   }
+  VISIT_HELD_OFF.clear();
+  for (const s of opts.held ?? []) VISIT_HELD_OFF.add(s);
   answers = { aave: AAVE, compound: COMPOUND, morpho: MORPHO, euler: 502 };
   summaryDelay = 0;
 };
@@ -253,14 +257,19 @@ globalThis.fetch = async (input) => {
 };
 
 const { protocolForSession } = await import("../../lib/shared/protocols.ts");
+const { VISIT_HELD_OFF } = await import("../../lib/wallet/families/visit.ts");
 /** The flags as protocols.ts has them today. */
 const FLAGS = Object.fromEntries(SESSIONS.map((s) => [s, protocolForSession(s)?.unlaunched === true]));
+/** The modules visit.ts holds off today. */
+const HELD = [...VISIT_HELD_OFF];
 test.after(() => {
   for (const s of SESSIONS) {
     const e = protocolForSession(s);
     if (FLAGS[s]) e.unlaunched = true;
     else delete e.unlaunched;
   }
+  VISIT_HELD_OFF.clear();
+  for (const s of HELD) VISIT_HELD_OFF.add(s);
 });
 
 const { readWalletUncached, walletFamiliesLine, walletVisitLine, WALLET_VISIT_FAMILIES } = await import(
@@ -459,9 +468,36 @@ test("a wallet holding nothing on a family draws no section and names no failure
 
 // ── Each module behind its explorer's launch flag ────────────────────────
 
-test("with today's flags the Optimism modules are on and Arc's is off", () => {
+test("today: the Optimism explorers are launched and their modules held off, so no module is on", async () => {
   for (const s of OPTIMISM) assert.equal(FLAGS[s], false, `${s} is launched in protocols.ts`);
   assert.equal(FLAGS["morpho-arc"], true, "morpho-arc is unlaunched in protocols.ts");
+  // Miles, 25 Nov 2026: held off until 852 step 2's presence check; Morpho until a check of its own.
+  assert.deepEqual(HELD.sort(), [...OPTIMISM].sort());
+  reset({ held: HELD });
+  assert.deepEqual(
+    WALLET_VISIT_FAMILIES.map((m) => [m.id, m.on]),
+    SESSIONS.map((s) => [s, false]),
+  );
+  urls = [];
+  const read = await readWalletUncached(W);
+  assert.deepEqual(atBlockCalls(), []);
+  assert.deepEqual(read.positions, []);
+  assert.equal(walletVisitLine(), "");
+});
+
+test("a held-off module stays off while launched, and comes on when it leaves the held-off set", () => {
+  for (const s of OPTIMISM) {
+    reset({ held: OPTIMISM });
+    assert.equal(WALLET_VISIT_FAMILIES.find((m) => m.id === s).on, false, `${s} held off`);
+    reset({ held: OPTIMISM.filter((x) => x !== s) });
+    assert.deepEqual(
+      WALLET_VISIT_FAMILIES.filter((m) => m.on).map((m) => m.id),
+      [s],
+    );
+  }
+});
+
+test("launched and not held off, the Optimism modules are on and Arc's is off", () => {
   reset();
   assert.deepEqual(
     WALLET_VISIT_FAMILIES.map((m) => [m.id, m.on]),

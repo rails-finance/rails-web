@@ -408,14 +408,17 @@ const { API_CONCURRENCY, apiHop, apiSlot, inWalletRead, isPastReadDeadline } = a
 );
 const { routeGate } = await import("../../lib/sources/api/route-gate.ts");
 const { protocolForSession } = await import("../../lib/shared/protocols.ts");
+const { VISIT_HELD_OFF } = await import("../../lib/wallet/families/visit.ts");
 
 const VISIT = ["aave-v3-optimism", "compound-v3-optimism", "morpho-optimism", "morpho-arc"];
 const FLAGS = Object.fromEntries(VISIT.map((s) => [s, protocolForSession(s)?.unlaunched === true]));
+const HELD = [...VISIT_HELD_OFF];
 test.after(() => {
   for (const s of VISIT) {
     if (FLAGS[s]) protocolForSession(s).unlaunched = true;
     else delete protocolForSession(s).unlaunched;
   }
+  for (const s of HELD) VISIT_HELD_OFF.add(s);
 });
 
 const reset = () => {
@@ -427,7 +430,9 @@ const reset = () => {
 test("a many-family wallet read with the Liquidity section beside it holds the api host to four at once", async () => {
   reset();
   assert.equal(API_CONCURRENCY, 4);
+  // Every module on, held-off ones included, so each kind of request is asked.
   for (const s of VISIT) delete protocolForSession(s).unlaunched;
+  VISIT_HELD_OFF.clear();
   summaryRows = WALLET_FAMILIES.flatMap(rowsOf);
   const [read, other, liquidity] = await Promise.all([
     readWalletUncached(W),
