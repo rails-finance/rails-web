@@ -78,7 +78,7 @@ export const TWITTER_HANDLE = RAILS_X_AT;
 // bytes — `public/og/home.png` itself stays at its unhashed path too (kept on
 // disk for scripts/verify/verify-share-abuse.mjs's static-file census), and is
 // regenerated in place alongside this hashed copy.
-export const HOME_SHARE_IMAGE = "/og/home-42a176a8.png";
+export const HOME_SHARE_IMAGE = "/og/home-62d75daa.png";
 
 /** The Twitter card for a page that sets its own `openGraph` without
  *  `shareMetadata`: the same title and description, on the home share image.

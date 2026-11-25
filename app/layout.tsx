@@ -68,7 +68,7 @@ export const viewport: Viewport = {
 // or a coverage page a reader cannot get to, would advertise a door that is
 // not open. Both come back on their own when the flags come off.
 const PROTOCOL_COUNT = LAUNCHED_PRODUCTION_PROTOCOL_VERSION_COUNT;
-/** "Ethereum, Base, and Arbitrum" — see `launchedProductionChainNames`. Polaris is named
+/** The launched production chains in a list ("Ethereum, Base, …") — see `launchedProductionChainNames`. Polaris is named
  *  separately, in words, where the sentence has room for it: it is one
  *  explorer on Sepolia, outside the production chains. */
 const PRODUCTION_CHAIN_NAMES = launchedProductionChainNames();
@@ -132,7 +132,7 @@ export const metadata: Metadata = {
         // fresh rather than served stale from their cache. Bump the hash
         // (`shasum -a 256 public/og/home.png | cut -c1-8`) whenever
         // `pnpm og` changes this file's bytes.
-        url: "/og/home-42a176a8.png",
+        url: "/og/home-62d75daa.png",
         width: 1200,
         height: 630,
         alt: `Look up a wallet on Rails: ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia`,
@@ -143,7 +143,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: SITE_TITLE,
     description: OG_DESCRIPTION,
-    images: ["/og/home-42a176a8.png"],
+    images: ["/og/home-62d75daa.png"],
     creator: TWITTER_HANDLE,
     site: TWITTER_HANDLE,
   },

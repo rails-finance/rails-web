@@ -159,17 +159,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly" as const,
       priority: 0.8,
     })),
-    // An explorer with no position listing redirects its route to its first
-    // sub-page, which is listed below; a redirect is no page to crawl. One with
-    // no sub-pages (CoW) is a front door at its route, so it is listed.
-    ...LAUNCHED_PROTOCOLS.filter((entry) => entry.positionListing !== false || entry.subPages.length === 0).map(
-      (entry) => ({
-        url: `${SITE_URL}${entry.href}`,
-        lastModified: DEPLOYED_AT,
-        changeFrequency: "daily" as const,
-        priority: 0.9,
-      }),
-    ),
+    // An explorer whose route redirects (`redirects`) is left out: a redirect is
+    // no page to crawl, and its first sub-page is listed below.
+    ...LAUNCHED_PROTOCOLS.filter((entry) => !entry.redirects?.includes("route")).map((entry) => ({
+      url: `${SITE_URL}${entry.href}`,
+      lastModified: DEPLOYED_AT,
+      changeFrequency: "daily" as const,
+      priority: 0.9,
+    })),
     // Each explorer's protocol-level sub-pages (branch roster, market roster,
     // system state, …) — derived the same way, off each sub-page's `href`
     // rather than a hand-joined path, so it moves when the roster entry moves.
@@ -194,8 +191,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     })),
     // Each explorer's /info page — the intro prose, derived off `infoHref` the
-    // same way. An explorer with no position listing redirects it too.
-    ...LAUNCHED_PROTOCOLS.filter((entry) => entry.positionListing !== false).map((entry) => ({
+    // same way, less one that redirects or that the explorer does not draw.
+    ...LAUNCHED_PROTOCOLS.filter((entry) => !entry.noInfoPage && !entry.redirects?.includes("info")).map((entry) => ({
       url: `${SITE_URL}${entry.infoHref}`,
       lastModified: DEPLOYED_AT,
       changeFrequency: "monthly" as const,

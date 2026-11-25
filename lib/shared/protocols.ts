@@ -89,6 +89,13 @@ type ProtocolSpec = {
    *  sub-page. Omitted means it has one; `false` is the only other value,
    *  because "has a listing" needs no declaring. */
   positionListing?: false;
+  /** Which of the explorer's own pages redirect: `route` its route (to the first sub-page), `info`
+   *  its /info page. The sitemap and llms.txt leave a redirect out, since it is no page to crawl.
+   *  Omitted means neither redirects. Checked against the page files in
+   *  scripts/test/explorer-redirects.test.mjs. */
+  redirects?: readonly ("route" | "info")[];
+  /** The explorer draws no /info page (CoW), so `infoHref` is not served. */
+  noInfoPage?: true;
   /** The explorer's own route is a front door (a wallet field and links to
    *  its pages), and its position listing is at `<route>/positions`: the
    *  position-first Arbitrum explorers (rails-ops TO-DO-arbitrum-scoping.md
@@ -399,6 +406,7 @@ const SPECS: ProtocolSpec[] = [
     // roster's sense (rails-ops decision 0027 call 2), so the rail's first tab
     // is this sub-page and `/ethereum/aave` opens on it.
     positionListing: false,
+    redirects: ["route", "info"],
     subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults", holderListing: true }],
   },
   {
@@ -1047,6 +1055,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Fixed yield", "Yield trading"],
     desc: "A wallet's principal, yield and liquidity tokens in each Pendle market, valued at Pendle's oracle and read at one block",
     positionListing: false,
+    redirects: ["route"],
     subPages: [
       { segment: "markets", label: "Markets overview", tab: "Markets" },
       { segment: "assets", label: "Assets", tab: "Assets" },
@@ -1138,6 +1147,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Trades"],
     desc: "Every trade a wallet settled through CoW Protocol, read from the settlement contract's logs and chosen by token",
     positionListing: false,
+    noInfoPage: true,
     subPages: [],
   },
   {
@@ -1291,6 +1301,7 @@ const SPECS: ProtocolSpec[] = [
     // (rails-ops decision 0027 call 2), so the rail's first tab is this
     // sub-page and `/ethereum/yearn` opens on it.
     positionListing: false,
+    redirects: ["route", "info"],
     subPages: [
       { segment: "vaults", label: "Vaults overview", tab: "Vaults" },
       { segment: "assets", label: "Assets", tab: "Assets" },
