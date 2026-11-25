@@ -277,7 +277,7 @@ const { bufferFromHealth } = await import("../../lib/wallet/summary-row.ts");
 const { opPosition } = await import("../../lib/aave-v3-optimism/position.ts");
 const { opWalletSuppliedProv } = await import("../../lib/aave-v3-optimism/provenance.ts");
 const { accountFigures } = await import("../../lib/compound-v3-optimism/position.ts");
-const { opcWalletLentProv } = await import("../../lib/compound-v3-optimism/provenance.ts");
+const { opcWalletBaseProv } = await import("../../lib/compound-v3-optimism/provenance.ts");
 
 const atBlockCalls = () => urls.filter((u) => u.pathname.startsWith("/api/at-block/")).map((u) => u.pathname);
 
@@ -326,7 +326,7 @@ test("Compound V3 Optimism: one position per Comet the wallet holds, at the Come
   assert.equal(p.card.read.comets[0].key, "usdc");
 });
 
-test("Morpho Blue Optimism: one position per market, dollars kept out of the tiles", async () => {
+test("Morpho Blue Optimism: one position per market, its dollars at a named feed", async () => {
   reset();
   const r = await readVisitFamilies([morphoOptimism], W, 2000);
   assert.equal(r.positions.length, 1);
@@ -383,12 +383,23 @@ test("Compound V3 Optimism: Lent's receipt states the collateral the wallet tota
   assert.equal(row.kind, "deposits");
   assert.equal(row.collateralUsd, 2000, "the posted WETH, the lent USDC left out");
   const ctx = (a) => ({ a, f: accountFigures(a, null), head: HEAD, ethUsd: null });
-  const prov = opcWalletLentProv(ctx(lender));
+  const prov = opcWalletBaseProv(ctx(lender));
   assert.equal(statedCollateral(prov), "$2,000");
   assert.match(prov.summary, /^USDC lent in USD\./, "the Lent headline's receipt");
   // A lender with nothing posted states $0.
   const bare = comet({ supply: "1000000000", borrow: "0", principal: "1000000000", collateral: [] });
-  assert.equal(statedCollateral(opcWalletLentProv(ctx(bare))), "$0");
+  assert.equal(statedCollateral(opcWalletBaseProv(ctx(bare))), "$0");
+});
+
+test("Compound V3 Optimism: Owed's receipt states the collateral the wallet total sums", async () => {
+  reset();
+  const borrower = comet();
+  answers.compound = { ...COMPOUND, comets: [borrower] };
+  const [row] = (await readVisitFamilies([compoundV3Optimism], W, 2000)).positions;
+  assert.equal(row.kind, "loans");
+  const prov = opcWalletBaseProv({ a: borrower, f: accountFigures(borrower, null), head: HEAD, ethUsd: null });
+  assert.equal(statedCollateral(prov), `$${fig(row.collateralUsd)}`);
+  assert.match(prov.summary, /^USDC owed in USD\./, "the Owed headline's receipt");
 });
 
 test("Compound V3 Optimism: an unpriced collateral gives no health factor and no collateral figure", async () => {
@@ -407,7 +418,7 @@ test("Compound V3 Optimism: an unpriced collateral gives no health factor and no
   assert.equal(row.collateralUsd, undefined);
   assert.equal(row.debtUsd, 1000);
   // The receipt states no collateral the total does not sum.
-  const prov = opcWalletLentProv({ a: unpriced, f: accountFigures(unpriced, null), head: HEAD, ethUsd: null });
+  const prov = opcWalletBaseProv({ a: unpriced, f: accountFigures(unpriced, null), head: HEAD, ethUsd: null });
   assert.equal(
     prov.inputs.some((x) => x.label === "Collateral"),
     false,

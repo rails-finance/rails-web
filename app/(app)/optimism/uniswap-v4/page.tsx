@@ -12,5 +12,5 @@ export const metadata = listingMetadata({
 });
 
 export default function Page() {
-  return <UniswapFrontDoor version="v4" protocol="uniswap" chainId={10} />;
+  return <UniswapFrontDoor version="v4" protocol="uniswap" chainId={10} chainNamed />;
 }

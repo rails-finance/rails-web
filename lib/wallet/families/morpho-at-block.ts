@@ -6,7 +6,7 @@
 // Each module is on while its explorer is launched (morpho-optimism,
 // morpho-arc; a cold Arc wallet read is about 160 chain calls). Dollars are at a Chainlink
 // feed, or Aave's oracle on Optimism, for the loan asset (decision 0046):
-// shown on the card and kept out of the tiles, as Morpho Arbitrum's are.
+// shown on the card and summed in the totals with the source named on the receipt.
 
 import { morphoAtBlockWalletPositions } from "@/lib/morpho-at-block/position";
 import {

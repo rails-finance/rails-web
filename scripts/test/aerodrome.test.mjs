@@ -407,7 +407,7 @@ test("minted inside the window: the daily reads are clipped to the days it exist
   assert.equal(p.againstHolding, null);
   const { yours } = rows(p);
   assert.equal(yours.days.now, "10 of 10");
-  assert.equal(yours.days.note, "one read a day since minted");
+  assert.match(yours.days.note, /^one read a day since \d+ \w+ 2026$/);
   assert.match(yours.earned.note, /^first figure on \d+ \w+ 2026$/);
   assert.equal(yours["token:0"].note, "minted inside the 30 days");
   assert.ok(flat(readoutExplainer(p)).some((b) => /^Minted inside the window and first read on/.test(b)));

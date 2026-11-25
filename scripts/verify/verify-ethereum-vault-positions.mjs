@@ -1261,7 +1261,7 @@ check(
 // A file check is the whole of the claim: Next mounts `loading.tsx` by
 // convention, and what it must render is the shared listing shell rather than
 // a hand-rolled one.
-const loadingPath = path.join(ROOT, "app", "(app)", "ethereum", "aave", "vaults", "(views)", "loading.tsx");
+const loadingPath = path.join(ROOT, "app", "(app)", "ethereum", "aave-v3", "vaults", "(views)", "loading.tsx");
 const loadingSrc = fs.existsSync(loadingPath) ? fs.readFileSync(loadingPath, "utf8") : "";
 check(
   "L13f the listing route has a loading.tsx that renders ListingRouteLoading",

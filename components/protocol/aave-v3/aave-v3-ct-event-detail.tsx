@@ -168,6 +168,8 @@ const ROW_SHEET_WORDS = {
 };
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
+/** A decimal string without its sign, digits as the index gave them. */
+const unsigned = (human: string): string => human.replace(/^[-+]/, "");
 
 /** A row behind a ParaSwap swap card, by the index action it was. */
 const SWAP_ROW_LABEL: Record<AaveV3SwapPoolEvent["action"], string> = {
@@ -303,7 +305,8 @@ export function useAaveV3EventBody({
   /** The row's own balance, before → after (the chain's where the index valued it). */
   const rowStat = (a: Axis): ChainTruthStat => ({
     label: a.label,
-    value: fmt(a.principalAfter),
+    // The exact decimal: the cell compacts it, and its USD reads a unit price from it.
+    value: a.principalAfter == null ? "—" : unsigned(a.principalAfter),
     symbol: a.symbol,
     ...(a.chain ? { address: a.reserve } : {}),
     prov: a.chain
@@ -532,7 +535,15 @@ export function useAaveV3EventBody({
       s.receivedAction === "trade"
         ? {
             label: s.kind === "supply_from_swap" ? "Sold" : "Bought",
-            value: fmt(s.receivedAmount),
+            // A line's `value` is the receipt's exact decimal, which the line
+            // compacts; `display` is the figure at the position block's precision.
+            // An amount the index could not scale (its decimals unread) reads "—".
+            ...(s.receivedAmount == null
+              ? { value: "—" }
+              : {
+                  value: unsigned(s.receivedAmount),
+                  display: fmtPositionAmount(Math.abs(Number(s.receivedAmount))),
+                }),
             symbol: rSym,
             address: s.receivedAsset,
             prov: swapLegProv(rSym, "trade", coords, s.raw.receivedAmount, undefined, s.kind, undefined, s),
@@ -568,7 +579,9 @@ export function useAaveV3EventBody({
     if (netted)
       extras.push({
         label: "Sold, net",
-        value: fmt(ctx.amount),
+        ...(ctx.amount == null
+          ? { value: "—" }
+          : { value: unsigned(ctx.amount), display: fmtPositionAmount(Math.abs(Number(ctx.amount))) }),
         symbol: sym,
         address: ctx.reserve,
         prov: swapLegProv(

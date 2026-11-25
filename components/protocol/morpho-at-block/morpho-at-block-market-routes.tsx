@@ -181,7 +181,7 @@ export async function morphoAtBlockMarketPageProps(
     data: data ? marketViewData(data) : null,
     chainId: dep.chainId,
     pair: "Morpho Blue market",
-    positions: { href: dep.route, label: `A wallet's Morpho Blue positions on ${dep.chain}` },
+    positions: { href: dep.route, label: `Look up a wallet's Morpho Blue positions on ${dep.chain}` },
     note,
     readCeiling: a.kind === "ceiling",
   };

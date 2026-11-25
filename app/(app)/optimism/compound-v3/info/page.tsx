@@ -9,18 +9,14 @@
 
 import Link from "next/link";
 import {
+  GlossaryLink,
   ProtocolInfoPage,
   type InfoReads,
+  type InfoTerm,
   type InfoView,
   GUIDE_NO_LEARN_MORE,
 } from "@/components/shared/protocol-info-page";
-import {
-  GLOSSARY,
-  INTEREST,
-  LIQUIDATION_ITEM,
-  ONE_BASE_ASSET,
-  WHAT_IT_IS,
-} from "@/components/protocol/compound-v3/compound-v3-info";
+import { GLOSSARY, INTEREST, ONE_BASE_ASSET, WHAT_IT_IS } from "@/components/protocol/compound-v3/compound-v3-info";
 import {
   COMPOUND_OPTIMISM_CONFIGURATOR,
   COMPOUND_OPTIMISM_DEPLOYMENT,
@@ -34,6 +30,25 @@ export const metadata = infoMetadata("compound-v3-optimism");
 
 const UL = "list-disc space-y-1 pl-5";
 const [USDC, ...REST] = COMPOUND_OPTIMISM_DEPLOYMENT.markets;
+
+// Liquidation told one way, by Compound's docs (Absorb, Buy collateral,
+// Reserves): the account is paid the collateral's value less a penalty in the
+// base asset, and the seized collateral stays with the protocol, sold while
+// reserves are below target.
+const LIQUIDATION_ITEM = (
+  <>
+    When an account&apos;s debt passes what its collateral covers, anyone can trigger its{" "}
+    <GlossaryLink term="Liquidation">liquidation</GlossaryLink> through the Comet&apos;s{" "}
+    <GlossaryLink term="Absorb">absorb</GlossaryLink> function. The Comet takes over the account&apos;s debt and
+    collateral and pays the account the collateral&apos;s value minus a penalty, in the base asset. The seized
+    collateral stays with the protocol, which sells it at a discount while its{" "}
+    <GlossaryLink term="Reserves">reserves</GlossaryLink> are below their target.
+  </>
+);
+
+const RESERVES =
+  "Reserves are a balance of the base or collateral asset that a market's protocol holds to protect users from bad debt. Collateral seized in a liquidation stays with the protocol, which sells it at a discount for the base asset while its reserves are below their target.";
+const [TERM_0, ...TERMS] = GLOSSARY.map((t): InfoTerm => (t.term === "Reserves" ? { ...t, definition: RESERVES } : t));
 
 const views: readonly [InfoView, ...InfoView[]] = [
   {
@@ -128,7 +143,7 @@ export default function InfoPage() {
         </>
       }
       notCovered="An account's history, a listing of every account, the largest suppliers and borrowers, absorptions and configuration changes aren't covered here."
-      glossary={GLOSSARY}
+      glossary={[TERM_0, ...TERMS]}
       howItWorks={[
         WHAT_IT_IS,
         <>

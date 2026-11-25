@@ -3,7 +3,7 @@
 // wallet view's page (/wallet/<address>) and the Aave CoW figures' proxies only.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
-import type { CowTradesPage, CowWalletEntry, CowWalletTokens } from "@/lib/cow/types";
+import type { CowTradeAaveSwap, CowTradesPage, CowWalletEntry, CowWalletTokens } from "@/lib/cow/types";
 import type { CowSettlement } from "@/lib/cow/settlement";
 import type { CowAaveFamily, CowAaveFigure, CowAaveSort, CowAaveSwapsPage, CowAaveTotals } from "@/lib/cow/aave-totals";
 
@@ -60,7 +60,12 @@ export function parseCowTradesQuery(sp: URLSearchParams): CowTradesQuery {
   };
 }
 
-export function readCowTrades(
+/** A wallet's trades. Each trade's `aave` is null where the answer has none, so an
+ *  answer from before rails-server served the field reads as no swap. Outside
+ *  production, `COW_AAVE_SWAP_FIXTURES=1` sets `aave` from the swaps read on
+ *  production for ui-jobs 853 (lib/cow/dev-aave-swap-fixture.json, by trade id)
+ *  where the answer has none, so the link can be read before the route is deployed. */
+export async function readCowTrades(
   wallet: string,
   q: CowTradesQuery,
   readerIp?: string,
@@ -72,7 +77,12 @@ export function readCowTrades(
   if (q.before) p.set("before", q.before);
   if (q.limit) p.set("limit", String(q.limit));
   const qs = p.toString();
-  return read<CowTradesPage>(`/${wallet}/trades${qs ? `?${qs}` : ""}`, readerIp, signal);
+  const page = await read<CowTradesPage>(`/${wallet}/trades${qs ? `?${qs}` : ""}`, readerIp, signal);
+  let fixture: Record<string, CowTradeAaveSwap> | null = null;
+  if (process.env.NODE_ENV !== "production" && process.env.COW_AAVE_SWAP_FIXTURES === "1")
+    fixture = (await import("@/lib/cow/dev-aave-swap-fixture.json")).default as Record<string, CowTradeAaveSwap>;
+  for (const t of page.trades) t.aave = t.aave ?? fixture?.[t.id] ?? null;
+  return page;
 }
 
 export function readCowTokens(wallet: string, readerIp?: string, signal?: AbortSignal): Promise<CowWalletTokens> {
