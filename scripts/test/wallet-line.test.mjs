@@ -184,7 +184,7 @@ const vault = (chain, root, n, status = "open") => ({
   status,
   href: `/${chain}/${root}/vaults/0xv${n}/${W}`,
 });
-const VAULT_ROSTER = { morpho: ["Morpho Blue", 3], aave: ["Aave vaults", 4], yearn: ["Yearn V3", 5] };
+const VAULT_ROSTER = { morpho: ["Morpho Blue", 3], "aave-v3": ["Aave V3", 4], yearn: ["Yearn V3", 5] };
 const vaultProtocolOf = (p) => {
   if (p.family !== "vaults") return protocolOf(p);
   const root = vaultRoot(p.href);
@@ -202,7 +202,7 @@ test("vault rows take one menu row per vault protocol and chain, each named", ()
     [
       vault("ethereum", "morpho", 1),
       vault("ethereum", "morpho", 2, "closed"),
-      vault("ethereum", "aave", 3),
+      vault("ethereum", "aave-v3", 3),
       vault("ethereum", "yearn", 4),
       vault("ethereum", "yearn", 5),
       vault("base", "morpho", 6),
@@ -216,7 +216,7 @@ test("vault rows take one menu row per vault protocol and chain, each named", ()
   assert.deepEqual(Object.keys(rows).sort(), [
     "base:vaults:morpho",
     "ethereum:morpho",
-    "ethereum:vaults:aave",
+    "ethereum:vaults:aave-v3",
     "ethereum:vaults:morpho",
     "ethereum:vaults:yearn",
   ]);
@@ -224,8 +224,8 @@ test("vault rows take one menu row per vault protocol and chain, each named", ()
   assert.equal(rows["ethereum:vaults:morpho"].counts, "1 open · 1 closed");
   assert.equal(rows["ethereum:vaults:morpho"].href, `/ethereum/morpho/vaults/positions?q=${W}`);
   assert.equal(rows["ethereum:morpho"].name, "Morpho Blue");
-  assert.equal(rows["ethereum:vaults:aave"].name, "Aave vaults");
-  assert.equal(rows["ethereum:vaults:aave"].href, `/ethereum/aave/vaults/0xv3/${W}`);
+  assert.equal(rows["ethereum:vaults:aave-v3"].name, "Aave vaults");
+  assert.equal(rows["ethereum:vaults:aave-v3"].href, `/ethereum/aave-v3/vaults/0xv3/${W}`);
   // Yearn V3 has no holder listing: past one holding, the wallet view's vault shares.
   assert.equal(rows["ethereum:vaults:yearn"].name, "Yearn V3");
   assert.equal(rows["ethereum:vaults:yearn"].href, `${DASHBOARD}?protocol=vaults`);

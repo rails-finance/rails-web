@@ -254,8 +254,6 @@ const GLYPHS: Record<string, Glyph> = {
   "aave-v3-arbitrum": AAVE_V3_MARK,
   // Aave V3 on Optimism: the Ethereum mark, its own deployment.
   "aave-v3-optimism": AAVE_V3_MARK,
-  // Aave's vault layer — same protocol, same mark, its own roster subject.
-  "aave-vaults": AAVE_V3_MARK,
   "aave-v4": AAVE_V4_MARK,
   // Aave V4 on Base: the Ethereum mark, its own deployment.
   "aave-v4-base": AAVE_V4_MARK,

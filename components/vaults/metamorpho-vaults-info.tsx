@@ -1,45 +1,104 @@
 // How Morpho's vault layer is built on one chain — /base/morpho/vaults/info and
-// /ethereum/morpho/vaults/info (rails-ops ui-jobs 486).
+// /ethereum/morpho/vaults/info (rails-ops ui-jobs 486), on the menu-led About
+// layout (ProtocolInfoPage with a `layer`, ui-jobs 791): the intro, then a
+// section for the roster and one for its holder listing, with the glossary in
+// its column.
 // ----------------------------------------------------------------------------
-// The rail's (i). The first paragraphs are the roster's words, its census
-// count with its receipt, and the vault's "?" concepts, which left the roster's
-// head (ui-jobs 771: the roster opens on its read stamp alone). The rest were
-// the positions listing's "How this listing is built" drawer.
+// The intro and the roster section are the roster's words, its census count
+// with its receipt, and the vault's "?" concepts, which left the roster's head
+// (ui-jobs 771: the roster opens on its read stamp alone). The positions
+// section was the listing's "How this listing is built" drawer.
 //
-// THE THREE-BLOCKS PARAGRAPH NAMES NO FINALIZED BLOCK. This page reads no
-// position and no overlay, so a number here would be a different request's
-// answer wearing the listing's words. It states the mechanism instead, and the
+// THE THREE-BLOCKS ITEMS NAME NO FINALIZED BLOCK. This page reads no position
+// and no overlay, so a number here would be a different request's answer
+// wearing the listing's words. They state the mechanism instead, and the
 // figure stays where it is read — on a position page, beside the cards it is
 // about.
 //
-// THE CENSUS HEADER IS FETCHED HERE, without the live overlay: the paragraphs
-// about the vaults nobody has ever held and the ones that did not pass the
-// completeness check are about the census itself. A census that does not
-// answer leaves those unstated rather than stated emptily.
+// THE CENSUS HEADER IS FETCHED HERE, without the live overlay: the items about
+// the vaults nobody has ever held and the ones that did not pass the
+// completeness check are about the census. A census that does not answer
+// leaves those unstated rather than stated emptily.
 //
 // SERVER-ONLY.
 
 import Link from "next/link";
-import { INFO_H2, INFO_UL, VaultsInfoPage } from "@/components/vaults/vaults-info-page";
+import {
+  GlossaryLink,
+  ProtocolInfoPage,
+  type InfoTerm,
+  type InfoView,
+  type MenuSection,
+} from "@/components/shared/protocol-info-page";
 import { Prov } from "@/components/shared/provenance";
-import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { hasUnpricedSentence, UnpricedSentence } from "@/components/vaults/unpriced-sentence";
 import { loadMetaMorphoCensus } from "@/components/vaults/metamorpho-roster-page";
-import { protocolForPathname } from "@/lib/shared/protocols";
 import { metaMorphoVaultRosterHref, metaMorphoVaultsListingHref } from "@/lib/vaults/routes";
 import { loadMetaMorphoVaultRoster, type MetaMorphoChainId } from "@/lib/metamorpho/vault-roster";
 import { vaultDirectoryCensusProv } from "@/lib/morpho-base/vault-provenance";
-import { FOOT_LINK, INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { chainMeta } from "@/lib/shared/chains";
 import { metaMorphoLead } from "@/lib/vaults/family-leads";
 import { MORPHO_VAULT_V1_ROLES_DOCS } from "@/lib/vaults/family-docs";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
-const MORPHO_VAULT_V2_DOCS = "https://docs.morpho.org/learn/concepts/vault-v2/";
-const MORPHO_VAULT_DOCS = MORPHO_VAULT_V1_ROLES_DOCS;
-const MORPHO_MARKET_DOCS = "https://docs.morpho.org/learn/concepts/blue/#what-is-a-variable-rate-market";
+const UL = "list-disc space-y-1 pl-5";
 
-/** The chain's facts in the three-blocks section. */
+const MORPHO_DOCS = "https://docs.morpho.org";
+const MORPHO_VAULT_V2_DOCS = `${MORPHO_DOCS}/learn/concepts/vault-v2/`;
+const MORPHO_ROLES_DOCS = `${MORPHO_DOCS}/curate/concepts/roles/`;
+const MORPHO_MARKET_DOCS = `${MORPHO_DOCS}/learn/concepts/blue/#what-is-a-variable-rate-market`;
+
+const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
+  {
+    term: "Vault",
+    definition:
+      "A MetaMorpho vault is a pool that one curator runs. It takes deposits of one token and lends them into several Morpho Blue markets. Morpho's docs call it a Morpho Vault V1.",
+    sources: [
+      { label: "Morpho curation", href: `${MORPHO_DOCS}/curate/#introduction-to-curation` },
+      { label: "Vaults V1 roles", href: MORPHO_VAULT_V1_ROLES_DOCS },
+    ],
+  },
+  {
+    term: "Market",
+    definition:
+      "A Morpho Blue market pairs one loan asset with one collateral token, isolated from every other market. A vault supplies the loan asset to the markets its curator picks.",
+    sources: [{ label: "Markets", href: MORPHO_MARKET_DOCS }],
+  },
+  {
+    term: "Curator",
+    definition:
+      "The curator is the one address that sets which markets a vault may supply and caps each one. Raising a cap or adding a market waits out a timelock.",
+    sources: [{ label: "Curator", href: `${MORPHO_ROLES_DOCS}#curator-1` }],
+  },
+  {
+    term: "Owner",
+    definition:
+      "The owner is the one address with full control of a vault. It appoints the curator and sets the performance fee.",
+    sources: [{ label: "Owner", href: `${MORPHO_ROLES_DOCS}#owner-1` }],
+  },
+  {
+    term: "Share price",
+    definition:
+      "The share price is what one share is worth in the vault's asset: the vault's answer to convertToAssets for one share. It rises as the markets pay interest.",
+    sources: [
+      {
+        label: "Yield in Morpho Vaults V1",
+        href: `${MORPHO_DOCS}/curate/concepts/yield/#yield-in-morpho-vaults-v1-legacy`,
+      },
+    ],
+  },
+  {
+    // ui-jobs 664, VA9: the docs' V2, which this section does not list.
+    term: "Vault V2",
+    definition:
+      "Morpho's docs name Morpho Vault V2 the primary vault surface and say “Morpho Vaults V1 are now legacy”.",
+    sources: [{ label: "Vault V2", href: MORPHO_VAULT_V2_DOCS }],
+  },
+];
+
+/** The chain's facts in the three-blocks view. */
 const FINALIZED: Record<MetaMorphoChainId, string> = {
   8453: "on Base the tag steps in jumps, 643 to 795 blocks behind head.",
   1: "on Ethereum the tag moves 32 blocks at a time, about two epochs behind head.",
@@ -57,83 +116,47 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
   const neverHeld = census.filter((c) => c.participants === 0).length;
   const unproven = census.filter((c) => !c.sumMatches);
   const censusBlock = census.length > 0 ? Math.max(...census.map((c) => c.censusBlock)) : null;
+  const menu: readonly [MenuSection, ...MenuSection[]] = [
+    { key: "roster", label: "Vault roster", href: metaMorphoVaultRosterHref(chainId) },
+    { key: "positions", label: "Vault positions", href: metaMorphoVaultsListingHref(chainId) },
+  ];
 
-  return (
-    <VaultsInfoPage chainId={chainId} protocol={protocolForPathname(metaMorphoVaultRosterHref(chainId))!}>
-      <p>
-        {metaMorphoLead(chainId)} The{" "}
-        <Link href={metaMorphoVaultsListingHref(chainId)} className={INLINE_LINK} prefetch={false}>
-          positions listing
-        </Link>{" "}
-        names every address holding a share in one of them.
-      </p>
-
-      <section data-intro-vault>
-        <h2 className={INFO_H2}>How a vault works</h2>
-        <ul className={INFO_UL}>
-          <li>
-            A MetaMorpho vault pools one asset and lends it across the Morpho Blue markets its curator chooses. A holder
-            owns shares, and a share buys back more of the asset as those markets pay interest.
-          </li>
-          <li>The curator picks the markets and caps each one. The owner can replace the curator and sets the fee.</li>
-          <li>
-            A vault&rsquo;s total assets include interest up to the block read. Morpho Blue books interest only when a
-            market is touched, so the sum the vault has allocated trails it.
-          </li>
-          <li>
-            On a V1.1 vault, lost assets are assets no market holds after a loss. The share price is not lowered for
-            them.
-          </li>
-          <li data-intro-docs>
-            <a href={MORPHO_VAULT_DOCS} target="_blank" rel="noopener" className={`font-medium ${FOOT_LINK}`}>
-              Morpho&rsquo;s docs
-            </a>{" "}
-            explain the Vaults V1 roles in Morpho&rsquo;s terms, and{" "}
-            <a href={MORPHO_MARKET_DOCS} target="_blank" rel="noopener" className={`font-medium ${FOOT_LINK}`}>
-              the markets
-            </a>{" "}
-            a vault lends to.
-          </li>
-          {/* ui-jobs 664, VA9: the docs' V2, which this section does not list. */}
-          <li data-intro-v2>
-            <a href={MORPHO_VAULT_V2_DOCS} target="_blank" rel="noopener" className="link-external">
-              Morpho&rsquo;s docs
-            </a>{" "}
-            name Morpho Vault V2 the primary vault surface and say &ldquo;Morpho Vaults V1 are now legacy&rdquo;. This
-            section lists MetaMorpho (V1) vaults only.
-          </li>
-        </ul>
-      </section>
-
-      <section data-intro-roster>
-        <h2 className={INFO_H2}>The roster</h2>
-        <p className="mt-1.5" data-figure="directory-census">
-          The roster is{" "}
-          <Prov
-            info={vaultDirectoryCensusProv(
-              { chainId },
-              { catalogSize: roster.vaults.length, censusBlock: roster.censusBlock },
-            )}
-          >
-            the {n(roster.vaults.length)} vaults the two MetaMorpho factories had made on {chain} at block{" "}
-            {n(roster.censusBlock)}
-          </Prov>
-          . Each was found from the creation event its factory emits.
-        </p>
-        <ul className={INFO_UL}>
-          <li>The list is a floor: a vault deployed without a factory emits no creation event.</li>
-          <li>A vault created after the census block joins when the census runs again.</li>
-          <li>Names are read live, because a V1.1 owner can rename a vault.</li>
-          <li>
-            Each total and share price is read at the block the read stamp names, and re-read at most every five
-            minutes.
-          </li>
-        </ul>
-      </section>
-
-      <section data-intro-figures>
-        <h2 className={INFO_H2}>Reading the roster</h2>
-        <ul className={INFO_UL}>
+  const views: readonly [InfoView, ...InfoView[]] = [
+    {
+      heading: "The roster",
+      section: "roster",
+      body: (
+        <div data-intro-roster>
+          <p data-figure="directory-census">
+            The roster is{" "}
+            <Prov
+              info={vaultDirectoryCensusProv(
+                { chainId },
+                { catalogSize: roster.vaults.length, censusBlock: roster.censusBlock },
+              )}
+            >
+              the {n(roster.vaults.length)} vaults the two MetaMorpho factories had made on {chain} at block{" "}
+              {n(roster.censusBlock)}
+            </Prov>
+            . Each was found from the creation event its factory emits.
+          </p>
+          <ul className={`mt-1.5 ${UL}`}>
+            <li>The list is a floor: a vault deployed without a factory emits no creation event.</li>
+            <li>A vault created after the census block joins when the census runs again.</li>
+            <li>Names are read live, because a V1.1 owner can rename a vault.</li>
+            <li>
+              Each total and share price is read at the block the read stamp names, and re-read at most every five
+              minutes.
+            </li>
+          </ul>
+        </div>
+      ),
+    },
+    {
+      heading: "Reading the roster",
+      section: "roster",
+      body: (
+        <ul className={UL} data-intro-figures>
           <li>
             Amounts are in each vault&rsquo;s asset. Nothing is priced in USD, so two assets are never ordered or added
             together.
@@ -152,11 +175,13 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
             </li>
           )}
         </ul>
-      </section>
-
-      <section data-intro-membership>
-        <h2 className={INFO_H2}>Who is on the positions listing</h2>
-        <ul className={INFO_UL}>
+      ),
+    },
+    {
+      heading: "Who is on the listing",
+      section: "positions",
+      body: (
+        <ul className={UL} data-intro-membership>
           <li>
             Membership comes only from the census: every address on either side of any <code>Transfer</code> a vault has
             emitted. The sweep runs from the vault&rsquo;s creation block, rather than a fixed window of six million
@@ -181,11 +206,13 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
             </li>
           )}
         </ul>
-      </section>
-
-      <section data-intro-blocks>
-        <h2 className={INFO_H2}>Three blocks</h2>
-        <ul className={INFO_UL}>
+      ),
+    },
+    {
+      heading: "Three blocks",
+      section: "positions",
+      body: (
+        <ul className={UL} data-intro-blocks>
           <li>The census block, stated on the listing, is when membership was swept.</li>
           <li>The block each card names is when its shares, claim and share of the vault were read.</li>
           <li>
@@ -194,11 +221,13 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
           </li>
           <li>How far it trails head varies: {FINALIZED[chainId]}</li>
         </ul>
-      </section>
-
-      <section data-intro-sort>
-        <h2 className={INFO_H2}>Value and sorting</h2>
-        <ul className={INFO_UL}>
+      ),
+    },
+    {
+      heading: "Value and sorting",
+      section: "positions",
+      body: (
+        <ul className={UL} data-intro-sort>
           <li>
             A card&rsquo;s Value · USD is its balance at the census block, converted by the vault&rsquo;s{" "}
             <code>convertToAssets</code>. The chain&rsquo;s Aave V3 oracle (<code>IAaveOracle.getAssetPrice</code>)
@@ -227,17 +256,55 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
             across vaults.
           </li>
         </ul>
-      </section>
+      ),
+    },
+  ];
 
-      <section data-intro-search>
-        <h2 className={INFO_H2}>Search</h2>
-        <p className="mt-1.5">
+  const layerTitle = `About MetaMorpho vaults on ${chainMeta(chainId).name}`;
+  return (
+    <ProtocolInfoPage
+      session={chainId === 1 ? "morpho" : "morpho-base"}
+      layer={{ title: layerTitle, menu }}
+      tracks={
+        <>
+          {metaMorphoLead(chainId)} The{" "}
+          <Link href={metaMorphoVaultsListingHref(chainId)} className={INLINE_LINK} prefetch={false}>
+            positions listing
+          </Link>{" "}
+          names every address holding a share in one of them.
+        </>
+      }
+      glossary={glossary}
+      howItWorks={[
+        <>
+          A MetaMorpho <GlossaryLink term="Vault">vault</GlossaryLink> pools one asset and lends it across the Morpho
+          Blue <GlossaryLink term="Market">markets</GlossaryLink> its{" "}
+          <GlossaryLink term="Curator">curator</GlossaryLink> chooses. A holder owns shares, and a share buys back more
+          of the asset as those markets pay interest.
+        </>,
+        <>
+          The curator picks the markets and caps each one. The <GlossaryLink term="Owner">owner</GlossaryLink> can
+          replace the curator and sets the fee.
+        </>,
+        <>
+          A vault&rsquo;s total assets include interest up to the block read. Morpho Blue books interest only when a
+          market is touched, so the sum the vault has allocated trails it.
+        </>,
+        <>
+          On a V1.1 vault, lost assets are assets no market holds after a loss. The{" "}
+          <GlossaryLink term="Share price">share price</GlossaryLink> is not lowered for them.
+        </>,
+      ]}
+      views={views}
+      search={
+        <span data-intro-search>
           The search matches an address, or part of one, against the holder. An address the census has never seen has no
           row here. The listing records nothing about the search.
-        </p>
-      </section>
-
-      <ProvInspectorLayer />
-    </VaultsInfoPage>
+        </span>
+      }
+      guide={false}
+      notCovered="Morpho Vault V2 isn't listed here."
+      docs={{ label: "Morpho documentation", href: `${MORPHO_DOCS}/` }}
+    />
   );
 }

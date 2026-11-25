@@ -280,7 +280,7 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
             eventPage={(slot) =>
               vaultExplorer.eventPage({
                 ...slot,
-                family: "aave-vaults",
+                family: "aave-v3",
                 deployment: "ethereum",
                 vaultName,
                 vault: timeline.vault,
@@ -414,7 +414,7 @@ function GateFailure({
 function aaveVaultTermsNotes(coords: VaultTimelineCoords, notes: AaveVaultNote[], shareUnit: string): MarketNote[] {
   return vaultTermsNotes(
     notes,
-    { address: coords.vault ?? "", shareSymbol: shareUnit, protocolId: "aave-vaults" },
+    { address: coords.vault ?? "", shareSymbol: shareUnit, protocolId: "aave-v3" },
     (note) => {
       const prov = vaultTimelineNoteProv(coords, note);
       switch (note.kind) {

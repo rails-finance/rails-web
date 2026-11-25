@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The vault POSITION page — the card, the lifetime flows, and a history half of
-// which is read at a finalized block and kept. /ethereum/aave/vaults/<vault>/<holder>
+// which is read at a finalized block and kept. /ethereum/aave-v3/vaults/<vault>/<holder>
 // ----------------------------------------------------------------------------
 // EVERY EXPECTED FIGURE HERE IS THIS SCRIPT'S OWN CHAIN READ. It makes its own
 // whole-`Transfer` sweep of each fixture's life to the block the page states,
@@ -30,7 +30,7 @@
 // time: two verifiers against one server produce a spurious 500.
 //
 // ── 2026-09-08 · THE POSITION HAS A PATH ───────────────────────────────────
-// `pageUrl` is `/ethereum/aave/vaults/<vault>/<holder>`; the bare vault page is the
+// `pageUrl` is `/ethereum/aave-v3/vaults/<vault>/<holder>`; the bare vault page is the
 // market view. T6a's target is unchanged and the page came in at 447 words
 // (was 594) once the four stat tiles that repeated the card were removed.
 // 56/56, unchanged.
@@ -593,7 +593,7 @@ async function ownLife(vault, holder, blockNumber) {
 // ── the page and the routes ─────────────────────────────────────────────────
 
 const routeUrl = (f, qs = "") => `${BASE}/api/chain/aave-vaults/vault?vault=${f.vault}&holder=${f.holder}${qs}`;
-const pageUrl = (f) => `${BASE}/ethereum/aave/vaults/${f.vault}/${f.holder}`;
+const pageUrl = (f) => `${BASE}/ethereum/aave-v3/vaults/${f.vault}/${f.holder}`;
 /** `AAVE_VAULT_TAIL_VERSION` in lib/shared/vault-holder-timeline.ts, restated. */
 const LOADER_VERSION = 3;
 const tailUrl = (f) =>
@@ -762,7 +762,7 @@ async function pageText(browser, url) {
 }
 
 const browser = await chromium.launch();
-console.log(`\n── /ethereum/aave/vaults/<vault>/<holder> · ${BASE} ──\n`);
+console.log(`\n── /ethereum/aave-v3/vaults/<vault>/<holder> · ${BASE} ──\n`);
 
 // ═══ T0 ═══════════════════════════════════════════════════════════════════
 // `?tail=0` here on purpose: T0 must not be the request that stores. T4 below
@@ -1417,7 +1417,7 @@ check(
 );
 
 // ═══ T6 — the words ═══════════════════════════════════════════════════════
-const f2Bare = await pageText(browser, `${BASE}/ethereum/aave/vaults/${F2.vault}`);
+const f2Bare = await pageText(browser, `${BASE}/ethereum/aave-v3/vaults/${F2.vault}`);
 check(
   `T6a F2's position page is at or under ${WORDS_WITH_HOLDER} visible words`,
   f2Page.words <= WORDS_WITH_HOLDER,

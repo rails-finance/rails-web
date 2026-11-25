@@ -44,13 +44,13 @@ const ALL_PAGES = [
   "/base/morpho/vaults/0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2",
   "/ethereum/morpho/vaults/0xbeef01735c132ada46aa9aa4c54623caa92a64cb",
   // Savings GHO, a static aToken (waUSDC), an Umbrella stake token (stkwaUSDC).
-  "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d",
-  "/ethereum/aave/vaults/0xd4fa2d31b7968e448877f69a96de69f5de8cd23e",
-  "/ethereum/aave/vaults/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6",
+  "/ethereum/aave-v3/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d",
+  "/ethereum/aave-v3/vaults/0xd4fa2d31b7968e448877f69a96de69f5de8cd23e",
+  "/ethereum/aave-v3/vaults/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6",
   "/ethereum/yearn/vaults/0x310b7ea7475a0b449cfd73be81522f1b88efafaa",
   "/base/morpho/vaults",
   "/ethereum/morpho/vaults",
-  "/ethereum/aave/vaults",
+  "/ethereum/aave-v3/vaults",
   "/ethereum/yearn/vaults",
   // The Aave family's market pages (A1, A2) and reserve pages (A3): the
   // Ethereum roster, Core's page, and a reserve on each chain and on SparkLend.

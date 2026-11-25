@@ -1,5 +1,5 @@
 // Aave's whole vault layer on Ethereum, read at ONE pinned block — the directory
-// behind /ethereum/aave/vaults. SERVER-ONLY.
+// behind /ethereum/aave-v3/vaults. SERVER-ONLY.
 // ----------------------------------------------------------------------------
 // The sibling on Base (morpho-base-vault-directory.ts) reads a roster that was
 // censused off logs months ago and is a FLOOR. This one asks the protocol who

@@ -334,7 +334,7 @@ test("Compound V3 Optimism: one position per Comet the wallet holds, at the Come
   assert.equal(p.card.read.comets[0].key, "usdc");
 });
 
-test("Morpho Blue Optimism: one position per market, dollars kept out of the tiles", async () => {
+test("Morpho Blue Optimism: one position per market, its dollars at a named feed", async () => {
   reset();
   const r = await readVisitFamilies([morphoOptimism], W, 2000);
   assert.equal(r.positions.length, 1);

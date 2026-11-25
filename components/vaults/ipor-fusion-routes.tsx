@@ -12,7 +12,7 @@ import { RailHeader } from "@/components/shared/rail-header";
 import { RouteNotFound } from "@/components/shared/route-not-found";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
 import { Prov } from "@/components/shared/provenance";
-import { VaultsInfoPage } from "@/components/vaults/vaults-info-page";
+import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
 import { IporFusionVaultDirectoryView, IPOR_FUSION_DOCS } from "@/components/vaults/ipor-fusion-vault-directory-view";
 import { IporFusionVaultPage } from "@/components/vaults/ipor-fusion-vault-page";
 import { loadIporFusionVaultDirectory } from "@/lib/sources/chain/ipor-fusion-vault-directory";
@@ -31,7 +31,6 @@ import { metaMorphoRosterEntry } from "@/lib/metamorpho/vault-roster";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { PROTOCOLS } from "@/lib/shared/protocols";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
-import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { IPOR_FUSION_LEAD } from "@/lib/vaults/family-leads";
 import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import type { SessionProtocol } from "@/lib/shared/sessions";
@@ -117,63 +116,131 @@ export function iporFusionInfoMetadata(chainId: IporFusionChainId): Metadata {
   });
 }
 
-/** The one place the words about the roster live (Miles, 19 Nov 2026). No
- *  chain read; the count comes from the census, with its receipt. */
+const IPOR_BUILD = "https://ipor.io/docs/build-on-fusion";
+const IPOR_VAULT_DOCS = `${IPOR_BUILD}/architecture-overview/what-is-a-fusion-vault`;
+
+const IPOR_GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
+  {
+    term: "Fusion vault",
+    definition:
+      "A Fusion vault, which IPOR's docs call a Plasma Vault, is an ERC-4626 vault that takes deposits of one token and acts in other protocols through fuses.",
+    sources: [{ label: "What is a Fusion vault", href: IPOR_VAULT_DOCS }],
+  },
+  {
+    term: "Fuse",
+    definition:
+      "A fuse is a small contract through which a vault acts in one protocol. Some move assets, some report the balance held there, and some claim rewards or swap.",
+    sources: [{ label: "What is a fuse", href: IPOR_FUSION_DOCS.href }],
+  },
+  {
+    term: "Access manager",
+    definition:
+      "Each vault's access manager is the contract that checks every restricted call against the roles it has granted.",
+    sources: [{ label: "Access Manager", href: `${IPOR_VAULT_DOCS}#open-zeppelin-access-manager` }],
+  },
+  {
+    term: "Atomist",
+    definition: "The Atomist configures a vault: its fees, its fuses and markets, and who may deposit and transfer.",
+    sources: [{ label: "What is an Atomist", href: `${IPOR_BUILD}/architecture-overview/what-is-an-atomist` }],
+  },
+  {
+    term: "Alpha",
+    definition: "The Alpha moves a vault's assets between markets, within the fuses the vault allows.",
+    sources: [{ label: "What is an Alpha", href: `${IPOR_BUILD}/architecture-overview/what-is-an-alpha` }],
+  },
+  {
+    term: "Fees",
+    definition:
+      "A vault's performance fee is charged on gains in the share price above its previous high, and its management fee yearly on its assets. The IPOR DAO takes a share of both.",
+    sources: [{ label: "Fees", href: `${IPOR_VAULT_DOCS}#fees` }],
+  },
+];
+
+/** The one place the words about the roster live (Miles, 19 Nov 2026), on the
+ *  menu-led About layout (ProtocolInfoPage, ui-jobs 791): the intro, then the
+ *  Vaults section, with the glossary in its column. No chain read; the count
+ *  comes from the census, with its receipt. */
 export function IporFusionInfoPage({ chainId }: { chainId: IporFusionChainId }) {
   const roster = iporFusionRoster(chainId);
   const chain = chainName(chainId);
   const rolesRead = IPOR_ROLE_LOG_LANE[chainId] != null;
+  const views: readonly [InfoView, ...InfoView[]] = [
+    {
+      heading: "The roster",
+      section: "vaults",
+      body: (
+        <p data-intro-roster>
+          The roster is every vault the IPOR Fusion factory made on {chain}:{" "}
+          <Prov
+            info={iporRosterCensusProv(
+              { chainId },
+              { catalogSize: roster.vaults.length, censusBlock: roster.censusBlock, factory: roster.factory },
+            )}
+          >
+            {n(roster.vaults.length)} by block {n(roster.censusBlock)}
+          </Prov>
+          , each found from the creation event the factory emits. Anyone may deploy from the factory, so a vault on the
+          list is not one IPOR curates. The list is a floor: a vault deployed by hand or by an earlier factory emits no
+          such event, and a vault made since that block joins when the census runs again. Every figure is read from
+          chain at one block, at most five minutes old.
+        </p>
+      ),
+    },
+    {
+      heading: "Reading the roster",
+      section: "vaults",
+      body: (
+        <p data-intro-units>
+          Amounts are in each vault&rsquo;s asset and nothing is priced in USD, so two assets are never ordered or added
+          together. A vault&rsquo;s total assets include the balances it last recorded in each market, which can trail
+          the markets. An empty vault answered zero to <code>totalAssets()</code>: one never funded looks the same as
+          one whose depositors have all left. A vault&rsquo;s position in a protocol Rails covers is that
+          explorer&rsquo;s row, under the vault&rsquo;s address.
+        </p>
+      ),
+    },
+  ];
   return (
-    <VaultsInfoPage chainId={chainId as ChainId} protocol={entryOf(chainId)}>
-      <p data-intro-membership>
-        {IPOR_FUSION_LEAD} A share converts to more of the token as those positions earn; the Share price column is the
-        vault&rsquo;s answer to <code>convertToAssets</code>, in its asset.
-      </p>
-      <p data-intro-roster>
-        The roster is every vault the IPOR Fusion factory made on {chain}:{" "}
-        <Prov
-          info={iporRosterCensusProv(
-            { chainId },
-            { catalogSize: roster.vaults.length, censusBlock: roster.censusBlock, factory: roster.factory },
-          )}
-        >
-          {n(roster.vaults.length)} by block {n(roster.censusBlock)}
-        </Prov>
-        , each found from the creation event the factory emits. Anyone may deploy from the factory, so a vault on the
-        list is not one IPOR curates. The list is a floor: a vault deployed by hand or by an earlier factory emits no
-        such event, and a vault made since that block joins when the census runs again. Every figure is read from chain
-        at one block, at most five minutes old.
-      </p>
-      <p data-intro-roles>
-        Each vault has an access manager that grants roles. Rails calls the holder of OWNER_ROLE the vault&rsquo;s
-        owner, who appoints its Atomist, owners and guardians, and the holder of ALPHA_ROLE its curator, IPOR&rsquo;s
-        Alpha, who moves the assets between markets. The Atomist, who manages the vault&rsquo;s settings and fuses,
-        keeps IPOR&rsquo;s word, and every other role is named by its constant in IPOR&rsquo;s code. The access manager
-        keeps no list of a role&rsquo;s holders, so a vault&rsquo;s page finds them in its grant events and confirms
-        each one at the block it reads.
-        {!rolesRead &&
-          ` On ${chain} Rails does not scan vault history yet, so a vault's page states its roles as not read.`}
-      </p>
-      <p data-intro-fees>
-        A vault charges a performance fee on gains in the share price and a yearly management fee on its assets, each
-        minted to its fee account as new shares. The IPOR DAO keeps a register of fuses, marking each one active,
-        deprecated or removed; a vault&rsquo;s page states each of its fuses&rsquo; standing there.
-      </p>
-      <p data-intro-units>
-        Amounts are in each vault&rsquo;s asset and nothing is priced in dollars, so two assets are never ordered or
-        added together. A vault&rsquo;s total assets include the balances it last recorded in each market, which can
-        trail the markets. An empty vault answered zero to <code>totalAssets()</code>: one never funded looks the same
-        as one whose depositors have all left. A vault&rsquo;s position in a protocol Rails covers is that
-        explorer&rsquo;s row, under the vault&rsquo;s address.
-      </p>
-      <p data-intro-docs>
-        <a href={IPOR_FUSION_DOCS.href} target="_blank" rel="noopener" className={`font-medium ${FOOT_LINK}`}>
-          IPOR&rsquo;s documentation
-        </a>{" "}
-        explains fuses and markets in IPOR&rsquo;s terms.
-      </p>
-      <ProvInspectorLayer />
-    </VaultsInfoPage>
+    <ProtocolInfoPage
+      session={sessionOf(chainId)}
+      layer={{}}
+      tracks={
+        <>
+          The roster lists every vault the IPOR Fusion factory made on {chain}, with each vault&rsquo;s totals and share
+          price.
+        </>
+      }
+      glossary={IPOR_GLOSSARY}
+      howItWorks={[
+        <span key="membership" data-intro-membership>
+          {IPOR_FUSION_LEAD}
+        </span>,
+        <>
+          A share converts to more of the token as those positions earn; the Share price column is the vault&rsquo;s
+          answer to <code>convertToAssets</code>, in its asset.
+        </>,
+        <span key="roles" data-intro-roles>
+          Each vault has an <GlossaryLink term="Access manager">access manager</GlossaryLink> that grants roles. Rails
+          calls the holder of OWNER_ROLE the vault&rsquo;s owner, who appoints its{" "}
+          <GlossaryLink term="Atomist">Atomist</GlossaryLink>, owners and guardians, and the holder of ALPHA_ROLE its
+          curator, IPOR&rsquo;s <GlossaryLink term="Alpha">Alpha</GlossaryLink>, who moves the assets between markets.
+          The Atomist, who manages the vault&rsquo;s settings and fuses, keeps IPOR&rsquo;s word, and every other role
+          is named by its constant in IPOR&rsquo;s code. The access manager keeps no list of a role&rsquo;s holders, so
+          a vault&rsquo;s page finds them in its grant events and confirms each one at the block it reads.
+          {!rolesRead &&
+            ` On ${chain} Rails does not scan vault history yet, so a vault's page states its roles as not read.`}
+        </span>,
+        <span key="fees" data-intro-fees>
+          A vault charges a <GlossaryLink term="Fees">performance fee</GlossaryLink> on gains in the share price and a
+          yearly management fee on its assets, each minted to its fee account as new shares. The IPOR DAO keeps a
+          register of fuses, marking each one active, deprecated or removed; a vault&rsquo;s page states each of its
+          fuses&rsquo; standing there.
+        </span>,
+      ]}
+      views={views}
+      guide={false}
+      docs={{ label: "IPOR Fusion documentation", href: IPOR_VAULT_DOCS }}
+    />
   );
 }
 

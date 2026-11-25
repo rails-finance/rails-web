@@ -25,6 +25,11 @@ const UNISWAP_REASON =
 const PANCAKESWAP_REASON =
   "a pool prices itself: every figure is in the pool's quote token at the pool's price, CAKE is stated in CAKE, and PancakeSwap runs no USD feed";
 
+/** An Aave vault position's price dropdown (Aave V3's Vaults section, whose
+ *  explorer prices its accounts in USD and so has no entry below). */
+export const AAVE_VAULT_USD_REASON =
+  "a vault share has no protocol oracle to value it. The one priced figure is the census's: the balance through the vault's convertToAssets and the chain's Aave V3 oracle on the asset at that block";
+
 export const ORACLE_USD_REASON: Record<string, string> = {
   fluid:
     "debt-token units by design: each vault's oracle prices the collateral in the vault's debt token (the space its liquidation engine judges in); Fluid runs no USD feed",
@@ -43,8 +48,6 @@ export const ORACLE_USD_REASON: Record<string, string> = {
   "morpho-base":
     "prices are in the market's loan token (each market's oracle quotes the collateral in it), so the loan token has no price; Morpho Blue has no USD oracle",
   pwn: "no protocol oracle: the two parties set the price",
-  "aave-vaults":
-    "a vault share has no protocol oracle to value it. The one priced figure is the census's: the balance through the vault's convertToAssets and the chain's Aave V3 oracle on the asset at that block",
   "sky-savings":
     "Sky has no price oracle for USDS, so amounts show in USDS and their dollar value goes through the LitePSM, Sky's USDS–USDC swap: one USDS is 1 ÷ (1 + exit fee) USDC, and the fee has been zero for the whole life of sUSDS. Lifetime flows count USDC as one dollar; the home page's value held prices it at the Aave V3 oracle.",
   yearn:

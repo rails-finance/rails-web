@@ -336,15 +336,7 @@
     "source": "live pick 2026-10-24 (/api/aave-v4-base/spoke-positions?status=closed)"
   },
   {
-    "page": "/ethereum/aave",
-    "chain": "ethereum",
-    "protocol": "aave",
-    "state": "listing",
-    "picked_for": "the explorer's own route (no position listing; opens on Vaults overview)",
-    "source": "lib/shared/protocols.ts"
-  },
-  {
-    "page": "/ethereum/aave/vaults",
+    "page": "/ethereum/aave-v3/vaults",
     "chain": "ethereum",
     "protocol": "aave",
     "state": "system",
@@ -352,7 +344,7 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/ethereum/aave/vaults/positions",
+    "page": "/ethereum/aave-v3/vaults/positions",
     "chain": "ethereum",
     "protocol": "aave",
     "state": "listing",
@@ -360,7 +352,7 @@
     "source": "lib/shared/protocols.ts (holderListing)"
   },
   {
-    "page": "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d",
+    "page": "/ethereum/aave-v3/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d",
     "chain": "ethereum",
     "protocol": "aave",
     "state": "system",
@@ -368,7 +360,7 @@
     "source": "scripts/verify/verify-ethereum-vault-timeline.mjs"
   },
   {
-    "page": "/ethereum/aave/vaults/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6",
+    "page": "/ethereum/aave-v3/vaults/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6",
     "chain": "ethereum",
     "protocol": "aave",
     "state": "system",
@@ -376,7 +368,7 @@
     "source": "scripts/verify/verify-vault-value-floor.mjs"
   },
   {
-    "page": "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x926bf90196781cf2161535d48af542889cac4d2e",
+    "page": "/ethereum/aave-v3/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x926bf90196781cf2161535d48af542889cac4d2e",
     "chain": "ethereum",
     "protocol": "aave",
     "state": "vault-holder-closed-and-reopened",
@@ -384,7 +376,7 @@
     "source": "scripts/verify/verify-ethereum-vault-timeline.mjs"
   },
   {
-    "page": "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x1676d23711186076fa74aa53511dda750a1f0d9a",
+    "page": "/ethereum/aave-v3/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x1676d23711186076fa74aa53511dda750a1f0d9a",
     "chain": "ethereum",
     "protocol": "aave",
     "state": "vault-holder-safe",
@@ -392,7 +384,7 @@
     "source": "scripts/verify/verify-ethereum-vault-timeline.mjs; verify-ethereum-vault-page.mjs (shape safe)"
   },
   {
-    "page": "/ethereum/aave/vaults/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6/0x5a2a98d3c9720734c2fca8d5ec808b073c047ccd",
+    "page": "/ethereum/aave-v3/vaults/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6/0x5a2a98d3c9720734c2fca8d5ec808b073c047ccd",
     "chain": "ethereum",
     "protocol": "aave",
     "state": "vault-holder-cooldown",
@@ -400,7 +392,7 @@
     "source": "scripts/verify/verify-ethereum-vault-timeline.mjs"
   },
   {
-    "page": "/ethereum/aave/vaults/0x4f827a63755855cdf3e8f3bcd20265c833f15033/0xcb7cd98c26b8e7bcda9445238d713ce8d59ce3b2",
+    "page": "/ethereum/aave-v3/vaults/0x4f827a63755855cdf3e8f3bcd20265c833f15033/0xcb7cd98c26b8e7bcda9445238d713ce8d59ce3b2",
     "chain": "ethereum",
     "protocol": "aave",
     "state": "vault-holder-cooldown",
@@ -408,7 +400,7 @@
     "source": "scripts/verify/verify-ethereum-vault-timeline.mjs"
   },
   {
-    "page": "/ethereum/aave/vaults/0xd4fa2d31b7968e448877f69a96de69f5de8cd23e/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6",
+    "page": "/ethereum/aave-v3/vaults/0xd4fa2d31b7968e448877f69a96de69f5de8cd23e/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6",
     "chain": "ethereum",
     "protocol": "aave",
     "state": "vault-holder-grouped",
@@ -416,7 +408,7 @@
     "source": "scripts/verify/verify-vault-transfer-folders.mjs (F3)"
   },
   {
-    "page": "/ethereum/aave/vaults/0x0bfc9d54fc184518a81162f8fb99c2eaca081202/0xce6ced23118edeb23054e06118a702797b13fc2f",
+    "page": "/ethereum/aave-v3/vaults/0x0bfc9d54fc184518a81162f8fb99c2eaca081202/0xce6ced23118edeb23054e06118a702797b13fc2f",
     "chain": "ethereum",
     "protocol": "aave",
     "state": "vault-holder-windowed",
@@ -424,7 +416,7 @@
     "source": "scripts/verify/verify-ethereum-vault-timeline.mjs (HEAVY)"
   },
   {
-    "page": "/ethereum/aave/vaults/0xd4fa2d31b7968e448877f69a96de69f5de8cd23e/0xce6ced23118edeb23054e06118a702797b13fc2f",
+    "page": "/ethereum/aave-v3/vaults/0xd4fa2d31b7968e448877f69a96de69f5de8cd23e/0xce6ced23118edeb23054e06118a702797b13fc2f",
     "chain": "ethereum",
     "protocol": "aave",
     "state": "vault-holder-withheld",
@@ -432,7 +424,7 @@
     "source": "scripts/verify/verify-ethereum-vault-timeline.mjs (CEILING_LIFE)"
   },
   {
-    "page": "/ethereum/aave/vaults/0x7bc3485026ac48b6cf9baf0a377477fff5703af8/0xa484ab92fe32b143aee7019fc1502b1daa522d31",
+    "page": "/ethereum/aave-v3/vaults/0x7bc3485026ac48b6cf9baf0a377477fff5703af8/0xa484ab92fe32b143aee7019fc1502b1daa522d31",
     "chain": "ethereum",
     "protocol": "aave",
     "state": "vault-holder-heavy",
@@ -440,7 +432,7 @@
     "source": "scripts/verify/verify-ethereum-vault-position-page.mjs (MILES)"
   },
   {
-    "page": "/ethereum/aave/vaults/0x7bc3485026ac48b6cf9baf0a377477fff5703af8/0x634826fb67d4eb9633f0011fae8e23cf99acd6f0",
+    "page": "/ethereum/aave-v3/vaults/0x7bc3485026ac48b6cf9baf0a377477fff5703af8/0x634826fb67d4eb9633f0011fae8e23cf99acd6f0",
     "chain": "ethereum",
     "protocol": "aave",
     "state": "vault-holder-windowed",
@@ -448,7 +440,7 @@
     "source": "scripts/verify/verify-timeline-boundary-card.mjs (vault-eth); verify-event-share.mjs"
   },
   {
-    "page": "/ethereum/aave/vaults/0x0bfc9d54fc184518a81162f8fb99c2eaca081202/0x99719e434ec7e5bf587599e4ca55817b3baceb8a",
+    "page": "/ethereum/aave-v3/vaults/0x0bfc9d54fc184518a81162f8fb99c2eaca081202/0x99719e434ec7e5bf587599e4ca55817b3baceb8a",
     "chain": "ethereum",
     "protocol": "aave",
     "state": "vault-holder-router",

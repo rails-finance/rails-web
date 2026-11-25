@@ -1,6 +1,6 @@
 // The print rules the two Aave-on-Ethereum surfaces share.
 // ----------------------------------------------------------------------------
-// `/ethereum/aave/vaults` lists eighteen vaults one column deep; `/ethereum/aave/vaults/
+// `/ethereum/aave-v3/vaults` lists eighteen vaults one column deep; `/ethereum/aave-v3/vaults/
 // <vault>` states one of them in full. The two must print the SAME wei the same
 // way — a reader who follows a row into its page and reads a different share
 // price has been told two things — so the rules live here once rather than

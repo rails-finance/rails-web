@@ -511,7 +511,7 @@ const FIXTURES = [
   {
     id: "vault-eth",
     arm: "vault",
-    path: "/ethereum/aave/vaults/0x7bc3485026ac48b6cf9baf0a377477fff5703af8/0x634826fb67d4eb9633f0011fae8e23cf99acd6f0",
+    path: "/ethereum/aave-v3/vaults/0x7bc3485026ac48b6cf9baf0a377477fff5703af8/0x634826fb67d4eb9633f0011fae8e23cf99acd6f0",
     // No export menu on a vault holder page: never a CSV offer.
     csv: false,
   },
@@ -519,7 +519,7 @@ const FIXTURES = [
     // 3,958 transfers: under the old 5,000 window, cut by the one of 1,000.
     id: "vault-eth-mid",
     arm: "vault",
-    path: "/ethereum/aave/vaults/0x0bfc9d54fc184518a81162f8fb99c2eaca081202/0xaafd07d53a7365d3e9fb6f3a3b09ec19676b73ce",
+    path: "/ethereum/aave-v3/vaults/0x0bfc9d54fc184518a81162f8fb99c2eaca081202/0xaafd07d53a7365d3e9fb6f3a3b09ec19676b73ce",
   },
   {
     id: "vault-base",
@@ -540,7 +540,7 @@ const FIXTURES = [
     // The arm matters even on a control: a vault holder page has no open/closed
     // concept for the tip rule to consult. See `noTenure` below.
     arm: "vault",
-    path: "/ethereum/aave/vaults/0x0bfc9d54fc184518a81162f8fb99c2eaca081202/0x99719e434ec7e5bf587599e4ca55817b3baceb8a",
+    path: "/ethereum/aave-v3/vaults/0x0bfc9d54fc184518a81162f8fb99c2eaca081202/0x99719e434ec7e5bf587599e4ca55817b3baceb8a",
   },
 ];
 

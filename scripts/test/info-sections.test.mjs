@@ -53,16 +53,23 @@ test("every About view names a section in its explorer's menu", () => {
   const { menus, routes } = rosterMenus();
   assert.ok(menus.size > 40, `read ${menus.size} roster entries`);
   const routePages = files("app", (p) => /[\\/]info[\\/]page\.tsx$/.test(p));
-  const components = files("components/protocol", (p) => /info(-page)?\.tsx$/.test(p));
+  const components = [
+    ...files("components/protocol", (p) => /info(-page)?\.tsx$/.test(p)),
+    // The vault layers' About pages (ui-jobs 791).
+    ...files("components/vaults", (p) => /(-info|-routes)\.tsx$/.test(p)),
+  ];
   // The sessions each file draws: a route page its own (by its chain and slug), a shared
   // component every route page importing it.
   const drawn = new Map();
   for (const p of routePages) {
-    const m = p.match(/app[\\/]\(app\)[\\/]([^\\/]+)[\\/]([^\\/]+)[\\/]info[\\/]page\.tsx$/);
+    // An explorer's /info, or its vault layer's /vaults/info (ui-jobs 791).
+    const m = p.match(
+      /app[\\/]\(app\)[\\/]([^\\/]+)[\\/]([^\\/]+)[\\/](?:vaults[\\/]\(views\)[\\/])?info[\\/]page\.tsx$/,
+    );
     const session = m && routes.get(`${m[1]}/${m[2]}`);
     if (!session) continue;
     drawn.set(p, new Set([session]));
-    for (const imp of readFileSync(p, "utf8").matchAll(/from "@\/(components\/protocol\/[^"]+)"/g)) {
+    for (const imp of readFileSync(p, "utf8").matchAll(/from "@\/(components\/(?:protocol|vaults)\/[^"]+)"/g)) {
       const c = components.find((f) => f.replace(/\\/g, "/") === `${imp[1]}.tsx`);
       if (c) drawn.set(c, new Set([...(drawn.get(c) ?? []), session]));
     }
@@ -75,7 +82,17 @@ test("every About view names a section in its explorer's menu", () => {
     if (keys.length === 0) continue;
     const sessions = [...(drawn.get(p) ?? [])];
     assert.ok(sessions.length > 0, `${p}: names sections but no roster session`);
+    // A vault layer with its own menu (`layer={{ … menu }}`, ui-jobs 791) names its
+    // sections by the `key`s that menu lists, in place of the explorer's.
+    const layerKeys = /\blayer=\{\{[^}]*\bmenu\b/.test(src)
+      ? new Set([...src.matchAll(/\bkey: "([^"]+)", label:/g)].map((m) => m[1]))
+      : null;
     for (const key of keys) {
+      if (layerKeys) {
+        assert.ok(layerKeys.has(key), `${p}: section "${key}" is in no key of the layer's menu`);
+        checked++;
+        continue;
+      }
       const owners = sessions.filter((s) => menus.get(s).has(key));
       assert.ok(owners.length > 0, `${p}: section "${key}" is in no menu of ${sessions.join(", ")}`);
       checked++;

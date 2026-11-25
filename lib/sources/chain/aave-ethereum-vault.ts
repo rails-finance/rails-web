@@ -1,5 +1,5 @@
 // ONE Aave vault on Ethereum, and one holder's reading of it, at one pinned
-// block — the page behind /ethereum/aave/vaults/<vault>. SERVER-ONLY.
+// block — the page behind /ethereum/aave-v3/vaults/<vault>. SERVER-ONLY.
 // ----------------------------------------------------------------------------
 // The directory (aave-ethereum-vault-directory.ts) reads eighteen vaults one
 // column deep. This reads ONE vault as deep as its family goes, plus — when

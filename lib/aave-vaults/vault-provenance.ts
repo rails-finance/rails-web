@@ -1,4 +1,4 @@
-// The receipts for Aave's vault layer on Ethereum — /ethereum/aave/vaults.
+// The receipts for Aave's vault layer on Ethereum — /ethereum/aave-v3/vaults.
 // ----------------------------------------------------------------------------
 // A sibling of lib/morpho-base/vault-provenance.ts for a different catalogue.
 // That one traces a MetaMorpho vault sitting on Morpho Blue; this one traces
@@ -44,7 +44,7 @@ import {
 } from "@/lib/aave-vaults/vault-catalog";
 import { attestedClause, attestedShortName, type AttestedAddress } from "@/lib/shared/attested-addresses";
 
-const LANE = "live Ethereum chain reads (/ethereum/aave/vaults)";
+const LANE = "live Ethereum chain reads (/ethereum/aave-v3/vaults)";
 
 export interface AaveVaultCoords {
   /** rails-server's read of `blockNumber`, when it answered every read of the page. */
@@ -276,7 +276,7 @@ const aaveVaultEmptyCountProv_ = (c: AaveVaultCoords, n: number, catalogSize: nu
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// THE VAULT PAGE — /ethereum/aave/vaults/<vault>
+// THE VAULT PAGE — /ethereum/aave-v3/vaults/<vault>
 // ─────────────────────────────────────────────────────────────────────────────
 // The directory states one column per vault; the page states the family's whole
 // mechanic and, when `?holder=` resolved, one address's reading of it. Every
@@ -512,7 +512,7 @@ export const aaveFirstPartySourcesProv = (count: number, fetchedOn: string): Pro
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// THE POSITION LISTING — /ethereum/aave/vaults/positions
+// THE POSITION LISTING — /ethereum/aave-v3/vaults/positions
 // ─────────────────────────────────────────────────────────────────────────────
 // Everything above is one lane: an `eth_call` at the block the page names. The
 // listing has a SECOND lane, and mixing the two would be the one thing a

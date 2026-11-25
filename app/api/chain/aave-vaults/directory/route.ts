@@ -4,7 +4,7 @@ import { loadAaveEthereumVaultDirectory } from "@/lib/sources/chain/aave-ethereu
 // Every vault Aave's own enumerators name on Ethereum, at one pinned block —
 // the roster, addressable.
 //
-// THE LISTING'S DISCLOSURE LANE. /ethereum/aave/vaults is the roster, and
+// THE LISTING'S DISCLOSURE LANE. /ethereum/aave-v3/vaults is the roster, and
 // the roster is what a reader opens beside it (the "eighteen vaults" drawer).
 // The roster is a Multicall3 wave over every catalogued vault — about a second
 // — and the listing's own path is a store read plus one overlay batch, so the
