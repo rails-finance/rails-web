@@ -15,12 +15,14 @@ import { CARD_WORDS, REQUESTS } from "@/lib/lido/words";
 export function LidoWalletCard({ read }: { read: LidoStakeRead }) {
   const s = lidoStake(read);
   const requests = REQUESTS.summary(s);
+  // An unclaimed withdrawal request holds the position open with no shares left.
+  const closed = s.now.shares === 0 && !read.requests.rows.some((q) => !q.isClaimed);
   return (
     <div data-position-card={`lido:${read.wallet.toLowerCase()}`}>
       <PositionCard
         slots={{
           surface: "listing",
-          status: s.now.shares === 0 ? { word: CARD_WORDS.closed, tone: "muted", tip: CARD_WORDS.none } : null,
+          status: closed ? { word: CARD_WORDS.closed, tone: "muted", tip: CARD_WORDS.none } : null,
           heads: lidoStakeHeads({ s, r: read }).filter((h) => h.id !== "rate"),
           tag: requests ? <ListingTag market={requests} /> : undefined,
           counters: null,

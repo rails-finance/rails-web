@@ -6,6 +6,7 @@
 // The read states no dollars and no risk figure; the position's page has them.
 
 import { legUnit } from "@/lib/fluid-base/position";
+import { FRONT_DOOR } from "@/lib/fluid-base/words";
 import type { FluidBasePositionsRead } from "@/lib/fluid-base/types";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { protocolForSession } from "@/lib/shared/protocols";
@@ -24,6 +25,7 @@ export const fluidBase: VisitModule = {
   },
   presence: FLUID_BASE_PRESENCE,
   path: (address) => `/api/at-block/fluid-base/positions?${new URLSearchParams({ owner: address.toLowerCase() })}`,
+  note: (answer) => ((answer as FluidBasePositionsRead).truncated ? FRONT_DOOR.truncatedOnWallet : null),
   shape(answer) {
     const r = answer as FluidBasePositionsRead;
     if (!r?.head || !Array.isArray(r.positions)) throw new Error("the Fluid Base read answered outside its shape");

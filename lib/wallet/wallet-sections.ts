@@ -46,6 +46,7 @@ import type { WalletPosition } from "@/lib/wallet/types";
 import { onEmptiedBranch, recordedCollateralLeg } from "@/lib/wallet/trove-shutdown";
 import { CHAINS } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
+import { HISTORY_NONE } from "@/lib/shared/history-tier";
 import { SP_DEPLOYMENTS, spPool, type SpDeploymentId } from "@/lib/liquity-v2/sp-deployment";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
@@ -180,9 +181,9 @@ export function unreadNote(unread: number, open: number, subtotal = false): stri
  *  states no total; in the wording of the wallet total's gap. */
 export const LIQUIDITY_NO_TOTAL = "No total: liquidity positions state no dollars.";
 
-/** A read at visit's line (decision 0073 point 3): on a card's stamp, and once as the Liquidity
+/** A read at visit's line (decision 0073 point 3), the history tag's "none" line: on a card's stamp, and once as the Liquidity
  *  section's line. */
-export const READ_AT_VISIT = "Read from the chain when you opened this page.";
+export const READ_AT_VISIT = HISTORY_NONE.line;
 
 /** A position's dollars in one field. A missing debt counts as none only on
  *  a deposit or a stake no head read contradicts: a head read states its debt, so one

@@ -21,7 +21,7 @@ const COMET_ABI = parseAbi([
 const BALANCE_ABI = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 /** Aave V3 on Optimism: the UiPoolDataProvider's reserves for the wallet, one call. A balance in
- *  any reserve is a position, the explorer's own test (lib/wallet/families/optimism.ts). */
+ *  any reserve is a position, as the explorer tests (lib/wallet/families/optimism.ts). */
 export const AAVE_V3_OPTIMISM_PRESENCE: Presence = {
   kind: "check",
   chainId: OPTIMISM_CHAIN_ID,
@@ -130,7 +130,7 @@ const SLIPSTREAM_NONE: Presence = {
 
 const BALANCER_NONE: Presence = {
   kind: "none",
-  why: "Balancer V3 pool shares are each pool's own token; no one call answers for every pool",
+  why: "Balancer V3 pool shares are a token per pool; no one call answers for every pool",
 };
 
 /** One entry per LIQUIDITY_SOURCES key (lib/wallet/liquidity/sources.ts). */

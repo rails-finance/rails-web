@@ -38,11 +38,14 @@ process.env.RAILS_API_URL = "http://box.test";
 
 // The backend: an empty summary and listing reads; every other route is recorded and refused.
 const urls = [];
+// The same requests with their query, where a route's chain is a parameter.
+const full = [];
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 globalThis.fetch = async (input) => {
   const url = new URL(typeof input === "string" ? input : input.url);
   urls.push(url.pathname);
+  full.push(url.pathname + url.search);
   if (/^\/api\/wallet\/[^/]+\/positions$/.test(url.pathname))
     return json({ address: "", rows: [], total: 0, open: 0, closed: 0, limit: 500, offset: 0 });
   if (url.pathname === "/api/liquity-v1/positions") return json({ rows: [], total: 0, limit: 100, offset: 0 });
@@ -56,7 +59,7 @@ const { readPresence, presenceReads, PRESENCE_MAX_CALLS, PRESENCE_MAX_REQUESTS }
   "../../lib/wallet/presence.ts"
 );
 const checks = await import("../../lib/wallet/presence-checks.ts");
-const { walletPresenceEntries, presenceDeps, readWalletUncached, WALLET_VISIT_FAMILIES } = await import(
+const { walletPresenceEntries, walletPresence, presenceDeps, readWalletUncached, WALLET_VISIT_FAMILIES } = await import(
   "../../lib/wallet/read-wallet.ts"
 );
 const { LIQUIDITY_SOURCES } = await import("../../lib/wallet/liquidity/sources.ts");
@@ -214,7 +217,7 @@ test("the Uniswap-family checks ask each chain's position managers, and PancakeS
     );
     assert.ok(calls.every((c) => c.functionName === "balanceOf" && c.args[0] === W));
   }
-  // A position staked in MasterChefV3 holds, with nothing in the owner's own NFTs.
+  // A position staked in MasterChefV3 holds, with no NFT in the owner's wallet.
   const farm = UNI_DEPLOYMENTS.find((d) => d.masterChef);
   const staked = await readPresence(
     [{ id: "farm", presence: checks.LIQUIDITY_PRESENCE[`${farm.protocol}:${farm.chainId}`] }],
@@ -259,6 +262,93 @@ test("a position read at visit is marked so its stamp says so (0073 point 3)", a
     const r = await readVisitFamilies([module], W, 2_000);
     assert.equal(r.positions.length, 1);
     assert.equal(r.positions[0].readAtVisit, true);
+  } finally {
+    globalThis.fetch = prior;
+  }
+});
+
+test("a liquidity source whose check finds nothing makes no read; one that holds reads its route", async () => {
+  // Base answers nothing; every other chain holds.
+  presenceDeps.multicall = async (chainId, contracts) =>
+    contracts.map((c) => ({
+      status: "success",
+      result: c.functionName === "balanceOf" && chainId !== 8453 ? BigInt(1) : nothing(c),
+    }));
+  const { readWalletLiquidity } = await import("../../lib/wallet/liquidity/read-liquidity.ts");
+  const owner = "0x00000000000000000000000000000000000000c4";
+  full.length = 0;
+  await readWalletLiquidity(owner, undefined, Date.now());
+  const routes = full.filter((u) => u.includes(owner));
+  // Uniswap V3 on Base: no read.
+  assert.ok(!routes.some((u) => u.startsWith("/api/at-block/uniswap/") && u.includes("chain=8453")), routes.join(" "));
+  // Uniswap on Ethereum holds and reads; Aerodrome has no check and reads as before.
+  assert.ok(
+    routes.some((u) => u.startsWith("/api/at-block/uniswap/") && !u.includes("chain=")),
+    routes.join(" "),
+  );
+  assert.ok(
+    routes.some((u) => u.startsWith("/api/at-block/aerodrome/")),
+    routes.join(" "),
+  );
+});
+
+test("a chain whose check failed is asked again alone; the other answers are kept", async () => {
+  const asked = [];
+  let down = true;
+  presenceDeps.multicall = async (chainId, contracts) => {
+    asked.push(chainId);
+    if (chainId === 5042 && down) throw new Error("no Arc RPC");
+    return contracts.map((c) => ({ status: "success", result: nothing(c) }));
+  };
+  const owner = "0x00000000000000000000000000000000000000d5";
+  const first = await walletPresence(owner);
+  assert.equal(first.get("uniswap:5042"), "failed");
+  const chains = asked.length;
+  assert.ok(chains > 1);
+  asked.length = 0;
+  down = false;
+  const second = await walletPresence(owner);
+  assert.deepEqual(asked, [5042]);
+  assert.equal(second.get("uniswap:5042"), "empty");
+  assert.equal(second.get("uniswap:8453"), "empty");
+  asked.length = 0;
+  await walletPresence(owner);
+  assert.deepEqual(asked, []);
+});
+
+test("a module's note reaches its family read; Fluid on Base names a read cut at 200", async () => {
+  const { readVisitFamilies } = await import("../../lib/wallet/families/visit.ts");
+  const { fluidBase } = await import("../../lib/wallet/families/fluid-base.ts");
+  assert.match(fluidBase.note({ truncated: true }), /newest 200/);
+  assert.equal(fluidBase.note({ truncated: false }), null);
+  const module = {
+    id: "test-note",
+    name: "Test",
+    chain: 10,
+    chainName: "Optimism",
+    family: "test",
+    on: true,
+    presence: { kind: "none", why: "test" },
+    path: () => "/api/at-block/test-note/wallet",
+    shape: () => [
+      {
+        chain: 10,
+        family: "test",
+        familyName: "Test",
+        positionId: "t1",
+        href: null,
+        status: "open",
+        card: { kind: "test" },
+        headRead: "read",
+      },
+    ],
+    note: () => "a line",
+  };
+  const prior = globalThis.fetch;
+  globalThis.fetch = async () => new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+  try {
+    const r = await readVisitFamilies([module], W, 2_000);
+    assert.deepEqual(r.families[0].note, { family: "test", line: "a line" });
   } finally {
     globalThis.fetch = prior;
   }

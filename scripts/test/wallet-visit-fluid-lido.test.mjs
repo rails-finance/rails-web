@@ -81,7 +81,7 @@ test("Fluid on Base: a holder's position is a vault on Base, its card the read w
   assert.equal(p.debtUsd, undefined);
 });
 
-test("Fluid on Base: two positions give two cards, each with its own position", () => {
+test("Fluid on Base: two positions give two cards, each holding one position", () => {
   const answer = fluidAnswer([fluidRow("9", "1", "0"), fluidRow("8", "5", "0")]);
   const out = fluidBase.shape(answer, W);
   assert.deepEqual(

@@ -202,18 +202,27 @@ const chainMulticall: PresenceMulticall = async (chainId, contracts) =>
 export const presenceDeps: { multicall: PresenceMulticall } = { multicall: chainMulticall };
 
 // Kept as the wallet read is, so the page's read and its liquidity read share one check.
-const presenceCache = new Map<string, { at: number; read: Promise<Map<string, PresenceAnswer>> }>();
+// `failed`: the entries whose check failed, set once the read settles.
+const presenceCache = new Map<
+  string,
+  { at: number; read: Promise<Map<string, PresenceAnswer>>; failed?: Set<string> }
+>();
 
-/** The wallet's presence answers, one read per address for WALLET_CACHE_MS. A read with an entry
- *  that failed is not kept. */
+/** The wallet's presence answers, one read per address for WALLET_CACHE_MS. An entry whose check
+ *  failed is asked again at the next call, alone, and its answer merged into the kept ones. */
 export function walletPresence(address: string): Promise<Map<string, PresenceAnswer>> {
   const key = address.toLowerCase();
   const hit = presenceCache.get(key);
-  if (hit && Date.now() - hit.at < WALLET_CACHE_MS) return hit.read;
-  const read = readPresence(walletPresenceEntries(), key, presenceDeps.multicall, PRESENCE_BUDGET_MS);
-  presenceCache.set(key, { at: Date.now(), read });
+  const fresh = hit != null && Date.now() - hit.at < WALLET_CACHE_MS;
+  if (fresh && !hit.failed?.size) return hit.read;
+  const entries = walletPresenceEntries();
+  const ask = fresh ? entries.filter((e) => hit.failed!.has(e.id)) : entries;
+  const asked = readPresence(ask, key, presenceDeps.multicall, PRESENCE_BUDGET_MS);
+  const read = fresh ? Promise.all([hit.read, asked]).then(([kept, again]) => new Map([...kept, ...again])) : asked;
+  const entry: { at: number; read: typeof read; failed?: Set<string> } = { at: fresh ? hit.at : Date.now(), read };
+  presenceCache.set(key, entry);
   void read.then((m) => {
-    if ([...m.values()].includes("failed")) presenceCache.delete(key);
+    entry.failed = new Set([...m].filter(([, a]) => a === "failed").map(([id]) => id));
   });
   if (presenceCache.size > 500) {
     for (const [k, v] of presenceCache) if (Date.now() - v.at >= WALLET_CACHE_MS) presenceCache.delete(k);

@@ -76,7 +76,7 @@ export async function readPresence(
     group.push({ id: e.id, check: e.presence, calls: e.presence.calls(o) });
     byChain.set(e.presence.chainId, group);
   }
-  // A timer of its own (AbortSignal.timeout's does not hold the process open), cleared at the end.
+  // A held timer (AbortSignal.timeout's does not hold the process open), cleared at the end.
   const budget = new AbortController();
   const timer = setTimeout(() => budget.abort(new Error("the presence check ran past its budget")), budgetMs);
   const signal = budget.signal;

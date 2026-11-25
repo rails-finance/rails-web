@@ -206,7 +206,17 @@ type Undrawn = NonNullable<WalletFamilyRead["undrawn"]> & { chain: ChainId };
 /** One protocol's section (W3): its name, the listing's band (N7) where it
  *  holds two positions or more, then its cards, open by risk, then closed
  *  newest first; under them, how many more the read did not draw. */
-function Section({ s, undrawn, status }: { s: WalletSection; undrawn: Undrawn[]; status?: WalletStatus }) {
+function Section({
+  s,
+  undrawn,
+  notes,
+  status,
+}: {
+  s: WalletSection;
+  undrawn: Undrawn[];
+  notes: string[];
+  status?: WalletStatus;
+}) {
   const atRiskCount = s.open.filter(atRisk).length;
   const id = `wallet-section-${s.slug}`;
   return (
@@ -248,6 +258,11 @@ function Section({ s, undrawn, status }: { s: WalletSection; undrawn: Undrawn[];
           )
         );
       })}
+      {notes.map((line) => (
+        <p key={line} className="mt-3 text-xs text-rb-500" data-wallet-section-note="">
+          {line}
+        </p>
+      ))}
     </section>
   );
 }
@@ -402,6 +417,8 @@ export function WalletView({
   const undrawn: Undrawn[] = read.families.flatMap((r) =>
     r.undrawn && (!focused || scope.chainOk(r.chain)) ? [{ ...r.undrawn, chain: r.chain }] : [],
   );
+  // The lines a module states under its section, on a chain in focus.
+  const notes = read.families.flatMap((r) => (r.note && (!focused || scope.chainOk(r.chain)) ? [r.note] : []));
   // Counted whenever rows are cut, as the line under the section says.
   const notDrawn = (k: "open" | "closed") => undrawn.reduce((n, u) => n + u[k], 0);
   const wallet = {
@@ -626,7 +643,13 @@ export function WalletView({
                   <Totals sections={sections} filtered={filtered} unanswered={blocking} />
                 )}
                 {sections.map((s) => (
-                  <Section key={s.slug} s={s} undrawn={undrawn.filter((u) => u.family === s.slug)} status={status} />
+                  <Section
+                    key={s.slug}
+                    s={s}
+                    undrawn={undrawn.filter((u) => u.family === s.slug)}
+                    notes={notes.filter((n) => n.family === s.slug).map((n) => n.line)}
+                    status={status}
+                  />
                 ))}
                 {/* What the filter bar leaves shown, with its noun: the bar
                     draws no count (ui-jobs 801; Miles, 22 Nov 2026). */}

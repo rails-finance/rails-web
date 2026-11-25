@@ -306,6 +306,9 @@ export interface WalletFamilyRead {
   /** Positions the family read and the page does not draw (a module's
    *  `drawLimit`): the protocol's slug and how many open and closed. */
   undrawn?: { family: string; open: number; closed: number };
+  /** A line the module states under the section (`VisitModule.note`): the protocol's slug and
+   *  the line. */
+  note?: { family: string; line: string };
 }
 
 /** The answer of /api/chain/wallet/<address>. */

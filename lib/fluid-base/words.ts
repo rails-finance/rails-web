@@ -19,6 +19,8 @@ export const FRONT_DOOR = {
   heading: "Fluid positions",
   none: "This address holds no Fluid vault position with collateral or debt in it.",
   truncated: "This wallet holds more than 200 positions; Rails read the newest 200.",
+  /** The wallet page's line under its Fluid section, which can hold Ethereum's too. */
+  truncatedOnWallet: "This wallet holds more than 200 Fluid positions on Base; Rails read the newest 200.",
   unanswered: "The read of this wallet's positions did not answer. Try again in a minute.",
   row: (p: FluidBasePositionsRead["positions"][number]) =>
     `#${p.id} · ${p.supplyLeg.kind === "shares" ? `${p.supplyLeg.token.symbol}·${p.supplyLeg.token1?.symbol} shares` : p.supplyLeg.token.symbol} / ${p.borrowLeg.kind === "shares" ? `${p.borrowLeg.token.symbol}·${p.borrowLeg.token1?.symbol} shares` : p.borrowLeg.token.symbol}`,

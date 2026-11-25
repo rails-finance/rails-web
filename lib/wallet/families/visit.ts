@@ -37,6 +37,9 @@ export interface VisitModule {
   /** One position per position the answer holds; none where it holds nothing.
    *  Throws on an answer outside the route's shape. */
   shape(answer: unknown, address: string): WalletPosition[];
+  /** A line the explorer states about the answer, drawn under the section: the Fluid read's
+   *  "Rails read the newest 200". Null where it has none. */
+  note?(answer: unknown): string | null;
 }
 
 /** What a failed read names: "Aave V3 on Optimism". */
@@ -85,7 +88,7 @@ export async function readVisitFamilies(
       const t0 = Date.now();
       try {
         const answer = await inChain(() => readOne(m, address, budgetMs, readerIp));
-        return { m, ms: Date.now() - t0, positions: m.shape(answer, address) };
+        return { m, ms: Date.now() - t0, positions: m.shape(answer, address), note: m.note?.(answer) ?? null };
       } catch (err) {
         throw { m, ms: Date.now() - t0, error: publicErrorMessage(err) };
       }
@@ -94,7 +97,7 @@ export async function readVisitFamilies(
   const out: VisitRead = { positions: [], families: [], failed: [] };
   for (const s of settled) {
     if (s.status === "fulfilled") {
-      const { m, ms, positions } = s.value;
+      const { m, ms, positions, note } = s.value;
       if (positions.length === 0) continue;
       out.positions.push(...positions.map((p) => ({ ...p, readAtVisit: true as const })));
       out.families.push({
@@ -106,6 +109,7 @@ export async function readVisitFamilies(
         headRead: "read",
         ms,
         reads: 1,
+        ...(note ? { note: { family: m.family, line: note } } : {}),
       });
     } else {
       const { m, ms, error } = s.reason as { m: VisitModule; ms: number; error: string };
