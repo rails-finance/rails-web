@@ -1,0 +1,41 @@
+// The CoW wallet page's `?at=` landing: the trade a link opens the page at.
+// Two forms. A trade's own id (`<block>-<txIndex>-<logIndex>`, its row's
+// `event-<id>`), or `<block>-<orderUid>` for a link that knows the order and
+// its block but not the Trade log's place in the block (an Aave swap's record
+// holds the order UID). The trades route's `before` cursor is exclusive, so
+// the read starts just past the target: the trade itself is the page's first
+// row, or for the order form among the block's trades at its top.
+
+const TRADE_ID = /^(\d+)-(\d+)-(\d+)$/;
+const ORDER = /^(\d+)-(0x[0-9a-f]{112})$/;
+
+export interface CowLanding {
+  /** The read's `before`: the first page holds the target. */
+  cursor: string;
+  /** The target's trade id, or its block and order UID. */
+  match: { id: string } | { block: number; orderUid: string };
+}
+
+export function parseCowLanding(at: string | undefined | null): CowLanding | null {
+  if (!at) return null;
+  const v = at.trim().toLowerCase();
+  const t = TRADE_ID.exec(v);
+  if (t) return { cursor: `${t[1]}-${t[2]}-${Number(t[3]) + 1}`, match: { id: v } };
+  const o = ORDER.exec(v);
+  if (o) return { cursor: `${Number(o[1]) + 1}-0-0`, match: { block: Number(o[1]), orderUid: o[2] } };
+  return null;
+}
+
+/** Whether a trade is the landing's target. */
+export function isCowLandingTrade(
+  landing: CowLanding,
+  t: { id: string; blockNumber: number; orderUid: string },
+): boolean {
+  const m = landing.match;
+  return "id" in m ? t.id === m.id : t.blockNumber === m.block && t.orderUid.toLowerCase() === m.orderUid;
+}
+
+/** The CoW wallet page opened at one order's trade in a block. */
+export function cowTradeHref(wallet: string, block: number, orderUid: string): string {
+  return `/ethereum/cow/${wallet.toLowerCase()}?at=${block}-${orderUid.toLowerCase()}`;
+}

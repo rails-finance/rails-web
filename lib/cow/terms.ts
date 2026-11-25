@@ -25,3 +25,9 @@ export const cowFeeSentence = (amount: string) => `The trade's fee amount was ${
 
 /** The count's one line on fills (C3), where the account explanation states the count. */
 export const COW_FILLS_SENTENCE = "An order filled in parts makes one trade per part.";
+
+/** The wallet page opened at one trade (`?at=`, lib/cow/landing.ts): the list starts there. */
+export const COW_LANDING_WORDS = {
+  /** Reads the first page again, the newest trade at the top. */
+  newest: "Show the newest trades",
+} as const;

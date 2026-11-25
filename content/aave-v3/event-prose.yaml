@@ -369,6 +369,16 @@ words:
     transferred out
   t1_leg_received: |-
     transferred in
+  # The Trade's other side on a withdraw and swap's or a supply from a swap's
+  # spine: the token bought, the token sold.
+  t1_leg_bought: |-
+    bought
+  t1_leg_sold: |-
+    sold
+  # The "via CoW" chip's link where the wallet owns the order: it opens the
+  # trade on the wallet's CoW page.
+  t1_cow_trade_link: |-
+    Opens this trade on the wallet's CoW page
   t1_treasury: |-
     Aave treasury
 
