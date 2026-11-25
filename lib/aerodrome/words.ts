@@ -247,7 +247,6 @@ export function readoutTable(p: AeroPosition): PoolTable {
   const Q = p.quote.symbol;
   const R = p.site.reward.symbol;
   const closed = BigInt(p.liquidity) === BigInt(0);
-  const minted = p.window.kind === "minted";
   const why = windowNote(p);
   const a = p.aero;
 
@@ -346,7 +345,11 @@ export function readoutTable(p: AeroPosition): PoolTable {
       // Said once: the fees row carries the same reason where it has it.
       p.holdsThen === null && p.priceThen !== null && why !== WINDOW_NOTE.minted ? WINDOW_NOTE.minted : undefined,
     ),
-    ...daysRow(closed ? null : p.daysInRange, minted ? "minted" : null),
+    // The start as a date, as Uniswap's row states it (ui-jobs 835): the first daily read that has the NFT.
+    ...daysRow(
+      closed ? null : p.daysInRange,
+      p.window.kind === "minted" && p.window.firstSeen !== null ? day(p.window.firstSeen) : null,
+    ),
     earned,
     ...against,
     ...open,
