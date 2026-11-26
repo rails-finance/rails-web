@@ -18,7 +18,7 @@ import Link from "next/link";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { Suspense, use, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
+import { TipLabel } from "@/components/shared/tip-label";
 import { WalletHeader } from "@/components/wallet/wallet-header";
 import { WalletPositionsMenu } from "@/components/shared/wallet-positions-menu";
 import { WalletFilterBar } from "@/components/wallet/wallet-filter-bar";
@@ -53,7 +53,6 @@ import { ARBITRUM_CHAIN_ID, chainMeta, type ChainId } from "@/lib/shared/chains"
 import { walletCountProv, walletTradeAtProv } from "@/lib/cow/trade";
 import type { CowWalletEntry } from "@/lib/cow/types";
 import type { WalletFamilyRead, WalletRead } from "@/lib/wallet/types";
-import { WALLET_COUNTS_SCOPE } from "@/lib/wallet/summary-counts";
 import {
   closestToLiquidation,
   countsDollars,
@@ -411,9 +410,6 @@ export function WalletView({
     );
   const all = narrow(kinds, status);
   const chosen = walletProtocol(read.protocol);
-  // The heading counts the wallet's positions whatever the pills hold.
-  // A testnet's positions are not counted (WALLET_COUNTS_SCOPE).
-  const counted = scoped.rows.filter((p) => !onTestnet(p));
   // The positions the read counted and did not draw.
   // Under Focus, only those on a chain in focus, as the drawn rows.
   const undrawn: Undrawn[] = read.families.flatMap((r) =>
@@ -421,13 +417,6 @@ export function WalletView({
   );
   // The lines a module states under its section, on a chain in focus.
   const notes = read.families.flatMap((r) => (r.note && (!focused || scope.chainOk(r.chain)) ? [r.note] : []));
-  // Counted whenever rows are cut, as the line under the section says.
-  const notDrawn = (k: "open" | "closed") => undrawn.reduce((n, u) => n + u[k], 0);
-  const wallet = {
-    open: counted.filter((p) => p.status === "open").length + notDrawn("open"),
-    moved: counted.filter((p) => p.status === "moved").length,
-    closed: counted.filter((p) => p.status !== "open" && p.status !== "moved").length + notDrawn("closed"),
-  };
   // The bands state a protocol's whole holding: drawn while no pill narrows it.
   // The listing reads that did not answer (read-wallet.ts, readListingRows).
   const unanswered = read.families.flatMap((r) => (r.unanswered ? [r.unanswered] : []));
@@ -551,12 +540,11 @@ export function WalletView({
               ) : focused ? (
                 <ScopeNote scoped={scoped} noun={["position", "positions"]} />
               ) : (
+                // The dashboard's line is the positions menu, the trail's
+                // first crumb, as the current page (ui-jobs 856).
                 read.total > 0 && (
-                  <div className="text-xs text-rb-500" data-wallet-count={read.total}>
-                    <HeadingTip
-                      text={`${plural(read.total, "position")} · ${wallet.open} open · ${wallet.closed} closed${wallet.moved > 0 ? ` · ${wallet.moved} moved` : ""}`}
-                      tip={WALLET_COUNTS_SCOPE}
-                    />
+                  <div className="flex" data-wallet-count={read.total}>
+                    <WalletPositionsMenu wallet={address} page="wallet" search="" onDashboard />
                   </div>
                 )
               )}

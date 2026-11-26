@@ -31,7 +31,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Activity, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import type { CardMenuRender, TrailMark, TrailStatus } from "@/components/shared/position-card-strip";
 import { Prov } from "@/components/shared/provenance";
@@ -97,13 +97,18 @@ type Crumb = ReturnType<typeof walletTrailCrumb<WalletCountsPosition>>;
 const ROW = "mx-1 my-0.5 flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-left";
 const ROW_LINK = `${ROW} transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]`;
 const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />;
-/** The pulse's colour for each pill tone: the pill's text colour. */
-const PULSE_TONE: Record<TrailStatus["tone"], string> = {
-  open: "text-positive",
-  muted: "text-rb-500",
-  danger: "text-red-500",
-  caution: "text-tone-caution",
+/** The status dot's colour for each pill tone (Miles, 26 Nov 2026). */
+const DOT_TONE: Record<TrailStatus["tone"], string> = {
+  open: "bg-positive",
+  muted: "bg-rb-500",
+  danger: "bg-red-500",
+  caution: "bg-caution-500",
 };
+
+/** The lifecycle as a 7px filled dot, centred on the text. */
+function StatusDot({ tone }: { tone: TrailStatus["tone"] }) {
+  return <span className={`block size-[7px] shrink-0 rounded-full ${DOT_TONE[tone]}`} aria-hidden="true" />;
+}
 const SLASH = (
   <span className="shrink-0 px-1.5 text-rb-500" aria-hidden="true">
     /
@@ -135,6 +140,7 @@ export function WalletPositionsMenu({
   status,
   mark,
   cardMenu,
+  onDashboard = false,
   onCrumb,
 }: {
   wallet: string;
@@ -145,12 +151,14 @@ export function WalletPositionsMenu({
   search?: string;
   /** The position crumb's words, on a position page whose card has named it. */
   position?: string | null;
-  /** The card's lifecycle, the pulse before the position crumb. */
+  /** The card's lifecycle, the dot before the position crumb. */
   status?: TrailStatus | null;
   /** The card's protocol and chain, drawn before the protocol on a phone. */
   mark?: TrailMark | null;
   /** The card's ⋮ menu, which the position crumb opens. */
   cardMenu?: CardMenuRender | null;
+  /** The page is the wallet dashboard: the menu is the current crumb. */
+  onDashboard?: boolean;
   /** Told once the read settles whether the trail has a protocol crumb. */
   onCrumb?: (found: boolean) => void;
 }) {
@@ -293,16 +301,29 @@ export function WalletPositionsMenu({
         );
       })}
       {DIVIDER}
-      <Link
-        href={dashboard}
-        prefetch={false}
-        role="menuitem"
-        className={`${ROW_LINK} text-sm text-[var(--text-link)]`}
-        onClick={close}
-        data-wallet-positions-dashboard=""
-      >
-        Wallet dashboard
-      </Link>
+      {onDashboard ? (
+        <div
+          role="menuitem"
+          aria-disabled="true"
+          aria-current="page"
+          tabIndex={-1}
+          className={`${ROW} text-sm text-foreground`}
+          data-wallet-positions-dashboard=""
+        >
+          Wallet dashboard
+        </div>
+      ) : (
+        <Link
+          href={dashboard}
+          prefetch={false}
+          role="menuitem"
+          className={`${ROW_LINK} text-sm text-[var(--text-link)]`}
+          onClick={close}
+          data-wallet-positions-dashboard=""
+        >
+          Wallet dashboard
+        </Link>
+      )}
       <div className="px-4 pb-1.5 pt-1 text-xs text-rb-500" data-wallet-positions-testnets="">
         {MENU_TESTNETS}
       </div>
@@ -323,10 +344,12 @@ export function WalletPositionsMenu({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-current={onDashboard ? "page" : undefined}
         // A 20px row with a 36px press area (after:), neutral as the address
-        // menu's trigger is.
+        // menu's trigger is. On the dashboard it is the current page, in the
+        // foreground as the other current crumbs.
         className={`relative -mx-1 flex h-5 cursor-pointer items-center gap-0.5 rounded-md px-1 text-xs transition-colors focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-[''] ${
-          open ? "text-foreground" : "text-rb-500 hover:text-foreground"
+          open || onDashboard ? "text-foreground" : "text-rb-500 hover:text-foreground"
         }`}
         data-wallet-positions-trigger=""
       >
@@ -385,7 +408,7 @@ export function WalletPositionsMenu({
       <span className="whitespace-nowrap">{crumb.row.name}</span>
     </>
   );
-  // The pulse's words: the pill's, with its read-more where it has one.
+  // The dot's words: the pill's, with its read-more where it has one.
   const statusTip = status && (status.tip ? `${status.word}. ${status.tip}` : status.word);
   return (
     <nav
@@ -436,11 +459,11 @@ export function WalletPositionsMenu({
                   <>
                     {status && (
                       <span
-                        className={`flex shrink-0 ${PULSE_TONE[status.tone]}`}
+                        className="flex size-3.5 shrink-0 items-center justify-center"
                         title={status.word}
                         data-wallet-trail-status={status.tone}
                       >
-                        <Activity className="size-3.5" aria-hidden="true" />
+                        <StatusDot tone={status.tone} />
                       </span>
                     )}
                     <span className="min-w-0 truncate">{named}</span>
@@ -458,7 +481,9 @@ export function WalletPositionsMenu({
                       className="mx-1 my-0.5 flex items-start gap-2 px-3 py-1.5"
                       data-trail-status-row=""
                     >
-                      <Activity className={`mt-0.5 size-4 shrink-0 ${PULSE_TONE[status.tone]}`} aria-hidden="true" />
+                      <span className="flex h-5 w-4 shrink-0 items-center justify-center">
+                        <StatusDot tone={status.tone} />
+                      </span>
                       <div className="min-w-0">
                         <div className="text-sm text-foreground">
                           {status.prov ? <Prov info={status.prov}>{status.word}</Prov> : status.word}
@@ -479,8 +504,8 @@ export function WalletPositionsMenu({
                     focusable
                     className="flex shrink-0 rounded-sm focus-ring"
                   >
-                    <span className={`flex ${PULSE_TONE[status.tone]}`} data-wallet-trail-status={status.tone}>
-                      <Activity className="size-3.5 shrink-0" aria-hidden="true" />
+                    <span className="flex size-3.5 items-center justify-center" data-wallet-trail-status={status.tone}>
+                      <StatusDot tone={status.tone} />
                     </span>
                   </RevealTip>
                 )}

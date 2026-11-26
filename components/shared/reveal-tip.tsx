@@ -71,10 +71,17 @@ export function RevealTip({
   // edge is the document's width: on a phone an unshifted bubble widens the
   // layout viewport, and `innerWidth` then reports the widened one.
   const [shift, setShift] = useState(0);
+  // Opens under the value where above it would run past the viewport's top
+  // (a tip in the page's first row).
+  const [below, setBelow] = useState(false);
   useLayoutEffect(() => {
-    if (!open) return setShift(0);
+    if (!open) {
+      setBelow(false);
+      return setShift(0);
+    }
     const b = bubbleRef.current;
     if (!b) return;
+    if (b.getBoundingClientRect().top < 8) setBelow(true);
     if (align === "end") {
       // Opening leftward: shift right by however far it would run past the left edge.
       const under = 8 - b.getBoundingClientRect().left;
@@ -177,7 +184,7 @@ export function RevealTip({
           ref={bubbleRef}
           role="tooltip"
           data-prov-hidden=""
-          className={`${interactive ? "pointer-events-auto" : "pointer-events-none"} absolute bottom-full ${align === "end" ? "right-0" : "left-0"} z-[var(--z-dropdown)] mb-2.5 ${wrap ? "w-max max-w-[min(20rem,calc(100vw-1.5rem))] whitespace-normal break-words" : "whitespace-nowrap"} rounded-2xl border p-3 text-xs font-medium tabular-nums text-foreground shadow-lg`}
+          className={`${interactive ? "pointer-events-auto" : "pointer-events-none"} absolute ${below ? "top-full mt-2.5" : "bottom-full mb-2.5"} ${align === "end" ? "right-0" : "left-0"} z-[var(--z-dropdown)] ${wrap ? "w-max max-w-[min(20rem,calc(100vw-1.5rem))] whitespace-normal break-words" : "whitespace-nowrap"} rounded-2xl border p-3 text-xs font-medium tabular-nums text-foreground shadow-lg`}
           style={{
             background: "var(--rb-tooltip-bg)",
             borderColor: "var(--rb-tooltip-border)",
@@ -187,7 +194,7 @@ export function RevealTip({
           {tip}
           <span
             aria-hidden="true"
-            className="absolute top-full -mt-[5px] size-2.5 rotate-45 border-b border-r"
+            className={`absolute size-2.5 rotate-45 ${below ? "bottom-full -mb-[5px] border-l border-t" : "top-full -mt-[5px] border-b border-r"}`}
             style={{
               ...(align === "end" ? { right: 12 - shift } : { left: 12 + shift }),
               background: "var(--rb-tooltip-bg)",
