@@ -146,9 +146,10 @@ export interface TroveCloseCheck extends TroveCloseInput {
 /** The close check for one Trove on a settled branch. A Trove with no debt (a
  *  fully redeemed dormant Trove) gets an answer: its close removes collateral
  *  only, so below the CCR it never passes. Null where the Trove's figures are
- *  missing, where the close would leave the branch with no debt (the last
- *  Trove, which TroveManager refuses to close on its own rule), and where the
- *  price is lastGoodPrice: closeTrove calls fetchPrice, and a fetchPrice that
+ *  missing; where the close would leave the branch with no debt, which stands
+ *  in for the last-Trove case, since TroveManager refuses to close a branch's
+ *  only Trove (OnlyOneTroveLeft), so the card gives no answer there; and where
+ *  the price is lastGoodPrice: closeTrove calls fetchPrice, and a fetchPrice that
  *  failed in simulation may shut the branch down instead. */
 export function troveCloseCheck(
   s: LiquityV2BranchCcr,
