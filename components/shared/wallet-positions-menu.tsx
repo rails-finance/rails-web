@@ -614,7 +614,7 @@ export function WalletPositionsMenu({
                     >
                       <span
                         className="flex size-3.5 items-center justify-center"
-                        title={statusTip}
+                        data-status-word={statusTip}
                         data-wallet-trail-status={status.tone}
                       >
                         <StatusDot tone={status.tone} />

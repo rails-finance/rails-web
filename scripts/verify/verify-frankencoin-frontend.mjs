@@ -206,7 +206,7 @@ const noDollar = (name, text) => {
       ...document.querySelectorAll(
         "[data-wallet-trail-position] [data-wallet-trail-status], [data-position-card-shell] [data-card-status-dot]",
       ),
-    ].map((e) => e.getAttribute("title") ?? ""),
+    ].map((e) => e.getAttribute("title") ?? e.getAttribute("data-status-word") ?? ""),
   );
   check(
     "detail status pill is the neutral mode word (Minting)",

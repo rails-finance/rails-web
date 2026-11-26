@@ -107,7 +107,7 @@ const badge = (page) =>
       ...document.querySelectorAll(
         "[data-wallet-trail-position] [data-wallet-trail-status], [data-position-card-shell] [data-card-status-dot]",
       ),
-    ].map((e) => e.getAttribute("title") ?? ""),
+    ].map((e) => e.getAttribute("title") ?? e.getAttribute("data-status-word") ?? ""),
   );
 
 /** The page's own words, whitespace-flattened, in one of two states.
