@@ -33,6 +33,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
+import { StatusDot } from "@/components/shared/status-dot";
 import type { CardMenuRender, TrailMark, TrailStatus } from "@/components/shared/position-card-strip";
 import { Prov } from "@/components/shared/provenance";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
@@ -125,18 +126,6 @@ function Tick() {
 }
 
 const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />;
-/** The status dot's colour for each pill tone (Miles, 26 Nov 2026). */
-const DOT_TONE: Record<TrailStatus["tone"], string> = {
-  open: "bg-positive",
-  muted: "bg-rb-500",
-  danger: "bg-red-500",
-  caution: "bg-caution-500",
-};
-
-/** The lifecycle as a 7px filled dot, centred on the text. */
-function StatusDot({ tone }: { tone: TrailStatus["tone"] }) {
-  return <span className={`block size-[7px] shrink-0 rounded-full ${DOT_TONE[tone]}`} aria-hidden="true" />;
-}
 const SLASH = (
   <span className="shrink-0 px-1.5 text-rb-500" aria-hidden="true">
     /

@@ -90,10 +90,10 @@ import {
 import { PositionCardMeta, type PositionCardMetaProps } from "@/components/shared/position-card-meta";
 import { RowHelp } from "@/components/shared/row-help";
 import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
+import { StatusDot, type DotTone } from "@/components/shared/status-dot";
 import { StatDash, StatValue } from "@/components/shared/stat-value";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { ExportMenu, type ExportMenuProps } from "@/components/shared/export-menu";
-import { POSITION_TAG_TONE } from "@/lib/shared/ui-grammar";
 import { SavePositionRow, useSavedEndedRefresh, useSavedNameRefresh } from "@/components/shared/saved-items";
 import type { PositionName } from "@/lib/shared/position-name";
 import type { SavedLink } from "@/lib/shared/sessions";
@@ -539,38 +539,29 @@ function DetailPill({ status }: { status: PositionCardStatus | null }) {
   );
 }
 
-const OPEN_PILL = "bg-positive/20 text-positive";
-
-/** The lifecycle pill on both surfaces: OPEN for a live position, else the
- *  status word in capitals. On the wallet view an open position draws none,
- *  AT RISK excepted (`PositionCardEdge`), and an open position the wallet
- *  stamps "Not read" (`edge.unread`) draws none, AT RISK included. */
+/** The lifecycle on both surfaces as a status dot (ui-jobs 856, in place of
+ *  the OPEN/CLOSED pill): green for a live position, else the status word's
+ *  tone; the word is its tip and accessible name, with its receipt where it
+ *  has one. On the wallet view an open position draws none, AT RISK excepted
+ *  (`PositionCardEdge`), and an open position the wallet stamps "Not read"
+ *  (`edge.unread`) draws none, AT RISK included. */
 function StatusPill({ status }: { status: PositionCardStatus | null }) {
   const edge = useContext(PositionCardEdgeContext);
   // An unread open position carries one mark, the wallet's "Not read" stamp.
   if (edge?.unread) return null;
-  if (!status && edge?.atRisk)
-    return (
-      <span
-        className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${POSITION_TAG_TONE.caution}`}
-        data-anatomy="C6"
-      >
-        AT RISK
-      </span>
-    );
-  if (!status && edge?.surface === "wallet") return null;
+  if (!status && edge?.surface === "wallet" && !edge?.atRisk) return null;
+  const word = status ? status.word : edge?.atRisk ? "At risk" : "Open";
+  const tone: DotTone = status ? status.tone : edge?.atRisk ? "caution" : "open";
+  const words = <span className="sr-only">{word}</span>;
   return (
     <span
-      className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${status ? POSITION_TAG_TONE[status.tone] : OPEN_PILL}`}
+      className="inline-flex h-4 items-center"
+      title={word}
       data-anatomy={status?.anatomy ? `C6 ${status.anatomy}` : "C6"}
+      data-card-status-dot={tone}
     >
-      {status?.prov ? (
-        <Prov info={status.prov}>{status.word.toUpperCase()}</Prov>
-      ) : status ? (
-        status.word.toUpperCase()
-      ) : (
-        "OPEN"
-      )}
+      <StatusDot tone={tone} />
+      {status?.prov ? <Prov info={status.prov}>{words}</Prov> : words}
     </span>
   );
 }
@@ -772,11 +763,17 @@ function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolea
   );
 }
 
+/** A closed position's figures, muted to the Closed outcome's grey with
+ *  their asset clusters (ui-jobs 856). */
+const MUTED_FIGURES =
+  "contents [&_*]:!text-rb-500 [&_img]:opacity-60 [&_img]:grayscale [&_svg]:opacity-60 [&_svg]:grayscale";
+
 function ClosedGrid({
   heads,
   outcome,
   tone,
   detail,
+  muted = false,
 }: {
   heads: PositionCardHead[];
   outcome: PositionCardOutcome;
@@ -784,6 +781,8 @@ function ClosedGrid({
   /** The Outcome's "?" draws on a detail card only: a listing card sits
    *  inside its row's link. */
   detail: boolean;
+  /** Mute the figures: a listing card, or a detail card that draws its pill. */
+  muted?: boolean;
 }) {
   const peaks = heads.slice(0, 2);
   const { toggleOf, panel } = useHeadPanels(peaks, detail);
@@ -800,7 +799,13 @@ function ClosedGrid({
             headerIcon={h.labelIcon}
             explain={detail}
           >
-            <HeadBody head={h} toggle={toggleOf(h)} />
+            {muted ? (
+              <div className={MUTED_FIGURES} data-card-figures-muted="">
+                <HeadBody head={h} toggle={toggleOf(h)} />
+              </div>
+            ) : (
+              <HeadBody head={h} toggle={toggleOf(h)} />
+            )}
           </PositionCardRow>
         ))}
         {peaks.length < 2 && <div className="hidden sm:block" />}
@@ -1164,6 +1169,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             outcome={slots.outcome}
             tone={slots.status?.tone ?? "muted"}
             detail={detail}
+            muted={!detail || !trailNamed}
           />
         ) : (
           <div data-nosnippet="">
