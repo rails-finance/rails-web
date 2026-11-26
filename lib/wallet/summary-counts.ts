@@ -18,6 +18,9 @@ export interface WalletCountsPosition {
   status: "open" | "closed" | "liquidated" | "redeemed" | "moved";
   /** Null on a position with no page. */
   href: string | null;
+  /** The market or branch the position sits in, as the wallet view names it
+   *  ("Core", "WETH"); the positions menu's crumb names read it. */
+  market?: string;
 }
 
 export interface WalletCountsFamily {

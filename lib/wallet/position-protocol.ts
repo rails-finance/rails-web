@@ -3,7 +3,8 @@
 // from its chain and family, as lib/wallet/wallet-summary.ts does.
 
 import { CHAINS } from "@/lib/shared/chains";
-import { PROTOCOLS, listingHrefForWallet, protocolForPathname } from "@/lib/shared/protocols";
+import { POSITION_NOUN, PROTOCOLS, listingHrefForWallet, protocolForPathname } from "@/lib/shared/protocols";
+import { positionCrumb, positionName } from "@/lib/shared/position-name";
 import {
   VAULT_SHARES_FAMILY,
   vaultProtocolOfHref,
@@ -47,4 +48,20 @@ export function menuProtocolOf(p: WalletCountsPosition, address: string): MenuPr
         ? walletProtocolHref(address, p.family)
         : listingHrefForWallet(entry.session, address),
   };
+}
+
+/** A summary row's name in the positions menu (H13.2; ui-jobs 856): the
+ *  trail's crumb (`positionCrumb`) from the row's market, the family's noun
+ *  and the id its `positionId` holds besides the market. An id that holds
+ *  the wallet ("0x…:core", "0x…-1", "<vault>-0x…") is the wallet's. */
+export function summaryCrumb(p: WalletCountsPosition, wallet: string): string {
+  const w = wallet.toLowerCase();
+  const entry = protocolEntryOf(p);
+  const noun = entry ? POSITION_NOUN[entry.session] : "Position";
+  const market = p.market?.toLowerCase();
+  const parts = p.positionId.split(":").filter((x) => x.toLowerCase() !== market);
+  const raw = parts.find((x) => x.toLowerCase().includes(w)) ?? parts[parts.length - 1] ?? p.positionId;
+  const id = raw.toLowerCase().includes(w) ? w : raw;
+  const chain = Object.values(CHAINS).find((c) => c.slug === p.chain)?.name;
+  return positionCrumb(positionName({ market: p.market, noun, id }), w, chain);
 }

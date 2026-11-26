@@ -31,7 +31,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import type { CardMenuRender, TrailMark, TrailStatus } from "@/components/shared/position-card-strip";
 import { Prov } from "@/components/shared/provenance";
@@ -50,7 +50,7 @@ import {
   chainMeta,
   type ChainId,
 } from "@/lib/shared/chains";
-import { menuProtocolOf, protocolEntryOf, protocolLabelOf } from "@/lib/wallet/position-protocol";
+import { menuProtocolOf, protocolEntryOf, protocolLabelOf, summaryCrumb } from "@/lib/wallet/position-protocol";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import {
   MENU_TESTNETS,
@@ -96,6 +96,34 @@ type Crumb = ReturnType<typeof walletTrailCrumb<WalletCountsPosition>>;
 
 const ROW = "mx-1 my-0.5 flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-left";
 const ROW_LINK = `${ROW} transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]`;
+// A position row under its protocol's, indented past the protocol's icons.
+const SUB_ROW = "mx-1 flex min-h-8 items-center gap-2 rounded-lg py-1 pl-[3.25rem] pr-3 text-left text-[13px]";
+const SUB_ROW_LINK = `${SUB_ROW} transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]`;
+/** The positions a protocol row lists before "N more". */
+const POSITIONS_SHOWN = 5;
+/** A summary row's status as the trail's dot reads it. */
+const SUMMARY_TONE: Record<WalletCountsPosition["status"], TrailStatus["tone"]> = {
+  open: "open",
+  closed: "muted",
+  liquidated: "danger",
+  redeemed: "muted",
+  moved: "muted",
+};
+const STATUS_WORD: Record<WalletCountsPosition["status"], string> = {
+  open: "Open",
+  closed: "Closed",
+  liquidated: "Liquidated",
+  redeemed: "Redeemed",
+  moved: "Moved",
+};
+
+const positionKey = (p: WalletCountsPosition) => `${p.chain}:${p.family}:${p.positionId}`;
+
+/** The selected row's tick. */
+function Tick() {
+  return <Check className="ml-auto size-3.5 shrink-0 text-foreground" aria-hidden="true" />;
+}
+
 const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />;
 /** The status dot's colour for each pill tone (Miles, 26 Nov 2026). */
 const DOT_TONE: Record<TrailStatus["tone"], string> = {
@@ -166,6 +194,8 @@ export function WalletPositionsMenu({
   const address = wallet.toLowerCase();
   const [menu, setMenu] = useState<Menu | null>(null);
   const [crumb, setCrumb] = useState<Crumb>(null);
+  // The positions whose page this is, ticked in the menu.
+  const [pageKeys, setPageKeys] = useState<Set<string>>(() => new Set());
   const crumbRef = useRef(onCrumb);
   crumbRef.current = onCrumb;
   // The summary read has answered (or failed): the placeholder goes.
@@ -202,6 +232,7 @@ export function WalletPositionsMenu({
       }
       const search = givenSearch ?? window.location.search;
       const isPage = (p: WalletCountsPosition) => rowIsPage(p.href, pathname, search);
+      setPageKeys(new Set(c.positions.filter(isPage).map(positionKey)));
       const protocolOf = (p: WalletCountsPosition) => menuProtocolOf(p, address);
       const dashboard = `/wallet/${address}`;
       setMenu(walletProtocolMenu(c.positions, isPage, protocolOf, dashboard));
@@ -257,47 +288,107 @@ export function WalletPositionsMenu({
     );
   const dashboard = `/wallet/${address}`;
   // On a wallet page the crumb's row is the page.
+  const isPageRow = (p: WalletCountsPosition) => pageKeys.has(positionKey(p));
   const here = (key: string) => page === "wallet" && crumb?.current === true && crumb.keys.includes(key);
 
   const rows = menu && (
     <>
       {menu.rows.map((r) => {
         const hook = { "data-wallet-protocol-row": r.key, "data-family": r.first.family };
-        const mark = here(r.key) ? "this page" : r.page ? (page === "wallet" ? "this page" : "this protocol") : null;
+        // The protocol row is the page on its narrowed view, ticked there:
+        // no position is selected (ui-jobs 856).
+        const rowHere = here(r.key);
         const body = (
           <>
             <ProtocolIcons p={r.first} />
             <span className="min-w-0 truncate">{r.name}</span>
-            <span className="ml-auto flex shrink-0 items-baseline gap-2 pl-3 text-xs text-rb-500 tabular-nums">
-              {mark && <span data-wallet-protocol-page="">{mark} ·</span>}
-              <span data-wallet-protocol-counts="">{r.counts}</span>
-            </span>
+            {rowHere && <Tick />}
           </>
         );
-        return r.current || here(r.key) ? (
-          <div
-            key={r.key}
-            role="menuitem"
-            aria-disabled="true"
-            aria-current="page"
-            tabIndex={-1}
-            className={`${ROW} text-sm text-foreground`}
-            {...hook}
-          >
-            {body}
+        // Its positions under it, five at most, the page's among them; past
+        // five, "N more" opens the protocol's narrowed view.
+        const pageOnes = r.positions.filter(isPageRow);
+        const shown = [...pageOnes, ...r.positions.filter((p) => !isPageRow(p))]
+          .slice(0, POSITIONS_SHOWN)
+          .sort((a, b) => r.positions.indexOf(a) - r.positions.indexOf(b));
+        const more = r.positions.length - shown.length;
+        return (
+          <div key={r.key} role="none">
+            {rowHere ? (
+              <div
+                role="menuitem"
+                aria-disabled="true"
+                aria-current="page"
+                tabIndex={-1}
+                className={`${ROW} text-sm text-foreground`}
+                {...hook}
+              >
+                {body}
+              </div>
+            ) : (
+              <Link
+                href={r.listing}
+                prefetch={false}
+                role="menuitem"
+                className={`${ROW_LINK} text-sm text-foreground`}
+                onClick={close}
+                {...hook}
+              >
+                {body}
+              </Link>
+            )}
+            {shown.map((p) => {
+              const sub = (
+                <>
+                  <StatusDot tone={SUMMARY_TONE[p.status]} />
+                  <span className="sr-only">{STATUS_WORD[p.status]}: </span>
+                  <span className="min-w-0 truncate">{summaryCrumb(p, address)}</span>
+                </>
+              );
+              const subHook = { "data-wallet-position-row": p.positionId, "data-wallet-position-status": p.status };
+              const title = STATUS_WORD[p.status];
+              return isPageRow(p) || !p.href ? (
+                <div
+                  key={p.positionId}
+                  role="menuitem"
+                  aria-disabled="true"
+                  aria-current={isPageRow(p) ? "page" : undefined}
+                  tabIndex={-1}
+                  title={title}
+                  className={`${SUB_ROW} text-foreground`}
+                  {...subHook}
+                >
+                  {sub}
+                  {isPageRow(p) && <Tick />}
+                </div>
+              ) : (
+                <Link
+                  key={p.positionId}
+                  href={p.href}
+                  prefetch={false}
+                  role="menuitem"
+                  title={title}
+                  className={`${SUB_ROW_LINK} text-rb-500 hover:text-foreground`}
+                  onClick={close}
+                  {...subHook}
+                >
+                  {sub}
+                </Link>
+              );
+            })}
+            {more > 0 && (
+              <Link
+                href={r.listing}
+                prefetch={false}
+                role="menuitem"
+                className={`${SUB_ROW_LINK} text-[var(--text-link)]`}
+                onClick={close}
+                data-wallet-positions-more={more}
+              >
+                {more.toLocaleString("en-US")} more
+              </Link>
+            )}
           </div>
-        ) : (
-          <Link
-            key={r.key}
-            href={r.href}
-            prefetch={false}
-            role="menuitem"
-            className={`${ROW_LINK} text-sm text-foreground`}
-            onClick={close}
-            {...hook}
-          >
-            {body}
-          </Link>
         );
       })}
       {DIVIDER}
@@ -379,7 +470,7 @@ export function WalletPositionsMenu({
         ) : (
           <div
             ref={menuRef}
-            className="overlay-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 w-max min-w-[240px] max-w-[min(22rem,calc(100vw-2rem))] overflow-hidden py-1"
+            className="overlay-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 max-h-[70vh] w-max min-w-[240px] max-w-[min(22rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain py-1"
             role="menu"
             aria-label="Positions"
             onKeyDown={moveFocus}

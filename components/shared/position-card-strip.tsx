@@ -70,7 +70,14 @@ interface StripStore {
   node: ReactNode;
   slots: string[];
   /** The detail cards' names, in mount order. */
-  names: { id: string; name: PositionName; status: TrailStatus | null; mark: TrailMark | null }[];
+  names: {
+    id: string;
+    name: PositionName;
+    status: TrailStatus | null;
+    mark: TrailMark | null;
+    /** The card's chain, which names a position with no market. */
+    chainName?: string;
+  }[];
   /** The wallet headings whose trail names the page's position. */
   trails: string[];
   /** The detail cards' menus, by the card's id. */
@@ -159,6 +166,7 @@ export function usePublishPositionCardName(
   name: PositionName | undefined,
   status: TrailStatus | null,
   mark: TrailMark | null = null,
+  chainName?: string,
 ): string {
   const store = useContext(PositionCardStripContext);
   const id = useId();
@@ -168,7 +176,7 @@ export function usePublishPositionCardName(
   const tip = status?.tip;
   useLayoutEffect(() => {
     if (!store || !name) return;
-    store.names = [...store.names.filter((n) => n.id !== id), { id, name, status, mark }];
+    store.names = [...store.names.filter((n) => n.id !== id), { id, name, status, mark, chainName }];
     notify(store);
     return () => {
       store.names = store.names.filter((n) => n.id !== id);
@@ -177,7 +185,7 @@ export function usePublishPositionCardName(
     // The name and status are new objects each render; their words are
     // what change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store, id, text, word, tone, tip, mark?.protocolId, mark?.chainId]);
+  }, [store, id, text, word, tone, tip, mark?.protocolId, mark?.chainId, chainName]);
   return id;
 }
 
@@ -216,6 +224,7 @@ export function usePositionCardName(): {
   name: PositionName;
   status: TrailStatus | null;
   mark: TrailMark | null;
+  chainName?: string;
 } | null {
   const store = useContext(PositionCardStripContext);
   const subscribe = useSubscribe(store);

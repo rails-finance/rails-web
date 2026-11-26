@@ -9,6 +9,7 @@
 // at visit inside the same budget (lib/wallet/families/visit.ts). Answers are
 // kept 60 s per address.
 
+import { MARKET_NAME } from "@/lib/aave-v3/asset-catalog";
 import { WALLET_FORMER_FAMILIES } from "@/lib/wallet/moved-row";
 import { walletRowStatus } from "@/lib/wallet/moved-row";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
@@ -687,6 +688,17 @@ export function readWallet(address: string, readerIp?: string, opts: { protocol?
 // position per Comet; every other row is one position. Kept 60 s per address.
 const countsCache = new Map<string, { at: number; read: Promise<WalletCounts> }>();
 
+/** A summary row's market as the wallet's cards name it, for the positions
+ *  menu (ui-jobs 856): Aave V3's market name ("Core"), a token key in
+ *  capitals ("USDC"); none for an address or a hex id, which the row's id
+ *  names instead. */
+function summaryMarketLabel(r: WalletSummaryRow): string | undefined {
+  const m = r.market?.trim();
+  if (!m || /^0x[0-9a-f]+$/i.test(m)) return undefined;
+  if (r.family === "aave-v3") return MARKET_NAME[m] ?? m;
+  return /^[a-z0-9]{2,8}$/.test(m) ? m.toUpperCase() : m;
+}
+
 export function readWalletCounts(address: string, readerIp?: string): Promise<WalletCounts> {
   const key = address.toLowerCase();
   const hit = countsCache.get(key);
@@ -715,6 +727,7 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
             positionId: p.positionId,
             status: p.status,
             href: p.href,
+            ...(p.market ? { market: p.market } : {}),
           });
         }
         rows.forEach((r) => taken.add(r));
@@ -730,6 +743,7 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
           positionId: r.positionId,
           status: walletRowStatus(r),
           href: r.href,
+          ...(summaryMarketLabel(r) ? { market: summaryMarketLabel(r) } : {}),
         });
     }
     const families = new Map<string, WalletCountsFamily>();

@@ -354,7 +354,7 @@ export function PositionWalletHeading({
   // The detail card's name, as the trail's last crumb.
   const card = usePositionCardName();
   const cardMenu = usePositionCardMenu();
-  const position = card && owner.wallet ? positionCrumb(card.name, owner.wallet) : null;
+  const position = card && owner.wallet ? positionCrumb(card.name, owner.wallet, card.chainName) : null;
   // The trail names the position on a position page: the card leaves it out.
   useRegisterPositionTrail(page === "position" && !!owner.wallet);
   const pill = owner.wallet ? (

@@ -944,6 +944,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
           chainName: cardIdentity.chain.name,
         }
       : null,
+    cardIdentity?.chain.name,
   );
   // Where the trail names the position, the detail card leaves its name (the
   // tag) and its pill out; the listing card and a page with no trail keep

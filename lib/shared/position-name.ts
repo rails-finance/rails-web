@@ -79,11 +79,14 @@ export function positionTitle(
 
 /** The position's crumb in the wallet heading's trail (H13.4): the name
  *  without an id that is the wallet's address, which the heading names
- *  ("Core" for an Aave V3 account, "Position" with no market), else the
+ *  ("Core" for an Aave V3 account, its chain with no market), else the
  *  whole name ("ETH-A · Vault #31951"). A Trove drops its noun and keeps the
  *  branch and id ("WETH · #31245"; Miles, 26 Nov 2026, ui-jobs 856). */
-export function positionCrumb(name: PositionName, wallet: string): string {
-  if (name.id.toLowerCase() === shortPositionId(wallet).toLowerCase()) return name.market ?? name.noun;
+export function positionCrumb(name: PositionName, wallet: string, chainName?: string): string {
+  // A position keyed by the wallet with no market takes its chain's name
+  // ("Arbitrum" for Aave V3 there; ui-jobs 856, pending Miles), else its
+  // noun. Drop `chainName ??` to go back to the noun.
+  if (name.id.toLowerCase() === shortPositionId(wallet).toLowerCase()) return name.market ?? chainName ?? name.noun;
   if (name.noun === "Trove") return name.market ? `${name.market} · ${name.id}` : name.id;
   return name.text;
 }
