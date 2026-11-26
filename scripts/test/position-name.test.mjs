@@ -92,5 +92,17 @@ test("the trail's crumb leaves out an id that is the wallet", () => {
   const w = "0x3dF83ec9d2b62bb9bb83eba1218a202564bb67da";
   assert.equal(positionCrumb(positionName({ market: "Core", noun: "Position", id: w.toLowerCase() }), w), "Core");
   assert.equal(positionCrumb(positionName({ noun: "Position", id: w }), w), "Position");
-  assert.equal(positionCrumb(positionName({ market: "WETH", noun: "Trove", id: "31245" }), w), "WETH · Trove #31245");
+  assert.equal(positionCrumb(positionName({ market: "WETH", noun: "Trove", id: "31245" }), w), "WETH · #31245");
+  assert.equal(
+    positionCrumb(
+      positionName({
+        market: "WETH",
+        noun: "Trove",
+        id: "89803332797170445130216482989432392196488317904030593713996450941537748664337",
+      }),
+      w,
+    ),
+    "WETH · 898033…4337",
+  );
+  assert.equal(positionCrumb(positionName({ market: "ETH-A", noun: "Vault", id: "31951" }), w), "ETH-A · Vault #31951");
 });

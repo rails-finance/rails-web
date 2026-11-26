@@ -93,7 +93,7 @@ export function WalletHeading({
           facehash beside the name block, the 21px gap putting the block on
           the cards' content edge: the 40px bar, the card's 1px border and
           its 20px padding. */}
-      <div className="grid min-w-0 flex-auto basis-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1 sm:basis-auto md:flex md:gap-[21px]">
+      <div className="grid min-w-0 flex-auto basis-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-2.5 sm:basis-auto md:flex md:gap-[21px]">
         {address && dashboard ? (
           <Link
             href={dashboard}
