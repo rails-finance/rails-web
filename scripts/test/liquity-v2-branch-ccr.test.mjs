@@ -126,10 +126,18 @@ test("a close that leaves the branch 1 wei under the CCR does not, and prints un
   assert.equal(tcrPercentText("1499960000000000000"), "149.99%");
 });
 
-test("no close answer for a Trove with no debt, more collateral than the branch, or a lastGoodPrice read", () => {
+test("a dormant Trove with no debt gets a close answer, and below the CCR it does not close", () => {
+  // Taking out 1 ETH and no debt leaves 3 ETH against 6,000 BOLD at $2,000: 100%.
+  const c = troveCloseCheck(settleBranchCcr(edge, at), { collRaw: edgeTrove.collRaw, debtRaw: "0" });
+  assert.notEqual(c, null);
+  assert.equal(c.newTcrRaw, "1000000000000000000");
+  assert.equal(c.closes, false);
+});
+
+test("no close answer for more collateral than the branch, the last Trove's debt, or a lastGoodPrice read", () => {
   const s = settleBranchCcr(edge, at);
-  assert.equal(troveCloseCheck(s, { collRaw: edgeTrove.collRaw, debtRaw: "0" }), null);
   assert.equal(troveCloseCheck(s, { collRaw: "5000000000000000000", debtRaw: edgeTrove.debtRaw }), null);
+  assert.equal(troveCloseCheck(s, { collRaw: edgeTrove.collRaw, debtRaw: edge.debtRaw }), null);
   const fallback = settleBranchCcr({ ...edge, priceCall: "lastGoodPrice" }, at);
   assert.equal(troveCloseCheck(fallback, edgeTrove), null);
 });
