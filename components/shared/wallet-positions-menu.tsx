@@ -115,10 +115,16 @@ function Tick() {
 }
 
 const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />;
-// The trail's divider: a tall, thin chevron pointing right (Miles, 26 Nov
-// 2026, ui-jobs 856).
+// The trail's divider: a tall, thin chevron pointing right, a step quieter
+// than the crumbs. The first two crumbs open their menus with no ⌄; the
+// position crumb keeps its ⌄ (Miles, 26 Nov 2026, ui-jobs 856).
 const SLASH = (
-  <svg viewBox="0 0 6 20" className="mx-2 h-5 w-1.5 shrink-0 text-rb-500" fill="none" aria-hidden="true">
+  <svg
+    viewBox="0 0 6 20"
+    className="mx-2 h-5 w-1.5 shrink-0 text-rb-500/60"
+    fill="none"
+    aria-hidden="true"
+  >
     <path
       d="M0.5 1 L5.5 10 L0.5 19"
       stroke="currentColor"
@@ -365,10 +371,6 @@ export function WalletPositionsMenu({
             data-wallet-positions-trigger=""
           >
             {menu.trigger}
-            <ChevronDown
-              className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
-              aria-hidden="true"
-            />
           </span>
         )}
       />
@@ -504,10 +506,6 @@ export function WalletPositionsMenu({
               className={`flex items-center gap-1 whitespace-nowrap ${crumb.current || open ? "text-foreground" : "text-rb-500 hover:text-foreground"}`}
             >
               {protocolBody}
-              <ChevronDown
-                className={`size-3.5 shrink-0 text-rb-500 transition-transform ${open ? "rotate-180" : ""}`}
-                aria-hidden="true"
-              />
             </span>
           )}
         />
