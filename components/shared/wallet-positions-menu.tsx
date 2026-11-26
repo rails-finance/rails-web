@@ -115,10 +115,18 @@ function Tick() {
 }
 
 const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />;
+// The trail's divider: a tall, thin chevron pointing right (Miles, 26 Nov
+// 2026, ui-jobs 856).
 const SLASH = (
-  <span className="shrink-0 px-1.5 text-rb-500" aria-hidden="true">
-    /
-  </span>
+  <svg viewBox="0 0 6 20" className="mx-2 h-5 w-1.5 shrink-0 text-rb-500" fill="none" aria-hidden="true">
+    <path
+      d="M0.5 1 L5.5 10 L0.5 19"
+      stroke="currentColor"
+      strokeWidth="1"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
 );
 
 /** The protocol's mark, named for screen readers and on hover. */
@@ -396,7 +404,10 @@ export function WalletPositionsMenu({
     <>
       {chainNode}
       {markNode}
-      <span className="whitespace-nowrap">{crumb.row.name}</span>
+      {/* Icons alone at md and up on a position page, where the card's
+          rail names the protocol (Miles, 26 Nov 2026, ui-jobs 856); the
+          rail is hidden below md, so phones keep the name. */}
+      <span className={`whitespace-nowrap ${mark ? "md:sr-only" : ""}`}>{crumb.row.name}</span>
     </>
   );
 
