@@ -21,7 +21,7 @@ import { useRouter } from "next/navigation";
 import { TipLabel } from "@/components/shared/tip-label";
 import { WalletHeader } from "@/components/wallet/wallet-header";
 import { WalletPositionsMenu } from "@/components/shared/wallet-positions-menu";
-import { vaultRoot, type WalletCountsPosition } from "@/lib/wallet/summary-counts";
+import { vaultRoot, vaultRootName, type WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { WalletFilterBar } from "@/components/wallet/wallet-filter-bar";
 import {
   walletProtocol,
@@ -50,10 +50,10 @@ import { ReadStamp } from "@/components/wallet/read-stamp";
 import { formatCompactUsd } from "@/lib/shared/format-compact";
 import { formatUsdValue } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
-import { ARBITRUM_CHAIN_ID, chainMeta, type ChainId } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, CHAINS, chainMeta, type ChainId } from "@/lib/shared/chains";
 import { walletCountProv, walletTradeAtProv } from "@/lib/cow/trade";
 import type { CowWalletEntry } from "@/lib/cow/types";
-import type { WalletFamilyRead, WalletRead } from "@/lib/wallet/types";
+import type { WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import {
   closestToLiquidation,
   countsDollars,
@@ -360,6 +360,26 @@ export function WalletUnresolved({ name, back }: { name: string; back: { href: s
   );
 }
 
+/** The plain vault shares view's protocol crumb, under Morpho's mark. */
+const VAULTS_CRUMB = { key: "vaults", name: "Vaults", mark: "morpho" };
+
+/** One vault protocol's shares the trail counts and the read did not draw,
+ *  by chain and status. */
+function vaultUndrawn(shares: WalletCountsPosition[], drawnRows: WalletPosition[]): Undrawn[] {
+  const drawnIds = new Set(drawnRows.map((p) => `${CHAINS[p.chain]?.slug}:${p.positionId}`));
+  const byChain = new Map<string, Undrawn>();
+  for (const p of shares) {
+    if (drawnIds.has(`${p.chain}:${p.positionId}`)) continue;
+    const chain = Object.values(CHAINS).find((c) => c.slug === p.chain)?.id;
+    if (chain == null) continue;
+    const u = byChain.get(p.chain) ?? { family: "vaults", open: 0, closed: 0, chain };
+    if (p.status === "open") u.open += 1;
+    else u.closed += 1;
+    byChain.set(p.chain, u);
+  }
+  return [...byChain.values()];
+}
+
 /** A read with no trail (the summary did not answer): the trail draws none. */
 const NO_TRAIL: WalletCountsPosition[] = [];
 
@@ -425,10 +445,21 @@ export function WalletView({
   const chosen = walletProtocol(read.protocol);
   // The positions the read counted and did not draw.
   // Under Focus, only those on a chain in focus, as the drawn rows.
-  // One vault protocol's shares: the family's undrawn counts name no vault.
-  const undrawn: Undrawn[] = read.families.flatMap((r) =>
-    r.undrawn && !vault && (!focused || scope.chainOk(r.chain)) ? [{ ...r.undrawn, chain: r.chain }] : [],
-  );
+  // One vault protocol's shares (`?vault=`): the family's undrawn counts
+  // name no vault, so its shares the trail counts and the read did not draw
+  // stand in their place, by chain (ui-jobs 856).
+  const trail = read.trail ?? NO_TRAIL;
+  const vaultShares = vault ? trail.filter((p) => p.family === "vaults" && vaultRoot(p.href) === vault) : [];
+  const undrawn: Undrawn[] = vault
+    ? vaultUndrawn(vaultShares, positions).filter((u) => !focused || scope.chainOk(u.chain))
+    : read.families.flatMap((r) =>
+        r.undrawn && (!focused || scope.chainOk(r.chain)) ? [{ ...r.undrawn, chain: r.chain }] : [],
+      );
+  const undrawnTotal = undrawn.reduce((n, u) => n + undrawnCount(u, status), 0);
+  // On a `?vault=` view the Protocol pill counts that vault protocol's shares.
+  const held = vault
+    ? read.held.map((h) => (h.slug === "vaults" ? { ...h, positions: vaultShares.length } : h))
+    : read.held;
   // The lines a module states under its section, on a chain in focus.
   const notes = read.families.flatMap((r) => (r.note && (!focused || scope.chainOk(r.chain)) ? [r.note] : []));
   // The bands state a protocol's whole holding: drawn while no pill narrows it.
@@ -481,11 +512,12 @@ export function WalletView({
       {notRead.length > 0 && <NotReadLine explorers={notRead} />}
     </>
   );
-  const filterBar = read.held.length > 0 && (
+  const filterBar = held.length > 0 && (
     <WalletFilterBar
       address={address}
       protocol={read.protocol}
-      held={read.held}
+      vault={vault}
+      held={held}
       statuses={WALLET_STATUSES.map((s) => s.value).filter((s) =>
         scoped.rows.some((p) => (s === "open") === (p.status === "open")),
       )}
@@ -556,7 +588,10 @@ export function WalletView({
                     wallet={address}
                     page="wallet"
                     search={`?protocol=${chosen.slug}${vault ? `&vault=${vault}` : ""}`}
-                    positions={read.trail ?? NO_TRAIL}
+                    positions={trail}
+                    // The vault shares alone are no summary row's protocol:
+                    // their crumb is the page (ui-jobs 856).
+                    pageCrumb={chosen.slug === "vaults" && !vault ? VAULTS_CRUMB : undefined}
                   />
                   {focused && <ScopeNote scoped={scoped} noun={["position", "positions"]} />}
                 </>
@@ -564,18 +599,12 @@ export function WalletView({
                 <ScopeNote scoped={scoped} noun={["position", "positions"]} />
               ) : (
                 // The dashboard's line is the positions menu, the trail's
-                // first crumb, as the current page, built from this read
-                // and counting its total (ui-jobs 856).
-                read.total > 0 && (
-                  <div className="flex" data-wallet-count={read.total}>
-                    <WalletPositionsMenu
-                      wallet={address}
-                      page="wallet"
-                      search=""
-                      onDashboard
-                      positions={read.trail ?? NO_TRAIL}
-                      total={read.total}
-                    />
+                // first crumb, as the current page, built from this read's
+                // trail: it counts as the position pages' /summary does,
+                // the positions read at visit left out (ui-jobs 856).
+                trail.length > 0 && (
+                  <div className="flex" data-wallet-count={trail.length}>
+                    <WalletPositionsMenu wallet={address} page="wallet" search="" onDashboard positions={trail} />
                   </div>
                 )
               )}
@@ -626,11 +655,31 @@ export function WalletView({
                       {andList(missing)} could not be read.
                     </p>
                   ) : chosen ? (
-                    <p className="text-sm text-foreground/80" data-wallet-reads="">
-                      {chosen.slug === "vaults"
-                        ? "Rails holds no vault shares for this wallet."
-                        : `Rails holds no ${chosen.name} position for this wallet.`}
-                    </p>
+                    undrawnTotal > 0 ? (
+                      // Every share the view counts is past the read's draw
+                      // limit: say so, with the lines a section draws.
+                      <>
+                        <p className="text-sm text-foreground/80" data-wallet-reads="">
+                          {`Rails holds ${plural(undrawnTotal, status ? `${status} holding` : "holding")} in ${vault ? (vaultRootName(vault) ?? chosen.name) : chosen.name} for this wallet, and draws none of them here.`}
+                        </p>
+                        {undrawn.map((u) => {
+                          const n = undrawnCount(u, status);
+                          return (
+                            n > 0 && (
+                              <p key={u.chain} className="text-xs text-rb-500" data-wallet-undrawn={n}>
+                                {undrawnLine(u, chainMeta(u.chain).name, status)}
+                              </p>
+                            )
+                          );
+                        })}
+                      </>
+                    ) : (
+                      <p className="text-sm text-foreground/80" data-wallet-reads="">
+                        {chosen.slug === "vaults"
+                          ? `Rails holds no ${vault ? (vaultRootName(vault) ?? "vault") : "vault"} shares for this wallet.`
+                          : `Rails holds no ${chosen.name} position for this wallet.`}
+                      </p>
+                    )
                   ) : liquidity && liquiditySection ? (
                     // Drawn once the liquidity read settles with none (W9 lists any it finds).
                     <LiquidityBoundary fallback={null}>

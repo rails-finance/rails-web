@@ -334,9 +334,10 @@ export interface WalletRead {
    *  Protocol pill: a narrowed read still offers the others. */
   held: { slug: string; name: string; positions: number }[];
   /** Every counted position of the wallet as the heading's trail reads it
-   *  (H13.4; ui-jobs 856): the summary rows and the positions read at
-   *  visit, whatever protocol the read is narrowed to. Unnarrowed, one per
-   *  position `total` counts. */
+   *  (H13.4; ui-jobs 856), whatever protocol the read is narrowed to: the
+   *  /summary route's positions, by the same rule (`countsFromSummary`), so
+   *  the dashboard and the position pages count alike. The positions read
+   *  at visit are not among them. */
   trail?: WalletCountsPosition[];
   /** The listing reads that did not answer, by what they read: the answer
    *  is part of the wallet, states no wallet total and is not kept. */

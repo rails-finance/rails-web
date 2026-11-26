@@ -10,7 +10,7 @@
 // across its chains, each linking to the wallet view narrowed to that
 // protocol, with a dot for each status among its positions; the page's
 // protocol row is ticked; "Testnets not included" at the foot. The wallet
-// view hands it its own read's positions (`positions`, `total`); a position
+// view hands it its own read's positions (`positions`); a position
 // page reads /api/chain/wallet/<address>/summary after mount, so its render
 // does not wait on it, and its line is held from first paint (a placeholder
 // bar while the read is out). Where the page's position is the wallet's only
@@ -40,7 +40,6 @@ import { menuProtocolOf, protocolEntryOf, summaryCrumb } from "@/lib/wallet/posi
 import { walletProtocol, walletProtocolHref } from "@/lib/wallet/wallet-filters";
 import {
   MENU_TESTNETS,
-  positionCount,
   rowIsPage,
   walletProtocolMenu,
   walletProtocolRows,
@@ -189,7 +188,7 @@ export function WalletPositionsMenu({
   page = "position",
   search: givenSearch,
   positions: given,
-  total,
+  pageCrumb,
   position,
   status,
   mark,
@@ -206,9 +205,10 @@ export function WalletPositionsMenu({
   /** The wallet's positions where the page has read them (the wallet view's
    *  `read.trail`): no summary read is made (ui-jobs 856). */
   positions?: WalletCountsPosition[];
-  /** The count the first crumb states, where the page counts it (the
-   *  wallet view's `read.total`). */
-  total?: number;
+  /** The wallet view's protocol where no summary row is its own (the vault
+   *  shares, `?protocol=vaults`): the protocol crumb names it, with `mark`,
+   *  as the current page (ui-jobs 856). */
+  pageCrumb?: { key: string; name: string; mark: string };
   /** The position crumb's words, on a position page whose card has named it. */
   position?: string | null;
   /** The card's lifecycle, the dot before the position crumb. */
@@ -273,7 +273,9 @@ export function WalletPositionsMenu({
   // The position crumb stands whatever the summary read answers: the card
   // leaves its name to it.
   const named = page === "position" && !crumb?.current && position ? position : null;
-  if (!menu && !crumb && !named)
+  // The page's own crumb on a wallet page the summary rows hold no row for.
+  const pageOwn = page === "wallet" && !crumb && pageCrumb ? pageCrumb : null;
+  if (!menu && !crumb && !named && !pageOwn)
     return (
       <div className="flex h-5 items-center" data-wallet-positions-pending={settled ? undefined : ""}>
         {!settled && <SkeletonBar width={72} />}
@@ -348,7 +350,7 @@ export function WalletPositionsMenu({
       </>
     );
 
-  const trigger = menu && (total != null ? positionCount(total) : menu.trigger);
+  const trigger = menu?.trigger;
   const dropdown = menu && (
     <span className="flex shrink-0">
       <ToolsMenu
@@ -546,6 +548,21 @@ export function WalletPositionsMenu({
               ))}
           </li>
         )}
+        {pageOwn && (
+          <li className="flex shrink-0 items-center">
+            {dropdown && SLASH}
+            <span
+              aria-current="page"
+              className="flex shrink-0 items-center gap-1 text-rb-500"
+              data-wallet-trail-protocol={pageOwn.key}
+            >
+              <span role="img" aria-label={pageOwn.name} className="flex shrink-0" data-wallet-trail-mark="">
+                <ProtocolIcon id={pageOwn.mark} className="size-3.5 shrink-0" />
+              </span>
+              <span className="whitespace-nowrap">{pageOwn.name}</span>
+            </span>
+          </li>
+        )}
         {named && (
           <li className="flex min-w-0 items-center">
             {(dropdown || crumb || !settled) && SLASH}
@@ -597,6 +614,7 @@ export function WalletPositionsMenu({
                     >
                       <span
                         className="flex size-3.5 items-center justify-center"
+                        title={statusTip}
                         data-wallet-trail-status={status.tone}
                       >
                         <StatusDot tone={status.tone} />

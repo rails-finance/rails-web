@@ -151,11 +151,11 @@ export function LatestPrices({
   const anyPriced = assets.some(priced);
 
   /** An inline price's receipt: the asset's, with a closed position's
-   *  closing block where the receipt names none, so a price standing inline
-   *  states the block and source the panel's row and heading state
-   *  (ui-jobs 856). */
+   *  closing block where its source names none, so a price standing inline
+   *  states the block the panel's heading states. A receipt with no source
+   *  is left as it is, so no receipt names a block alone (ui-jobs 856). */
   const receiptOf = (a: LatestPriceAsset): Provenance | undefined =>
-    a.info && at && a.info.source?.block == null
+    a.info?.source && at && a.info.source.block == null
       ? { ...a.info, source: { ...a.info.source, block: at.block } }
       : a.info;
 

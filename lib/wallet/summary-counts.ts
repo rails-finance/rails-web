@@ -94,8 +94,7 @@ export function rowIsPage(href: string | null, pathname: string, search: string)
 export const WALLET_COUNTS_SCOPE = "Counts mainnet positions; the Sepolia testnet is not counted.";
 
 /** "1 position", "5 positions": the positions menu's trigger. */
-export const positionCount = (n: number): string =>
-  `${n.toLocaleString("en-US")} ${n === 1 ? "position" : "positions"}`;
+const positionCount = (n: number): string => `${n.toLocaleString("en-US")} ${n === 1 ? "position" : "positions"}`;
 
 /** The menu's footer: the counts are mainnet only. */
 export const MENU_TESTNETS = "Testnets not included";
@@ -125,11 +124,16 @@ const VAULT_ROOTS: Record<string, string> = {
  *  undefined for a path outside the vault routes. */
 export function vaultRoot(href: string | null): string | undefined {
   const m = href ? /^\/[^/]+\/([^/]+)\/vaults\//.exec(href.split("?")[0].toLowerCase()) : null;
-  return m && m[1] in VAULT_ROOTS ? m[1] : undefined;
+  return m && Object.hasOwn(VAULT_ROOTS, m[1]) ? m[1] : undefined;
 }
 
 /** Whether `root` names a vault protocol (`?vault=` on the wallet view). */
-export const isVaultRoot = (root: string | null | undefined): root is string => root != null && root in VAULT_ROOTS;
+export const isVaultRoot = (root: string | null | undefined): root is string =>
+  root != null && Object.hasOwn(VAULT_ROOTS, root);
+
+/** A vault protocol's name in the menu ("MetaMorpho vaults") by its root. */
+export const vaultRootName = (root: string): string | undefined =>
+  Object.hasOwn(VAULT_ROOTS, root) ? VAULT_ROOTS[root] : undefined;
 
 /** The menu's name for a vault-share row's protocol ("MetaMorpho vaults"), or
  *  undefined where its href names none (or it has no page). */

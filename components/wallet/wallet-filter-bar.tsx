@@ -21,6 +21,7 @@ import {
 export function WalletFilterBar({
   address,
   protocol,
+  vault,
   held,
   statuses,
   offered,
@@ -34,6 +35,8 @@ export function WalletFilterBar({
 }: {
   address: string;
   protocol?: string;
+  /** `?vault=`, kept while the protocol stays (ui-jobs 856). */
+  vault?: string;
   held: WalletProtocolCount[];
   /** The statuses the positions read take: the Status pill's options. */
   statuses: WalletStatus[];
@@ -83,7 +86,7 @@ export function WalletFilterBar({
           }
           setKinds(k);
           setStatus(s);
-          window.history.replaceState(null, "", walletHref(address, protocol, k, s));
+          window.history.replaceState(null, "", walletHref(address, protocol, k, s, vault));
         }}
       />
     </div>

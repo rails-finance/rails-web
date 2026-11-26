@@ -324,12 +324,16 @@ for (const spec of ROSTER) {
                 `served open, page said ${said ?? "nothing"}`,
               );
             }
+            // A page that draws no status dot at all passes no badge check:
+            // the words must be read before their absence of "Closed" counts.
             check(
-              label(`2. ${spec.id(subject)} draws no closed badge, ${when}`),
-              !spec.badgeClosed(words),
-              spec.badgeClosed(words)
-                ? `Closed badge on a served-open position (${words.join(", ")})`
-                : `no closed badge (${words.join(", ") || "none drawn"})`,
+              label(`2. ${spec.id(subject)} draws a status and no closed badge, ${when}`),
+              words.length > 0 && !spec.badgeClosed(words),
+              words.length === 0
+                ? "no status dot drawn, so no badge to read"
+                : spec.badgeClosed(words)
+                  ? `Closed badge on a served-open position (${words.join(", ")})`
+                  : `no closed badge (${words.join(", ")})`,
             );
           }
           await ctx.close();
@@ -344,11 +348,18 @@ for (const spec of ROSTER) {
         spec.subject = closed;
         const ctx = await browser.newContext();
         const page = await ctx.newPage();
-        const { text } = await narration(page, spec, "held");
+        const { text, badge: closedWords } = await narration(page, spec, "held");
         check(
           label(`3. a served-CLOSED position still narrates closed (${spec.id(closed)})`),
           spec.said(text) === "closed",
           `served closed, page said ${spec.said(text) ?? "nothing"} — without this, check 1 passes on a page that never says "closed"`,
+        );
+        // Without this, check 2 passes on a page whose badge reader never
+        // finds "Closed" at all.
+        check(
+          label(`3. a served-CLOSED position draws the closed badge (${spec.id(closed)})`),
+          spec.badgeClosed(closedWords),
+          `served closed, badge read ${closedWords.join(", ") || "nothing"}`,
         );
         await ctx.close();
       }

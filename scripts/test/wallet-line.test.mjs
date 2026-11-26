@@ -12,6 +12,7 @@ import {
   rowIsPage,
   vaultProtocolOfHref,
   vaultRoot,
+  isVaultRoot,
   hrefIsPage,
   walletProtocolMenu,
   walletProtocolRows,
@@ -221,6 +222,10 @@ test("menuKey splits vault rows by their href's root and leaves other families w
   assert.equal(menuKey(vault("base", "morpho", 1)), "base:vaults:morpho");
   assert.equal(menuKey(pos("aave-v3", "open", 1)), "ethereum:aave-v3");
   assert.equal(vaultRoot("/ethereum/aave-v3/0xabc"), undefined);
+  // `?vault=` takes the three roots alone, no inherited key.
+  assert.equal(isVaultRoot("morpho"), true);
+  assert.equal(isVaultRoot("constructor"), false);
+  assert.equal(vaultRoot("/ethereum/constructor/vaults/0xv/0xh"), undefined);
   assert.equal(vaultProtocolOfHref("/ethereum/yearn/vaults/0xv/0xh?x=1"), "Yearn V3");
 });
 

@@ -13,7 +13,6 @@ import { MARKET_NAME } from "@/lib/aave-v3/asset-catalog";
 import { COMPOUND_DEPLOYMENT } from "@/lib/compound/asset-catalog";
 import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
 import { marketPair } from "@/lib/shared/position-name";
-import { CHAINS, type ChainId } from "@/lib/shared/chains";
 import { WALLET_FORMER_FAMILIES } from "@/lib/wallet/moved-row";
 import { walletRowStatus } from "@/lib/wallet/moved-row";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
@@ -72,12 +71,7 @@ import {
 import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
 import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
-import type {
-  WalletCounts,
-  WalletCountsChain,
-  WalletCountsFamily,
-  WalletCountsPosition,
-} from "@/lib/wallet/summary-counts";
+import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
 import { explorerName, PROTOCOLS } from "@/lib/shared/protocols";
 import { LIQUIDITY_SOURCES } from "@/lib/wallet/liquidity/sources";
@@ -660,7 +654,7 @@ async function readWalletInScope(address: string, readerIp: string | undefined, 
     ms: Date.now() - t0,
     protocol: opts.protocol,
     held,
-    trail: trailPositions(summary.rows, visitedAll.positions, positions),
+    trail: (await trailCounts(address, summary, t0)).positions,
     ...(failed.length || visited.failed.length ? { partial: [...failed.map((x) => x.what), ...visited.failed] } : {}),
   };
 }
@@ -713,43 +707,81 @@ function summaryMarketLabel(r: WalletSummaryRow): string | undefined {
   return /^[a-z0-9]{2,8}$/.test(m) ? m.toUpperCase() : m;
 }
 
-/** The wallet's counted positions for the heading's trail (`WalletRead.trail`;
- *  ui-jobs 856): each counted summary row and each position read at visit,
- *  named by the drawn card's market where the read drew one. */
-function trailPositions(
-  rows: WalletSummaryRow[],
-  visited: WalletPosition[],
-  drawnRows: WalletPosition[],
-): WalletCountsPosition[] {
-  const drawnMarket = new Map(drawnRows.map((p) => [`${p.family}:${p.positionId}`, p.market]));
-  const TRAIL_CHAINS: WalletCountsChain[] = ["ethereum", "base", "arbitrum", "optimism", "arc", "sepolia"];
-  const slug = (id: ChainId) => TRAIL_CHAINS.find((c) => c === CHAINS[id]?.slug);
-  const fromRows = rows.filter(countedRow).map((r): WalletCountsPosition => {
-    const market = drawnMarket.get(`${r.family}:${r.positionId}`) ?? summaryMarketLabel(r);
-    return {
-      chain: r.chain,
-      family: r.family,
-      positionId: r.positionId,
-      status: walletRowStatus(r),
-      href: r.href,
-      ...(market ? { market } : {}),
-    };
-  });
-  const fromVisit = visited.flatMap((p): WalletCountsPosition[] => {
-    const chain = slug(p.chain);
-    if (!chain) return [];
-    return [
-      {
-        chain,
-        family: p.family,
-        positionId: p.positionId,
-        status: p.status,
-        href: p.href,
-        ...(p.market ? { market: p.market } : {}),
-      },
-    ];
-  });
-  return [...fromRows, ...fromVisit];
+/** The wallet's counted positions from its summary rows, the one rule for
+ *  both the /summary route and the wallet view's trail (ui-jobs 856): a
+ *  family whose figures are stored (no `head`) shaped as the wallet view
+ *  shapes it, which makes no read (an Arbitrum Compound V3 row is one
+ *  position per Comet), every other counted row one position. The
+ *  positions read at visit are left out: reading them is a head read. */
+async function countsFromSummary(key: string, summary: Summary, t0: number): Promise<WalletCounts> {
+  const positions: WalletCountsPosition[] = [];
+  const taken = new Set<WalletSummaryRow>();
+  for (const f of WALLET_FAMILIES) {
+    if (f.head || f.summaryChain === "sepolia") continue;
+    const rows = summary.rows.filter((r) => takesRow(f, r));
+    if (rows.length === 0) continue;
+    try {
+      for (const p of await f.shape(rows)) {
+        positions.push({
+          chain: f.summaryChain,
+          family: f.summaryFamily,
+          positionId: p.positionId,
+          status: p.status,
+          href: p.href,
+          ...(p.market ? { market: p.market } : {}),
+        });
+      }
+      rows.forEach((r) => taken.add(r));
+    } catch {
+      // The rows count one each below.
+    }
+  }
+  for (const r of summary.rows) {
+    if (!taken.has(r) && countedRow(r))
+      positions.push({
+        chain: r.chain,
+        family: r.family,
+        positionId: r.positionId,
+        status: walletRowStatus(r),
+        href: r.href,
+        ...(summaryMarketLabel(r) ? { market: summaryMarketLabel(r) } : {}),
+      });
+  }
+  const families = new Map<string, WalletCountsFamily>();
+  for (const p of positions) {
+    const k = `${p.chain}:${p.family}`;
+    const fam = families.get(k) ?? { chain: p.chain, family: p.family, positions: 0, open: 0, closed: 0, moved: 0 };
+    fam.positions += 1;
+    if (p.status === "open") fam.open += 1;
+    else if (p.status === "moved") fam.moved += 1;
+    else fam.closed += 1;
+    families.set(k, fam);
+  }
+  const open = positions.filter((p) => p.status === "open").length;
+  const moved = positions.filter((p) => p.status === "moved").length;
+  return {
+    address: key,
+    positions,
+    families: [...families.values()],
+    total: positions.length,
+    open,
+    closed: positions.length - open - moved,
+    moved,
+    chains: [...new Set(positions.map((p) => p.chain))],
+    readAt: Math.floor(Date.now() / 1000),
+    ms: Date.now() - t0,
+    ...(summary.listingFailed.length ? { partial: summary.listingFailed.map((x) => x.what) } : {}),
+  };
+}
+
+/** The wallet view's counts from its own summary read, kept as the /summary
+ *  route's answer where none is kept, so the position pages read the same. */
+async function trailCounts(key: string, summary: Summary, t0: number): Promise<WalletCounts> {
+  const counts = await countsFromSummary(key, summary, t0);
+  const hit = countsCache.get(key);
+  if (!counts.partial && !(hit && Date.now() - hit.at < WALLET_CACHE_MS))
+    countsCache.set(key, { at: Date.now(), read: Promise.resolve(counts) });
+  return counts;
 }
 
 export function readWalletCounts(address: string, readerIp?: string): Promise<WalletCounts> {
@@ -766,64 +798,7 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
       const error = publicErrorMessage(err);
       return { ...empty, readAt: Math.floor(Date.now() / 1000), ms: Date.now() - t0, error };
     }
-    const positions: WalletCountsPosition[] = [];
-    const taken = new Set<WalletSummaryRow>();
-    for (const f of WALLET_FAMILIES) {
-      if (f.head || f.summaryChain === "sepolia") continue;
-      const rows = summary.rows.filter((r) => takesRow(f, r));
-      if (rows.length === 0) continue;
-      try {
-        for (const p of await f.shape(rows)) {
-          positions.push({
-            chain: f.summaryChain,
-            family: f.summaryFamily,
-            positionId: p.positionId,
-            status: p.status,
-            href: p.href,
-            ...(p.market ? { market: p.market } : {}),
-          });
-        }
-        rows.forEach((r) => taken.add(r));
-      } catch {
-        // The rows count one each below.
-      }
-    }
-    for (const r of summary.rows) {
-      if (!taken.has(r) && countedRow(r))
-        positions.push({
-          chain: r.chain,
-          family: r.family,
-          positionId: r.positionId,
-          status: walletRowStatus(r),
-          href: r.href,
-          ...(summaryMarketLabel(r) ? { market: summaryMarketLabel(r) } : {}),
-        });
-    }
-    const families = new Map<string, WalletCountsFamily>();
-    for (const p of positions) {
-      const k = `${p.chain}:${p.family}`;
-      const fam = families.get(k) ?? { chain: p.chain, family: p.family, positions: 0, open: 0, closed: 0, moved: 0 };
-      fam.positions += 1;
-      if (p.status === "open") fam.open += 1;
-      else if (p.status === "moved") fam.moved += 1;
-      else fam.closed += 1;
-      families.set(k, fam);
-    }
-    const open = positions.filter((p) => p.status === "open").length;
-    const moved = positions.filter((p) => p.status === "moved").length;
-    return {
-      address: key,
-      positions,
-      families: [...families.values()],
-      total: positions.length,
-      open,
-      closed: positions.length - open - moved,
-      moved,
-      chains: [...new Set(positions.map((p) => p.chain))],
-      readAt: Math.floor(Date.now() / 1000),
-      ms: Date.now() - t0,
-      ...(summary.listingFailed.length ? { partial: summary.listingFailed.map((x) => x.what) } : {}),
-    };
+    return countsFromSummary(key, summary, t0);
   })();
   countsCache.set(key, { at: Date.now(), read });
   void read.then((r) => {

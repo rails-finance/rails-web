@@ -181,17 +181,21 @@ export function parseKinds(raw: string | string[] | undefined): WalletKind[] {
 }
 
 /** The URL of the wallet page for a protocol and kinds; a kind the protocol
- *  does not hold, or the one kind a protocol holds, is left out. */
+ *  does not hold, or the one kind a protocol holds, is left out. `vault`
+ *  keeps one vault protocol's shares, with the vault shares chosen
+ *  (`?vault=`; ui-jobs 856). */
 export function walletHref(
   address: string,
   protocol: string | undefined,
   kinds: WalletKind[] = [],
   status?: WalletStatus,
+  vault?: string,
 ): string {
   const p = walletProtocol(protocol);
   const keep = p ? (p.kinds.length > 1 ? kinds.filter((k) => p.kinds.includes(k)) : []) : kinds;
   const sp = new URLSearchParams();
   if (p) sp.set("protocol", p.slug);
+  if (p?.slug === "vaults" && vault) sp.set("vault", vault);
   if (keep.length) sp.set("kind", keep.join(","));
   if (status) sp.set("status", status);
   const s = sp.toString().replace(/%2C/gi, ",");
