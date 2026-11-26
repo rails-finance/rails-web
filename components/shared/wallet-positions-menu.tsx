@@ -1,32 +1,25 @@
 "use client";
 
-// The positions menu under the wallet heading (H13.2; rails-ops decisions/0050
-// point 10, decisions/0051 step 3; Miles 17 Nov 2026, ui-jobs 701): "3
-// positions ⌄", opening one row per protocol and chain the wallet holds
-// positions in: the protocol's and the chain's icons, the protocol's name and
-// its counts ("1 open · 2 closed"). A row links to its one position, or past
-// one to the protocol's listing searched by the wallet; the row holding the
-// page's position reads "this page" (not a link where it is the page). Then
-// "Wallet dashboard" and "Testnets not included". Read after mount from
-// /api/chain/wallet/<address>/summary, so the page's render does not wait on
-// it. Its line is held from first paint (the loading grammar,
-// skeleton-card.tsx): a placeholder bar while the read is out, and the line
-// left empty when it fails or when the page's position is the wallet's only
-// one, so the heading never changes height. The popover is the address menu's (C7,
-// wallet-menu.tsx): a dropdown on desktop, a sheet below sm, closed by an
-// outside press and Escape; the rows take the Tools menu's keys.
+// The trail under the wallet heading (H13.4; ui-jobs 856, Miles 25–27 Nov
+// 2026): "5 positions ⌄ / Aave V3 ⌄ / ● Core ⌄", slash-separated, three menus
+// on the one panel (`ToolsMenu` variant `crumb`: a dropdown, a sheet below
+// sm).
 //
-// The menu is the first crumb of the trail under the address (H13.4; Miles,
-// 25 Nov 2026): "3 positions ⌄ / Aave V3 / Core ⟠", slash-separated. The
-// protocol crumb is the menu's row for the page's protocol, linking where
-// that row's listing does (`walletTrailCrumb`): the wallet view narrowed to
-// the protocol, which spans its chains. On a page that lists the wallet's
-// positions in one protocol it is the page and the trail ends there. On a
-// position page the position crumb follows, the detail card's name
-// (`usePositionCardName`) with its chain's glyph, as the page: the only
-// crumb that truncates. There the menu's row reads "this protocol"; on the
-// wallet page "this page". Where the page's position is the wallet's only
-// one the trail is the protocol and the position, with no menu.
+// The first crumb (H13.2) is the wallet and its protocols: "Wallet
+// dashboard", then one row per protocol and chain the wallet holds positions
+// in, each linking to the wallet view narrowed to the protocol, with a dot
+// for each status among its positions; the page's protocol row is ticked.
+// "Testnets not included" at the foot. Read after mount from
+// /api/chain/wallet/<address>/summary, so the page's render does not wait on
+// it; its line is held from first paint (a placeholder bar while the read is
+// out). Where the page's position is the wallet's only one there is no menu.
+//
+// The protocol crumb (H13.5) links to the narrowed view (`walletTrailCrumb`)
+// and is the page there; where the wallet holds two or more positions in the
+// protocol, across its chains, it opens their list: "All <protocol>
+// positions", then each position's dot and name (`summaryCrumb`), five at
+// most, then "N more". The position crumb is the detail card's name
+// (`usePositionCardName`) with its lifecycle dot, opening the card's menu.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -39,9 +32,7 @@ import { Prov } from "@/components/shared/provenance";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
-import { MobileSheet } from "@/components/shared/mobile-sheet";
-import { moveFocus } from "@/components/shared/tools-menu";
-import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
+import { ToolsMenu } from "@/components/shared/tools-menu";
 import {
   ARBITRUM_CHAIN_ID,
   ARC_CHAIN_ID,
@@ -52,7 +43,6 @@ import {
   type ChainId,
 } from "@/lib/shared/chains";
 import { menuProtocolOf, protocolEntryOf, protocolLabelOf, summaryCrumb } from "@/lib/wallet/position-protocol";
-import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import {
   MENU_TESTNETS,
   rowIsPage,
@@ -94,12 +84,10 @@ function readCounts(address: string): Promise<WalletCounts | null> {
 
 type Menu = ReturnType<typeof walletProtocolMenu<WalletCountsPosition>>;
 type Crumb = ReturnType<typeof walletTrailCrumb<WalletCountsPosition>>;
+type Row = ReturnType<typeof walletProtocolRows<WalletCountsPosition>>[number];
 
 const ROW = "mx-1 my-0.5 flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-left";
 const ROW_LINK = `${ROW} transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]`;
-// A position row under its protocol's, indented past the protocol's icons.
-const SUB_ROW = "mx-1 flex min-h-8 items-center gap-2 rounded-lg py-1 pl-[3.25rem] pr-3 text-left text-[13px]";
-const SUB_ROW_LINK = `${SUB_ROW} transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]`;
 /** The positions a protocol row lists before "N more". */
 const POSITIONS_SHOWN = 5;
 /** A summary row's status as the trail's dot reads it. */
@@ -122,7 +110,7 @@ const positionKey = (p: WalletCountsPosition) => `${p.chain}:${p.family}:${p.pos
 
 /** The selected row's tick. */
 function Tick() {
-  return <Check className="ml-auto size-3.5 shrink-0 text-foreground" aria-hidden="true" />;
+  return <Check className="ml-auto size-3.5 shrink-0 text-foreground" aria-hidden="true" data-menu-tick="" />;
 }
 
 const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />;
@@ -148,6 +136,18 @@ function ProtocolIcons({ p }: { p: WalletCountsPosition }) {
     </span>
   );
 }
+
+/** The order and words of the status dots on a protocol row. */
+const TONE_ORDER: TrailStatus["tone"][] = ["open", "muted", "danger", "caution"];
+const TONE_WORD: Record<TrailStatus["tone"], string> = {
+  open: "open",
+  muted: "closed",
+  danger: "liquidated",
+  caution: "shut down",
+};
+
+const andWords = (xs: string[]) =>
+  xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 
 export function WalletPositionsMenu({
   wallet,
@@ -182,31 +182,21 @@ export function WalletPositionsMenu({
   const pathname = usePathname();
   const address = wallet.toLowerCase();
   const [menu, setMenu] = useState<Menu | null>(null);
+  const [allRows, setAllRows] = useState<Row[]>([]);
   const [crumb, setCrumb] = useState<Crumb>(null);
-  // The positions whose page this is, ticked in the menu.
+  // The positions whose page this is, ticked in the protocol's menu.
   const [pageKeys, setPageKeys] = useState<Set<string>>(() => new Set());
   const crumbRef = useRef(onCrumb);
   crumbRef.current = onCrumb;
   // The summary read has answered (or failed): the placeholder goes.
   const [settled, setSettled] = useState(false);
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const isPhone = useMediaQuery(PHONE_QUERY);
-  const close = () => setOpen(false);
-  // Escape and the sheet's close hand focus back to the trigger.
-  const closeToTrigger = () => {
-    setOpen(false);
-    triggerRef.current?.focus();
-  };
 
   useEffect(() => {
     let live = true;
     setMenu(null);
+    setAllRows([]);
     setCrumb(null);
     setSettled(false);
-    setOpen(false);
     if (!ADDRESS.test(address)) {
       setSettled(true);
       crumbRef.current?.(false);
@@ -224,47 +214,17 @@ export function WalletPositionsMenu({
       setPageKeys(new Set(c.positions.filter(isPage).map(positionKey)));
       const protocolOf = (p: WalletCountsPosition) => menuProtocolOf(p, address);
       const dashboard = `/wallet/${address}`;
+      const rows = walletProtocolRows(c.positions, isPage, protocolOf, dashboard);
       setMenu(walletProtocolMenu(c.positions, isPage, protocolOf, dashboard));
-      setCrumb(
-        walletTrailCrumb(walletProtocolRows(c.positions, isPage, protocolOf, dashboard), pathname, search, page),
-      );
+      setAllRows(rows);
+      const found = walletTrailCrumb(rows, pathname, search, page);
+      setCrumb(found);
+      crumbRef.current?.(found != null);
     });
     return () => {
       live = false;
     };
   }, [address, pathname, givenSearch, page]);
-
-  // Outside press and Escape close the dropdown, as the address menu's do; the
-  // sheet closes from its scrim and Escape, and its rows are portalled outside
-  // `ref`.
-  useEffect(() => {
-    if (!open || isPhone) return;
-    const onPointer = (e: PointerEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      setOpen(false);
-      if (ref.current?.contains(document.activeElement)) triggerRef.current?.focus();
-    };
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, isPhone]);
-
-  // The first row takes focus as the menu opens, so the arrows move from there.
-  useEffect(() => {
-    if (!open) return;
-    const t = window.setTimeout(() =>
-      menuRef.current
-        ?.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])')
-        ?.focus({ preventScroll: true }),
-    );
-    return () => window.clearTimeout(t);
-  }, [open, isPhone]);
 
   // The position crumb stands whatever the summary read answers: the card
   // leaves its name to it.
@@ -276,198 +236,128 @@ export function WalletPositionsMenu({
       </div>
     );
   const dashboard = `/wallet/${address}`;
-  // On a wallet page the crumb's row is the page.
   const isPageRow = (p: WalletCountsPosition) => pageKeys.has(positionKey(p));
   const here = (key: string) => page === "wallet" && crumb?.current === true && crumb.keys.includes(key);
 
-  const rows = menu && (
-    <>
-      {menu.rows.map((r) => {
-        const hook = { "data-wallet-protocol-row": r.key, "data-family": r.first.family };
-        // The protocol row is the page on its narrowed view, ticked there:
-        // no position is selected (ui-jobs 856).
-        const rowHere = here(r.key);
-        const body = (
-          <>
-            <ProtocolIcons p={r.first} />
-            <span className="min-w-0 truncate">{r.name}</span>
-            {rowHere && <Tick />}
-          </>
-        );
-        // Its positions under it, five at most, the page's among them; past
-        // five, "N more" opens the protocol's narrowed view.
-        const pageOnes = r.positions.filter(isPageRow);
-        const shown = [...pageOnes, ...r.positions.filter((p) => !isPageRow(p))]
-          .slice(0, POSITIONS_SHOWN)
-          .sort((a, b) => r.positions.indexOf(a) - r.positions.indexOf(b));
-        const more = r.positions.length - shown.length;
-        return (
-          <div key={r.key} role="none">
-            {rowHere ? (
-              <div
-                role="menuitem"
-                aria-disabled="true"
-                aria-current="page"
-                tabIndex={-1}
-                className={`${ROW} text-sm text-foreground`}
-                {...hook}
-              >
-                {body}
-              </div>
-            ) : (
-              <Link
-                href={r.listing}
-                prefetch={false}
-                role="menuitem"
-                className={`${ROW_LINK} text-sm text-foreground`}
-                onClick={close}
-                {...hook}
-              >
-                {body}
-              </Link>
-            )}
-            {shown.map((p) => {
-              const sub = (
-                <>
-                  <StatusDot tone={SUMMARY_TONE[p.status]} />
-                  <span className="sr-only">{STATUS_WORD[p.status]}: </span>
-                  <span className="min-w-0 truncate">{summaryCrumb(p, address)}</span>
-                </>
-              );
-              const subHook = { "data-wallet-position-row": p.positionId, "data-wallet-position-status": p.status };
-              const title = STATUS_WORD[p.status];
-              return isPageRow(p) || !p.href ? (
-                <div
-                  key={p.positionId}
-                  role="menuitem"
-                  aria-disabled="true"
-                  aria-current={isPageRow(p) ? "page" : undefined}
-                  tabIndex={-1}
-                  title={title}
-                  className={`${SUB_ROW} text-foreground`}
-                  {...subHook}
-                >
-                  {sub}
-                  {isPageRow(p) && <Tick />}
-                </div>
-              ) : (
-                <Link
-                  key={p.positionId}
-                  href={p.href}
-                  prefetch={false}
-                  role="menuitem"
-                  title={title}
-                  className={`${SUB_ROW_LINK} text-rb-500 hover:text-foreground`}
-                  onClick={close}
-                  {...subHook}
-                >
-                  {sub}
-                </Link>
-              );
-            })}
-            {more > 0 && (
-              <Link
-                href={r.listing}
-                prefetch={false}
-                role="menuitem"
-                className={`${SUB_ROW_LINK} text-[var(--text-link)]`}
-                onClick={close}
-                data-wallet-positions-more={more}
-              >
-                {more.toLocaleString("en-US")} more
-              </Link>
-            )}
+  // The first crumb's rows: the dashboard, then each protocol and chain with
+  // its status dots, the page's ticked.
+  const walletRows = (close: () => void) =>
+    menu && (
+      <>
+        {onDashboard ? (
+          <div
+            role="menuitem"
+            aria-disabled="true"
+            aria-current="page"
+            tabIndex={-1}
+            className={`${ROW} text-sm text-foreground`}
+            data-wallet-positions-dashboard=""
+          >
+            Wallet dashboard
+            <Tick />
           </div>
-        );
-      })}
-      {DIVIDER}
-      {onDashboard ? (
-        <div
-          role="menuitem"
-          aria-disabled="true"
-          aria-current="page"
-          tabIndex={-1}
-          className={`${ROW} text-sm text-foreground`}
-          data-wallet-positions-dashboard=""
-        >
-          Wallet dashboard
+        ) : (
+          <Link
+            href={dashboard}
+            prefetch={false}
+            role="menuitem"
+            className={`${ROW_LINK} text-sm text-[var(--text-link)]`}
+            onClick={close}
+            data-wallet-positions-dashboard=""
+          >
+            Wallet dashboard
+          </Link>
+        )}
+        {DIVIDER}
+        {menu.rows.map((r) => {
+          const tones = TONE_ORDER.filter((t) => r.positions.some((p) => SUMMARY_TONE[p.status] === t));
+          const chain = chainMeta(CHAIN_ID[r.first.chain]).name;
+          const label = `${r.name} on ${chain}: ${andWords(tones.map((t) => TONE_WORD[t]))} ${r.positions.length === 1 ? "position" : "positions"}`;
+          const ticked = r.page || here(r.key);
+          const hook = {
+            "data-wallet-protocol-row": r.key,
+            "data-family": r.first.family,
+            "data-wallet-protocol-statuses": tones.join(" "),
+          };
+          const body = (
+            <>
+              <ProtocolIcons p={r.first} />
+              <span className="min-w-0 truncate" aria-hidden="true">
+                {r.name}
+              </span>
+              <span className="ml-auto flex shrink-0 items-center gap-1 pl-3" aria-hidden="true">
+                {tones.map((t) => (
+                  <StatusDot key={t} tone={t} />
+                ))}
+              </span>
+              {ticked ? (
+                <Check className="size-3.5 shrink-0 text-foreground" aria-hidden="true" data-menu-tick="" />
+              ) : (
+                <span className="w-3.5 shrink-0" aria-hidden="true" />
+              )}
+            </>
+          );
+          return here(r.key) ? (
+            <div
+              key={r.key}
+              role="menuitem"
+              aria-disabled="true"
+              aria-current="page"
+              aria-label={label}
+              tabIndex={-1}
+              className={`${ROW} text-sm text-foreground`}
+              {...hook}
+            >
+              {body}
+            </div>
+          ) : (
+            <Link
+              key={r.key}
+              href={r.listing}
+              prefetch={false}
+              role="menuitem"
+              aria-label={label}
+              className={`${ROW_LINK} text-sm text-foreground`}
+              onClick={close}
+              {...hook}
+            >
+              {body}
+            </Link>
+          );
+        })}
+        <div className="px-4 pb-1.5 pt-1 text-xs text-rb-500" data-wallet-positions-testnets="">
+          {MENU_TESTNETS}
         </div>
-      ) : (
-        <Link
-          href={dashboard}
-          prefetch={false}
-          role="menuitem"
-          className={`${ROW_LINK} text-sm text-[var(--text-link)]`}
-          onClick={close}
-          data-wallet-positions-dashboard=""
-        >
-          Wallet dashboard
-        </Link>
-      )}
-      <div className="px-4 pb-1.5 pt-1 text-xs text-rb-500" data-wallet-positions-testnets="">
-        {MENU_TESTNETS}
-      </div>
-    </>
-  );
+      </>
+    );
 
   const dropdown = menu && (
-    <div
-      ref={ref}
-      className="relative flex shrink-0"
-      data-anatomy="H13.2"
-      data-wallet-positions-menu=""
-      data-wallet-elsewhere={menu.pageCounted ? "others" : "all"}
-    >
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-current={onDashboard ? "page" : undefined}
-        // A 20px row with a 36px press area (after:), neutral as the address
-        // menu's trigger is. On the dashboard it is the current page, in the
-        // foreground as the other current crumbs.
-        className={`relative -mx-1 flex h-5 cursor-pointer items-center gap-0.5 rounded-md px-1 text-xs transition-colors focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-[''] ${
-          open || onDashboard ? "text-foreground" : "text-rb-500 hover:text-foreground"
-        }`}
-        data-wallet-positions-trigger=""
-      >
-        {menu.trigger}
-        <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
-          aria-hidden="true"
-        />
-      </button>
-      {open &&
-        (isPhone ? (
-          <MobileSheet
-            label="Positions menu"
-            onClose={closeToTrigger}
-            header={<div className={`${OVERLAY_HEADING} px-1 pb-2`}>Positions</div>}
+    <span className="flex shrink-0">
+      <ToolsMenu
+        variant="crumb"
+        label={`${menu.trigger}: wallet menu`}
+        heading="Positions"
+        current={onDashboard}
+        hooks={{
+          "data-anatomy": "H13.2",
+          "data-wallet-positions-menu": "",
+          "data-wallet-elsewhere": menu.pageCounted ? "others" : "all",
+        }}
+        leading={walletRows}
+        trigger={(open) => (
+          <span
+            className={`flex items-center gap-0.5 ${open || onDashboard ? "text-foreground" : "text-rb-500 hover:text-foreground"}`}
+            data-wallet-positions-trigger=""
           >
-            <div
-              ref={menuRef}
-              role="menu"
-              aria-label="Positions"
-              onKeyDown={moveFocus}
-              className="-mx-4 [&_[role=menuitem]]:min-h-11"
-            >
-              {rows}
-            </div>
-          </MobileSheet>
-        ) : (
-          <div
-            ref={menuRef}
-            className="overlay-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 max-h-[70vh] w-max min-w-[240px] max-w-[min(22rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain py-1"
-            role="menu"
-            aria-label="Positions"
-            onKeyDown={moveFocus}
-          >
-            {rows}
-          </div>
-        ))}
-    </div>
+            {menu.trigger}
+            <ChevronDown
+              className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            />
+          </span>
+        )}
+      />
+    </span>
   );
 
   // On a phone, where the card's sidebar is a bare strip, the card's
@@ -488,6 +378,129 @@ export function WalletPositionsMenu({
       <span className="whitespace-nowrap">{crumb.row.name}</span>
     </>
   );
+
+  // The protocol's positions across its chains: the rows the narrowed view
+  // lists (the same page), or the crumb's row alone where it has none.
+  const group = crumb
+    ? crumb.row.listed
+      ? allRows.filter((r) => r.listed && r.listing === crumb.row.listing)
+      : [crumb.row]
+    : [];
+  const protocolPositions = group.flatMap((r) => r.positions);
+  const protocolMenu =
+    crumb && protocolPositions.length >= 2 ? (
+      <span className="flex shrink-0">
+        <ToolsMenu
+          variant="crumb"
+          label={`${crumb.row.name} positions`}
+          heading={`${crumb.row.name} positions`}
+          current={crumb.current}
+          hooks={{
+            "data-anatomy": "H13.5",
+            "data-wallet-trail-protocol": crumb.row.key,
+            "data-wallet-protocol-menu": "",
+          }}
+          leading={(close) => {
+            const shown = [...protocolPositions.filter(isPageRow), ...protocolPositions.filter((p) => !isPageRow(p))]
+              .slice(0, POSITIONS_SHOWN)
+              .sort((a, b) => protocolPositions.indexOf(a) - protocolPositions.indexOf(b));
+            const more = protocolPositions.length - shown.length;
+            const all = `All ${crumb.row.name} positions`;
+            return (
+              <>
+                {crumb.current ? (
+                  <div
+                    role="menuitem"
+                    aria-disabled="true"
+                    aria-current="page"
+                    tabIndex={-1}
+                    className={`${ROW} text-sm text-foreground`}
+                    data-wallet-protocol-all=""
+                  >
+                    {all}
+                    <Tick />
+                  </div>
+                ) : (
+                  <Link
+                    href={crumb.row.listing}
+                    prefetch={false}
+                    role="menuitem"
+                    className={`${ROW_LINK} text-sm text-[var(--text-link)]`}
+                    onClick={close}
+                    data-wallet-protocol-all=""
+                  >
+                    {all}
+                  </Link>
+                )}
+                {DIVIDER}
+                {shown.map((p) => {
+                  const body = (
+                    <>
+                      <StatusDot tone={SUMMARY_TONE[p.status]} />
+                      <span className="sr-only">{STATUS_WORD[p.status]}: </span>
+                      <span className="min-w-0 truncate">{summaryCrumb(p, address)}</span>
+                    </>
+                  );
+                  const hook = { "data-wallet-position-row": p.positionId, "data-wallet-position-status": p.status };
+                  return isPageRow(p) || !p.href ? (
+                    <div
+                      key={positionKey(p)}
+                      role="menuitem"
+                      aria-disabled="true"
+                      aria-current={isPageRow(p) ? "page" : undefined}
+                      tabIndex={-1}
+                      title={STATUS_WORD[p.status]}
+                      className={`${ROW} text-sm text-foreground`}
+                      {...hook}
+                    >
+                      {body}
+                      {isPageRow(p) && <Tick />}
+                    </div>
+                  ) : (
+                    <Link
+                      key={positionKey(p)}
+                      href={p.href}
+                      prefetch={false}
+                      role="menuitem"
+                      title={STATUS_WORD[p.status]}
+                      className={`${ROW_LINK} text-sm text-foreground`}
+                      onClick={close}
+                      {...hook}
+                    >
+                      {body}
+                    </Link>
+                  );
+                })}
+                {more > 0 && (
+                  <Link
+                    href={crumb.row.listing}
+                    prefetch={false}
+                    role="menuitem"
+                    className={`${ROW_LINK} text-sm text-[var(--text-link)]`}
+                    onClick={close}
+                    data-wallet-positions-more={more}
+                  >
+                    {more.toLocaleString("en-US")} more
+                  </Link>
+                )}
+              </>
+            );
+          }}
+          trigger={(open) => (
+            <span
+              className={`flex items-center gap-1 whitespace-nowrap ${crumb.current || open ? "text-foreground" : "text-rb-500 hover:text-foreground"}`}
+            >
+              {protocolBody}
+              <ChevronDown
+                className={`size-3.5 shrink-0 text-rb-500 transition-transform ${open ? "rotate-180" : ""}`}
+                aria-hidden="true"
+              />
+            </span>
+          )}
+        />
+      </span>
+    ) : null;
+
   // The dot's words: the pill's, with its read-more where it has one.
   const statusTip = status && (status.tip ? `${status.word}. ${status.tip}` : status.word);
   return (
@@ -502,24 +515,25 @@ export function WalletPositionsMenu({
       {crumb && (
         <>
           {dropdown && SLASH}
-          {crumb.current ? (
-            <span
-              aria-current="page"
-              className="flex shrink-0 items-center gap-1 text-foreground"
-              data-wallet-trail-protocol={crumb.row.key}
-            >
-              {protocolBody}
-            </span>
-          ) : (
-            <Link
-              href={crumb.href}
-              prefetch={false}
-              className="relative -mx-1 flex h-5 shrink-0 items-center gap-1 rounded-md px-1 text-rb-500 transition-colors hover:text-foreground focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']"
-              data-wallet-trail-protocol={crumb.row.key}
-            >
-              {protocolBody}
-            </Link>
-          )}
+          {protocolMenu ??
+            (crumb.current ? (
+              <span
+                aria-current="page"
+                className="flex shrink-0 items-center gap-1 text-foreground"
+                data-wallet-trail-protocol={crumb.row.key}
+              >
+                {protocolBody}
+              </span>
+            ) : (
+              <Link
+                href={crumb.href}
+                prefetch={false}
+                className="relative -mx-1 flex h-5 shrink-0 items-center gap-1 rounded-md px-1 text-rb-500 transition-colors hover:text-foreground focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']"
+                data-wallet-trail-protocol={crumb.row.key}
+              >
+                {protocolBody}
+              </Link>
+            ))}
         </>
       )}
       {named && (

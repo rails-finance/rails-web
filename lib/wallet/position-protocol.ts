@@ -57,11 +57,27 @@ export function menuProtocolOf(p: WalletCountsPosition, address: string): MenuPr
 export function summaryCrumb(p: WalletCountsPosition, wallet: string): string {
   const w = wallet.toLowerCase();
   const entry = protocolEntryOf(p);
-  const noun = entry ? POSITION_NOUN[entry.session] : "Position";
+  // A vault share is a holding, whichever explorer its page sits under; a
+  // Stability Pool deposit and a Liquity V1 stake take their cards' nouns
+  // and pools (v1-sp-deposit-card, v1-staking-card).
+  const path = p.href?.split("?")[0] ?? "";
+  const pool = path.includes("/stability-pool/");
+  const stake = path.includes("/staking/");
+  const noun =
+    p.family === VAULT_SHARES_FAMILY
+      ? "Holding"
+      : pool
+        ? "Deposit"
+        : stake
+          ? "LQTY stake"
+          : entry
+            ? POSITION_NOUN[entry.session]
+            : "Position";
+  const label = p.market ?? (pool ? "Stability Pool" : stake ? "Staking" : undefined);
   const market = p.market?.toLowerCase();
   const parts = p.positionId.split(":").filter((x) => x.toLowerCase() !== market);
   const raw = parts.find((x) => x.toLowerCase().includes(w)) ?? parts[parts.length - 1] ?? p.positionId;
   const id = raw.toLowerCase().includes(w) ? w : raw;
   const chain = Object.values(CHAINS).find((c) => c.slug === p.chain)?.name;
-  return positionCrumb(positionName({ market: p.market, noun, id }), w, chain);
+  return positionCrumb(positionName({ market: label, noun, id }), w, chain);
 }

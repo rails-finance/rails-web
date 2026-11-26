@@ -138,6 +138,8 @@ export function ToolsMenu({
   heading,
   noun = "position",
   trigger,
+  current = false,
+  hooks,
   children,
 }: {
   /** `tools`: the spanner trigger of a page row. `card`: the position card's
@@ -151,6 +153,11 @@ export function ToolsMenu({
    *  card menu's rows opened from the wallet heading's position crumb
    *  (H13.4; ui-jobs 856), its panel opening left. */
   trigger?: (open: boolean) => ReactNode;
+  /** The `crumb` menu's trigger is the current page (`aria-current`). */
+  current?: boolean;
+  /** The `crumb` menu's wrapper hooks, in place of the card menu's: the
+   *  trail's positions and protocol menus (H13.2, H13.5). */
+  hooks?: Record<string, string>;
   /** Rows above the export shapes (the card's ID, NFT and page link), handed
    *  the menu's close like `children`. */
   leading?: (close: () => void) => ReactNode;
@@ -244,7 +251,12 @@ export function ToolsMenu({
           : eventMenu
             ? { "data-event-menu": "" }
             : crumb
-              ? { "data-export-menu": "", "data-tools-menu": "", "data-card-menu": "", "data-position-crumb-menu": "" }
+              ? (hooks ?? {
+                  "data-export-menu": "",
+                  "data-tools-menu": "",
+                  "data-card-menu": "",
+                  "data-position-crumb-menu": "",
+                })
               : { "data-export-menu": "", "data-tools-menu": "", "data-card-menu": "", "data-anatomy": "C17" };
     return (
       <div ref={ref} className={crumb ? "relative flex min-w-0" : "relative flex"} {...wrapperData}>
@@ -254,6 +266,7 @@ export function ToolsMenu({
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-haspopup="menu"
+          aria-current={crumb && current ? "page" : undefined}
           aria-label={copied ? "Copied" : ariaLabel ? `${name}: ${ariaLabel}` : name}
           // A 28px glyph with a 44px press area: the after: box reaches past
           // the button without moving the strip.
@@ -262,7 +275,7 @@ export function ToolsMenu({
               ? // The crumb's words: a 20px row with a 36px press area. No
                 // max-w-full: the -mx-1 makes the wrapper 8px narrower than
                 // the button, and a 100% cap cut the name by that much.
-                `relative -mx-1 flex h-5 min-w-0 cursor-pointer items-center gap-1 rounded-md px-1 text-left text-foreground transition-colors focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']`
+                `relative -mx-1 flex h-5 min-w-0 cursor-pointer items-center gap-1 rounded-md px-1 text-left transition-colors focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']`
               : variant === "view"
                 ? // The listing's ⋮ as a neutral pill button, beside the sort
                   // (ui-jobs 735).
@@ -283,7 +296,11 @@ export function ToolsMenu({
             <MobileSheet
               label={name}
               onClose={closeToTrigger}
-              header={<div className={`${OVERLAY_HEADING} px-1 pb-2`}>{eventMenu ? heading : "Position"}</div>}
+              header={
+                <div className={`${OVERLAY_HEADING} px-1 pb-2`}>
+                  {eventMenu || (crumb && heading) ? heading : "Position"}
+                </div>
+              }
             >
               <div
                 ref={menuRef}
@@ -298,7 +315,7 @@ export function ToolsMenu({
           ) : (
             <div
               ref={menuRef}
-              className={`overlay-panel absolute ${crumb ? "left-0" : "right-0"} top-full z-[var(--z-dropdown)] mt-2 min-w-[260px] overflow-hidden py-1`}
+              className={`overlay-panel absolute ${crumb ? "left-0 max-h-[70vh] w-max max-w-[min(22rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain" : "right-0 overflow-hidden"} top-full z-[var(--z-dropdown)] mt-2 min-w-[260px] py-1`}
               role="menu"
               aria-label={name}
               onKeyDown={moveFocus}

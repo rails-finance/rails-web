@@ -106,3 +106,11 @@ test("the trail's crumb leaves out an id that is the wallet", () => {
   );
   assert.equal(positionCrumb(positionName({ market: "ETH-A", noun: "Vault", id: "31951" }), w), "ETH-A · Vault #31951");
 });
+
+test("a lending account with no market takes its chain's name; any other noun stands", () => {
+  const w = "0x3dF83ec9d2b62bb9bb83eba1218a202564bb67da";
+  assert.equal(positionCrumb(positionName({ noun: "Position", id: w }), w, "Arbitrum"), "Arbitrum");
+  assert.equal(positionCrumb(positionName({ market: "Core", noun: "Position", id: w }), w, "Ethereum"), "Core");
+  assert.equal(positionCrumb(positionName({ noun: "Trove", id: w }), w, "Ethereum"), "Trove");
+  assert.equal(positionCrumb(positionName({ noun: "Deposit", id: w }), w, "Ethereum"), "Deposit");
+});
