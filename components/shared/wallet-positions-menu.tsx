@@ -42,7 +42,8 @@ import {
   chainMeta,
   type ChainId,
 } from "@/lib/shared/chains";
-import { menuProtocolOf, protocolEntryOf, protocolLabelOf, summaryCrumb } from "@/lib/wallet/position-protocol";
+import { menuProtocolOf, protocolEntryOf, summaryCrumb } from "@/lib/wallet/position-protocol";
+import { walletProtocol, walletProtocolHref } from "@/lib/wallet/wallet-filters";
 import {
   MENU_TESTNETS,
   rowIsPage,
@@ -120,21 +121,51 @@ const SLASH = (
   </span>
 );
 
-/** The protocol's and the chain's icons, each named for screen readers and on hover. */
-function ProtocolIcons({ p }: { p: WalletCountsPosition }) {
+/** The protocol's mark, named for screen readers and on hover. */
+function ProtocolMark({ p, name }: { p: WalletCountsPosition; name: string }) {
   const entry = protocolEntryOf(p);
-  const protocol = protocolLabelOf(p);
-  const chain = chainMeta(CHAIN_ID[p.chain]).name;
   return (
-    <span className="flex shrink-0 items-center gap-1">
-      <span role="img" aria-label={protocol} title={protocol} className="flex" data-wallet-protocol-name={protocol}>
-        <ProtocolIcon id={entry?.id ?? p.family} className="size-4 shrink-0" />
-      </span>
-      <span role="img" aria-label={chain} title={chain} className="flex text-rb-500" data-wallet-protocol-chain={chain}>
-        <ChainGlyph id={CHAIN_ID[p.chain]} className="size-3.5 shrink-0" />
-      </span>
+    <span role="img" aria-label={name} title={name} className="flex shrink-0" data-wallet-protocol-name={name}>
+      <ProtocolIcon id={entry?.id ?? p.family} className="size-4 shrink-0" />
     </span>
   );
+}
+
+/** The menu's rows by protocol across its chains: the chains' rows of one
+ *  protocol name merge ("Aave V3" over Ethereum, Arbitrum and Base;
+ *  "MetaMorpho vaults" over Ethereum and Base), in the rows' order. A group
+ *  links to the wallet view narrowed to the protocol: its rows' one listing,
+ *  else the narrowed view of the family. */
+function protocolGroups(rows: Row[], address: string) {
+  const groups = new Map<
+    string,
+    {
+      key: string;
+      name: string;
+      first: WalletCountsPosition;
+      rows: Row[];
+      positions: WalletCountsPosition[];
+      href: string;
+    }
+  >();
+  for (const r of rows) {
+    const g = groups.get(r.name);
+    if (g) {
+      g.rows.push(r);
+      g.positions.push(...r.positions);
+      if (g.href !== r.listing)
+        g.href = walletProtocol(r.first.family) ? walletProtocolHref(address, r.first.family) : g.href;
+    } else
+      groups.set(r.name, {
+        key: r.key.split(":").slice(1).join(":"),
+        name: r.name,
+        first: r.first,
+        rows: [r],
+        positions: [...r.positions],
+        href: r.listing,
+      });
+  }
+  return [...groups.values()];
 }
 
 /** The order and words of the status dots on a protocol row. */
@@ -238,26 +269,28 @@ export function WalletPositionsMenu({
   const isPageRow = (p: WalletCountsPosition) => pageKeys.has(positionKey(p));
   const here = (key: string) => page === "wallet" && crumb?.current === true && crumb.keys.includes(key);
 
-  // The first crumb's rows: each protocol and chain with its status dots, the
-  // page's ticked. The dashboard is in the address menu (C7) and the facehash.
+  // The first crumb's rows: one per protocol across its chains (Miles, 27
+  // Nov 2026, ui-jobs 856), its status dots, the page's ticked. The
+  // dashboard is in the address menu (C7) and the facehash.
   const walletRows = (close: () => void) =>
     menu && (
       <>
-        {menu.rows.map((r) => {
-          const tones = TONE_ORDER.filter((t) => r.positions.some((p) => SUMMARY_TONE[p.status] === t));
-          const chain = chainMeta(CHAIN_ID[r.first.chain]).name;
-          const label = `${r.name} on ${chain}: ${andWords(tones.map((t) => TONE_WORD[t]))} ${r.positions.length === 1 ? "position" : "positions"}`;
-          const ticked = r.page || here(r.key);
+        {protocolGroups(menu.rows, address).map((g) => {
+          const tones = TONE_ORDER.filter((t) => g.positions.some((p) => SUMMARY_TONE[p.status] === t));
+          const label = `${g.name}: ${andWords(tones.map((t) => TONE_WORD[t]))} ${g.positions.length === 1 ? "position" : "positions"}`;
+          const current = g.rows.some((x) => here(x.key));
+          const ticked = current || g.rows.some((x) => x.page);
           const hook = {
-            "data-wallet-protocol-row": r.key,
-            "data-family": r.first.family,
+            "data-wallet-protocol-row": g.key,
+            "data-family": g.first.family,
+            "data-wallet-protocol-chains": g.rows.map((x) => x.first.chain).join(" "),
             "data-wallet-protocol-statuses": tones.join(" "),
           };
           const body = (
             <>
-              <ProtocolIcons p={r.first} />
+              <ProtocolMark p={g.first} name={g.name} />
               <span className="min-w-0 truncate" aria-hidden="true">
-                {r.name}
+                {g.name}
               </span>
               <span className="ml-auto flex shrink-0 items-center gap-1 pl-3" aria-hidden="true">
                 {tones.map((t) => (
@@ -271,9 +304,9 @@ export function WalletPositionsMenu({
               )}
             </>
           );
-          return here(r.key) ? (
+          return current ? (
             <div
-              key={r.key}
+              key={g.key}
               role="menuitem"
               aria-disabled="true"
               aria-current="page"
@@ -286,8 +319,8 @@ export function WalletPositionsMenu({
             </div>
           ) : (
             <Link
-              key={r.key}
-              href={r.listing}
+              key={g.key}
+              href={g.href}
               prefetch={false}
               role="menuitem"
               aria-label={label}
@@ -334,33 +367,29 @@ export function WalletPositionsMenu({
     </span>
   );
 
-  // The card's protocol mark and chain glyph lead the protocol at every width
-  // (Miles, 26 Nov 2026, ui-jobs 856). The narrowed view, which spans chains
-  // and draws no card, shows the protocol's mark alone.
-  const markNode = mark ? (
-    <span className="flex shrink-0 items-center gap-1" data-wallet-trail-mark="">
-      <span role="img" aria-label={mark.protocolName} title={mark.protocolName} className="flex">
-        <ProtocolIcon id={mark.protocolId} className="size-3.5 shrink-0" />
-      </span>
-      <span role="img" aria-label={mark.chainName} title={mark.chainName} className="flex">
-        <ChainGlyph id={mark.chainId} className="size-3.5 shrink-0" />
-      </span>
+  // The protocol's mark leads it at every width, with no chain glyph: the
+  // protocol spans chains (Miles, 27 Nov 2026, ui-jobs 856). The card's
+  // mark where a card hands one, else the summary row's.
+  const markId = mark?.protocolId ?? (crumb ? (protocolEntryOf(crumb.row.first)?.id ?? crumb.row.first.family) : null);
+  const markName = mark?.protocolName ?? crumb?.row.name;
+  const markNode = markId && (
+    <span role="img" aria-label={markName} title={markName} className="flex shrink-0" data-wallet-trail-mark="">
+      <ProtocolIcon id={markId} className="size-3.5 shrink-0" />
     </span>
-  ) : (
-    crumb && (
-      <span
-        role="img"
-        aria-label={crumb.row.name}
-        title={crumb.row.name}
-        className="flex shrink-0"
-        data-wallet-trail-mark=""
-      >
-        <ProtocolIcon
-          id={protocolEntryOf(crumb.row.first)?.id ?? crumb.row.first.family}
-          className="size-3.5 shrink-0"
-        />
-      </span>
-    )
+  );
+  // The position's chain, after its dot: the card's, else the summary row's.
+  const positionChain = mark?.chainId ?? (crumb ? CHAIN_ID[crumb.row.first.chain] : undefined);
+  const positionChainName = positionChain != null ? chainMeta(positionChain).name : undefined;
+  const chainNode = positionChain != null && (
+    <span
+      role="img"
+      aria-label={positionChainName}
+      title={positionChainName}
+      className="flex shrink-0 text-rb-500"
+      data-wallet-trail-chain=""
+    >
+      <ChainGlyph id={positionChain} className="size-3.5 shrink-0" />
+    </span>
   );
   const protocolBody = crumb && (
     <>
@@ -369,12 +398,9 @@ export function WalletPositionsMenu({
     </>
   );
 
-  // The protocol's positions across its chains: the rows the narrowed view
-  // lists (the same page), or the crumb's row alone where it has none.
+  // The protocol's positions across its chains: its rows of every chain.
   const group = crumb
-    ? crumb.row.listed
-      ? allRows.filter((r) => r.listed && r.listing === crumb.row.listing)
-      : [crumb.row]
+    ? (protocolGroups(allRows, address).find((g) => g.name === crumb.row.name)?.rows ?? [crumb.row])
     : [];
   const protocolPositions = group.flatMap((r) => r.positions);
   const protocolMenu =
@@ -558,6 +584,7 @@ export function WalletPositionsMenu({
                         <StatusDot tone={status.tone} />
                       </span>
                     )}
+                    {chainNode}
                     <span className="min-w-0 truncate">{named}</span>
                     <ChevronDown
                       className={`size-3.5 shrink-0 text-rb-500 transition-transform ${open ? "rotate-180" : ""}`}
@@ -581,6 +608,7 @@ export function WalletPositionsMenu({
                     </span>
                   </RevealTip>
                 )}
+                {chainNode}
                 <span title={named} className="min-w-0 truncate">
                   {named}
                 </span>

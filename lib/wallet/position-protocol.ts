@@ -22,13 +22,6 @@ export function protocolEntryOf(p: Pick<WalletCountsPosition, "chain" | "family"
   return PROTOCOLS.find((e) => e.chainId === chainId && e.slug === p.family);
 }
 
-/** The protocol a position's row names: a vault-share row its vault
- *  protocol ("MetaMorpho vaults" under Morpho's door), any other its
- *  explorer's label, else its family. */
-export function protocolLabelOf(p: Pick<WalletCountsPosition, "chain" | "family" | "href">): string {
-  return vaultProtocolOfHref(p.href) ?? protocolEntryOf(p)?.label ?? p.family;
-}
-
 /** A position's explorer on the roster: its name, its place, and the page of
  *  the wallet's positions in it: the wallet view narrowed to the protocol
  *  where the view reads it (Miles, 25 Nov 2026), else its listing searched by
