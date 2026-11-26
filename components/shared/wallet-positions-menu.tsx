@@ -397,7 +397,7 @@ export function WalletPositionsMenu({
       <span role="img" aria-label={mark.protocolName} title={mark.protocolName} className="flex">
         <ProtocolIcon id={mark.protocolId} className="size-3.5 shrink-0" />
       </span>
-      <span role="img" aria-label={mark.chainName} title={mark.chainName} className="flex text-rb-500">
+      <span role="img" aria-label={mark.chainName} title={mark.chainName} className="flex">
         <ChainGlyph id={mark.chainId} className="size-3.5 shrink-0" />
       </span>
     </span>
