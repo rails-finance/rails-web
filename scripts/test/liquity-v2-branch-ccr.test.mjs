@@ -1,6 +1,7 @@
 // A Liquity V2 branch against its CCR (ui-jobs 747): the TCR on the contract's
 // integers, the comparison with the CCR, the price at which the TCR meets the
-// SCR, and the notice drawn only below the CCR on a branch not shut down.
+// SCR, the notice drawn only below the CCR on a branch not shut down, and
+// whether one Trove's close passes closeTrove's CCR check (ui-jobs 858).
 // Figures: the WETH branch at block 26,444,500, priced at $1,748.45.
 // Run: npm test
 import test from "node:test";
@@ -11,6 +12,7 @@ import {
   settleAllBranchCcr,
   settleBranchCcr,
   tcrPercentText,
+  troveCloseCheck,
 } from "../../lib/liquity-v2/branch-ccr.ts";
 
 const at = { blockNumber: 26_444_500, blockTimestamp: 1_795_381_187 };
@@ -26,6 +28,7 @@ const weth = {
   ccrRaw: "1500000000000000000",
   scrRaw: "1100000000000000000",
   mcrRaw: "1100000000000000000",
+  bcrRaw: "100000000000000000",
   shutDown: false,
 };
 
@@ -75,4 +78,22 @@ test("the TCR prints floored to hundredths of a percent", () => {
   assert.equal(tcrPercentText("24467554292130450000"), "2,446.75%");
   const s = settleBranchCcr(weth, at);
   assert.equal(tcrPercentText(s.tcrRaw), "149.86%");
+});
+
+test("a close passes while (coll − Trove coll) × price ÷ (debt − Trove debt) ≥ CCR", () => {
+  const s = settleBranchCcr(weth, at);
+  // A Trove below the branch's TCR: taking it out lifts the branch.
+  const low = { collRaw: "3000000000000000000000", debtRaw: "4500000000000000000000000" };
+  const c = troveCloseCheck(s, low);
+  const coll = BigInt(weth.collRaw) - BigInt(low.collRaw);
+  const debt = BigInt(weth.debtRaw) - BigInt(low.debtRaw);
+  assert.equal(c.newTcrRaw, ((coll * BigInt(weth.priceRaw)) / debt).toString());
+  assert.equal(c.closes, true);
+  // A Trove above it: taking it out pulls the branch further down.
+  const high = { collRaw: "100000000000000000000", debtRaw: "50000000000000000000000" };
+  assert.equal(troveCloseCheck(s, high).closes, false);
+  assert.equal(troveCloseCheck(s, null), null);
+  assert.equal(troveCloseCheck(s, { collRaw: weth.collRaw, debtRaw: weth.debtRaw }), null);
+  assert.equal(s.bcr, 0.1);
+  assert.equal(settleBranchCcr({ ...weth, bcrRaw: null }, at).bcr, null);
 });
