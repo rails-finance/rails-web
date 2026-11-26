@@ -48,6 +48,20 @@ import {
 import { positionCrumb } from "@/lib/shared/position-name";
 import type { TrailPage } from "@/lib/wallet/summary-counts";
 
+/** The facehash at 28px below md and 40px from md. */
+function face(address: string) {
+  return (
+    <>
+      <span className="flex md:hidden">
+        <Facehash address={address} size={28} />
+      </span>
+      <span className="hidden md:flex">
+        <Facehash address={address} size={40} />
+      </span>
+    </>
+  );
+}
+
 /** The shell both surfaces draw. `title` is the name line (the h1 and what
  *  sits beside it), `lines` the text-xs lines under it, `end` the controls at
  *  the right. */
@@ -73,30 +87,37 @@ export function WalletHeading({
 } & { [k: `data-${string}`]: string | undefined }) {
   return (
     <div className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 ${className}`} {...data}>
-      {/* From md the 21px gap puts the name block on the cards' content edge:
-          the 40px bar, the card's 1px border and its 20px padding. */}
-      <div className="flex min-w-0 flex-auto basis-0 items-center gap-3 sm:basis-auto md:gap-[21px]">
+      {/* Below md a grid (Miles, 26 Nov 2026, ui-jobs 856): a 28px facehash
+          beside the name line, and the lines under both from the column's
+          left edge, so the trail takes the whole width. From md the 40px
+          facehash beside the name block, the 21px gap putting the block on
+          the cards' content edge: the 40px bar, the card's 1px border and
+          its 20px padding. */}
+      <div className="grid min-w-0 flex-auto basis-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1 sm:basis-auto md:flex md:gap-[21px]">
         {address && dashboard ? (
           <Link
             href={dashboard}
             prefetch={false}
             aria-label="Wallet dashboard"
             title="Wallet dashboard"
-            className="flex shrink-0 rounded-[9px] focus-ring"
+            className="flex shrink-0 rounded-[9px] focus-ring max-md:rounded-md"
             data-wallet-facehash-link=""
           >
-            <Facehash address={address} size={40} />
+            {face(address)}
           </Link>
         ) : address ? (
-          <Facehash address={address} size={40} />
+          <span className="flex shrink-0">{face(address)}</span>
         ) : (
-          <span className="block size-10 shrink-0 rounded-[9px] bg-rb-300/40 dark:bg-rb-700/40" aria-hidden />
+          <span
+            className="block size-7 shrink-0 rounded-md bg-rb-300/40 md:size-10 md:rounded-[9px] dark:bg-rb-700/40"
+            aria-hidden
+          />
         )}
-        <div className="flex min-w-0 flex-col gap-0.5">
+        <div className="contents md:flex md:min-w-0 md:flex-col md:gap-0.5">
           <div className="flex min-h-7 min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-rb-500">
             {title}
           </div>
-          {lines}
+          {lines && <div className="col-span-2 flex min-w-0 flex-col gap-0.5">{lines}</div>}
         </div>
       </div>
       {end}
