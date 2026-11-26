@@ -5,8 +5,8 @@
 // on the one panel (`ToolsMenu` variant `crumb`: a dropdown, a sheet below
 // sm).
 //
-// The first crumb (H13.2) is the wallet and its protocols: "Wallet
-// dashboard", then one row per protocol and chain the wallet holds positions
+// The first crumb (H13.2) is the wallet's protocols: one row per protocol
+// and chain the wallet holds positions
 // in, each linking to the wallet view narrowed to the protocol, with a dot
 // for each status among its positions; the page's protocol row is ticked.
 // "Testnets not included" at the foot. Read after mount from
@@ -235,40 +235,14 @@ export function WalletPositionsMenu({
         {!settled && <SkeletonBar width={72} />}
       </div>
     );
-  const dashboard = `/wallet/${address}`;
   const isPageRow = (p: WalletCountsPosition) => pageKeys.has(positionKey(p));
   const here = (key: string) => page === "wallet" && crumb?.current === true && crumb.keys.includes(key);
 
-  // The first crumb's rows: the dashboard, then each protocol and chain with
-  // its status dots, the page's ticked.
+  // The first crumb's rows: each protocol and chain with its status dots, the
+  // page's ticked. The dashboard is in the address menu (C7) and the facehash.
   const walletRows = (close: () => void) =>
     menu && (
       <>
-        {onDashboard ? (
-          <div
-            role="menuitem"
-            aria-disabled="true"
-            aria-current="page"
-            tabIndex={-1}
-            className={`${ROW} text-sm text-foreground`}
-            data-wallet-positions-dashboard=""
-          >
-            Wallet dashboard
-            <Tick />
-          </div>
-        ) : (
-          <Link
-            href={dashboard}
-            prefetch={false}
-            role="menuitem"
-            className={`${ROW_LINK} text-sm text-[var(--text-link)]`}
-            onClick={close}
-            data-wallet-positions-dashboard=""
-          >
-            Wallet dashboard
-          </Link>
-        )}
-        {DIVIDER}
         {menu.rows.map((r) => {
           const tones = TONE_ORDER.filter((t) => r.positions.some((p) => SUMMARY_TONE[p.status] === t));
           const chain = chainMeta(CHAIN_ID[r.first.chain]).name;
@@ -546,15 +520,15 @@ export function WalletPositionsMenu({
             data-wallet-trail-position=""
           >
             {cardMenu ? (
-              // The card's ⋮ menu, opened from the crumb: the status row
-              // first (ui-jobs 856).
+              // The card's ⋮ menu, opened from the crumb; the dot's tooltip
+              // names the status (ui-jobs 856).
               cardMenu({
                 trigger: (open) => (
                   <>
                     {status && (
                       <span
                         className="flex size-3.5 shrink-0 items-center justify-center"
-                        title={status.word}
+                        title={statusTip ?? status.word}
                         data-wallet-trail-status={status.tone}
                       >
                         <StatusDot tone={status.tone} />
@@ -568,27 +542,6 @@ export function WalletPositionsMenu({
                   </>
                 ),
                 label: status ? `${named}, ${status.word}: position menu` : `${named}: position menu`,
-                top: status && (
-                  <>
-                    <div
-                      role="none"
-                      className="mx-1 my-0.5 flex items-start gap-2 px-3 py-1.5"
-                      data-trail-status-row=""
-                    >
-                      <span className="flex h-5 w-4 shrink-0 items-center justify-center">
-                        <StatusDot tone={status.tone} />
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-sm text-foreground">
-                          <span className="text-rb-500">Status: </span>
-                          {status.prov ? <Prov info={status.prov}>{status.word}</Prov> : status.word}
-                        </div>
-                        {status.tip && <p className="mt-0.5 text-xs leading-relaxed text-rb-500">{status.tip}</p>}
-                      </div>
-                    </div>
-                    {DIVIDER}
-                  </>
-                ),
               })
             ) : (
               <>
