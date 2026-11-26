@@ -9,7 +9,7 @@
 // One part per surface, keyed off `anatomy`:
 // - C23·liquity, the Trove card: the owner's answer at rest (whether this
 //   Trove's close goes through, what stays open, the delegated-rate floor for
-//   a Trove in a batch), the rules behind the app's one disclosure control
+//   a Trove in a batch, a line for a dormant Trove), the rules behind the app's one disclosure control
 //   (components/shared/disclosure.ts, the DiscChevron, the whole notice as
 //   the row target);
 // - N8·liquity, the listing: the headline and one sentence of rules;
@@ -19,7 +19,15 @@
 // The rules are BorrowerOperations' (liquity/bold contracts/src):
 // - closeTrove takes the Trove's entire collateral and debt out of the branch
 //   and calls _requireNewTCRisAboveCCR on what is left (troveCloseCheck in
-//   lib/liquity-v2/branch-ccr.ts); _openTrove calls it too;
+//   lib/liquity-v2/branch-ccr.ts); _openTrove calls it too. The card gives no
+//   close answer on a lastGoodPrice read: closeTrove calls fetchPrice, which
+//   may shut the branch down where its simulation failed;
+// - a dormant (zombie) Trove: closeTrove takes it (_requireTroveIsOpen), and
+//   adjustTrove, addColl, repayBold and the rate and delegate calls revert
+//   (_requireTroveIsActive); adjustZombieTrove must leave its debt at or above
+//   MIN_DEBT (_requireAtLeastMinDebt in _adjustTrove), so under the minimum it
+//   has to borrow, which below the CCR passes only where the branch ends at or
+//   above CCR (zombieMustBorrow in lib/liquity-v2/branch-ccr.ts);
 // - _requireValidAdjustmentInCurrentMode below the CCR: borrowing only if the
 //   branch ends at or above CCR (_requireNoBorrowingUnlessNewTCRisAboveCCR), a
 //   collateral withdrawal needs a repayment of at least its value
@@ -30,7 +38,7 @@
 // - _applyUpfrontFee adds the upfront fee to the debt and calls
 //   _requireNewTCRisAboveCCR, so below the CCR it always reverts. It runs on a
 //   rate change inside the 7-day cooldown (adjustTroveInterestRate;
-//   _removeFromBatch with a new rate; setBatchManagerAnnualInterestRate's own
+//   _removeFromBatch with a new rate; setBatchManagerAnnualInterestRate's
 //   copy of the check) and on every setInterestBatchManager. switchBatchManager
 //   is removeFromBatch at the old batch's rate (no fee) then
 //   setInterestBatchManager, so joining or switching a batch manager is
@@ -55,6 +63,7 @@ import {
   ccrNoticeShown,
   tcrPercentText,
   troveCloseCheck,
+  zombieMustBorrow,
   type LiquityV2BranchCcr,
   type TroveCloseInput,
 } from "@/lib/liquity-v2/branch-ccr";
@@ -75,10 +84,11 @@ type Anatomy = "C23·liquity" | "M6.2" | "N8·liquity";
 
 /** The Trove the card is about (C23·liquity). `figures` is its live
  *  getLatestTroveData, null until that read lands; `delegated` is its batch
- *  membership. */
+ *  membership; `isZombie` is the index's dormant flag. */
 export interface CcrNoticeTrove {
   id: string;
   delegated: boolean;
+  isZombie: boolean;
   figures: TroveCloseInput | null;
 }
 
@@ -156,6 +166,10 @@ function Notice({
   const onCard = anatomy === "C23·liquity";
   const ccr = whole(s.ccr);
   const floorProv = branchBatchFloorProv(s);
+  // The floor sentence spells out the MCR: always on the branches page, on the
+  // card where the Trove has a delegated rate. The liquidation sentence then
+  // names it short.
+  const mcrSpelled = !onCard || trove?.delegated === true;
   const floor =
     s.bcr != null && floorProv ? (
       <>
@@ -199,12 +213,18 @@ function Notice({
                 Opening a Trove, closing one and borrowing more are blocked unless they bring the branch back to {ccr}.
                 A rate change inside the 7-day cooldown, and joining or switching a delegate, are blocked, since each
                 charges the upfront fee. Withdrawing collateral needs a repayment of at least its value in the same
-                adjustment. A Trove with a delegated rate must stay at or above {floor}.
+                adjustment. For a Trove with a delegated rate, each change must leave it at or above {floor}.
               </p>
             )}
             <p>
-              Liquidation is unchanged: a Trove is liquidated only below its {whole(s.mcr)} Minimum Collateral Ratio
-              (MCR).
+              {mcrSpelled ? (
+                <>Liquidation is unchanged: a Trove is liquidated only below the {whole(s.mcr)} MCR.</>
+              ) : (
+                <>
+                  Liquidation is unchanged: a Trove is liquidated only below its {whole(s.mcr)} Minimum Collateral Ratio
+                  (MCR).
+                </>
+              )}
             </p>
             <p>
               At today&rsquo;s collateral and debt, the branch falls to its Shutdown Collateral Ratio (SCR) of{" "}
@@ -234,28 +254,37 @@ function TroveAnswer({
   const ccr = whole(s.ccr);
   const closeProv = check && trove ? troveCloseTcrProv(s, check, trove.id) : null;
   const minDebt = `${LIQUITY_MIN_DEBT.toLocaleString("en-US")} BOLD`;
+  const zombie = trove?.isZombie === true;
+  const subject = zombie ? "This dormant Trove" : "This Trove";
   return (
-    <p data-branch-ccr-close={check ? (check.closes ? "yes" : "no") : undefined}>
+    <p
+      data-branch-ccr-close={check ? (check.closes ? "yes" : "no") : undefined}
+      data-branch-ccr-dormant={zombie ? "" : undefined}
+    >
       {check && closeProv ? (
         check.closes ? (
           <>
-            This Trove <Prov info={closeProv}>can be closed</Prov>: closing it leaves the branch at or above {ccr}.
-            Repaying, down to the {minDebt} minimum debt, and adding collateral stay open.
+            {subject} <Prov info={closeProv}>can be closed</Prov>: closing it leaves the branch at or above {ccr}.{" "}
           </>
         ) : (
           <>
-            This Trove <Prov info={closeProv}>can&rsquo;t be closed</Prov> until the branch is back at {ccr}. Repaying,
-            down to the {minDebt} minimum debt, and adding collateral stay open.
+            {subject} <Prov info={closeProv}>can&rsquo;t be closed</Prov> until the branch is back at {ccr}.{" "}
           </>
         )
+      ) : null}
+      {zombie && zombieMustBorrow(trove?.figures, LIQUITY_MIN_DEBT) ? (
+        <>
+          {check ? "Any other change" : "Apart from closing it, any change to this dormant Trove"} has to bring its debt
+          back to the {minDebt} minimum, and that borrowing is blocked unless it brings the branch back to {ccr}.
+        </>
       ) : (
         <>Repaying, down to the {minDebt} minimum debt, and adding collateral stay open.</>
       )}
       {trove?.delegated ? (
         <>
           {" "}
-          This Trove has a delegated rate, so it must stay at or above {floor}, and switching delegates is blocked,
-          since every switch charges the upfront fee.
+          This Trove has a delegated rate, so each change must leave it at or above {floor}.
+          {zombie ? null : <> Switching delegates is blocked, since every switch charges the upfront fee.</>}
         </>
       ) : null}{" "}
       <BranchesLink />

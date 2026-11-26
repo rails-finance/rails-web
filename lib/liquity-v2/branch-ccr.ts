@@ -144,12 +144,14 @@ export interface TroveCloseCheck extends TroveCloseInput {
 }
 
 /** The close check for one Trove on a settled branch; null where the Trove's
- *  figures are missing or would leave the branch with no debt. */
+ *  figures are missing or would leave the branch with no debt, and where the
+ *  price is lastGoodPrice: closeTrove calls fetchPrice, and a fetchPrice that
+ *  failed in simulation may shut the branch down instead. */
 export function troveCloseCheck(
   s: LiquityV2BranchCcr,
   trove: TroveCloseInput | null | undefined,
 ): TroveCloseCheck | null {
-  if (!trove) return null;
+  if (!trove || s.priceCall !== "fetchPrice") return null;
   const tColl = BigInt(trove.collRaw);
   const tDebt = BigInt(trove.debtRaw);
   const coll = BigInt(s.collRaw) - tColl;
@@ -164,6 +166,17 @@ export function troveCloseCheck(
     newTcr: num(newTcr),
     closes: newTcr >= BigInt(s.ccrRaw),
   };
+}
+
+/** Whether a dormant (zombie) Trove has to borrow to change at all below the
+ *  CCR: adjustTrove and its one-way siblings revert for it
+ *  (_requireTroveIsActive), and adjustZombieTrove must leave its debt at or
+ *  above MIN_DEBT (_adjustTrove's _requireAtLeastMinDebt). True while its
+ *  entire debt is under `minDebt` (whole BOLD), or unread, since the index
+ *  marks a Trove dormant for debt under the minimum. */
+export function zombieMustBorrow(trove: TroveCloseInput | null | undefined, minDebt: number): boolean {
+  if (!trove) return true;
+  return BigInt(trove.debtRaw) < BigInt(minDebt) * BigInt("1000000000000000000");
 }
 
 /** The notice draws while TCR < CCR on a branch that reads as not shut down;

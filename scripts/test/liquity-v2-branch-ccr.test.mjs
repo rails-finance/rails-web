@@ -1,7 +1,8 @@
 // A Liquity V2 branch against its CCR (ui-jobs 747): the TCR on the contract's
 // integers, the comparison with the CCR, the price at which the TCR meets the
 // SCR, the notice drawn only below the CCR on a branch not shut down, and
-// whether one Trove's close passes closeTrove's CCR check (ui-jobs 858).
+// whether one Trove's close passes closeTrove's CCR check, and when a dormant
+// Trove has to borrow to change (ui-jobs 858).
 // Figures: the WETH branch at block 26,444,500, priced at $1,748.45.
 // Run: npm test
 import test from "node:test";
@@ -13,6 +14,7 @@ import {
   settleBranchCcr,
   tcrPercentText,
   troveCloseCheck,
+  zombieMustBorrow,
 } from "../../lib/liquity-v2/branch-ccr.ts";
 
 const at = { blockNumber: 26_444_500, blockTimestamp: 1_795_381_187 };
@@ -96,4 +98,45 @@ test("a close passes while (coll − Trove coll) × price ÷ (debt − Trove deb
   assert.equal(troveCloseCheck(s, { collRaw: weth.collRaw, debtRaw: weth.debtRaw }), null);
   assert.equal(s.bcr, 0.1);
   assert.equal(settleBranchCcr({ ...weth, bcrRaw: null }, at).bcr, null);
+});
+
+// A branch where taking out a 1 ETH, 2,000 BOLD Trove leaves 3 ETH against
+// 4,000 BOLD at $2,000: 3 × 2,000 ÷ 4,000 = 150%, the CCR to the wei.
+const edge = {
+  ...weth,
+  collRaw: "4000000000000000000",
+  debtRaw: "6000000000000000000000",
+  priceRaw: "2000000000000000000000",
+};
+const edgeTrove = { collRaw: "1000000000000000000", debtRaw: "2000000000000000000000" };
+
+test("a close that leaves the branch exactly at the CCR goes through", () => {
+  const c = troveCloseCheck(settleBranchCcr(edge, at), edgeTrove);
+  assert.equal(c.newTcrRaw, edge.ccrRaw);
+  assert.equal(c.closes, true);
+});
+
+test("a close that leaves the branch 1 wei under the CCR does not, and prints under 150%", () => {
+  // One more wei of debt left behind floors the new TCR to CCR − 1.
+  const s = settleBranchCcr({ ...edge, debtRaw: (BigInt(edge.debtRaw) + BigInt(1)).toString() }, at);
+  const c = troveCloseCheck(s, edgeTrove);
+  assert.equal(c.newTcrRaw, (BigInt(edge.ccrRaw) - BigInt(1)).toString());
+  assert.equal(c.closes, false);
+  assert.equal(tcrPercentText(c.newTcrRaw), "149.99%");
+  assert.equal(tcrPercentText("1499960000000000000"), "149.99%");
+});
+
+test("no close answer for a Trove with no debt, more collateral than the branch, or a lastGoodPrice read", () => {
+  const s = settleBranchCcr(edge, at);
+  assert.equal(troveCloseCheck(s, { collRaw: edgeTrove.collRaw, debtRaw: "0" }), null);
+  assert.equal(troveCloseCheck(s, { collRaw: "5000000000000000000", debtRaw: edgeTrove.debtRaw }), null);
+  const fallback = settleBranchCcr({ ...edge, priceCall: "lastGoodPrice" }, at);
+  assert.equal(troveCloseCheck(fallback, edgeTrove), null);
+});
+
+test("a dormant Trove has to borrow while its debt is under the minimum, or unread", () => {
+  assert.equal(zombieMustBorrow({ collRaw: "1", debtRaw: "1999999999999999999999" }, 2000), true);
+  assert.equal(zombieMustBorrow({ collRaw: "1", debtRaw: "0" }, 2000), true);
+  assert.equal(zombieMustBorrow(null, 2000), true);
+  assert.equal(zombieMustBorrow({ collRaw: "1", debtRaw: "2000000000000000000000" }, 2000), false);
 });

@@ -317,6 +317,8 @@ export default function TroveView({
         trove={{
           id: troveId,
           delegated: troveData.batch.isMember,
+          // The page's "open" takes in dormant (zombie) Troves; the notice gives them their own line.
+          isZombie: troveData.isZombie,
           // getLatestTroveData's entire collateral and debt, what closeTrove takes out (ui-jobs 858).
           figures: liveState ? { collRaw: liveState.collateral.entireRaw, debtRaw: liveState.debt.entireRaw } : null,
         }}
