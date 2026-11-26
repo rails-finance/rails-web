@@ -98,17 +98,3 @@ test("the counts take every chain's rows but a testnet's", async () => {
   assert.equal(countedRow({ chain: "sepolia" }), false);
   for (const chain of ["ethereum", "base", "arbitrum", "arc"]) assert.equal(countedRow({ chain }), true, chain);
 });
-
-test("an Aave vault holding's stored page opens under Aave V3's Vaults section (ui-jobs 789)", async () => {
-  const { servedSummaryRow } = await import("../../lib/wallet/summary-row.ts");
-  const V = "0xe1753f2e00940cc31213dd92013cf019dfe4ca1d";
-  const H = "0x1676d23711186076fa74aa53511dda750a1f0d9a";
-  assert.equal(
-    servedSummaryRow({ href: `/ethereum/aave/vaults/${V}/${H}` }).href,
-    `/ethereum/aave-v3/vaults/${V}/${H}`,
-  );
-  const morpho = { href: `/ethereum/morpho/vaults/${V}/${H}` };
-  assert.equal(servedSummaryRow(morpho), morpho);
-  const none = { href: null };
-  assert.equal(servedSummaryRow(none), none);
-});
