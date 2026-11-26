@@ -580,6 +580,7 @@ export function WalletPositionsMenu({
                       </span>
                       <div className="min-w-0">
                         <div className="text-sm text-foreground">
+                          <span className="text-rb-500">Status: </span>
                           {status.prov ? <Prov info={status.prov}>{status.word}</Prov> : status.word}
                         </div>
                         {status.tip && <p className="mt-0.5 text-xs leading-relaxed text-rb-500">{status.tip}</p>}
