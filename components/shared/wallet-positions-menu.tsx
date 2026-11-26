@@ -367,9 +367,8 @@ export function WalletPositionsMenu({
     </span>
   );
 
-  // The protocol's mark leads it at every width, with no chain glyph: the
-  // protocol spans chains (Miles, 27 Nov 2026, ui-jobs 856). The card's
-  // mark where a card hands one, else the summary row's.
+  // The protocol's mark, after the page's chain glyph, at every width. The
+  // card's mark where a card hands one, else the summary row's.
   const markId = mark?.protocolId ?? (crumb ? (protocolEntryOf(crumb.row.first)?.id ?? crumb.row.first.family) : null);
   const markName = mark?.protocolName ?? crumb?.row.name;
   const markNode = markId && (
@@ -377,17 +376,17 @@ export function WalletPositionsMenu({
       <ProtocolIcon id={markId} className="size-3.5 shrink-0" />
     </span>
   );
-  // The position's chain, after its dot: the card's, else the summary row's.
+  // The page's chain leads the protocol crumb, before the protocol's mark
+  // ("⟠ [aave] Aave V3"; Miles, 26 Nov 2026, ui-jobs 856): the card's, else
+  // the summary row's. It takes the crumb's colour, so it lights with it.
   const positionChain = mark?.chainId ?? (crumb ? CHAIN_ID[crumb.row.first.chain] : undefined);
   const positionChainName = positionChain != null ? chainMeta(positionChain).name : undefined;
-  // No glyph where the position's name is its chain ("Arbitrum"; Miles,
-  // 26 Nov 2026, ui-jobs 856): it would say the chain twice.
-  const chainNode = positionChain != null && named !== positionChainName && (
+  const chainNode = positionChain != null && (
     <span
       role="img"
       aria-label={positionChainName}
       title={positionChainName}
-      className="flex shrink-0 text-rb-500"
+      className="flex shrink-0"
       data-wallet-trail-chain=""
     >
       <ChainGlyph id={positionChain} className="size-3.5 shrink-0" />
@@ -395,6 +394,7 @@ export function WalletPositionsMenu({
   );
   const protocolBody = crumb && (
     <>
+      {chainNode}
       {markNode}
       <span className="whitespace-nowrap">{crumb.row.name}</span>
     </>
@@ -541,7 +541,12 @@ export function WalletPositionsMenu({
       {named && (
         <>
           {(dropdown || crumb || !settled) && SLASH}
-          {!crumb && markNode && <span className="mr-1 flex">{markNode}</span>}
+          {!crumb && markNode && (
+            <span className="mr-1 flex items-center gap-1">
+              {chainNode}
+              {markNode}
+            </span>
+          )}
           <span
             aria-current="page"
             className="flex min-w-0 items-center gap-1 text-foreground"
@@ -562,7 +567,6 @@ export function WalletPositionsMenu({
                         <StatusDot tone={status.tone} />
                       </span>
                     )}
-                    {chainNode}
                     <span className="min-w-0 truncate">{named}</span>
                     <ChevronDown
                       className={`size-3.5 shrink-0 text-rb-500 transition-transform ${open ? "rotate-180" : ""}`}
@@ -586,7 +590,6 @@ export function WalletPositionsMenu({
                     </span>
                   </RevealTip>
                 )}
-                {chainNode}
                 <span title={named} className="min-w-0 truncate">
                   {named}
                 </span>
