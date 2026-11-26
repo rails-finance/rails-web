@@ -380,7 +380,9 @@ export function WalletPositionsMenu({
   // The position's chain, after its dot: the card's, else the summary row's.
   const positionChain = mark?.chainId ?? (crumb ? CHAIN_ID[crumb.row.first.chain] : undefined);
   const positionChainName = positionChain != null ? chainMeta(positionChain).name : undefined;
-  const chainNode = positionChain != null && (
+  // No glyph where the position's name is its chain ("Arbitrum"; Miles,
+  // 26 Nov 2026, ui-jobs 856): it would say the chain twice.
+  const chainNode = positionChain != null && named !== positionChainName && (
     <span
       role="img"
       aria-label={positionChainName}
