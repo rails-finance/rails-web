@@ -334,10 +334,11 @@ export function WalletPositionsMenu({
     </span>
   );
 
-  // On a phone, where the card's sidebar is a bare strip, the card's
-  // protocol mark and chain glyph lead the protocol (ui-jobs 856).
-  const markNode = mark && (
-    <span className="flex shrink-0 items-center gap-1 md:hidden" data-wallet-trail-mark="">
+  // The card's protocol mark and chain glyph lead the protocol at every width
+  // (Miles, 26 Nov 2026, ui-jobs 856). The narrowed view, which spans chains
+  // and draws no card, shows the protocol's mark alone.
+  const markNode = mark ? (
+    <span className="flex shrink-0 items-center gap-1" data-wallet-trail-mark="">
       <span role="img" aria-label={mark.protocolName} title={mark.protocolName} className="flex">
         <ProtocolIcon id={mark.protocolId} className="size-3.5 shrink-0" />
       </span>
@@ -345,6 +346,21 @@ export function WalletPositionsMenu({
         <ChainGlyph id={mark.chainId} className="size-3.5 shrink-0" />
       </span>
     </span>
+  ) : (
+    crumb && (
+      <span
+        role="img"
+        aria-label={crumb.row.name}
+        title={crumb.row.name}
+        className="flex shrink-0"
+        data-wallet-trail-mark=""
+      >
+        <ProtocolIcon
+          id={protocolEntryOf(crumb.row.first)?.id ?? crumb.row.first.family}
+          className="size-3.5 shrink-0"
+        />
+      </span>
+    )
   );
   const protocolBody = crumb && (
     <>
@@ -412,6 +428,14 @@ export function WalletPositionsMenu({
                     <>
                       <StatusDot tone={SUMMARY_TONE[p.status]} />
                       <span className="sr-only">{STATUS_WORD[p.status]}: </span>
+                      <span
+                        role="img"
+                        aria-label={chainMeta(CHAIN_ID[p.chain]).name}
+                        title={chainMeta(CHAIN_ID[p.chain]).name}
+                        className="flex shrink-0 text-rb-500"
+                      >
+                        <ChainGlyph id={CHAIN_ID[p.chain]} className="size-3.5 shrink-0" />
+                      </span>
                       <span className="min-w-0 truncate">{summaryCrumb(p, address)}</span>
                     </>
                   );
