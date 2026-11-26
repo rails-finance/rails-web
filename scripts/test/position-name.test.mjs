@@ -152,6 +152,14 @@ test("a Compound V3 account names its Comet", () => {
 
 test("a summary row keeps its market and id where it states them", () => {
   const w = "0x3df83ec9d2b62bb9bb83eba1218a202564bb67da";
+  // A vault share stands as "Holding", whatever address keys it.
+  assert.equal(
+    summaryPositionCrumb(
+      { positionId: `0xbeef01ba7a5f2d4a3e0c9b1d2e3f405162738495:${w}`, noun: "Holding", chainName: "Ethereum" },
+      w,
+    ),
+    "Holding",
+  );
   assert.equal(
     summaryPositionCrumb({ positionId: `${w}:core`, market: "Core", noun: "Position", chainName: "Ethereum" }, w),
     "Core",
