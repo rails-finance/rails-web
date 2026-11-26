@@ -421,34 +421,10 @@ export function WalletPositionsMenu({
               .slice(0, POSITIONS_SHOWN)
               .sort((a, b) => protocolPositions.indexOf(a) - protocolPositions.indexOf(b));
             const more = protocolPositions.length - shown.length;
-            const all = `All ${crumb.row.name} positions`;
+            // No "All <protocol> positions" row: the first crumb's menu
+            // links the protocol (Miles, 26 Nov 2026, ui-jobs 856).
             return (
               <>
-                {crumb.current ? (
-                  <div
-                    role="menuitem"
-                    aria-disabled="true"
-                    aria-current="page"
-                    tabIndex={-1}
-                    className={`${ROW} text-sm text-foreground`}
-                    data-wallet-protocol-all=""
-                  >
-                    {all}
-                    <Tick />
-                  </div>
-                ) : (
-                  <Link
-                    href={crumb.row.listing}
-                    prefetch={false}
-                    role="menuitem"
-                    className={`${ROW_LINK} text-sm text-[var(--text-link)]`}
-                    onClick={close}
-                    data-wallet-protocol-all=""
-                  >
-                    {all}
-                  </Link>
-                )}
-                {DIVIDER}
                 {shown.map((p) => {
                   const body = (
                     <>
