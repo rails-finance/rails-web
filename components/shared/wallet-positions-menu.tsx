@@ -115,6 +115,8 @@ function Tick() {
 }
 
 const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />;
+// Every crumb is muted, the current one too, and lights to the foreground
+// on hover or while its menu is open (Miles, 26 Nov 2026, ui-jobs 856).
 // The trail's divider: a tall, thin chevron pointing right, a step quieter
 // than the crumbs. The first two crumbs open their menus with no ⌄; the
 // position crumb keeps its ⌄ (Miles, 26 Nov 2026, ui-jobs 856).
@@ -362,7 +364,7 @@ export function WalletPositionsMenu({
         leading={walletRows}
         trigger={(open) => (
           <span
-            className={`flex items-center gap-0.5 ${open || onDashboard ? "text-foreground" : "text-rb-500 hover:text-foreground"}`}
+            className={`flex items-center gap-0.5 transition-colors ${open ? "text-foreground" : "text-rb-500 group-hover/crumb:text-foreground"}`}
             data-wallet-positions-trigger=""
           >
             {menu.trigger}
@@ -498,7 +500,7 @@ export function WalletPositionsMenu({
           }}
           trigger={(open) => (
             <span
-              className={`flex items-center gap-1 whitespace-nowrap ${crumb.current || open ? "text-foreground" : "text-rb-500 hover:text-foreground"}`}
+              className={`flex items-center gap-1 whitespace-nowrap transition-colors ${open ? "text-foreground" : "text-rb-500 group-hover/crumb:text-foreground"}`}
             >
               {protocolBody}
             </span>
@@ -525,7 +527,7 @@ export function WalletPositionsMenu({
             (crumb.current ? (
               <span
                 aria-current="page"
-                className="flex shrink-0 items-center gap-1 text-foreground"
+                className="flex shrink-0 items-center gap-1 text-rb-500"
                 data-wallet-trail-protocol={crumb.row.key}
               >
                 {protocolBody}
@@ -553,7 +555,7 @@ export function WalletPositionsMenu({
           )}
           <span
             aria-current="page"
-            className="flex min-w-0 items-center gap-1 text-foreground"
+            className="flex min-w-0 items-center gap-1 text-rb-500"
             data-wallet-trail-position=""
           >
             {cardMenu ? (
@@ -561,7 +563,9 @@ export function WalletPositionsMenu({
               // names the status (ui-jobs 856).
               cardMenu({
                 trigger: (open) => (
-                  <>
+                  <span
+                    className={`flex min-w-0 items-center gap-1 transition-colors ${open ? "text-foreground" : "text-rb-500 group-hover/crumb:text-foreground"}`}
+                  >
                     {status && (
                       <span
                         className="flex size-3.5 shrink-0 items-center justify-center"
@@ -573,10 +577,10 @@ export function WalletPositionsMenu({
                     )}
                     <span className="min-w-0 truncate">{named}</span>
                     <ChevronDown
-                      className={`size-3.5 shrink-0 text-rb-500 transition-transform ${open ? "rotate-180" : ""}`}
+                      className={`size-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
                       aria-hidden="true"
                     />
-                  </>
+                  </span>
                 ),
                 label: status ? `${named}, ${status.word}: position menu` : `${named}: position menu`,
               })
