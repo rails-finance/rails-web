@@ -22,6 +22,7 @@ import { TipLabel } from "@/components/shared/tip-label";
 import { WalletHeader } from "@/components/wallet/wallet-header";
 import { WalletPositionsMenu } from "@/components/shared/wallet-positions-menu";
 import { vaultRoot, vaultRootName, type WalletCountsPosition } from "@/lib/wallet/summary-counts";
+import { noneDrawnLine, vaultUndrawn } from "@/lib/wallet/trail-counts";
 import { WalletFilterBar } from "@/components/wallet/wallet-filter-bar";
 import {
   walletProtocol,
@@ -53,7 +54,8 @@ import { formatDate } from "@/lib/date";
 import { ARBITRUM_CHAIN_ID, CHAINS, chainMeta, type ChainId } from "@/lib/shared/chains";
 import { walletCountProv, walletTradeAtProv } from "@/lib/cow/trade";
 import type { CowWalletEntry } from "@/lib/cow/types";
-import type { WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
+import type { WalletFamilyRead, WalletRead } from "@/lib/wallet/types";
+import { Vault } from "lucide-react";
 import {
   closestToLiquidation,
   countsDollars,
@@ -360,25 +362,9 @@ export function WalletUnresolved({ name, back }: { name: string; back: { href: s
   );
 }
 
-/** The plain vault shares view's protocol crumb, under Morpho's mark. */
-const VAULTS_CRUMB = { key: "vaults", name: "Vaults", mark: "morpho" };
-
-/** One vault protocol's shares the trail counts and the read did not draw,
- *  by chain and status. */
-function vaultUndrawn(shares: WalletCountsPosition[], drawnRows: WalletPosition[]): Undrawn[] {
-  const drawnIds = new Set(drawnRows.map((p) => `${CHAINS[p.chain]?.slug}:${p.positionId}`));
-  const byChain = new Map<string, Undrawn>();
-  for (const p of shares) {
-    if (drawnIds.has(`${p.chain}:${p.positionId}`)) continue;
-    const chain = Object.values(CHAINS).find((c) => c.slug === p.chain)?.id;
-    if (chain == null) continue;
-    const u = byChain.get(p.chain) ?? { family: "vaults", open: 0, closed: 0, chain };
-    if (p.status === "open") u.open += 1;
-    else u.closed += 1;
-    byChain.set(p.chain, u);
-  }
-  return [...byChain.values()];
-}
+/** The plain vault shares view's protocol crumb, under a neutral vault
+ *  glyph: it spans MetaMorpho, Aave's vaults and Yearn V3 (ui-jobs 856). */
+const VAULTS_CRUMB = { key: "vaults", name: "Vaults", mark: <Vault className="size-3.5 shrink-0" /> };
 
 /** A read with no trail (the summary did not answer): the trail draws none. */
 const NO_TRAIL: WalletCountsPosition[] = [];
@@ -451,7 +437,11 @@ export function WalletView({
   const trail = read.trail ?? NO_TRAIL;
   const vaultShares = vault ? trail.filter((p) => p.family === "vaults" && vaultRoot(p.href) === vault) : [];
   const undrawn: Undrawn[] = vault
-    ? vaultUndrawn(vaultShares, positions).filter((u) => !focused || scope.chainOk(u.chain))
+    ? vaultUndrawn(
+        vaultShares,
+        new Set(positions.map((p) => `${CHAINS[p.chain]?.slug}:${p.positionId}`)),
+        (slug) => Object.values(CHAINS).find((c) => c.slug === slug)?.id,
+      ).filter((u) => !focused || scope.chainOk(u.chain))
     : read.families.flatMap((r) =>
         r.undrawn && (!focused || scope.chainOk(r.chain)) ? [{ ...r.undrawn, chain: r.chain }] : [],
       );
@@ -660,7 +650,11 @@ export function WalletView({
                       // limit: say so, with the lines a section draws.
                       <>
                         <p className="text-sm text-foreground/80" data-wallet-reads="">
-                          {`Rails holds ${plural(undrawnTotal, status ? `${status} holding` : "holding")} in ${vault ? (vaultRootName(vault) ?? chosen.name) : chosen.name} for this wallet, and draws none of them here.`}
+                          {noneDrawnLine(
+                            undrawnTotal,
+                            vault ? (vaultRootName(vault) ?? chosen.name) : chosen.name,
+                            status,
+                          )}
                         </p>
                         {undrawn.map((u) => {
                           const n = undrawnCount(u, status);

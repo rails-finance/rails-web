@@ -71,7 +71,8 @@ import {
 import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
 import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
-import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
+import type { WalletCounts } from "@/lib/wallet/summary-counts";
+import { countsOf, summaryPositions } from "@/lib/wallet/trail-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
 import { explorerName, PROTOCOLS } from "@/lib/shared/protocols";
 import { LIQUIDITY_SOURCES } from "@/lib/wallet/liquidity/sources";
@@ -714,60 +715,21 @@ function summaryMarketLabel(r: WalletSummaryRow): string | undefined {
  *  position per Comet), every other counted row one position. The
  *  positions read at visit are left out: reading them is a head read. */
 async function countsFromSummary(key: string, summary: Summary, t0: number): Promise<WalletCounts> {
-  const positions: WalletCountsPosition[] = [];
-  const taken = new Set<WalletSummaryRow>();
-  for (const f of WALLET_FAMILIES) {
-    if (f.head || f.summaryChain === "sepolia") continue;
-    const rows = summary.rows.filter((r) => takesRow(f, r));
-    if (rows.length === 0) continue;
-    try {
-      for (const p of await f.shape(rows)) {
-        positions.push({
-          chain: f.summaryChain,
-          family: f.summaryFamily,
-          positionId: p.positionId,
-          status: p.status,
-          href: p.href,
-          ...(p.market ? { market: p.market } : {}),
-        });
-      }
-      rows.forEach((r) => taken.add(r));
-    } catch {
-      // The rows count one each below.
-    }
-  }
-  for (const r of summary.rows) {
-    if (!taken.has(r) && countedRow(r))
-      positions.push({
-        chain: r.chain,
-        family: r.family,
-        positionId: r.positionId,
-        status: walletRowStatus(r),
-        href: r.href,
-        ...(summaryMarketLabel(r) ? { market: summaryMarketLabel(r) } : {}),
-      });
-  }
-  const families = new Map<string, WalletCountsFamily>();
-  for (const p of positions) {
-    const k = `${p.chain}:${p.family}`;
-    const fam = families.get(k) ?? { chain: p.chain, family: p.family, positions: 0, open: 0, closed: 0, moved: 0 };
-    fam.positions += 1;
-    if (p.status === "open") fam.open += 1;
-    else if (p.status === "moved") fam.moved += 1;
-    else fam.closed += 1;
-    families.set(k, fam);
-  }
-  const open = positions.filter((p) => p.status === "open").length;
-  const moved = positions.filter((p) => p.status === "moved").length;
+  const positions = await summaryPositions(WALLET_FAMILIES, summary.rows, takesRow, (r) => {
+    if (!countedRow(r)) return null;
+    const market = summaryMarketLabel(r);
+    return {
+      chain: r.chain,
+      family: r.family,
+      positionId: r.positionId,
+      status: walletRowStatus(r),
+      href: r.href,
+      ...(market ? { market } : {}),
+    };
+  });
   return {
     address: key,
-    positions,
-    families: [...families.values()],
-    total: positions.length,
-    open,
-    closed: positions.length - open - moved,
-    moved,
-    chains: [...new Set(positions.map((p) => p.chain))],
+    ...countsOf(positions),
     readAt: Math.floor(Date.now() / 1000),
     ms: Date.now() - t0,
     ...(summary.listingFailed.length ? { partial: summary.listingFailed.map((x) => x.what) } : {}),
@@ -775,12 +737,14 @@ async function countsFromSummary(key: string, summary: Summary, t0: number): Pro
 }
 
 /** The wallet view's counts from its own summary read, kept as the /summary
- *  route's answer where none is kept, so the position pages read the same. */
+ *  route's answer where none is kept, so the position pages read the same.
+ *  The entry is dated from `t0`, when the summary read began, as the route
+ *  dates its own. */
 async function trailCounts(key: string, summary: Summary, t0: number): Promise<WalletCounts> {
   const counts = await countsFromSummary(key, summary, t0);
   const hit = countsCache.get(key);
   if (!counts.partial && !(hit && Date.now() - hit.at < WALLET_CACHE_MS))
-    countsCache.set(key, { at: Date.now(), read: Promise.resolve(counts) });
+    countsCache.set(key, { at: t0, read: Promise.resolve(counts) });
   return counts;
 }
 

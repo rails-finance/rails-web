@@ -26,7 +26,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { StatusDot } from "@/components/shared/status-dot";
@@ -208,7 +208,7 @@ export function WalletPositionsMenu({
   /** The wallet view's protocol where no summary row is its own (the vault
    *  shares, `?protocol=vaults`): the protocol crumb names it, with `mark`,
    *  as the current page (ui-jobs 856). */
-  pageCrumb?: { key: string; name: string; mark: string };
+  pageCrumb?: { key: string; name: string; mark: ReactNode };
   /** The position crumb's words, on a position page whose card has named it. */
   position?: string | null;
   /** The card's lifecycle, the dot before the position crumb. */
@@ -556,8 +556,8 @@ export function WalletPositionsMenu({
               className="flex shrink-0 items-center gap-1 text-rb-500"
               data-wallet-trail-protocol={pageOwn.key}
             >
-              <span role="img" aria-label={pageOwn.name} className="flex shrink-0" data-wallet-trail-mark="">
-                <ProtocolIcon id={pageOwn.mark} className="size-3.5 shrink-0" />
+              <span aria-hidden="true" className="flex shrink-0" data-wallet-trail-mark="">
+                {pageOwn.mark}
               </span>
               <span className="whitespace-nowrap">{pageOwn.name}</span>
             </span>
