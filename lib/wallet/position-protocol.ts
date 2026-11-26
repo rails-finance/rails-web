@@ -4,14 +4,15 @@
 
 import { CHAINS } from "@/lib/shared/chains";
 import { POSITION_NOUN, PROTOCOLS, listingHrefForWallet, protocolForPathname } from "@/lib/shared/protocols";
-import { positionCrumb, positionName } from "@/lib/shared/position-name";
+import { summaryPositionCrumb } from "@/lib/shared/position-name";
 import {
   VAULT_SHARES_FAMILY,
   vaultProtocolOfHref,
+  vaultRoot,
   type MenuProtocol,
   type WalletCountsPosition,
 } from "@/lib/wallet/summary-counts";
-import { walletProtocol, walletProtocolHref } from "@/lib/wallet/wallet-filters";
+import { walletProtocol, walletProtocolHref, walletVaultHref } from "@/lib/wallet/wallet-filters";
 
 type Entry = (typeof PROTOCOLS)[number];
 
@@ -26,29 +27,26 @@ export function protocolEntryOf(p: Pick<WalletCountsPosition, "chain" | "family"
  *  the wallet's positions in it: the wallet view narrowed to the protocol
  *  where the view reads it (Miles, 25 Nov 2026), else its listing searched by
  *  the wallet. A vault-share row names its vault protocol and opens the
- *  holder listing of the explorer's Vaults tab, where it has one; Yearn V3
- *  has none, so its row opens the wallet view narrowed to the vault shares. */
+ *  wallet view narrowed to that protocol's shares (`?vault=`; ui-jobs 856). */
 export function menuProtocolOf(p: WalletCountsPosition, address: string): MenuProtocol | undefined {
   const entry = protocolEntryOf(p);
   if (!entry) return undefined;
   const vault = vaultProtocolOfHref(p.href);
+  const root = vaultRoot(p.href);
   return {
     name: vault ?? entry.label,
     order: PROTOCOLS.indexOf(entry),
-    listing: vault
-      ? (listingHrefForWallet(entry.session, address, "vaults") ?? walletProtocolHref(address, VAULT_SHARES_FAMILY))
+    listing: root
+      ? walletVaultHref(address, root)
       : walletProtocol(p.family)
         ? walletProtocolHref(address, p.family)
         : listingHrefForWallet(entry.session, address),
   };
 }
 
-/** A summary row's name in the positions menu (H13.2; ui-jobs 856): the
- *  trail's crumb (`positionCrumb`) from the row's market, the family's noun
- *  and the id its `positionId` holds besides the market. An id that holds
- *  the wallet ("0x…:core", "0x…-1", "<vault>-0x…") is the wallet's. */
+/** A summary row's name in the positions menu (H13.5; ui-jobs 856):
+ *  `summaryPositionCrumb` from the row's market and the family's noun. */
 export function summaryCrumb(p: WalletCountsPosition, wallet: string): string {
-  const w = wallet.toLowerCase();
   const entry = protocolEntryOf(p);
   // A vault share is a holding, whichever explorer its page sits under; a
   // Stability Pool deposit and a Liquity V1 stake take their cards' nouns
@@ -66,11 +64,7 @@ export function summaryCrumb(p: WalletCountsPosition, wallet: string): string {
           : entry
             ? POSITION_NOUN[entry.session]
             : "Position";
-  const label = p.market ?? (pool ? "Stability Pool" : stake ? "Staking" : undefined);
-  const market = p.market?.toLowerCase();
-  const parts = p.positionId.split(":").filter((x) => x.toLowerCase() !== market);
-  const raw = parts.find((x) => x.toLowerCase().includes(w)) ?? parts[parts.length - 1] ?? p.positionId;
-  const id = raw.toLowerCase().includes(w) ? w : raw;
-  const chain = Object.values(CHAINS).find((c) => c.slug === p.chain)?.name;
-  return positionCrumb(positionName({ market: label, noun, id }), w, chain);
+  const market = p.market ?? (pool ? "Stability Pool" : stake ? "Staking" : undefined);
+  const chainName = Object.values(CHAINS).find((c) => c.slug === p.chain)?.name;
+  return summaryPositionCrumb({ positionId: p.positionId, market, noun, chainName }, wallet);
 }

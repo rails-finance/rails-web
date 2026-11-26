@@ -138,9 +138,10 @@ export function closingPricesAt<E extends { blockNumber: number; timestamp: numb
  *  one naming the wallet (the family's wallet page). The trail's protocol
  *  crumb opens the wallet view narrowed to the protocol, and the heading
  *  takes Back's row. Back returns where the summary has no row for the page
- *  (`onCrumb`). It stays on an event page, whose parent is the position; on
- *  a wallet page (`walletPage`); and where `fallbackHref` is a listing the
- *  trail does not hold. */
+ *  (`onCrumb`). It stays on an event page, whose parent is the position, and
+ *  where `fallbackHref` is a listing the trail does not hold. A wallet page
+ *  (`walletPage`) is the protocol crumb and draws Back only where the trail
+ *  finds none. */
 export function DetailTopRow({
   session,
   wallet,
@@ -242,8 +243,10 @@ export function DetailTopRow({
   // The trail's protocol crumb goes where Back's fallback would: Back
   // goes. Where that rests on the summary read, Back stays out until the
   // read settles and lands in the row held under the heading (HeadingRow).
-  const [crumb, setCrumb] = useState<"pending" | "found" | "none">("pending");
+  // Keyed by the owner: a new wallet's trail starts pending (ui-jobs 856).
   const ownerWallet = owner?.wallet?.toLowerCase();
+  const [told, setTold] = useState<{ wallet: string | undefined; crumb: "found" | "none" } | null>(null);
+  const crumb = told && told.wallet === ownerWallet ? told.crumb : "pending";
   const trailed =
     owner != null &&
     page === "position" &&
@@ -251,8 +254,10 @@ export function DetailTopRow({
     walletProtocol(entry.slug) != null &&
     (fallbackHref == null || (ownerWallet != null && fallbackHref.toLowerCase().includes(ownerWallet)));
   const unowned = owner != null && !owner.wallet && !owner.pending;
-  // A wallet page is the trail's protocol crumb: no Back.
-  const back = page !== "wallet" && (!trailed || unowned || crumb === "none");
+  // A wallet page whose trail draws its protocol crumb has no Back; where
+  // the summary holds no row for it (Pendle, Uniswap and the other families
+  // without one) Back stays, as on a position page (ui-jobs 856).
+  const back = page === "wallet" ? unowned || crumb === "none" : !trailed || unowned || crumb === "none";
   const heading = owner && (
     // In the row's scope: a holder can carry a receipt (Polaris).
     <ProvReceiptsScope registry={registry}>
@@ -260,7 +265,7 @@ export function DetailTopRow({
         owner={owner}
         session={session}
         page={page}
-        onCrumb={(found) => setCrumb(found ? "found" : "none")}
+        onCrumb={(found) => setTold({ wallet: ownerWallet, crumb: found ? "found" : "none" })}
         // The heading is the column's first row, clear of the profile
         // control (H20) at the top right from md.
         className={PROFILE_CLEARANCE}

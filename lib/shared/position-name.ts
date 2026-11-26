@@ -91,3 +91,33 @@ export function positionCrumb(name: PositionName, wallet: string, chainName?: st
   if (name.noun === "Trove") return name.market ? `${name.market} · ${name.id}` : name.id;
   return name.text;
 }
+
+/** A wallet summary row's crumb in the trail's protocol menu (H13.5; ui-jobs
+ *  856): `positionCrumb` from the row's market, its family's noun and the id
+ *  its `positionId` holds besides the market. An id that holds the wallet
+ *  ("0x…:core", "<market>-0x…", "<comet>:0x…") is the wallet's, and with no
+ *  market named the other hex id in it names the market, so a wallet's
+ *  Morpho Blue markets or Comets read apart. */
+export function summaryPositionCrumb(
+  parts: { positionId: string; market?: string; noun: string; chainName?: string },
+  wallet: string,
+): string {
+  const w = wallet.toLowerCase();
+  const market = parts.market?.toLowerCase();
+  const pieces = parts.positionId.split(":").filter((x) => x.toLowerCase() !== market);
+  const raw = pieces.find((x) => x.toLowerCase().includes(w)) ?? pieces[pieces.length - 1] ?? parts.positionId;
+  const holdsWallet = raw.toLowerCase().includes(w);
+  let label = parts.market;
+  if (!label && holdsWallet) {
+    const other = parts.positionId
+      .toLowerCase()
+      .split(/[:-]/)
+      .find((x) => x !== w && /^(0x)?[0-9a-f]{8,}$/.test(x));
+    if (other) label = shortPositionId(other.startsWith("0x") ? other : `0x${other}`);
+  }
+  return positionCrumb(
+    positionName({ market: label, noun: parts.noun, id: holdsWallet ? w : raw }),
+    w,
+    parts.chainName,
+  );
+}

@@ -86,6 +86,12 @@ export const WALLET_SEARCH_FAMILIES = new Set(["liquity-v2", "ebisu", "asymmetry
 export const walletProtocolHref = (wallet: string, protocol: string): string =>
   `/wallet/${encodeURIComponent(wallet.toLowerCase())}?protocol=${protocol}`;
 
+/** The wallet page narrowed to one vault protocol's shares (MetaMorpho,
+ *  Aave's vaults, Yearn V3; `vaultRoot` in summary-counts.ts): the vault
+ *  shares, then `?vault=` keeps that protocol's (ui-jobs 856). */
+export const walletVaultHref = (wallet: string, root: string): string =>
+  `${walletProtocolHref(wallet, "vaults")}&vault=${root}`;
+
 /** Where a listing search lands: the wallet page with the protocol chosen,
  *  where the search names a whole address or an ENS name and the family's
  *  listings send a wallet there; null for anything else, which the listing

@@ -4,8 +4,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { shortPositionId, listingTagId, marketPair, spacePair, positionName, positionTitle, positionCrumb } =
-  await import("../../lib/shared/position-name.ts");
+const {
+  shortPositionId,
+  listingTagId,
+  marketPair,
+  spacePair,
+  positionName,
+  positionTitle,
+  positionCrumb,
+  summaryPositionCrumb,
+} = await import("../../lib/shared/position-name.ts");
 
 test("a decimal id of up to ten digits reads #n", () => {
   assert.equal(shortPositionId("31245"), "#31245");
@@ -113,4 +121,42 @@ test("a lending account with no market takes its chain's name; any other noun st
   assert.equal(positionCrumb(positionName({ market: "Core", noun: "Position", id: w }), w, "Ethereum"), "Core");
   assert.equal(positionCrumb(positionName({ noun: "Trove", id: w }), w, "Ethereum"), "Trove");
   assert.equal(positionCrumb(positionName({ noun: "Deposit", id: w }), w, "Ethereum"), "Deposit");
+});
+
+// The protocol menu's rows from the wallet summary (H13.5; ui-jobs 856).
+test("a wallet's Morpho Blue markets read apart, by pair or by market id", () => {
+  const w = "0x3df83ec9d2b62bb9bb83eba1218a202564bb67da";
+  const m1 = "b323495f7e4148be5643a4ea4a8221eef163e4bccfdedc2a6f4696baacbc86cc";
+  const m2 = "c54d7acf14de29e0e5527cabd7a576506870346a78a11a6762e2cca66322ec41";
+  const row = (market, mkt) => ({ positionId: `${market}-${w}`, market: mkt, noun: "Position", chainName: "Ethereum" });
+  // The summary row's loan and collateral name the market.
+  assert.equal(summaryPositionCrumb(row(m1, "USDC / wstETH"), w), "USDC / wstETH");
+  // With no pair, each market's id: two markets, two names.
+  const a = summaryPositionCrumb(row(m1), w);
+  const b = summaryPositionCrumb(row(m2), w);
+  assert.equal(a, "0xb323…86cc");
+  assert.equal(b, "0xc54d…ec41");
+  assert.notEqual(a, "Ethereum");
+});
+
+test("a Compound V3 account names its Comet", () => {
+  const w = "0x3df83ec9d2b62bb9bb83eba1218a202564bb67da";
+  const comet = "0xc3d688b66703497daa19211eedff47f25384cdc3";
+  const acct = (positionId, market) => ({ positionId, market, noun: "Account", chainName: "Ethereum" });
+  assert.equal(summaryPositionCrumb(acct(`${comet}:${w}`, "cUSDCv3"), w), "cUSDCv3");
+  assert.equal(summaryPositionCrumb(acct(`usdc:${w}`, "cUSDCv3"), w), "cUSDCv3");
+  // A Comet address with no label: its address names it.
+  assert.equal(summaryPositionCrumb(acct(`${comet}:${w}`), w), "0xc3d6…cdc3");
+  assert.notEqual(summaryPositionCrumb(acct(`${comet}:${w}`), w), "Account");
+});
+
+test("a summary row keeps its market and id where it states them", () => {
+  const w = "0x3df83ec9d2b62bb9bb83eba1218a202564bb67da";
+  assert.equal(
+    summaryPositionCrumb({ positionId: `${w}:core`, market: "Core", noun: "Position", chainName: "Ethereum" }, w),
+    "Core",
+  );
+  // A lending account keyed by the wallet alone takes its chain's name.
+  assert.equal(summaryPositionCrumb({ positionId: w, noun: "Position", chainName: "Arbitrum" }, w), "Arbitrum");
+  assert.equal(summaryPositionCrumb({ positionId: "31245", market: "WETH", noun: "Trove" }, w), "WETH · #31245");
 });

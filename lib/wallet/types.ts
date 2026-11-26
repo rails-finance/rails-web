@@ -62,6 +62,7 @@ import type { OpcWalletRead } from "@/lib/compound-v3-optimism/types";
 import type { MorphoAtBlockWalletRead } from "@/lib/morpho-at-block/types";
 import type { FluidBasePositionsRead } from "@/lib/fluid-base/types";
 import type { LidoStakeRead } from "@/lib/lido/types";
+import type { WalletCountsPosition } from "@/lib/wallet/summary-counts";
 
 /** "redeemed" is in the type for the families that end a position by
  *  redemption; no store states it as an ending yet (a fully redeemed Liquity
@@ -332,6 +333,11 @@ export interface WalletRead {
   /** Every protocol the summary rows and the positions read at visit name, with its count, for the
    *  Protocol pill: a narrowed read still offers the others. */
   held: { slug: string; name: string; positions: number }[];
+  /** Every counted position of the wallet as the heading's trail reads it
+   *  (H13.4; ui-jobs 856): the summary rows and the positions read at
+   *  visit, whatever protocol the read is narrowed to. Unnarrowed, one per
+   *  position `total` counts. */
+  trail?: WalletCountsPosition[];
   /** The listing reads that did not answer, by what they read: the answer
    *  is part of the wallet, states no wallet total and is not kept. */
   partial?: string[];

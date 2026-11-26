@@ -150,10 +150,21 @@ export function LatestPrices({
   // and what an asset IS belongs on a surface with room for it (ui-jobs 356).
   const anyPriced = assets.some(priced);
 
+  /** An inline price's receipt: the asset's, with a closed position's
+   *  closing block where the receipt names none, so a price standing inline
+   *  states the block and source the panel's row and heading state
+   *  (ui-jobs 856). */
+  const receiptOf = (a: LatestPriceAsset): Provenance | undefined =>
+    a.info && at && a.info.source?.block == null
+      ? { ...a.info, source: { ...a.info.source, block: at.block } }
+      : a.info;
+
   /** One inline price: the asset's icon and its figure, traced where the
-   *  view hands its receipt; an unpriced asset puts its symbol in the
-   *  figure's place, so the strip still names what the position holds. */
+   *  view hands its receipt and named on hover as the panel's row is; an
+   *  unpriced asset puts its symbol in the figure's place, so the strip still
+   *  names what the position holds. */
   const inlinePrice = (a: LatestPriceAsset) => {
+    const info = priced(a) ? receiptOf(a) : undefined;
     const text = priced(a)
       ? (a.figure ?? (a.unit ? fmtNative(a.price as number, a.unit) : fmtPrice(a.price as number)))
       : a.symbol;
@@ -169,12 +180,14 @@ export function LatestPrices({
       <span
         key={a.unit ? `${a.symbol}-${a.unit}` : a.symbol}
         className="inline-flex items-center gap-1"
+        title={a.label ?? a.symbol}
         data-latest-price={a.symbol}
+        data-latest-price-block={info?.source?.block ?? at?.block}
       >
         <TokenChipIcon symbol={a.symbol} address={a.address} size={14} filterable={false} />
         {a.triggerLabel && <span className="font-medium text-foreground">{a.triggerLabel}</span>}
-        {priced(a) && a.info ? (
-          <Prov info={a.info} value={String(a.price)} symbol={a.symbol}>
+        {info ? (
+          <Prov info={info} value={String(a.price)} symbol={a.symbol}>
             {figure}
           </Prov>
         ) : (

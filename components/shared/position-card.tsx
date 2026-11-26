@@ -983,11 +983,24 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
         crumb={crumb}
       />
     );
-  // Where the trail names this card's position, its ⋮ menu opens from the
-  // position crumb (H13.4; ui-jobs 856).
-  usePublishPositionCardMenu(cardId, cardMenu ? (crumb) => detailMenu(crumb) : null);
-  const menu = detail ? (trailNamed ? null : detailMenu()) : slots.menu;
   const edge = useContext(PositionCardEdgeContext);
+  const quietTips = useContext(QuietTipsContext);
+  // Where the trail names this card's position, its ⋮ menu opens from the
+  // position crumb (H13.4). The menu renders in the heading, so it takes the
+  // card's receipts scope, edge and tips with it (ui-jobs 856).
+  usePublishPositionCardMenu(
+    cardId,
+    cardMenu
+      ? (crumb) => (
+          <ProvReceiptsScope registry={registry} bounds={false}>
+            <PositionCardEdgeContext.Provider value={edge}>
+              <QuietTipsContext.Provider value={quietTips}>{detailMenu(crumb)}</QuietTipsContext.Provider>
+            </PositionCardEdgeContext.Provider>
+          </ProvReceiptsScope>
+        )
+      : null,
+  );
+  const menu = detail ? (trailNamed ? null : detailMenu()) : slots.menu;
   const wallet = !detail && edge?.surface === "wallet";
   const identity = cardIdentity;
   // A card with a sidebar: below md its protocol and chain stand in the

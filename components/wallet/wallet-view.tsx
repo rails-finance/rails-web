@@ -16,11 +16,12 @@
 import { IndexNotice } from "@/components/shared/index-notice";
 import Link from "next/link";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
-import { Suspense, use, useState, useTransition, type ReactNode } from "react";
+import { Suspense, use, useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { TipLabel } from "@/components/shared/tip-label";
 import { WalletHeader } from "@/components/wallet/wallet-header";
 import { WalletPositionsMenu } from "@/components/shared/wallet-positions-menu";
+import { vaultRoot, type WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { WalletFilterBar } from "@/components/wallet/wallet-filter-bar";
 import {
   walletProtocol,
@@ -359,6 +360,9 @@ export function WalletUnresolved({ name, back }: { name: string; back: { href: s
   );
 }
 
+/** A read with no trail (the summary did not answer): the trail draws none. */
+const NO_TRAIL: WalletCountsPosition[] = [];
+
 export function WalletView({
   address,
   ensName,
@@ -369,6 +373,7 @@ export function WalletView({
   back,
   kinds: initialKinds = [],
   status: initialStatus,
+  vault,
 }: {
   address: string;
   ensName: string | null;
@@ -383,6 +388,10 @@ export function WalletView({
   kinds?: WalletKind[];
   /** `?status=`: the Status pill's selection on arrival. */
   status?: WalletStatus;
+  /** `?vault=` with the vault shares chosen: one vault protocol's shares
+   *  (`vaultRoot`), the trail's MetaMorpho, Aave vaults or Yearn V3 row
+   *  (ui-jobs 856). */
+  vault?: string;
   /** The explorer the reader came from, for the empty state's link back. */
   back: { href: string; name: string } | null;
   /** The launched explorers no wallet read takes (`walletUnreadExplorers`); empty where one
@@ -391,7 +400,11 @@ export function WalletView({
 }) {
   // AIM (ui-jobs 557): the positions naming an AIM asset (lib/wallet/aim-assets.ts),
   // the reader's own wallet included.
-  const scoped = useScopedRows(read.positions, walletPositionAssetKeys, (p) => p.chain as number);
+  const positions = useMemo(
+    () => (vault ? read.positions.filter((p) => vaultRoot(p.href) === vault) : read.positions),
+    [read.positions, vault],
+  );
+  const scoped = useScopedRows(positions, walletPositionAssetKeys, (p) => p.chain as number);
   const scope = useAssetScope();
   const [kinds, setKinds] = useState<WalletKind[]>(initialKinds);
   const [status, setStatus] = useState<WalletStatus | undefined>(initialStatus);
@@ -412,8 +425,9 @@ export function WalletView({
   const chosen = walletProtocol(read.protocol);
   // The positions the read counted and did not draw.
   // Under Focus, only those on a chain in focus, as the drawn rows.
+  // One vault protocol's shares: the family's undrawn counts name no vault.
   const undrawn: Undrawn[] = read.families.flatMap((r) =>
-    r.undrawn && (!focused || scope.chainOk(r.chain)) ? [{ ...r.undrawn, chain: r.chain }] : [],
+    r.undrawn && !vault && (!focused || scope.chainOk(r.chain)) ? [{ ...r.undrawn, chain: r.chain }] : [],
   );
   // The lines a module states under its section, on a chain in focus.
   const notes = read.families.flatMap((r) => (r.note && (!focused || scope.chainOk(r.chain)) ? [r.note] : []));
@@ -535,16 +549,33 @@ export function WalletView({
             <>
               {chosen ? (
                 // Narrowed to one protocol, the line is the trail (H13.4): the
-                // positions menu, then the protocol as the page.
-                <WalletPositionsMenu wallet={address} page="wallet" search={`?protocol=${chosen.slug}`} />
+                // positions menu, then the protocol as the page; under
+                // Focus, the scope's line under it (ui-jobs 856).
+                <>
+                  <WalletPositionsMenu
+                    wallet={address}
+                    page="wallet"
+                    search={`?protocol=${chosen.slug}${vault ? `&vault=${vault}` : ""}`}
+                    positions={read.trail ?? NO_TRAIL}
+                  />
+                  {focused && <ScopeNote scoped={scoped} noun={["position", "positions"]} />}
+                </>
               ) : focused ? (
                 <ScopeNote scoped={scoped} noun={["position", "positions"]} />
               ) : (
                 // The dashboard's line is the positions menu, the trail's
-                // first crumb, as the current page (ui-jobs 856).
+                // first crumb, as the current page, built from this read
+                // and counting its total (ui-jobs 856).
                 read.total > 0 && (
                   <div className="flex" data-wallet-count={read.total}>
-                    <WalletPositionsMenu wallet={address} page="wallet" search="" onDashboard />
+                    <WalletPositionsMenu
+                      wallet={address}
+                      page="wallet"
+                      search=""
+                      onDashboard
+                      positions={read.trail ?? NO_TRAIL}
+                      total={read.total}
+                    />
                   </div>
                 )
               )}
@@ -568,7 +599,7 @@ export function WalletView({
             {liquiditySection}
             {trades}
           </>
-        ) : filtered && all.length === 0 && read.positions.length > 0 ? (
+        ) : filtered && all.length === 0 && positions.length > 0 ? (
           <>
             {filterBar}
             {body(

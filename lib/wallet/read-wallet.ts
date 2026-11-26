@@ -10,6 +10,10 @@
 // kept 60 s per address.
 
 import { MARKET_NAME } from "@/lib/aave-v3/asset-catalog";
+import { COMPOUND_DEPLOYMENT } from "@/lib/compound/asset-catalog";
+import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
+import { marketPair } from "@/lib/shared/position-name";
+import { CHAINS, type ChainId } from "@/lib/shared/chains";
 import { WALLET_FORMER_FAMILIES } from "@/lib/wallet/moved-row";
 import { walletRowStatus } from "@/lib/wallet/moved-row";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
@@ -68,7 +72,12 @@ import {
 import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
 import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
-import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
+import type {
+  WalletCounts,
+  WalletCountsChain,
+  WalletCountsFamily,
+  WalletCountsPosition,
+} from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
 import { explorerName, PROTOCOLS } from "@/lib/shared/protocols";
 import { LIQUIDITY_SOURCES } from "@/lib/wallet/liquidity/sources";
@@ -651,6 +660,7 @@ async function readWalletInScope(address: string, readerIp: string | undefined, 
     ms: Date.now() - t0,
     protocol: opts.protocol,
     held,
+    trail: trailPositions(summary.rows, visitedAll.positions, positions),
     ...(failed.length || visited.failed.length ? { partial: [...failed.map((x) => x.what), ...visited.failed] } : {}),
   };
 }
@@ -683,14 +693,63 @@ export function readWallet(address: string, readerIp?: string, opts: { protocol?
 const countsCache = new Map<string, { at: number; read: Promise<WalletCounts> }>();
 
 /** A summary row's market as the wallet's cards name it, for the positions
- *  menu (ui-jobs 856): Aave V3's market name ("Core"), a token key in
- *  capitals ("USDC"); none for an address or a hex id, which the row's id
+ *  menu (ui-jobs 856): Aave V3's market name ("Core"), a Compound V3 Comet's
+ *  label ("cUSDCv3", by key or address), a Morpho Blue market's pair from the
+ *  row's loan and collateral symbols ("USDC / wstETH"), a token key in
+ *  capitals ("USDC"); none for another address or hex id, which the row's id
  *  names instead. */
 function summaryMarketLabel(r: WalletSummaryRow): string | undefined {
   const m = r.market?.trim();
-  if (!m || /^0x[0-9a-f]+$/i.test(m)) return undefined;
+  if (!m) return undefined;
+  if (r.family === "compound-v3" && (r.chain === "ethereum" || r.chain === "base")) {
+    const markets = (r.chain === "ethereum" ? COMPOUND_DEPLOYMENT : COMPOUND_BASE_DEPLOYMENT).markets;
+    const comet = markets.find((x) => x.key === m.toLowerCase() || x.comet === m.toLowerCase());
+    if (comet) return comet.label;
+  }
+  if (r.family === "morpho" && r.debt?.symbol && r.collateral?.symbol)
+    return marketPair(r.debt.symbol, r.collateral.symbol);
+  if (/^0x[0-9a-f]+$/i.test(m) || /^[0-9a-f]{64}$/i.test(m)) return undefined;
   if (r.family === "aave-v3") return MARKET_NAME[m] ?? m;
   return /^[a-z0-9]{2,8}$/.test(m) ? m.toUpperCase() : m;
+}
+
+/** The wallet's counted positions for the heading's trail (`WalletRead.trail`;
+ *  ui-jobs 856): each counted summary row and each position read at visit,
+ *  named by the drawn card's market where the read drew one. */
+function trailPositions(
+  rows: WalletSummaryRow[],
+  visited: WalletPosition[],
+  drawnRows: WalletPosition[],
+): WalletCountsPosition[] {
+  const drawnMarket = new Map(drawnRows.map((p) => [`${p.family}:${p.positionId}`, p.market]));
+  const TRAIL_CHAINS: WalletCountsChain[] = ["ethereum", "base", "arbitrum", "optimism", "arc", "sepolia"];
+  const slug = (id: ChainId) => TRAIL_CHAINS.find((c) => c === CHAINS[id]?.slug);
+  const fromRows = rows.filter(countedRow).map((r): WalletCountsPosition => {
+    const market = drawnMarket.get(`${r.family}:${r.positionId}`) ?? summaryMarketLabel(r);
+    return {
+      chain: r.chain,
+      family: r.family,
+      positionId: r.positionId,
+      status: walletRowStatus(r),
+      href: r.href,
+      ...(market ? { market } : {}),
+    };
+  });
+  const fromVisit = visited.flatMap((p): WalletCountsPosition[] => {
+    const chain = slug(p.chain);
+    if (!chain) return [];
+    return [
+      {
+        chain,
+        family: p.family,
+        positionId: p.positionId,
+        status: p.status,
+        href: p.href,
+        ...(p.market ? { market: p.market } : {}),
+      },
+    ];
+  });
+  return [...fromRows, ...fromVisit];
 }
 
 export function readWalletCounts(address: string, readerIp?: string): Promise<WalletCounts> {

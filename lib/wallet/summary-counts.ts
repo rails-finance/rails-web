@@ -5,7 +5,9 @@
 // wallet heading (`components/shared/wallet-positions-menu.tsx`) reads it. Client-safe: the
 // read is `readWalletCounts` in lib/wallet/read-wallet.ts.
 
-export type WalletCountsChain = "ethereum" | "base" | "arbitrum" | "arc" | "sepolia";
+/** Optimism: a position read at visit, in the wallet view's trail rows
+ *  (`WalletRead.trail`; ui-jobs 856). */
+export type WalletCountsChain = "ethereum" | "base" | "arbitrum" | "optimism" | "arc" | "sepolia";
 
 /** One position as the wallet view lists it: its chain, family, id, status and
  *  page. An Arbitrum Compound V3 row is one position per Comet held, as on
@@ -91,7 +93,9 @@ export function rowIsPage(href: string | null, pathname: string, search: string)
  *  691). */
 export const WALLET_COUNTS_SCOPE = "Counts mainnet positions; the Sepolia testnet is not counted.";
 
-const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+/** "1 position", "5 positions": the positions menu's trigger. */
+export const positionCount = (n: number): string =>
+  `${n.toLocaleString("en-US")} ${n === 1 ? "position" : "positions"}`;
 
 /** The menu's footer: the counts are mainnet only. */
 export const MENU_TESTNETS = "Testnets not included";
@@ -124,6 +128,9 @@ export function vaultRoot(href: string | null): string | undefined {
   return m && m[1] in VAULT_ROOTS ? m[1] : undefined;
 }
 
+/** Whether `root` names a vault protocol (`?vault=` on the wallet view). */
+export const isVaultRoot = (root: string | null | undefined): root is string => root != null && root in VAULT_ROOTS;
+
 /** The menu's name for a vault-share row's protocol ("MetaMorpho vaults"), or
  *  undefined where its href names none (or it has no page). */
 export const vaultProtocolOfHref = (href: string | null): string | undefined => {
@@ -146,29 +153,17 @@ export interface WalletProtocolRow<P extends WalletCountsPosition> {
   /** Any one of its positions, for its chain and family. */
   first: P;
   positions: P[];
-  open: number;
-  closed: number;
-  /** Passed to another wallet (ui-jobs 705); never open or closed. */
-  moved: number;
-  /** "1 open", "2 closed", "1 open · 2 closed", "1 open · 1 moved". */
-  counts: string;
-  /** The one position's page; past one, `listing`. */
-  href: string;
   /** The protocol's listing searched by the wallet, else the wallet view. */
   listing: string;
   /** `listing` is the protocol's, not the wallet view. */
   listed: boolean;
   /** The page's position is one of the row's. */
   page: boolean;
-  /** The row's href is the page: the row is not a link. */
-  current: boolean;
 }
 
 /** One row per protocol and chain the wallet holds positions in (each vault
  *  protocol its own, `menuKey`), those with an open position first, each
- *  group in roster order; closed counts closed, liquidated and redeemed, as
- *  the counts do, and moved (a position passed to another wallet, ui-jobs
- *  705) is counted apart. The positions menu (H13.2) and the trail's
+ *  group in roster order. The positions menu (H13.2) and the trail's
  *  protocol crumb (H13.4) read them. */
 export function walletProtocolRows<P extends WalletCountsPosition>(
   positions: P[],
@@ -186,37 +181,19 @@ export function walletProtocolRows<P extends WalletCountsPosition>(
     groups.set(key, g);
   }
   const order = (key: string) => groups.get(key)?.protocol?.order ?? Number.MAX_SAFE_INTEGER;
-  const rows = [...groups.entries()].map(([key, g]): WalletProtocolRow<P> => {
-    const open = g.positions.filter((p) => p.status === "open").length;
-    const moved = g.positions.filter((p) => p.status === "moved").length;
-    const closed = g.positions.length - open - moved;
-    const one = g.positions.length === 1;
-    const onPage = g.positions.some(isPage);
-    const parts = [
-      open > 0 && `${open.toLocaleString("en-US")} open`,
-      closed > 0 && `${closed.toLocaleString("en-US")} closed`,
-      moved > 0 && `${moved.toLocaleString("en-US")} moved`,
-    ];
-    const listing = g.protocol?.listing ?? dashboard;
-    return {
+  const rows = [...groups.entries()].map(
+    ([key, g]): WalletProtocolRow<P> => ({
       key,
       name: g.protocol?.name ?? g.positions[0].family,
       first: g.positions[0],
       positions: g.positions,
-      open,
-      closed,
-      moved,
-      counts: parts.filter(Boolean).join(" · "),
-      href: (one ? g.positions[0].href : null) ?? listing,
-      listing,
+      listing: g.protocol?.listing ?? dashboard,
       listed: g.protocol?.listing != null,
-      page: onPage,
-      current: one && onPage,
-    };
-  });
-  rows.sort(
-    (a, b) => Number(b.open > 0) - Number(a.open > 0) || order(a.key) - order(b.key) || a.key.localeCompare(b.key),
+      page: g.positions.some(isPage),
+    }),
   );
+  const open = (r: WalletProtocolRow<P>) => Number(r.positions.some((p) => p.status === "open"));
+  rows.sort((a, b) => open(b) - open(a) || order(a.key) - order(b.key) || a.key.localeCompare(b.key));
   return rows;
 }
 
@@ -232,7 +209,7 @@ export function walletProtocolMenu<P extends WalletCountsPosition>(
   const page = positions.filter(isPage);
   if (positions.length === page.length) return null;
   return {
-    trigger: count(positions.length, "position"),
+    trigger: positionCount(positions.length),
     rows: walletProtocolRows(positions, isPage, protocolOf, dashboard),
     pageCounted: page.length > 0,
   };

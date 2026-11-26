@@ -219,13 +219,16 @@ export function ToolsMenu({
     };
   }, [open, sheet]);
 
-  // The first row takes focus as the menu opens, so the arrows move from
-  // there; in the sheet, after the sheet has focused its panel.
+  // The first enabled row takes focus as the menu opens, so the arrows move
+  // from there; in the sheet, after the sheet has focused its panel. A row
+  // that is the page (aria-disabled) is passed over (ui-jobs 856).
   useEffect(() => {
     if (!open) return;
     const t = window.setTimeout(() =>
       menuRef.current
-        ?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]), [role="menuitemcheckbox"]:not([disabled])')
+        ?.querySelector<HTMLElement>(
+          '[role="menuitem"]:not([disabled]):not([aria-disabled="true"]), [role="menuitemcheckbox"]:not([disabled]):not([aria-disabled="true"])',
+        )
         ?.focus({ preventScroll: true }),
     );
     return () => window.clearTimeout(t);
@@ -256,6 +259,9 @@ export function ToolsMenu({
                   "data-tools-menu": "",
                   "data-card-menu": "",
                   "data-position-crumb-menu": "",
+                  // The card's menu opened from the position crumb keeps
+                  // its anatomy (ui-jobs 856).
+                  "data-anatomy": "C17",
                 })
               : { "data-export-menu": "", "data-tools-menu": "", "data-card-menu": "", "data-anatomy": "C17" };
     return (

@@ -82,11 +82,24 @@ interface StripStore {
   trails: string[];
   /** The detail cards' menus, by the card's id. */
   menus: Map<string, CardMenuRender>;
+  /** What the server's render and the hydrating one learn as they render,
+   *  read as the trail hooks' server snapshot so the first paint agrees
+   *  with the client's (ui-jobs 856): a heading that will draw the trail,
+   *  and the first detail card to name its position. */
+  seed: { trail: boolean; name: string | null };
   listeners: Set<() => void>;
 }
 
 function createStore(): StripStore {
-  return { node: null, slots: [], names: [], trails: [], menus: new Map(), listeners: new Set() };
+  return {
+    node: null,
+    slots: [],
+    names: [],
+    trails: [],
+    menus: new Map(),
+    seed: { trail: false, name: null },
+    listeners: new Set(),
+  };
 }
 
 const notify = (s: StripStore) => s.listeners.forEach((l) => l());
@@ -174,6 +187,9 @@ export function usePublishPositionCardName(
   const word = status?.word;
   const tone = status?.tone;
   const tip = status?.tip;
+  // Seeded in render: the heading renders above the card, so the server's
+  // paint knows which card the trail names (ui-jobs 856).
+  if (store && name && store.seed.name == null) store.seed.name = id;
   useLayoutEffect(() => {
     if (!store || !name) return;
     store.names = [...store.names.filter((n) => n.id !== id), { id, name, status, mark, chainName }];
@@ -242,6 +258,8 @@ export function usePositionCardName(): {
 export function useRegisterPositionTrail(on: boolean) {
   const store = useContext(PositionCardStripContext);
   const id = useId();
+  // Seeded in render, for the cards' server snapshot (ui-jobs 856).
+  if (store && on) store.seed.trail = true;
   useLayoutEffect(() => {
     if (!store || !on) return;
     store.trails = [...store.trails, id];
@@ -254,15 +272,15 @@ export function useRegisterPositionTrail(on: boolean) {
 }
 
 /** The card's half: whether a wallet heading's trail names this card's
- *  position (the first detail card to name one). False on the server and on
- *  a page with no wallet heading. */
+ *  position (the first detail card to name one). False on a page with no
+ *  wallet heading; the server and hydration read the render's seed. */
 export function usePositionTrailNamed(id: string): boolean {
   const store = useContext(PositionCardStripContext);
   const subscribe = useSubscribe(store);
   return useSyncExternalStore(
     subscribe,
     () => (store ? store.trails.length > 0 && store.names[0]?.id === id : false),
-    () => false,
+    () => (store ? store.seed.trail && store.seed.name === id : false),
   );
 }
 
@@ -274,6 +292,6 @@ export function usePositionTrailDrawn(): boolean {
   return useSyncExternalStore(
     subscribe,
     () => (store ? store.trails.length > 0 : false),
-    () => false,
+    () => store?.seed.trail ?? false,
   );
 }
