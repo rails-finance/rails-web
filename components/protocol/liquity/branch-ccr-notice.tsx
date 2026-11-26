@@ -131,7 +131,7 @@ function ListingNotice({ s }: { s: LiquityV2BranchCcr }) {
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
       <p className="min-w-0 flex-1 text-sm leading-relaxed">
         <Headline s={s} /> Opening or closing a Trove and borrowing more are blocked unless they bring the branch back
-        to {whole(s.ccr)}, and so is a rate change inside the 7-day cooldown. <BranchesLink />
+        to {whole(s.ccr)}. A rate change inside the 7-day cooldown is blocked. <BranchesLink />
       </p>
     </div>
   );
@@ -159,10 +159,11 @@ function Notice({
   const floor =
     s.bcr != null && floorProv ? (
       <>
-        <Prov info={floorProv}>{whole(s.mcr + s.bcr)}</Prov> (MCR + BCR)
+        <Prov info={floorProv}>{whole(s.mcr + s.bcr)}</Prov>, the {whole(s.mcr)} Minimum Collateral Ratio (MCR) plus a{" "}
+        {whole(s.bcr)} buffer
       </>
     ) : (
-      <>the MCR plus the BCR</>
+      <>the {whole(s.mcr)} Minimum Collateral Ratio (MCR) plus a buffer</>
     );
   return (
     <div
@@ -238,17 +239,17 @@ function TroveAnswer({
       {check && closeProv ? (
         check.closes ? (
           <>
-            This Trove <Prov info={closeProv}>can be closed</Prov>, because closing it brings the branch back to at
-            least {ccr}. You can also repay, down to the {minDebt} minimum debt, and add collateral.
+            This Trove <Prov info={closeProv}>can be closed</Prov>: closing it leaves the branch at or above {ccr}.
+            Repaying, down to the {minDebt} minimum debt, and adding collateral stay open.
           </>
         ) : (
           <>
-            This Trove <Prov info={closeProv}>can&rsquo;t be closed</Prov> until the branch is back at {ccr}. You can
-            repay, down to the {minDebt} minimum debt, and add collateral.
+            This Trove <Prov info={closeProv}>can&rsquo;t be closed</Prov> until the branch is back at {ccr}. Repaying,
+            down to the {minDebt} minimum debt, and adding collateral stay open.
           </>
         )
       ) : (
-        <>You can repay, down to the {minDebt} minimum debt, and add collateral.</>
+        <>Repaying, down to the {minDebt} minimum debt, and adding collateral stay open.</>
       )}
       {trove?.delegated ? (
         <>
