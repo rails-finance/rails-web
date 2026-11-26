@@ -542,14 +542,13 @@ function DetailPill({ status }: { status: PositionCardStatus | null }) {
 /** The lifecycle on both surfaces as a status dot (ui-jobs 856, in place of
  *  the OPEN/CLOSED pill): green for a live position, else the status word's
  *  tone; the word is its tip and accessible name, with its receipt where it
- *  has one. On the wallet view an open position draws none, AT RISK excepted
- *  (`PositionCardEdge`), and an open position the wallet stamps "Not read"
- *  (`edge.unread`) draws none, AT RISK included. */
+ *  has one; every card draws it, on the wallet view too ("At risk" there in
+ *  the caution tone, `PositionCardEdge`). An open position the wallet stamps
+ *  "Not read" (`edge.unread`) draws none, that stamp its one mark. */
 function StatusPill({ status }: { status: PositionCardStatus | null }) {
   const edge = useContext(PositionCardEdgeContext);
   // An unread open position carries one mark, the wallet's "Not read" stamp.
   if (edge?.unread) return null;
-  if (!status && edge?.surface === "wallet" && !edge?.atRisk) return null;
   const word = status ? status.word : edge?.atRisk ? "At risk" : "Open";
   const tone: DotTone = status ? status.tone : edge?.atRisk ? "caution" : "open";
   const words = <span className="sr-only">{word}</span>;
