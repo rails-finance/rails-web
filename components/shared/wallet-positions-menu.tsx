@@ -121,9 +121,9 @@ const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-30
 // than the crumbs. The first two crumbs open their menus with no ⌄; the
 // position crumb keeps its ⌄ (Miles, 26 Nov 2026, ui-jobs 856).
 const SLASH = (
-  <svg viewBox="0 0 6 20" className="mx-2 h-5 w-1.5 shrink-0 text-rb-500/60" fill="none" aria-hidden="true">
+  <svg viewBox="0 0 5 14" className="mx-2 h-3.5 w-[5px] shrink-0 text-rb-500/45" fill="none" aria-hidden="true">
     <path
-      d="M0.5 1 L5.5 10 L0.5 19"
+      d="M0.5 0.5 L4.5 7 L0.5 13.5"
       stroke="currentColor"
       strokeWidth="1"
       strokeLinecap="round"
