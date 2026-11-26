@@ -120,10 +120,12 @@ const dateLabel = async (page) => {
   return (await pill.locator("span.font-semibold").first().innerText()).trim();
 };
 
-/** The view's link, as the card's ⋮ copies it: its "Link to this …" row
+/** The view's link, as the card menu copies it: its "Link to this …" row
  *  copies the view on the position's own page (lib/shared/
- *  position-link.ts, ui-jobs 807). Pressed until the menu opens: a press
- *  before hydration is lost. */
+ *  position-link.ts, ui-jobs 807). `[data-card-menu] > button` is the card's
+ *  ⋮, or the wallet trail's position crumb where the trail names the
+ *  position (ui-jobs 856). Pressed until the menu opens: a press before
+ *  hydration is lost. */
 async function copyLink(page) {
   // At 390 px the ⋮ opens a MobileSheet portalled to body, outside the card.
   const menu = page.getByRole("menu").first();

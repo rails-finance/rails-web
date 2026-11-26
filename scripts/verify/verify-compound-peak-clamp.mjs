@@ -39,6 +39,15 @@ const LENDER = "0xae11326b304410837e6499cb40e81d2f69f58e5b";
 // no-regression control: the fix must not suppress real data.
 const BORROWER = "0xd89c490984af4ae33ebb71534d65b331c9e32b60";
 
+/** The status dot (C6) and market of the card holding `grid`: the dot's
+ *  `title` is the status word (ui-jobs 856). */
+const cardOf = (grid) =>
+  grid.evaluate((g) => {
+    const c = g.closest("[data-position-card-shell]");
+    const dot = c?.querySelector("[data-card-status-dot]");
+    return { word: dot?.getAttribute("title") ?? null, cWETHv3: /cWETHv3/.test(c?.innerText ?? "") };
+  });
+
 function assert(cond, msg) {
   if (!cond) throw new Error("ASSERT FAILED: " + msg);
   console.log("  ok:", msg);
@@ -58,10 +67,12 @@ const rawText = await grid.innerText();
 const cardText = rawText.replace(/\s+/g, " ");
 
 const bodyText = await page.locator("body").innerText();
-// The wallet pill sits between the CLOSED badge and the market label since
-// the identity flip (wallet leads the cluster) — allow it, keep the
-// same-header-cluster claim tight (≤60 chars of pill between them).
-assert(/CLOSED[\s\S]{0,60}?cWETHv3/.test(bodyText), "the closed card is the cWETHv3 one");
+// The grid's own card carries the Closed status dot and the cWETHv3 market.
+const lenderCard = await cardOf(grid);
+assert(
+  lenderCard.word === "Closed" && lenderCard.cWETHv3,
+  `the closed card is the cWETHv3 one (${JSON.stringify(lenderCard)})`,
+);
 assert(cardText.includes(PEAK_SUPPLY), `collateral column labelled '${PEAK_SUPPLY}'`);
 assert(!cardText.includes(HEAD_COLLATERAL), `no '${HEAD_COLLATERAL}' on a supply-only card`);
 assert(new RegExp(`${PEAK_SUPPLY}\\s*3\\b`).test(rawText), "supply value reads 3");
@@ -101,9 +112,10 @@ const bGrid = page.locator("div.grid").filter({ hasText: PEAK_DEBT });
 assert((await bGrid.count()) === 1, `exactly one stat grid carries a "${PEAK_DEBT}" column`);
 const bRaw = await bGrid.innerText();
 const bText = bRaw.replace(/\s+/g, " ");
+const borrowerCard = await cardOf(bGrid);
 assert(
-  /CLOSED[\s\S]{0,60}?cWETHv3/.test(await page.locator("body").innerText()),
-  "the control's closed card is cWETHv3",
+  borrowerCard.word === "Closed" && borrowerCard.cWETHv3,
+  `the control's closed card is cWETHv3 (${JSON.stringify(borrowerCard)})`,
 );
 assert(
   new RegExp(`${PEAK_DEBT}\\s*0\\.10?\\b`).test(bRaw),

@@ -62,7 +62,7 @@
 //       backend orders and what the page says it orders), lastActivity desc is
 //       descending by last block, and the DOM's order is the API's order
 //   L5  the closed card (F4): no Shares and no Claim figure in the DOM, the
-//       CLOSED pill, and "closed by" naming this script's own last log block
+//       Closed status dot, and "closed by" naming this script's own last log block
 //   L6  F9: each never-held vault is STATED on the listing with its census
 //       block, and none of them contributes a row
 //   L7  F10: an address this script's own sweep proves is not in F1's set
@@ -732,6 +732,8 @@ async function readListingDom(qs = "") {
         liveBlock: e.getAttribute("data-live-block"),
         valueUsdE8: e.getAttribute("data-value-usd-e8"),
         pricedBlock: e.getAttribute("data-priced-block"),
+        // The status dot (C6, ui-jobs 856): its `title` is the status word.
+        statusWord: e.querySelector("[data-card-status-dot]")?.getAttribute("title") ?? null,
         stats,
         vaultSymbol: symbolEl?.getAttribute("data-card-vault-symbol") ?? null,
         symbolLeadsPill: symbolEl && pillEl ? (symbolEl.compareDocumentPosition(pillEl) & 4) === 4 : null,
@@ -1023,10 +1025,10 @@ const f4OwnLast = [...f4Sent, ...f4Recv].reduce((m, l) => Math.max(m, Number(Big
 const f4Dom = await readListingDom(`vault=${F4_VAULT}&q=${F4_HOLDER}`);
 const f4Card = f4Dom.cards.find((c) => c.holder === F4_HOLDER);
 check(
-  "L5b the closed card carries the CLOSED pill and no Shares or Claim figure",
+  "L5b the closed card carries the Closed status dot and no Shares or Claim figure",
   f4Card != null &&
     f4Card.status === "closed" &&
-    /CLOSED/.test(f4Card.text) &&
+    f4Card.statusWord === "Closed" &&
     !/Shares ·/.test(f4Card.text) &&
     !/Claim ·/.test(f4Card.text),
   f4Card ? f4Card.text.slice(0, 120) : "no card",

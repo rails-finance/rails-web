@@ -391,7 +391,9 @@ try {
   pageErrors.length = 0;
   await page.goto(`${BASE}${EXPLORER}`, { waitUntil: "networkidle", timeout: 180000 });
   body = await page.textContent("body");
-  check("listing: OPEN cards render from the live index", /OPEN/.test(body));
+  // The lifecycle pill is a status dot since ui-jobs 856.
+  const openDots = await page.locator('[data-card-status-dot="open"]').count();
+  check("listing: Open cards render from the live index", openDots > 0, `${openDots} open dots`);
   check("listing: market pair identity on rows", /\/ crvUSD/.test(body));
   check("listing: no page errors", pageErrors.length === 0, pageErrors.join(" | "));
 
@@ -400,7 +402,12 @@ try {
   body = await page.textContent("body");
   // The closed-card outcome pill renders "Liquidated" (mixed case — asserted
   // against the actual render, not an assumed all-caps).
-  check("listing: Closed by liquidation renders Liquidated cards", /Liquidated/.test(body) && !/\bOPEN\b/.test(body));
+  const openOnClosed = await page.locator('[data-card-status-dot="open"]').count();
+  check(
+    "listing: Closed by liquidation renders Liquidated cards",
+    /Liquidated/.test(body) && openOnClosed === 0,
+    `${openOnClosed} open dots`,
+  );
 
   // The soft-liq subject, found at run time — see findSoftLiq(). Everything
   // from here to the end of section 3 asserts against the chain read it

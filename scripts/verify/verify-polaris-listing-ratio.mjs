@@ -408,18 +408,24 @@ if (!probeLine) {
 const page6 = await context.newPage();
 await page6.goto(`${BASE}/sepolia/polaris/usdp/8`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page6.waitForTimeout(6000);
-// Since ui-jobs 272 the prices sit in a menu at the wallet row's right end
-// (`[data-latest-prices]`, H7.2): open it, pressing until it reads open.
+// The strip (`[data-latest-prices]`, H7.2) stands up to three prices inline
+// (`[data-latest-price]`) and the rest behind a "+N" trigger (ui-jobs 856).
+// Where a trigger is drawn, open it, pressing until it reads open.
 const pricesTrigger = page6.locator("[data-latest-prices] button[aria-haspopup]").first();
-for (let i = 0; i < 6 && (await pricesTrigger.getAttribute("aria-expanded").catch(() => null)) !== "true"; i++) {
-  await pricesTrigger.click({ timeout: 10000 }).catch(() => {});
-  await page6.waitForTimeout(800);
-}
+if ((await pricesTrigger.count()) > 0)
+  for (let i = 0; i < 6 && (await pricesTrigger.getAttribute("aria-expanded").catch(() => null)) !== "true"; i++) {
+    await pricesTrigger.click({ timeout: 10000 }).catch(() => {});
+    await page6.waitForTimeout(800);
+  }
 const strip = await page6.evaluate(() => {
+  const inline = [...document.querySelectorAll("[data-latest-prices] [data-latest-price]")].map((el) => ({
+    symbol: el.getAttribute("data-latest-price"),
+    text: (el.textContent ?? "").trim(),
+  }));
   const pills = [...document.querySelectorAll("span[title]")]
     .filter((el) => el.className.includes("tabular-nums") && el.className.includes("cursor-default"))
     .map((el) => ({ symbol: el.getAttribute("title"), text: (el.textContent ?? "").trim() }));
-  return pills;
+  return [...inline, ...pills];
 });
 check(
   "6. usdp/8's price strip lists pETH and USDp",

@@ -136,9 +136,11 @@ async function openListing(context, url) {
   return page;
 }
 
-/** The lifecycle pill of every listing row, in order. `rowSel` is the CSS
+/** The lifecycle word of every listing row, in order. `rowSel` is the CSS
  *  selector for the row anchors into the explorer's detail routes (Polaris takes
- *  two, one per market); the pill is the row's one all-caps status word. */
+ *  two, one per market). Since ui-jobs 856 the pill is a status dot
+ *  (`[data-card-status-dot]`, C6) whose `title` is the word in Title case; it
+ *  is read upper-cased, so the sets below keep the pill's spelling. */
 async function readPills(page, rowSel) {
   return page.evaluate((sel) => {
     // NOT LOADED is a listing row whose account has not been read from the chain
@@ -162,11 +164,8 @@ async function readPills(page, rowSel) {
     ];
     const rows = [...document.querySelectorAll(sel)];
     return rows.map((row) => {
-      for (const el of row.querySelectorAll("span")) {
-        const t = el.textContent?.trim();
-        if (t && words.includes(t)) return t;
-      }
-      return null;
+      const t = row.querySelector("[data-card-status-dot]")?.getAttribute("title")?.trim().toUpperCase();
+      return t && words.includes(t) ? t : null;
     });
   }, rowSel);
 }
@@ -518,8 +517,8 @@ if (wants("Liquity V2")) {
         searchChips.statusChip == null,
       `${JSON.stringify(walletView)}${protocolsHeld != null ? `; protocols held ${protocolsHeld}` : ""}${summaryError ? `; summary unread: ${summaryError}` : ""}; ${describeChips(searchChips)}`,
     );
-    // An open card on the wallet page draws no lifecycle word (94b544d15), so a
-    // row with none reads as open.
+    // An unread open card on the wallet page draws no status dot (its "Not
+    // read" stamp stands alone), so a row with none reads as open.
     const walletPills = searchPills.map((p) => p ?? "OPEN");
     check(
       label("5d. every rendered pill is a real lifecycle word, a row with none read as open"),
@@ -732,7 +731,7 @@ if (wants("Polaris")) {
     const liq = liqHolder.ended.filter((r) => r.status === "liquidated");
     const page = await openListing(context, `${BASE}/sepolia/polaris?q=${liqHolder.addr}`);
     const rows = await readRows(page);
-    // The badge on every ended card reads CLOSED; the Outcome column carries the
+    // The status dot on every ended card reads Closed; the Outcome column carries the
     // actual word, which is where a liquidation is named.
     const named = rows.filter((r) => /Outcome\s+Liquidated\b/.test(r.text)).length;
     info(

@@ -48,14 +48,14 @@ const ROW = 'a[class~="group/listing-row"]';
 // (ui-jobs 738).
 const FILTER_BTN = 'button[aria-label^="Filter positions by wallet"], button[aria-label^="Open wallet"]';
 // On a position page the owner's wallet is its address menu (ui-jobs 271,
-// `components/shared/wallet-menu.tsx`), whose "View wallet" row opens the
+// `components/shared/wallet-menu.tsx`), whose "Wallet dashboard" row opens the
 // wallet view, `/wallet/<address>` (rails-ops decision 0051). For those
 // explorers the run asserts that landing, then loads `<route>?q=<address>`
 // itself to prove the listing filters. The listings that draw a pill of their
 // own (Liquity V2, Aave V4) keep the filter button: Aave V4's links `?q=`,
 // Liquity V2's the wallet page with Liquity V2 chosen (ui-jobs 738).
 const OWNER_MENU = '[data-wallet-menu] button[aria-haspopup="menu"]';
-const OWNER_MENU_WALLET = '[data-wallet-menu] [role="menuitem"]:has-text("View wallet")';
+const OWNER_MENU_WALLET = '[data-wallet-menu] [role="menuitem"]:has-text("Wallet dashboard")';
 // Since fb80809a the menu carries the page it opened from as `?from=`, so
 // the wallet view can link back to its explorer.
 const WALLET_VIEW = /^\/wallet\/(0x[0-9a-f]{40})(?:\?from=([^&]*))?$/;
