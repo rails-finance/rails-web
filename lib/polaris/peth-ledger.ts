@@ -85,6 +85,8 @@ export const PETH_KINDS: Record<string, { effect: PethEffect; label: string }> =
   loan_collateral: { effect: "change_of_place", label: "Reserve-loan collateral" },
   lp_add: { effect: "change_of_place", label: "Liquidity added" },
   lp_remove: { effect: "change_of_place", label: "Liquidity removed" },
+  lp_received: { effect: "acquisition", label: "Pool share received" },
+  lp_sent: { effect: "exit", label: "Pool share sent" },
   venue_swap_in: { effect: "acquisition", label: "Bought on a pool" },
   venue_swap_out: { effect: "sale", label: "Sold on a pool" },
   zap_in: { effect: "acquisition", label: "Bought through the zap" },
@@ -320,6 +322,9 @@ export function pethRowBullets(r: PethLedgerRow, names: PethTokenNames): string[
   if (pethRowEffect(r) === "not_decoded")
     return ["Rails does not read this Morpho Blue market yet, so this row counts in no figure on the page."];
   const out: string[] = [];
+  if (r.kind === "lp_received")
+    out.push("The pool minted this share to the address without a deposit from it in this transaction.");
+  if (r.kind === "lp_sent") out.push("This address sent its pool share to another address.");
   const P = names.peth.symbol;
   const ethIn = big(r.eth_in_raw);
   const ethOut = big(r.eth_out_raw);

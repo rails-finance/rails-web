@@ -190,3 +190,39 @@ test("svpETH is a place with the vpETH it converts to; svpETH moves are changes 
   const e = pethTimelineEvent(row, NAMES, VENUES);
   assert.equal(e.actionType, "peth.not_decoded");
 });
+
+test("a pool share received with no deposit is an acquisition with its one bullet", () => {
+  assert.deepEqual(PETH_KINDS.lp_received, { effect: "acquisition", label: "Pool share received" });
+  const row = {
+    ...fx("cdp").rows[0],
+    kind: "lp_received",
+    effect: "acquisition",
+    valuation: null,
+    peth_delta_raw: "0",
+    fpeth_delta_raw: "0",
+    vpeth_delta_raw: "0",
+    eth_in_raw: "0",
+    eth_out_raw: "0",
+    curve_fee_raw: "0",
+  };
+  assert.deepEqual(pethRowBullets(row, NAMES), [
+    "The pool minted this share to the address without a deposit from it in this transaction.",
+  ]);
+});
+
+test("a pool share sent to another holder is an exit with its one bullet", () => {
+  assert.deepEqual(PETH_KINDS.lp_sent, { effect: "exit", label: "Pool share sent" });
+  const row = {
+    ...fx("cdp").rows[0],
+    kind: "lp_sent",
+    effect: "exit",
+    valuation: null,
+    peth_delta_raw: "0",
+    fpeth_delta_raw: "0",
+    vpeth_delta_raw: "0",
+    eth_in_raw: "0",
+    eth_out_raw: "0",
+    curve_fee_raw: "0",
+  };
+  assert.deepEqual(pethRowBullets(row, NAMES), ["This address sent its pool share to another address."]);
+});
