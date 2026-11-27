@@ -30,11 +30,15 @@ import { RawFigure, tokenIcon } from "./polaris-sp-loan-parts";
 const ETH = "ETH";
 const W = POLARIS_WETH;
 
+/** The heavy address's sentence, the same on the card, the explanation, the
+ *  timeline and the refusal. */
+export const PETH_HEAVY = "This address has too many transactions for one page, so its pETH account is not drawn.";
+
 /** Why a head figure is not on the card. */
 export const PETH_UNREAD = {
   ledger: "History still being read",
-  heavy: "Too many transactions to show",
-  head: "The current figures did not load; reload the page to try again.",
+  heavy: PETH_HEAVY,
+  head: "The current figures did not load. Reload to try again.",
 } as const;
 
 function PethMenuRows({ address }: { address: string }) {
@@ -193,7 +197,7 @@ export function polarisPethSlots({
     {
       id: "spot-over-floor",
       label: "Spot over the floor",
-      tip: "The holding's value at spot less its value at the floor: the downside a holder carries.",
+      tip: "The holding's value at spot less its value at the floor.",
       asset: gap != null ? { symbol: ETH, address: W.address, figure: `${exactUnits(gap)} ${ETH}` } : undefined,
       value:
         gap != null ? (

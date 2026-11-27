@@ -233,3 +233,21 @@ export const POLARIS_TOKENS_BY_ADDRESS: Record<string, PolarisTokenMeta> = Objec
     ]),
   ].map((t) => [t.address.toLowerCase(), t]),
 );
+
+/** Every contract this deployment names, lower-cased: the protocol's
+ *  addresses, which hold pETH for the protocol and have no account page. */
+export const POLARIS_PROTOCOL_ADDRESSES: ReadonlySet<string> = new Set(
+  [
+    ...Object.values(POLARIS_CORE),
+    ...POLARIS_MARKETS.flatMap((m) => {
+      const c = POLARIS_MARKET_CONFIG[m];
+      return [c.cdpManager, c.stabilityPool, c.cdpNft, c.priceFeed, c.psm, c.vault.address, c.stable.address];
+    }),
+    ...Object.keys(POLARIS_TOKENS_BY_ADDRESS),
+    ...Object.values(POLARIS_VENUES).map((v) => v.address),
+    POLARIS_ZAP_ROUTER,
+  ].map((a) => a.toLowerCase()),
+);
+
+/** Whether an address (any case) is one of the deployment's contracts. */
+export const isPolarisProtocolAddress = (a: string): boolean => POLARIS_PROTOCOL_ADDRESSES.has(a.toLowerCase());

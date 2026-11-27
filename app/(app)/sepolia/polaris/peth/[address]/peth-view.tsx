@@ -25,7 +25,7 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
-import { PolarisPethCard } from "@/components/protocol/polaris/polaris-peth-card";
+import { PETH_HEAVY, PETH_UNREAD, PolarisPethCard } from "@/components/protocol/polaris/polaris-peth-card";
 import { PolarisPethPlaces } from "@/components/protocol/polaris/polaris-peth-places";
 import { PETH_NAMES, PolarisPethEventCard } from "@/components/protocol/polaris/polaris-peth-event-card";
 import { PETH, POLARIS_VENUES } from "@/lib/polaris/asset-catalog";
@@ -45,7 +45,7 @@ import {
 import { pethHeadProv } from "@/lib/polaris/peth-provenance";
 import { polarisPethEventPage } from "@/lib/polaris/peth-explorer";
 import { pethStoredAsOf } from "@/lib/polaris/peth-as-of";
-import { isPethRefusal, PETH_FIRST_READ, type PethRefusal } from "@/lib/polaris/peth-page-data-shared";
+import { isPethRefusal, PETH_FIRST_READ, PETH_OLDER_READ, type PethRefusal } from "@/lib/polaris/peth-page-data-shared";
 import {
   PolarisPethHttpError,
   readPolarisPeth,
@@ -56,8 +56,7 @@ import {
 /** The sentence a refused address reads, by what the route said. */
 export function pethRefusalText(r: PethRefusal): string {
   const said = `${r.code ?? ""} ${r.reason ?? ""}`.toLowerCase();
-  if (/heavy/.test(said))
-    return "This address has too many transactions to show on one page, so Rails does not draw its pETH account.";
+  if (/heavy/.test(said)) return PETH_HEAVY;
   if (/protocol|contract/.test(said))
     return "This address is a Polaris contract. Its pETH belongs to the protocol, so it has no account page.";
   return r.reason ? `The index refused this address: ${r.reason}` : "The index refused this address.";
@@ -89,8 +88,6 @@ function PethExplanation({
       </>,
     );
   if (ledgerGap == null) {
-    if (f.ethIn != null)
-      items.push(<>This address paid {strong(eth(f.ethIn)!)}, in ETH or WETH, for pETH and fpETH.</>);
     if (f.ethOut != null) items.push(<>This address received {strong(eth(f.ethOut)!)}, in ETH or WETH.</>);
     if (f.curveFees != null)
       items.push(
@@ -101,9 +98,7 @@ function PethExplanation({
     items.push(<>PSM mints and POLAR conversions carry a valuation on their rows, which ETH out does not count.</>);
     items.push(<>pETH received by plain transfer counts in pETH held and in neither ETH figure.</>);
   } else if (ledgerGap === "too_heavy") {
-    items.push(
-      <>This address has too many transactions to show on one page, so ETH in, ETH out and the fees are not stated.</>,
-    );
+    items.push(<>{PETH_HEAVY}</>);
   } else {
     items.push(
       <>The history of this address is still being read, so ETH in, ETH out and the fees are not stated yet.</>,
@@ -111,7 +106,7 @@ function PethExplanation({
   }
   if (ledgerGap == null && unchecked)
     items.push(<>The history may stop short of this address&rsquo;s latest transactions.</>);
-  if (!headRead) items.push(<>The current figures did not load; reload the page to try again.</>);
+  if (!headRead) items.push(<>{PETH_UNREAD.head}</>);
   return (
     <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
       {items.map((it, i) => (
@@ -155,8 +150,9 @@ export default function PethView({
   }, [initial, address]);
 
   // The rows past the first read, on the cut notice's "Load the older
-  // events": pages of PETH_FIRST_READ, newest first, read on while a page
-  // comes back full; the ids settle repeats.
+  // events": pages of PETH_OLDER_READ (the route's most), newest first, read
+  // on while a page comes back full. A row landing meanwhile shifts the pages
+  // down, so a page can repeat a row; the list keeps each transaction once.
   const [older, setOlder] = useState<PethLedgerRow[]>([]);
   const [olderRead, setOlderRead] = useState<"idle" | "loading" | "failed">("idle");
   const reading = useRef(false);
@@ -166,10 +162,10 @@ export default function PethView({
     setOlderRead("loading");
     const got: PethLedgerRow[] = [];
     try {
-      for (let offset = data.rows.length; ; offset += PETH_FIRST_READ) {
-        const page = await readPolarisPeth(address, { limit: String(PETH_FIRST_READ), offset: String(offset) });
+      for (let offset = data.rows.length; ; offset += PETH_OLDER_READ) {
+        const page = await readPolarisPeth(address, { limit: String(PETH_OLDER_READ), offset: String(offset) });
         got.push(...(page.rows ?? []));
-        if ((page.rows ?? []).length < PETH_FIRST_READ) break;
+        if ((page.rows ?? []).length < PETH_OLDER_READ) break;
       }
       setOlder(got);
       setOlderRead("idle");
@@ -229,15 +225,13 @@ export default function PethView({
   if (notSetUp)
     return (
       <div className="py-8 text-sm text-rb-500" data-peth-not-set-up="">
-        This deployment is not set up for pETH accounts yet.
+        Polaris on Sepolia is not set up for pETH accounts yet.
       </div>
     );
   if (!data && !failed) return <DetailBodySkeleton />;
   if (!data || !figures || !places)
     return (
-      <div className="py-8 text-sm text-rb-500">
-        The index did not answer for this address just now. Reload the page to try again.
-      </div>
+      <div className="py-8 text-sm text-rb-500">The index did not answer for this address. Reload to try again.</div>
     );
 
   const ledgerGap = pethLedgerGap(data);
@@ -308,7 +302,7 @@ export default function PethView({
         displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
         emptyLabel={
           ledgerGap === "too_heavy"
-            ? "This address has too many transactions to show on one page"
+            ? PETH_HEAVY
             : ledgerGap === "reading"
               ? "The history of this address is still being read"
               : "No pETH, fpETH or vpETH transactions recorded for this address"

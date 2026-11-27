@@ -94,37 +94,31 @@ test("an event page's title is the kind and the pETH it moved, as a Trove event'
   assert.match(title(buy), /^Bought on the curve [\d.,]+K? pETH$/);
 });
 
-test("an unread head dates the stored places by the last block read", async () => {
+test("an unread head reads the stored places as of the last read, with no date", async () => {
   const { pethStoredAsOf, pethAsOfWords } = await import("../../lib/polaris/peth-as-of.ts");
   const ledger = {
     complete: null,
     scanned_to_block: "12224849",
+    // The pETH lane's watermark: the stored places come from another lane, so
+    // this time does not date them.
     scanned_to_timestamp: "2026-11-27T17:57:24.000Z",
     deploy_block: "11482700",
     head_block: null,
     fresh_within_blocks: 7200,
   };
-  const asOf = pethStoredAsOf({ ledger });
-  assert.deepEqual(asOf, { block: "12224849", timestamp: "2026-11-27T17:57:24.000Z" });
-  assert.equal(pethAsOfWords(asOf), ", as of 27 November 2026");
-  // A head that answered: the stored places are current, and no note is added.
-  assert.equal(pethStoredAsOf({ ledger: { ...ledger, complete: true, head_block: "12225476" } }), null);
-  assert.equal(pethAsOfWords(null), "");
+  assert.equal(pethStoredAsOf({ ledger }), true);
+  assert.equal(pethAsOfWords(pethStoredAsOf({ ledger })), ", as of the last read");
+  assert.equal(
+    pethAsOfWords(pethStoredAsOf({ ledger: { ...ledger, scanned_to_timestamp: null } })),
+    ", as of the last read",
+  );
 });
 
-test("with no time from the route, the note names the last read", async () => {
+test("a head that answered adds no note", async () => {
   const { pethStoredAsOf, pethAsOfWords } = await import("../../lib/polaris/peth-as-of.ts");
-  const asOf = pethStoredAsOf({
-    ledger: {
-      complete: null,
-      scanned_to_block: "12224849",
-      scanned_to_timestamp: null,
-      deploy_block: "11482700",
-      head_block: null,
-    },
-  });
-  assert.equal(asOf.timestamp, null);
-  assert.equal(pethAsOfWords(asOf), ", as of the last read");
+  const ledger = { complete: true, scanned_to_block: "12224849", deploy_block: "11482700", head_block: "12225476" };
+  assert.equal(pethStoredAsOf({ ledger }), false);
+  assert.equal(pethAsOfWords(false), "");
 });
 
 test("a not-decoded vpETH move titles with its vpETH and keeps its one bullet", async () => {
@@ -162,7 +156,14 @@ test("a not-decoded vpETH move titles with its vpETH and keeps its one bullet", 
     eventTitleWords(polarisPethEventPage({ address: d.address, row, event }).title),
     "Morpho Blue market (not decoded) <0.01 vpETH",
   );
-  assert.deepEqual(pethRowBullets(row, NAMES), [
-    "Rails does not read this Morpho Blue market yet, so this vpETH move counts in no ETH figure or valuation.",
-  ]);
+  assert.deepEqual(pethRowBullets(row, NAMES), ["This vpETH move is in no ETH figure or valuation."]);
+});
+
+test("a protocol contract is not an account: no pETH account link for it", async () => {
+  const { isPolarisProtocolAddress } = await import("../../lib/polaris/asset-catalog.ts");
+  // The sUSDp vault (holds deposit #2), the zap router and the bonding curve.
+  assert.equal(isPolarisProtocolAddress("0x63d01003f67d8807799fdfbdeefb583d3c8f7f73"), true);
+  assert.equal(isPolarisProtocolAddress("0xD09416D328DFAA07A422A1DF233D1D968B80FBF8"), true);
+  assert.equal(isPolarisProtocolAddress("0x07ea2ff889e6228cded329a09f66e370f12c705e"), true);
+  assert.equal(isPolarisProtocolAddress(d.address), false);
 });

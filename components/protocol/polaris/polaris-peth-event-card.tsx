@@ -263,7 +263,7 @@ export function PolarisPethEventCard({
     caption: label,
     cells,
     sheet: polarisPethSheet(row),
-    ledgers: { none: "Each token's balance is its side's total." },
+    ledgers: { none: "Each balance is its side's total." },
     explainer: {
       body:
         bullets.length > 0 ? (

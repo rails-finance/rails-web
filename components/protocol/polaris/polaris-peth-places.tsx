@@ -33,7 +33,7 @@ import {
   pethValuedProv,
 } from "@/lib/polaris/peth-provenance";
 import { RawFigure } from "./polaris-sp-loan-parts";
-import { pethAsOfWords, type PethStoredAsOf } from "@/lib/polaris/peth-as-of";
+import { pethAsOfWords } from "@/lib/polaris/peth-as-of";
 import { PETH_UNREAD } from "./polaris-peth-card";
 
 function Figure({ raw, symbol, address, info }: { raw: bigint; symbol: string; address: string; info: Provenance }) {
@@ -95,15 +95,14 @@ export function PolarisPethPlaces({
   places: PethPlaces;
   headRead: boolean;
   headBlock: string | null;
-  /** Set when the head was not read (`ledger.complete` null): the places the
-   *  stored ledger states (CDPs, deposits, loans) are as of the last block the
-   *  lane read, the date in the note and the block in the receipt. */
-  storedAsOf?: PethStoredAsOf | null;
+  /** The head was not read (`ledger.complete` null): the places the stored
+   *  index states (CDPs, deposits, loans) are as of its last read. */
+  storedAsOf?: boolean;
 }) {
   const registry = useReceiptRegistry();
-  const asOfWords = pethAsOfWords(storedAsOf ?? null);
+  const asOfWords = pethAsOfWords(storedAsOf === true);
   const asOfReceipt = storedAsOf
-    ? ` The chain did not answer, so this is the stored ledger through ${storedAsOf.block ? `block ${storedAsOf.block}` : "its last block read"}; later changes are not counted.`
+    ? " The chain did not answer, so this is the stored index as of its last read; later changes are not counted."
     : "";
   const headUnread = unread(headRead ? "Not read" : PETH_UNREAD.head);
   const lpTotal = p.lp.every((x) => x.share != null) ? p.lp.reduce((s, x) => s + (x.share ?? ZERO), ZERO) : null;
@@ -125,8 +124,7 @@ export function PolarisPethPlaces({
             </h2>
           </div>
           <p className="mt-1 text-sm leading-relaxed text-rb-500">
-            The list below gives one figure for each place, in that place&rsquo;s token, and links each CDP, deposit and
-            loan to its page.
+            The list below shows one figure for each place, in its token.
           </p>
           <ul className="mt-3 divide-y divide-[var(--edge-raised)]">
             <Place

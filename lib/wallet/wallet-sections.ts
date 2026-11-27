@@ -33,6 +33,7 @@
 // a section mixing stored and head figures states none (rule 743).
 
 import { polarisPethAccountHref } from "@/lib/polaris/routes";
+import { isPolarisProtocolAddress } from "@/lib/polaris/asset-catalog";
 import type { HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { liquityV2HolderStrip } from "@/lib/liquity-v2/holder-strip";
@@ -613,7 +614,7 @@ export function walletSections(
     }
     if (!opts.bands) band = { ...band, positions: 0 };
     // Polaris's section links the wallet's pETH account (N7.4, ui-jobs 865).
-    if (slug === "polaris" && opts.address)
+    if (slug === "polaris" && opts.address && !isPolarisProtocolAddress(opts.address))
       band = { ...band, accountLink: { href: polarisPethAccountHref(opts.address), label: "pETH account" } };
     sections.push({
       slug,

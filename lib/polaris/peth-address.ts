@@ -9,7 +9,7 @@ import { isWalletEnsName, WALLET_ADDRESS } from "@/lib/wallet/wallet-filters";
 import { polarisPethAccountHref } from "@/lib/polaris/routes";
 
 export const PETH_ACCOUNT_DESCRIPTION =
-  "A Rails replay of this address's Polaris pETH on Sepolia: the ETH it paid and received, the curve fees, the pETH it holds and where it sits, with a receipt on every number. Test tokens only.";
+  "A Rails replay of this address's Polaris pETH on Sepolia: the ETH it paid and received, the curve fees, the pETH it holds and where it sits. Test tokens on Sepolia.";
 
 /** The lower-cased address the URL names; `rest` rides any redirect. */
 export async function pethAddressOf(raw: string, rest = ""): Promise<string> {

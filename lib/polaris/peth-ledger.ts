@@ -161,12 +161,13 @@ export function pethLineToken(
 ): { symbol: string; address: string } {
   if (token === "peth" || token === "fpeth" || token === "vpeth") return names[token];
   if (token.startsWith("lp_")) {
-    const key = {
-      lp_tripool: "venue_curve_tripool",
-      lp_polar_peth: "venue_univ2_polar_peth",
-      lp_peth_weth: "venue_univ2_peth_weth",
+    // Each venue's LP token by its pool, so the Asset filter keeps them apart.
+    const lp = {
+      lp_tripool: { key: "venue_curve_tripool", symbol: "pETH/fpETH/vpETH LP" },
+      lp_polar_peth: { key: "venue_univ2_polar_peth", symbol: "pETH/POLAR LP" },
+      lp_peth_weth: { key: "venue_univ2_peth_weth", symbol: "pETH/WETH LP" },
     }[token];
-    return { symbol: "LP", address: (key && venues[key]?.address) || token };
+    return { symbol: lp?.symbol ?? "LP", address: (lp && venues[lp.key]?.address) || token };
   }
   const t = token.toLowerCase();
   if (t === names.weth.address) return names.weth;
@@ -336,10 +337,7 @@ export function pethAmountText(raw: bigint): string {
 /** The row's Explanation bullets, one fact each. */
 export function pethRowBullets(r: PethLedgerRow, names: PethTokenNames): string[] {
   // A move Rails does not read: one bullet, and none of the sums.
-  if (pethRowEffect(r) === "not_decoded")
-    return [
-      "Rails does not read this Morpho Blue market yet, so this vpETH move counts in no ETH figure or valuation.",
-    ];
+  if (pethRowEffect(r) === "not_decoded") return ["This vpETH move is in no ETH figure or valuation."];
   const out: string[] = [];
   if (r.kind === "lp_received")
     out.push("The pool minted this share to the address without a deposit from it in this transaction.");
@@ -358,7 +356,13 @@ export function pethRowBullets(r: PethLedgerRow, names: PethTokenNames): string[
     if (raw > ZERO) out.push(`${pethAmountText(raw)} ${sym} reached this address.`);
     if (raw < ZERO) out.push(`${pethAmountText(raw)} ${sym} left this address.`);
   }
-  if (ethIn > ZERO) out.push(`This address paid ${pethAmountText(ethIn)} ETH, counted in ETH in.`);
+  // ETH in counts only zaps into pETH or fpETH (Miles, 27 Nov 2026): a zap
+  // into vpETH or a stablecoin is a separate row and counts in no ETH figure.
+  const zapOut = r.zap ? r.zap.token_out.toLowerCase() : null;
+  const zapElsewhere = zapOut != null && zapOut !== names.peth.address && zapOut !== names.fpeth.address;
+  if (ethIn > ZERO && zapElsewhere)
+    out.push(`This zap to ${pethLineToken(zapOut, names, {}).symbol} is in no ETH figure or valuation.`);
+  else if (ethIn > ZERO) out.push(`This address paid ${pethAmountText(ethIn)} ETH, counted in ETH in.`);
   if (ethOut > ZERO) out.push(`This address received ${pethAmountText(ethOut)} ETH, counted in ETH out.`);
   if (fee > ZERO) out.push(`The curve took ${pethAmountText(fee)} ${P} as its fee.`);
   const v = r.valuation;

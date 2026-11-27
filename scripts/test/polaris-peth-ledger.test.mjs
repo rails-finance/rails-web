@@ -188,8 +188,7 @@ test("svpETH is a place with the vpETH it converts to; svpETH moves are changes 
   };
   const bullets = pethRowBullets(row, NAMES);
   assert.equal(bullets.length, 1);
-  assert.match(bullets[0], /does not read this Morpho Blue market/);
-  assert.match(bullets[0], /counts in no ETH figure or valuation\.$/);
+  assert.equal(bullets[0], "This vpETH move is in no ETH figure or valuation.");
   const e = pethTimelineEvent(row, NAMES, VENUES);
   assert.equal(e.actionType, "peth.not_decoded");
 });
@@ -275,4 +274,36 @@ test("a liquidated CDP's row: the wallet's pETH side adds up without the CDP's c
     pethWalletLines(withTransfer, "peth").map((l) => l.rule),
     ["wallet_send"],
   );
+});
+
+test("a zap into vpETH or a stablecoin is in no ETH figure; a zap into pETH counts in ETH in", () => {
+  const usdp = "0x899d225d779f41fa1ab422ab1b8a9408296dd5c6";
+  const named = { ...NAMES, others: { [usdp]: { symbol: "USDp", address: usdp } } };
+  const base = {
+    ...fx("cdp").rows[0],
+    kind: "zap_in",
+    effect: "acquisition",
+    valuation: null,
+    peth_delta_raw: "0",
+    fpeth_delta_raw: "0",
+    vpeth_delta_raw: "0",
+    eth_in_raw: "1000000000000000000",
+    eth_out_raw: "0",
+    curve_fee_raw: "0",
+  };
+  const zap = (token_out) => ({ token_in: NAMES.weth.address, token_out, amount_in: "1", amount_out: "1" });
+  assert.deepEqual(pethRowBullets({ ...base, zap: zap(NAMES.vpeth.address) }, named), [
+    "This zap to vpETH is in no ETH figure or valuation.",
+  ]);
+  assert.deepEqual(pethRowBullets({ ...base, zap: zap(usdp) }, named), [
+    "This zap to USDp is in no ETH figure or valuation.",
+  ]);
+  assert.deepEqual(pethRowBullets({ ...base, zap: zap(NAMES.peth.address) }, named), [
+    "This address paid 1 ETH, counted in ETH in.",
+  ]);
+});
+
+test("each venue's LP token is named by its pool", () => {
+  const symbols = ["lp_tripool", "lp_polar_peth", "lp_peth_weth"].map((t) => pethLineToken(t, NAMES, VENUES).symbol);
+  assert.deepEqual(symbols, ["pETH/fpETH/vpETH LP", "pETH/POLAR LP", "pETH/WETH LP"]);
 });

@@ -10,11 +10,10 @@ interface Props {
   params: Promise<{ address: string; eventId: string }>;
 }
 
-// Restated: the parent route renders per request over a `no-store` read.
 export const dynamic = "force-dynamic";
 
-// The row's metadata, from the read the parent page makes in the same
-// request (`loadPolarisPeth`, cached).
+// The row's metadata, from the account page's read (`loadPolarisPeth`,
+// cached for the request).
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { address: raw, eventId } = await params;
   const address = pethAddressForMetadata(raw);
@@ -34,9 +33,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-// The parent account page, same params: the view reads `eventId` from the
-// route and draws the timeline alone in its pinned mode (rails-ops
-// reference/app-anatomy.md, P4).
+// The account page: its view reads `eventId` from the route and draws the
+// timeline alone in its pinned mode (rails-ops reference/app-anatomy.md, P4).
 export default async function PolarisPethEventPage({ params }: Props) {
   const p = await params;
   await pethAddressOf(p.address, `/event/${encodeURIComponent(decodeEventId(p.eventId))}`);

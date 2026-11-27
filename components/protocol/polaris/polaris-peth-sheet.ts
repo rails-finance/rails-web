@@ -57,7 +57,7 @@ const TIPS = {
   ethIn: "The ETH and WETH this address paid for pETH and fpETH, through this transaction.",
   ethOut: "The ETH and WETH that reached this address, through this transaction.",
   fees: "The fees the bonding curve took on this address's trades, through this transaction, in pETH.",
-  liquidated: "The collateral sat in the CDP, so the wallet's pETH side does not change.",
+  liquidated: "The collateral sat in the CDP.",
 };
 
 const VIA = "GET /api/polaris/peth/<address>";
@@ -119,10 +119,12 @@ export function polarisPethSheet(row: PethLedgerRow): EventSheet | undefined {
       const raw = l.direction === "in" ? amt : -amt;
       // The ETH the transaction paid or received, beside its first move in.
       let note: string | undefined;
-      if (l.direction === "in" && ethIn > ZERO && !inNoted) {
+      // A not-decoded Morpho Blue move is in no ETH figure: it carries no note.
+      const decoded = l.effect !== "not_decoded";
+      if (decoded && l.direction === "in" && ethIn > ZERO && !inNoted) {
         note = WORDS.ethPaid(pethAmountText(ethIn));
         inNoted = true;
-      } else if (l.direction === "out" && ethOut > ZERO && !outNoted) {
+      } else if (decoded && l.direction === "out" && ethOut > ZERO && !outNoted) {
         note = WORDS.ethReceived(pethAmountText(ethOut));
         outNoted = true;
       }

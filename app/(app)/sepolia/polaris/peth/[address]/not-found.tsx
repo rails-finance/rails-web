@@ -10,7 +10,7 @@ export default function PolarisPethNotFound() {
       backHref={POLARIS_BASE_PATH}
       backLabel="Browse Polaris positions"
     >
-      A Polaris pETH account is named by an address or an ENS name.
+      A Polaris pETH account on Sepolia is named by an address or an ENS name.
     </RouteNotFound>
   );
 }

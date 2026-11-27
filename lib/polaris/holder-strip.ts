@@ -48,6 +48,7 @@ import {
   POLARIS_MARKET_CONFIG,
   POLARIS_MARKETS,
   POLARIS_WETH,
+  isPolarisProtocolAddress,
   type PolarisMarket,
 } from "@/lib/polaris/asset-catalog";
 import { holderUsdReceipt, type UsdLeg } from "@/lib/shared/holder-usd-receipt";
@@ -232,7 +233,11 @@ export function polarisHolderStrip(
   const other = otherKinds(others);
   // The wallet's pETH account (N7.4, ui-jobs 865): named by the search, an
   // address or an ENS name, which the page resolves.
-  const accountLink = wallet ? { accountLink: { href: polarisPethAccountHref(wallet), label: "pETH account" } } : {};
+  // A protocol contract has no account page.
+  const accountLink =
+    wallet && !isPolarisProtocolAddress(wallet)
+      ? { accountLink: { href: polarisPethAccountHref(wallet), label: "pETH account" } }
+      : {};
   const kinds = other.counts.length ? { kinds: other.counts } : {};
   // A CDP the wallet passed on is not its holding: left out of the counts,
   // the sums and the count it holds. Whether the page is the whole answer is

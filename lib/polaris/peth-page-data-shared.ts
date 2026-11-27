@@ -4,6 +4,11 @@
 /** Rows the page's first read brings, newest first. */
 export const PETH_FIRST_READ = 500;
 
+/** Rows each "Load the older events" read asks for: the route's most
+ *  (rails-server api/src/routes/polaris-peth.ts, limit ≤ 5,000). Each read
+ *  reruns the route's head reads, so fewer, larger pages. */
+export const PETH_OLDER_READ = 5000;
+
 /** The route's refusal of an address, with its reason (a protocol contract,
  *  an address too heavy to replay). */
 export interface PethRefusal {

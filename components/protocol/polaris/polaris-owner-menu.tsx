@@ -6,20 +6,27 @@
 import { Coins, ListFilter } from "lucide-react";
 import type { WalletMenuItem } from "@/components/shared/wallet-menu";
 import { polarisPethAccountHref } from "@/lib/polaris/routes";
+import { isPolarisProtocolAddress } from "@/lib/polaris/asset-catalog";
 
 export function polarisOwnerMenuItems(
   wallet: string | null | undefined,
   listing?: { href: string; title: string; subtitle: string },
 ): WalletMenuItem[] | undefined {
   if (!wallet) return undefined;
+  // A protocol contract (a savings vault holding a deposit) has no account page.
+  const account = !isPolarisProtocolAddress(wallet);
   return [
-    {
-      key: "peth-account",
-      icon: <Coins size={16} />,
-      title: "pETH account",
-      subtitle: "This wallet's pETH on Polaris",
-      href: polarisPethAccountHref(wallet),
-    },
+    ...(account
+      ? [
+          {
+            key: "peth-account",
+            icon: <Coins size={16} />,
+            title: "pETH account",
+            subtitle: "This wallet's pETH on Polaris",
+            href: polarisPethAccountHref(wallet),
+          },
+        ]
+      : []),
     ...(listing ? [{ key: "listing", icon: <ListFilter size={16} />, ...listing }] : []),
   ];
 }
