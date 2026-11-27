@@ -684,6 +684,12 @@ test("the undrawn line follows the Status pill, as the heading's count", async (
     "80 more open holdings on Base are not drawn; the ones with the largest census value come first.",
   );
   assert.equal(undrawnLine(u, "Base", "closed"), "1,100 more closed holdings on Base are not drawn.");
+  // With no pill, a chain whose undrawn holdings share one status names it.
+  assert.equal(undrawnLine({ open: 0, closed: 13 }, "Ethereum"), "13 more closed holdings on Ethereum are not drawn.");
+  assert.equal(
+    undrawnLine({ open: 6, closed: 0 }, "Ethereum"),
+    "6 more open holdings on Ethereum are not drawn; the ones with the largest census value come first.",
+  );
   assert.equal(
     undrawnLine({ open: 1, closed: 0 }, "Ethereum", "open").startsWith("1 more open holding on Ethereum is"),
     true,

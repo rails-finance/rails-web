@@ -135,8 +135,11 @@ export const undrawnCount = (u: UndrawnCounts, status?: "open" | "closed"): numb
 
 /** The line under a section's cards naming what it does not draw on one
  *  chain, for the Status pill: "1,180 more holdings on Base are not drawn
- *  (80 open); the open ones with the largest census value come first." */
-export function undrawnLine(u: UndrawnCounts, chain: string, status?: "open" | "closed"): string {
+ *  (80 open); the open ones with the largest census value come first." With
+ *  no pill and every undrawn holding of one status, the line names that
+ *  status as the pill would. */
+export function undrawnLine(u: UndrawnCounts, chain: string, pill?: "open" | "closed"): string {
+  const status = pill ?? (u.open === 0 ? "closed" : u.closed === 0 ? "open" : undefined);
   const n = undrawnCount(u, status);
   const num = n.toLocaleString("en-US");
   const noun = `${status ? `${status} ` : ""}${n === 1 ? "holding" : "holdings"}`;
