@@ -33,7 +33,7 @@ import {
   pethValuedProv,
 } from "@/lib/polaris/peth-provenance";
 import { RawFigure } from "./polaris-sp-loan-parts";
-import { formatDateLong } from "@/lib/date";
+import { pethAsOfWords, type PethStoredAsOf } from "@/lib/polaris/peth-as-of";
 import { PETH_UNREAD } from "./polaris-peth-card";
 
 function Figure({ raw, symbol, address, info }: { raw: bigint; symbol: string; address: string; info: Provenance }) {
@@ -98,12 +98,10 @@ export function PolarisPethPlaces({
   /** Set when the head was not read (`ledger.complete` null): the places the
    *  stored ledger states (CDPs, deposits, loans) are as of the last block the
    *  lane read, the date in the note and the block in the receipt. */
-  storedAsOf?: { block: string | null; timestamp: number | null } | null;
+  storedAsOf?: PethStoredAsOf | null;
 }) {
   const registry = useReceiptRegistry();
-  const asOfWords = storedAsOf
-    ? `, as of ${storedAsOf.timestamp != null ? formatDateLong(storedAsOf.timestamp) : "the last block read"}`
-    : "";
+  const asOfWords = pethAsOfWords(storedAsOf ?? null);
   const asOfReceipt = storedAsOf
     ? ` The chain did not answer, so this is the stored ledger through ${storedAsOf.block ? `block ${storedAsOf.block}` : "its last block read"}; later changes are not counted.`
     : "";

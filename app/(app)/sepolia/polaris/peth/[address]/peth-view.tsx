@@ -44,6 +44,7 @@ import {
 } from "@/lib/polaris/peth-ledger";
 import { pethHeadProv } from "@/lib/polaris/peth-provenance";
 import { polarisPethEventPage } from "@/lib/polaris/peth-explorer";
+import { pethStoredAsOf } from "@/lib/polaris/peth-as-of";
 import { isPethRefusal, PETH_FIRST_READ, type PethRefusal } from "@/lib/polaris/peth-page-data-shared";
 import {
   PolarisPethHttpError,
@@ -285,15 +286,7 @@ export default function PethView({
             places={places}
             headRead={headRead}
             headBlock={headBlock}
-            storedAsOf={
-              unchecked
-                ? {
-                    block: scannedTo,
-                    timestamp:
-                      data.ledger?.scanned_to_timestamp != null ? Number(data.ledger.scanned_to_timestamp) : null,
-                  }
-                : null
-            }
+            storedAsOf={pethStoredAsOf(data)}
           />
         </>
       )}

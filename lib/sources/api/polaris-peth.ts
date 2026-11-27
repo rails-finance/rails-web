@@ -144,9 +144,9 @@ export interface PethLedgerState {
   scanned_to_block: string | null;
   deploy_block: string | null;
   head_block: string | null;
-  /** The time of the last block the lane read (unix seconds), where the
-   *  route states it: the date a stored holding is "as of" when the head is
-   *  unread. */
+  /** The time of the last block the lane read, ISO 8601 UTC
+   *  ("2026-11-27T17:57:24.000Z"), or null: the date a stored holding is
+   *  "as of" when the head is unread. Absent on a server before 86173773. */
   scanned_to_timestamp?: string | null;
   /** How far behind the head the lane may sit and still read as complete. */
   fresh_within_blocks?: number;

@@ -93,3 +93,36 @@ test("an event page's title is the kind and the pETH it moved, as a Trove event'
   assert.equal(title(split), "Split 10 pETH");
   assert.match(title(buy), /^Bought on the curve [\d.,]+K? pETH$/);
 });
+
+test("an unread head dates the stored places by the last block read", async () => {
+  const { pethStoredAsOf, pethAsOfWords } = await import("../../lib/polaris/peth-as-of.ts");
+  const ledger = {
+    complete: null,
+    scanned_to_block: "12224849",
+    scanned_to_timestamp: "2026-11-27T17:57:24.000Z",
+    deploy_block: "11482700",
+    head_block: null,
+    fresh_within_blocks: 7200,
+  };
+  const asOf = pethStoredAsOf({ ledger });
+  assert.deepEqual(asOf, { block: "12224849", timestamp: "2026-11-27T17:57:24.000Z" });
+  assert.equal(pethAsOfWords(asOf), ", as of 27 November 2026");
+  // A head that answered: the stored places are current, and no note is added.
+  assert.equal(pethStoredAsOf({ ledger: { ...ledger, complete: true, head_block: "12225476" } }), null);
+  assert.equal(pethAsOfWords(null), "");
+});
+
+test("with no time from the route, the note names the last block read", async () => {
+  const { pethStoredAsOf, pethAsOfWords } = await import("../../lib/polaris/peth-as-of.ts");
+  const asOf = pethStoredAsOf({
+    ledger: {
+      complete: null,
+      scanned_to_block: "12224849",
+      scanned_to_timestamp: null,
+      deploy_block: "11482700",
+      head_block: null,
+    },
+  });
+  assert.equal(asOf.timestamp, null);
+  assert.equal(pethAsOfWords(asOf), ", as of the last block read");
+});
