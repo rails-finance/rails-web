@@ -663,14 +663,13 @@ async function readWalletInScope(address: string, readerIp: string | undefined, 
   };
 }
 
-/** A chain id as the counts name it ("optimism"); none for a chain they do not count. */
+/** A chain id as the counts name it ("optimism"); none for a chain they do not count, Sepolia among them. */
 const COUNTED_CHAINS = new Set<string>([
   "ethereum",
   "base",
   "arbitrum",
   "optimism",
   "arc",
-  "sepolia",
 ] satisfies WalletCountsChain[]);
 const slugOf = (id: ChainId): WalletCountsChain | undefined => {
   const slug = CHAINS[id]?.slug;
