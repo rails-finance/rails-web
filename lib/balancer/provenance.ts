@@ -312,8 +312,8 @@ export function finderProv(r: BalPositionsRead): Provenance {
 }
 
 /** The block the wallet's pools were found through where the tail went unread, else null. */
-export function foundThrough(r: BalPositionsRead): number | null {
-  const tail = r.sources.find((s) => s.source === "tail");
+export function foundThrough(r: Partial<BalPositionsRead>): number | null {
+  const tail = r.sources?.find((s) => s.source === "tail");
   if (tail?.unread == null) return null;
-  return r.sources.find((s) => s.source === "index")?.to ?? tail.from - 1;
+  return r.sources?.find((s) => s.source === "index")?.to ?? tail.from - 1;
 }

@@ -84,7 +84,8 @@ type Props = {
 
 /** One read per request: `generateMetadata` and the page both await this, and
  *  React's cache() collapses the two into one chain read. The key is lowercased,
- *  so the metadata's typed address and the page's resolved one are one key. */
+ *  so the metadata's typed address and the page's resolved one are one key. Under
+ *  an ENS name the metadata reads the vault without a holder, a second read. */
 const loadVault = cache((vault: string, holder: string | undefined) => loadAaveEthereumVault(vault, holder));
 const load = (vault: string, holder: string | undefined) => loadVault(vault.toLowerCase(), holder?.toLowerCase());
 

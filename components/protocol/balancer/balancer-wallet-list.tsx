@@ -77,7 +77,7 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
         </p>
       </SectionHeading>
       {through != null && (
-        <p className="mt-3 text-sm text-rb-500" data-balancer-found-through={through}>
+        <p className="mt-3 text-sm text-rb-500" data-anatomy="U6.3" data-balancer-found-through={through}>
           {FRONT_DOOR.foundThrough(through.toLocaleString("en-US"))}
         </p>
       )}

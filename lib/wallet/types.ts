@@ -361,7 +361,7 @@ export interface LiquiditySourceRead {
   state: "ok" | "ceiling" | "refused" | "failed";
   /** The route answered part of the wallet's positions (`truncated`). */
   truncated: boolean;
-  /** Where the route found the wallet's positions only through a block (Balancer V3's tail unread), that block. */
+  /** Balancer V3 with its tail unread: the last block whose transfers were read; a position opened after it may be missing. */
   foundThrough?: number;
   /** Positions holding liquidity the route named. */
   held: number;
