@@ -78,6 +78,9 @@ const toDateProv = (row: PethLedgerRow, what: "ethIn" | "ethOut" | "fees"): Prov
   source: { block: row.block_number, txHash: row.tx_hash },
 });
 
+/** A balance keeps its sign: a negative one (a history the index holds with
+ *  gaps) reads as negative, never as its magnitude. */
+const balanceText = (raw: bigint) => `${raw < ZERO ? "−" : ""}${pethAmountText(raw)}`;
 const signed = (raw: bigint) => `${raw < ZERO ? "−" : "+"}${pethAmountText(raw)}`;
 
 /** The row's sheet, or undefined where it keeps its cells. */
@@ -133,12 +136,12 @@ export function polarisPethSheet(row: PethLedgerRow): EventSheet | undefined {
       before: {
         key: "before",
         label: SHEET_WORDS.before,
-        amount: fig(before, pethAmountText(before), balanceProv(row, meta.symbol, "before")),
+        amount: fig(before, balanceText(before), balanceProv(row, meta.symbol, "before")),
         tip: TIPS.before(meta.symbol),
       },
       rows,
       total: SHEET_NO_USD,
-      totalAmount: fig(after, pethAmountText(after), balanceProv(row, meta.symbol, "after")),
+      totalAmount: fig(after, balanceText(after), balanceProv(row, meta.symbol, "after")),
       totalTip: TIPS.after(meta.symbol),
     });
   }
