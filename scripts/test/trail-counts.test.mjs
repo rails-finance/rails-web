@@ -124,25 +124,32 @@ test("the counts: by chain and family; closed takes closed, liquidated and redee
   );
 });
 
-test("a vault protocol's undrawn shares: those not drawn, by chain and status", () => {
+test("the undrawn vault shares: those not drawn, by section and chain (ui-jobs 863)", () => {
   const ids = { ethereum: 1, base: 8453 };
   const shares = [
-    row("ethereum", "vaults", "v1"),
-    row("ethereum", "vaults", "v2", "closed"),
-    row("ethereum", "vaults", "v3"),
-    row("base", "vaults", "v4"),
-    row("optimism", "vaults", "v5"),
+    row("ethereum", "vaults", "v1", "open", { vault: "morpho" }),
+    row("ethereum", "vaults", "v2", "closed", { vault: "morpho" }),
+    row("ethereum", "vaults", "v3", "open", { vault: "yearn" }),
+    row("base", "vaults", "v4", "open", { vault: "morpho" }),
+    row("optimism", "vaults", "v5", "open", { vault: "morpho" }),
   ];
-  const u = vaultUndrawn(shares, new Set(["ethereum:v1"]), (slug) => ids[slug]);
+  const sectionOf = (p) => `vaults-${p.vault}`;
+  const u = vaultUndrawn(shares, new Set(["ethereum:v1"]), (slug) => ids[slug], sectionOf);
   assert.deepEqual(u, [
-    { family: "vaults", open: 1, closed: 1, chain: 1 },
-    { family: "vaults", open: 1, closed: 0, chain: 8453 },
+    { family: "vaults-morpho", open: 0, closed: 1, chain: 1 },
+    { family: "vaults-yearn", open: 1, closed: 0, chain: 1 },
+    { family: "vaults-morpho", open: 1, closed: 0, chain: 8453 },
   ]);
   // Every share drawn: nothing undrawn.
   assert.deepEqual(
-    vaultUndrawn(shares.slice(0, 1), new Set(["ethereum:v1"]), (s) => ids[s]),
+    vaultUndrawn(shares.slice(0, 1), new Set(["ethereum:v1"]), (s) => ids[s], sectionOf),
     [],
   );
+});
+
+test("the trail carries a vault share's protocol root", () => {
+  const t = trailWithVisited([], [row(1, "vaults", "v1", "open", { vault: "yearn" })], () => "ethereum");
+  assert.equal(t[0].vault, "yearn");
 });
 
 test("the line where a vault view draws none of the shares it counts", () => {

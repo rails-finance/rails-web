@@ -71,7 +71,12 @@ import {
 import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
 import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
-import { VAULT_SHARES_FAMILY, type WalletCounts, type WalletCountsChain } from "@/lib/wallet/summary-counts";
+import {
+  VAULT_SHARES_FAMILY,
+  vaultRootOfCensus,
+  type WalletCounts,
+  type WalletCountsChain,
+} from "@/lib/wallet/summary-counts";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
 import { countsOf, summaryPositions, trailWithVisited } from "@/lib/wallet/trail-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
@@ -703,8 +708,9 @@ export function readWallet(address: string, readerIp?: string, opts: { protocol?
 // position per Comet; every other row is one position. Kept 60 s per address.
 const countsCache = new Map<string, { at: number; read: Promise<WalletCounts> }>();
 
-/** The stored vault card's symbols (mig 531's census fields). */
-const vaultCard = (r: WalletSummaryRow) => (r.card ?? {}) as { symbol?: string | null; assetSymbol?: string | null };
+/** The stored vault card's census family and symbols (mig 531's census fields). */
+const vaultCard = (r: WalletSummaryRow) =>
+  (r.card ?? {}) as { family?: string | null; symbol?: string | null; assetSymbol?: string | null };
 
 /** A summary row's market as the wallet's cards name it, for the positions
  *  menu (ui-jobs 856): Aave V3's market name ("Core"), a Compound V3 Comet's
@@ -740,6 +746,8 @@ async function countsFromSummary(key: string, summary: Summary, t0: number): Pro
     if (!countedRow(r)) return null;
     const market = summaryMarketLabel(r);
     const asset = r.family === VAULT_SHARES_FAMILY ? vaultCard(r).assetSymbol?.trim() : undefined;
+    // A vault share's protocol, from its census family (ui-jobs 863).
+    const vault = r.family === VAULT_SHARES_FAMILY ? vaultRootOfCensus(vaultCard(r).family) : undefined;
     return {
       chain: r.chain,
       family: r.family,
@@ -748,6 +756,7 @@ async function countsFromSummary(key: string, summary: Summary, t0: number): Pro
       href: r.href,
       ...(market ? { market } : {}),
       ...(asset ? { asset } : {}),
+      ...(vault ? { vault } : {}),
     };
   });
   return {

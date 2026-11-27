@@ -87,7 +87,7 @@ export const walletProtocolHref = (wallet: string, protocol: string): string =>
   `/wallet/${encodeURIComponent(wallet.toLowerCase())}?protocol=${protocol}`;
 
 /** The wallet page narrowed to one vault protocol's shares (MetaMorpho,
- *  Aave's vaults, Yearn V3; `vaultRoot` in summary-counts.ts): the vault
+ *  Aave's vaults, Yearn V3; `vaultRootOf` in summary-counts.ts): the vault
  *  shares, then `?vault=` keeps that protocol's (ui-jobs 856). */
 export const walletVaultHref = (wallet: string, root: string): string =>
   `${walletProtocolHref(wallet, "vaults")}&vault=${root}`;

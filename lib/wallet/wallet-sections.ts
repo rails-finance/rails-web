@@ -26,8 +26,9 @@
 // buffer, so the risk sort and "Closest to liquidation" leave it out.
 //
 // A vault share's dollars are the holder census's at its census block (ui-jobs
-// 783), a stored figure: its card states them, and its section states them as
-// a dated subtotal outside the wallet total (`census`). So does a section
+// 783), a stored figure: its card states them, and its section, one per vault
+// protocol (ui-jobs 863), states them as a dated subtotal outside the wallet
+// total (`census`). So does a section
 // whose every open position is a stored read with dollars (`storedSubtotal`);
 // a section mixing stored and head figures states none (rule 743).
 
@@ -43,6 +44,7 @@ import { headDepositLeg, headStakeLeg } from "@/lib/wallet/deposit-claim";
 import { scaled } from "@/lib/wallet/summary-row";
 import { formatUsdValue } from "@/lib/utils/format";
 import { walletProtocol } from "@/lib/wallet/wallet-filters";
+import { sectionSlug, vaultProtocolOf } from "@/lib/wallet/summary-counts";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { onEmptiedBranch, recordedCollateralLeg } from "@/lib/wallet/trove-shutdown";
 import { CHAINS } from "@/lib/shared/chains";
@@ -487,9 +489,10 @@ function shutNames(emptied: WalletPosition[]): string[] {
   return [...byMarket].map(([m, n]) => (n > 1 ? `the ${m}s' recorded collateral` : `the ${m}'s recorded collateral`));
 }
 
-/** One section per protocol, in the order of their riskiest open position;
- *  sections without a ranked buffer after, by collateral; sections with no
- *  open position last, by their latest close. */
+/** One section per protocol, each vault protocol its own (`sectionSlug`;
+ *  ui-jobs 863), in the order of their riskiest open position; sections
+ *  without a ranked buffer after, by collateral; sections with no open
+ *  position last, by their latest close. */
 export function walletSections(
   positions: WalletPosition[],
   opts: {
@@ -499,10 +502,13 @@ export function walletSections(
   },
 ): WalletSection[] {
   const bySlug = new Map<string, WalletPosition[]>();
-  for (const p of positions) bySlug.set(p.family, [...(bySlug.get(p.family) ?? []), p]);
+  for (const p of positions) {
+    const slug = sectionSlug(p);
+    bySlug.set(slug, [...(bySlug.get(slug) ?? []), p]);
+  }
   const sections: WalletSection[] = [];
   for (const [slug, mine] of bySlug) {
-    const name = walletProtocol(slug)?.name ?? mine[0].familyName;
+    const name = vaultProtocolOf(mine[0]) ?? walletProtocol(slug)?.name ?? mine[0].familyName;
     const openAll = mine.filter((p) => p.status === "open");
     const ranked = openAll.filter((p) => !p.notRead && !isDust(p)).sort(byRisk);
     const dust = openAll.filter((p) => !p.notRead && isDust(p)).sort(byRisk);

@@ -10,8 +10,10 @@ import {
   WALLET_COUNTS_SCOPE,
   menuKey,
   rowIsPage,
-  vaultProtocolOfHref,
-  vaultRoot,
+  vaultProtocolOf,
+  vaultRootOf,
+  vaultRootOfCensus,
+  sectionSlug,
   isVaultRoot,
   hrefIsPage,
   walletProtocolMenu,
@@ -162,21 +164,23 @@ test("a row of moved positions alone sorts with the rows that hold nothing open 
 });
 
 // Vault shares (ui-jobs 783): one summary family, "vaults", over MetaMorpho,
-// Aave's vaults and Yearn V3; the menu gives each vault protocol its row.
+// Aave's vaults and Yearn V3; the menu gives each vault protocol its row,
+// keyed on the root the row carries from its census family (ui-jobs 863).
 const vault = (chain, root, n, status = "open") => ({
   chain,
   family: "vaults",
   positionId: `0xv${n}-${W}`,
   status,
   href: `/${chain}/${root}/vaults/0xv${n}/${W}`,
+  vault: root,
 });
 const VAULT_ROSTER = { morpho: ["Morpho Blue", 3], "aave-v3": ["Aave V3", 4], yearn: ["Yearn V3", 5] };
-const vaultProtocolOf = (p) => {
+const vaultMenuProtocolOf = (p) => {
   if (p.family !== "vaults") return protocolOf(p);
-  const root = vaultRoot(p.href);
+  const root = vaultRootOf(p);
   const [label, order] = VAULT_ROSTER[root];
   return {
-    name: vaultProtocolOfHref(p.href) ?? label,
+    name: vaultProtocolOf(p) ?? label,
     order,
     // Yearn V3 has no holder listing: the wallet view narrowed to the vault shares.
     listing: root === "yearn" ? `${DASHBOARD}?protocol=vaults` : `/${p.chain}/${root}/vaults/positions?q=${W}`,
@@ -195,7 +199,7 @@ test("vault rows take one menu row per vault protocol and chain, each named", ()
       pos("morpho", "open", 7),
     ],
     (p) => rowIsPage(p.href, "/x", ""),
-    vaultProtocolOf,
+    vaultMenuProtocolOf,
     DASHBOARD,
   );
   const rows = Object.fromEntries(m.rows.map((r) => [r.key, r]));
@@ -218,15 +222,41 @@ test("vault rows take one menu row per vault protocol and chain, each named", ()
   assert.equal(rows["base:vaults:morpho"].name, "MetaMorpho vaults");
 });
 
-test("menuKey splits vault rows by their href's root and leaves other families whole", () => {
+test("menuKey splits vault rows by their protocol root and leaves other families whole", () => {
   assert.equal(menuKey(vault("base", "morpho", 1)), "base:vaults:morpho");
   assert.equal(menuKey(pos("aave-v3", "open", 1)), "ethereum:aave-v3");
-  assert.equal(vaultRoot("/ethereum/aave-v3/0xabc"), undefined);
   // `?vault=` takes the three roots alone, no inherited key.
   assert.equal(isVaultRoot("morpho"), true);
   assert.equal(isVaultRoot("constructor"), false);
-  assert.equal(vaultRoot("/ethereum/constructor/vaults/0xv/0xh"), undefined);
-  assert.equal(vaultProtocolOfHref("/ethereum/yearn/vaults/0xv/0xh?x=1"), "Yearn V3");
+});
+
+test("a vault share's protocol comes from its census family (ui-jobs 863)", () => {
+  assert.equal(vaultRootOfCensus("morpho"), "morpho");
+  assert.equal(vaultRootOfCensus("morpho-v2"), "morpho");
+  assert.equal(vaultRootOfCensus("yearn-v3"), "yearn");
+  for (const f of ["umbrella-stake", "stata", "sgho"]) assert.equal(vaultRootOfCensus(f), "aave-v3");
+  assert.equal(vaultRootOfCensus("constructor"), undefined);
+  assert.equal(vaultRootOfCensus(null), undefined);
+  // The carried root wins over the href; a row of another family has none.
+  const share = { ...vault("ethereum", "morpho", 1), vault: "yearn" };
+  assert.equal(vaultRootOf(share), "yearn");
+  assert.equal(vaultProtocolOf(share), "Yearn V3");
+  assert.equal(vaultRootOf({ ...pos("morpho", "open", 1), vault: "morpho" }), undefined);
+  // A /summary answer cached before rows carried the root: read from the href.
+  const { vault: _, ...cached } = vault("ethereum", "aave-v3", 2);
+  assert.equal(vaultRootOf(cached), "aave-v3");
+  assert.equal(vaultProtocolOf(cached), "Aave vaults");
+  assert.equal(vaultRootOf({ ...cached, href: "/ethereum/aave-v3/0xabc" }), undefined);
+  assert.equal(vaultRootOf({ ...cached, href: "/ethereum/constructor/vaults/0xv/0xh" }), undefined);
+  assert.equal(vaultRootOf({ ...cached, href: "/ethereum/yearn/vaults/0xv/0xh?x=1" }), "yearn");
+  // An unknown carried root falls back to the href too.
+  assert.equal(vaultRootOf({ ...cached, vault: "constructor" }), "aave-v3");
+  // The section slugs: one per vault protocol, "vaults" for an unknown one.
+  assert.equal(sectionSlug(vault("base", "morpho", 3)), "vaults-morpho");
+  assert.equal(sectionSlug(vault("ethereum", "yearn", 4)), "vaults-yearn");
+  assert.equal(sectionSlug(vault("ethereum", "aave-v3", 5)), "vaults-aave-v3");
+  assert.equal(sectionSlug({ ...cached, href: null }), "vaults");
+  assert.equal(sectionSlug(pos("aave-v3", "open", 6)), "aave-v3");
 });
 
 // The trail's protocol crumb (H13.4).

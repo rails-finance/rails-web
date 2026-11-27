@@ -607,6 +607,60 @@ test("a vault-share section states a dated subtotal outside the wallet total (ui
   assert.equal(failed[0].band.note, unreadNote(1, 1));
 });
 
+test("vault shares take one section per vault protocol, each with its subtotal (ui-jobs 863)", async () => {
+  const { CENSUS_NOTE, CENSUS_NO_TOTAL } = await import("../../lib/wallet/wallet-sections.ts");
+  const share = (root, extra = {}) =>
+    pos("vaults", {
+      vault: root,
+      href: `/ethereum/${root}/vaults/0xv/0xh`,
+      card: { kind: "vault" },
+      headRead: "stored",
+      usdOwnOracle: false,
+      debtUsd: undefined,
+      readAt: 1_795_000_000,
+      ...extra,
+    });
+  const s = walletSections(
+    [
+      share("morpho", { collateralUsd: 500 }),
+      share("yearn", { collateralUsd: 40 }),
+      share("morpho", { collateralUsd: 20, readAt: 1_794_900_000 }),
+      share("aave-v3"),
+      share("yearn", { status: "closed", history: { closedAt: 5 } }),
+      pos("aave-v3", { collateralUsd: 100, debtUsd: 10 }),
+    ],
+    { bands: true },
+  );
+  const by = Object.fromEntries(s.map((x) => [x.slug, x]));
+  assert.deepEqual(Object.keys(by).sort(), ["aave-v3", "vaults-aave-v3", "vaults-morpho", "vaults-yearn"]);
+  assert.equal(by["vaults-morpho"].name, "MetaMorpho vaults");
+  assert.equal(by["vaults-yearn"].name, "Yearn V3");
+  assert.equal(by["vaults-aave-v3"].name, "Aave vaults");
+  // Aave V3's lending section stands apart from Aave's vaults.
+  assert.equal(by["aave-v3"].name, "Aave V3");
+  assert.equal(by["vaults-morpho"].positions.length, 2);
+  assert.equal(by["vaults-yearn"].positions.length, 2);
+  // Each section its own census subtotal, footnote and note.
+  assert.deepEqual(
+    by["vaults-morpho"].band.legs.map((l) => [l.label, l.value, l.footnote.text]),
+    [["Subtotal", "$520.00", "as read from 17 Nov 2026 to 18 Nov 2026"]],
+  );
+  assert.equal(by["vaults-morpho"].band.note, CENSUS_NOTE);
+  assert.deepEqual(
+    by["vaults-yearn"].band.legs.map((l) => [l.label, l.value, l.footnote.text]),
+    [["Subtotal", "$40.00", "as read on 18 Nov 2026"]],
+  );
+  // A share with no dollars stops its own section's subtotal alone.
+  assert.deepEqual(by["vaults-aave-v3"].band.legs, []);
+  assert.equal(by["vaults-aave-v3"].band.note, CENSUS_NO_TOTAL);
+  // The wallet total leaves each vault section out, named.
+  const t = walletTotal(s, "collateral");
+  assert.equal(t.figure.usd, 100);
+  assert.match(t.leaves, /^Leaves out /);
+  for (const name of ["MetaMorpho vaults", "Yearn V3", "Aave vaults"]) assert.ok(t.leaves.includes(name), name);
+  assert.ok(t.leaves.endsWith("(valued at the census blocks)."));
+});
+
 test("a stored section holding a Trove on an emptied branch states no subtotal", () => {
   const stored = { headRead: "stored", readAt: 1_795_000_000 };
   const shut = { ...shutDownTrove(forkTrove("ebisu", "stcUSD", 10), ebisuState("stcUSD")), ...stored };
