@@ -73,6 +73,8 @@ export type BalIndexRefusal = "index_unavailable" | "index_behind";
  *  Vault's pool-share Transfer events from deployment through `to`; "tail",
  *  the Transfer logs read from the chain after the index, through the head. */
 export type BalFinderSource = "index" | "tail";
+/** Why the tail was not read: it took longer than the server's wait, or its read failed. */
+export type BalTailUnread = "slow" | "failed";
 
 /** Shares of a pool staked in its gauge: the gauge holds them for the wallet. */
 export interface BalStaked {
@@ -88,7 +90,8 @@ export interface BalPositionsRead {
   wallet: string;
   head: BlockRef;
   provider: string;
-  sources: { source: BalFinderSource; from: number; to: number; logs: number; pools: number }[];
+  /** `unread` on the tail: its logs were not read, and the positions are the index's alone. */
+  sources: { source: BalFinderSource; from: number; to: number; logs: number; pools: number; unread?: BalTailUnread }[];
   checked: number;
   positions: {
     pool: string;

@@ -99,6 +99,13 @@ function marketOf(card: WalletCard): string | undefined {
 const headOf = (card: WalletCard) =>
   card.kind === "uniswap" || card.kind === "slipstream" || card.kind === "balancer" ? card.read.head : null;
 
+/** A Balancer answer whose tail went unread: the block its index reached, through which the pools were found. */
+function balancerFoundThrough(r: BalPositionsRead): number | null {
+  const tail = r.sources?.find((x) => x.source === "tail");
+  if (tail?.unread == null) return null;
+  return r.sources.find((x) => x.source === "index")?.to ?? tail.from - 1;
+}
+
 async function readSource(
   s: LiquiditySource,
   owner: string,
@@ -155,11 +162,13 @@ async function readSource(
   // fields by design and are on the explorer's wallet page.
   const headRows = (answer.data as { headRows?: number }).headRows ?? LIQUIDITY_HEAD_ROWS;
   const failed = all.slice(0, headRows).filter((n) => !n.card).length;
+  const through = s.kind === "balancer" ? balancerFoundThrough(answer.data as BalPositionsRead) : null;
   return {
     read: {
       ...base,
       state: "ok",
       truncated: answer.data.truncated === true,
+      ...(through != null ? { foundThrough: through } : {}),
       held: all.length,
       drawn: positions.length,
       failed,

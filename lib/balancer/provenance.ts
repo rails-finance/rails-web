@@ -282,11 +282,14 @@ export function finderProv(r: BalPositionsRead): Provenance {
   const idx = r.sources.find((s) => s.source === "index");
   const tail = r.sources.find((s) => s.source === "tail");
   const through = idx?.to ?? r.head.block;
+  const unread = tail?.unread != null;
   const parts = [
     idx &&
       `Rails's index of the Vault's BPT Transfer events naming this wallet, blocks ${n(idx.from)} to ${n(idx.to)}: ${n(idx.logs)} transfers across ${n(idx.pools)} pools`,
     tail &&
-      `the Vault's Transfer logs to this wallet, blocks ${n(tail.from)} to ${n(tail.to)}: ${n(tail.logs)} across ${n(tail.pools)} pools`,
+      (unread
+        ? `the Vault's Transfer logs to this wallet above block ${n(through)} were not read (${tail.unread === "slow" ? "the chain's log read was too slow" : "the chain's log read failed"}), so a pool the wallet joined after block ${n(through)} may be missing`
+        : `the Vault's Transfer logs to this wallet, blocks ${n(tail.from)} to ${n(tail.to)}: ${n(tail.logs)} across ${n(tail.pools)} pools`),
   ].filter(Boolean);
   return {
     kind: "chain",
@@ -294,13 +297,23 @@ export function finderProv(r: BalPositionsRead): Provenance {
     source: { block: r.head.block },
     summary: `Pools found — ${parts.join("; then ")}; ${n(r.checked)} pools checked with balanceOf at ${at(r.head)}.`,
     contract: vaultC(r),
-    via: `rails-server · position index through block ${n(through)}, eth_getLogs to ${n(r.head.block)}, then eth_call @ block ${n(r.head.block)}`,
+    via: unread
+      ? `rails-server · position index through block ${n(through)}, then eth_call @ block ${n(r.head.block)}`
+      : `rails-server · position index through block ${n(through)}, eth_getLogs to ${n(r.head.block)}, then eth_call @ block ${n(r.head.block)}`,
     inputs: [
       chain("index transfers", n(idx?.logs ?? 0)),
       chain("index pools", n(idx?.pools ?? 0)),
-      chain("tail logs", n(tail?.logs ?? 0)),
-      chain("tail pools", n(tail?.pools ?? 0)),
+      ...(unread
+        ? [chain(`logs above block ${n(through)}`, "not read")]
+        : [chain("tail logs", n(tail?.logs ?? 0)), chain("tail pools", n(tail?.pools ?? 0))]),
       chain("pools checked", n(r.checked)),
     ],
   };
+}
+
+/** The block the wallet's pools were found through where the tail went unread, else null. */
+export function foundThrough(r: BalPositionsRead): number | null {
+  const tail = r.sources.find((s) => s.source === "tail");
+  if (tail?.unread == null) return null;
+  return r.sources.find((s) => s.source === "index")?.to ?? tail.from - 1;
 }

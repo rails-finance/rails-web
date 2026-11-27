@@ -16,7 +16,7 @@ import { SectionReadStamp, readStampProv } from "@/components/shared/read-stamp"
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { assetKey } from "@/lib/shared/asset-family";
 import { walletRow } from "@/lib/balancer/position";
-import { finderProv, gaugeContracts, stakedProv, walletShareProv } from "@/lib/balancer/provenance";
+import { finderProv, foundThrough, gaugeContracts, stakedProv, walletShareProv } from "@/lib/balancer/provenance";
 import type { BalPositionsRead } from "@/lib/balancer/types";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
 import { balChain } from "@/lib/balancer/chains";
@@ -31,6 +31,7 @@ const ROW =
 
 export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: string }) {
   const finder = finderProv(r);
+  const through = foundThrough(r);
   const scoped = useScopedRows(
     r.positions,
     (row) => row.tokens.map((t) => assetKey(r.chainId, t.address)),
@@ -75,9 +76,14 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
           {FRONT_DOOR.found(balChain(r.chainId).name)}
         </p>
       </SectionHeading>
+      {through != null && (
+        <p className="mt-3 text-sm text-rb-500" data-balancer-found-through={through}>
+          {FRONT_DOOR.foundThrough(through.toLocaleString("en-US"))}
+        </p>
+      )}
       {r.positions.length === 0 ? (
         <p className="mt-3 text-sm text-rb-500" data-balancer-none="">
-          {FRONT_DOOR.none}
+          {through != null ? FRONT_DOOR.noneThrough(through.toLocaleString("en-US")) : FRONT_DOOR.none}
         </p>
       ) : (
         <>

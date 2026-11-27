@@ -26,6 +26,11 @@ export const FRONT_DOOR = {
   truncated: (checked: number, held: number) =>
     `This wallet has held BPT of more pools than Rails reads at once: Rails checked the ${checked} it touched most recently and shows at most ${held}.`,
   unanswered: "The read of this wallet's pools did not answer. Try again in a minute.",
+  /** The tail went unread: the pools are those Rails's index names through `block`. */
+  foundThrough: (block: string) =>
+    `Rails read this wallet's transfers through block ${block}. The chain's newer transfers did not answer, so a pool joined since may be missing. Try again in a minute.`,
+  noneThrough: (block: string) =>
+    `Rails found no Balancer V3 pool this wallet holds a share of through block ${block}.`,
   rowShare: (s: number) => `${share(s)} of the pool`,
   /** A row's gauge stake, part of the row's share: the gauge holds this BPT for the wallet. */
   rowStakedLabel: "Of which staked in a gauge",
