@@ -33,16 +33,9 @@ export function polarisPethEventPage({ address, row, event, ...slot }: PolarisPe
     title: makeEventTitle(
       event,
       label,
-      d !== ZERO
-        ? [
-            {
-              value: units(d < ZERO ? -d : d),
-              symbol: PETH.symbol,
-              address: PETH.address,
-              label: d > ZERO ? "In" : "Out",
-            },
-          ]
-        : [],
+      // The kind and the pETH it moved, unlabelled, as a Trove event's title
+      // reads ("Repay 5K USDC"): the kind word carries the direction.
+      d !== ZERO ? [{ value: units(d < ZERO ? -d : d), symbol: PETH.symbol, address: PETH.address }] : [],
     ),
     facts: [
       {

@@ -80,3 +80,16 @@ test("one kind hidden under an effect leaves its siblings", () => {
   assert.equal(rows.length, 154);
   assert.ok(!rows.some((e) => e.actionLabel === "Bought on the curve"));
 });
+
+test("an event page's title is the kind and the pETH it moved, as a Trove event's reads", async () => {
+  const { polarisPethEventPage } = await import("../../lib/polaris/peth-explorer.ts");
+  const { eventTitleWords } = await import("../../lib/shared/event-title.ts");
+  const title = (r) => {
+    const event = pethTimelineEvent(r, NAMES, {});
+    return eventTitleWords(polarisPethEventPage({ address: d.address, row: r, event }).title);
+  };
+  const buy = d.rows.find((r) => r.kind === "curve_buy");
+  const split = { ...buy, kind: "split", effect: "change_of_place", peth_delta_raw: "-10000000000000000000" };
+  assert.equal(title(split), "Split 10 pETH");
+  assert.match(title(buy), /^Bought on the curve [\d.,]+K? pETH$/);
+});
