@@ -56,6 +56,7 @@ export const PETH_EFFECTS: { key: PethEffect; label: string }[] = [
   { key: "change_of_place", label: "Moved between places" },
   { key: "exit", label: "Left the address" },
   { key: "fee", label: "Paid in fees" },
+  { key: "not_decoded", label: "Not decoded" },
 ];
 
 /** Each kind the server's classifier names (api/src/services/
@@ -75,8 +76,7 @@ export const PETH_KINDS: Record<string, { effect: PethEffect; label: string }> =
   svpeth_reward: { effect: "income", label: "svpETH reward" },
   svpeth_stake: { effect: "change_of_place", label: "Staked in svpETH" },
   svpeth_vpeth_in: { effect: "change_of_place", label: "Unstaked from svpETH" },
-  morpho_supply: { effect: "change_of_place", label: "Supplied to Morpho" },
-  morpho_withdraw: { effect: "change_of_place", label: "Withdrawn from Morpho" },
+  morpho_vpeth_not_decoded: { effect: "not_decoded", label: "Morpho Blue market (not decoded)" },
   surplus_claim: { effect: "change_of_place", label: "Surplus claimed" },
   split: { effect: "change_of_place", label: "Split" },
   merge: { effect: "change_of_place", label: "Merge" },
@@ -316,6 +316,9 @@ export function pethAmountText(raw: bigint): string {
 
 /** The row's Explanation bullets, one fact each. */
 export function pethRowBullets(r: PethLedgerRow, names: PethTokenNames): string[] {
+  // A move Rails does not read: one bullet, and none of the sums.
+  if (pethRowEffect(r) === "not_decoded")
+    return ["Rails does not read this Morpho Blue market yet, so this row counts in no figure on the page."];
   const out: string[] = [];
   const P = names.peth.symbol;
   const ethIn = big(r.eth_in_raw);

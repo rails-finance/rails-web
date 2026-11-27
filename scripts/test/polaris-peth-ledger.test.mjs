@@ -155,7 +155,7 @@ test("an unread head serves the stored ledger, its freshness unchecked", () => {
   assert.equal(pethLedgerUnchecked({ ...d, ledger: { ...d.ledger, complete: true } }), false);
 });
 
-test("svpETH is a place with the vpETH it converts to, and the vPETH moves are changes of place", () => {
+test("svpETH is a place with the vpETH it converts to; svpETH moves are changes of place, Morpho rows not decoded", () => {
   const base = fx("cdp");
   const d = {
     ...base,
@@ -172,6 +172,21 @@ test("svpETH is a place with the vpETH it converts to, and the vPETH moves are c
   };
   assert.deepEqual(pethPlaces(d).svpeth, { raw: BigInt("2000000000000000000"), vpeth: BigInt("2100000000000000000") });
   assert.equal(pethPlaces(base).svpeth, null);
-  for (const k of ["svpeth_stake", "svpeth_vpeth_in", "morpho_supply", "morpho_withdraw"])
-    assert.equal(PETH_KINDS[k].effect, "change_of_place");
+  for (const k of ["svpeth_stake", "svpeth_vpeth_in"]) assert.equal(PETH_KINDS[k].effect, "change_of_place");
+  // vpETH with Morpho Blue is out of v1: its own effect, never a change of place.
+  assert.equal(PETH_KINDS.morpho_vpeth_not_decoded.effect, "not_decoded");
+  assert.ok(PETH_EFFECT_LABELS["peth.not_decoded"]);
+  const row = {
+    ...fx("cdp").rows[0],
+    kind: "morpho_vpeth_not_decoded",
+    effect: "not_decoded",
+    valuation: null,
+    peth_delta_raw: "0",
+    vpeth_delta_raw: "0",
+  };
+  const bullets = pethRowBullets(row, NAMES);
+  assert.equal(bullets.length, 1);
+  assert.match(bullets[0], /does not read this Morpho Blue market/);
+  const e = pethTimelineEvent(row, NAMES, VENUES);
+  assert.equal(e.actionType, "peth.not_decoded");
 });

@@ -71,7 +71,9 @@ export interface PethRollup {
   wallet_svpeth?: (PethHeadStamp & { raw: string | null; vpeth_raw: string | null; valued: false }) | null;
 }
 
-export type PethEffect = "acquisition" | "sale" | "fee" | "change_of_place" | "income" | "exit";
+/** `not_decoded`: a move Rails does not read yet (vpETH with Morpho Blue),
+ *  which no figure counts. */
+export type PethEffect = "acquisition" | "sale" | "fee" | "change_of_place" | "income" | "exit" | "not_decoded";
 
 export interface PethLedgerLine {
   rule: string;
