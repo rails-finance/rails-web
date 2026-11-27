@@ -5,9 +5,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { summaryPositions, countsOf, vaultUndrawn, noneDrawnLine, trailWithVisited } = await import(
-  "../../lib/wallet/trail-counts.ts"
-);
+const { summaryPositions, countsOf, vaultUndrawn, noneDrawnLine, trailWithVisited, undrawnWhereVaultsRead } =
+  await import("../../lib/wallet/trail-counts.ts");
 
 const W = "0x3df83ec9d2b62bb9bb83eba1218a202564bb67da";
 const COMET_A = "0x9c4ec768c28520b50860ea7a15bd7213a9ff58bf";
@@ -190,4 +189,31 @@ test("the wallet view's trail adds the positions read at visit that the stored o
   assert.equal("market" in trail[1], false);
   // The stored list stands as it was: the position pages count it alone.
   assert.equal(stored.length, 1);
+});
+
+test("a chain whose vault shares read failed states no undrawn vault line (ui-jobs 863)", () => {
+  const undrawn = [
+    { family: "vaults-morpho", open: 3, closed: 0, chain: 1 },
+    { family: "vaults-yearn", open: 1, closed: 0, chain: 1 },
+    { family: "vaults-morpho", open: 2, closed: 0, chain: 8453 },
+  ];
+  const read = (id, chain, extra = {}) => ({ id, chain, positions: 4, headRead: "ok", ...extra });
+  // Every read answered: every line stands.
+  assert.equal(undrawnWhereVaultsRead(undrawn, [read("vaults", 1), read("vaults-base", 8453)]).length, 3);
+  // Ethereum's read rejected (0 positions, failed, an error): its lines go, Base's stay.
+  const rejected = read("vaults", 1, { positions: 0, headRead: "failed", error: "timeout" });
+  assert.deepEqual(
+    undrawnWhereVaultsRead(undrawn, [rejected, read("vaults-base", 8453)]).map((u) => u.chain),
+    [8453],
+  );
+  // A listing read that did not answer drops that chain's lines too.
+  const unanswered = read("vaults-base", 8453, { positions: 0, headRead: "failed", unanswered: { family: "vaults" } });
+  assert.deepEqual(
+    undrawnWhereVaultsRead(undrawn, [read("vaults", 1), unanswered]).map((u) => u.chain),
+    [1, 1],
+  );
+  // A head read that failed over drawn shares leaves the lines: the draw limit still held them.
+  assert.equal(undrawnWhereVaultsRead(undrawn, [read("vaults", 1, { headRead: "failed" })]).length, 3);
+  // Another family's failed read is not the vault read's.
+  assert.equal(undrawnWhereVaultsRead(undrawn, [read("aave-v3", 1, { positions: 0, headRead: "failed" })]).length, 3);
 });

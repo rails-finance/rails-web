@@ -29,6 +29,7 @@ import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { historyBase, storeStamp, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import { holdsNothingSince } from "@/lib/wallet/holds-nothing";
+import { VAULT_READ_IDS } from "@/lib/wallet/trail-counts";
 import { VAULT_SHARES_FAMILY, vaultRootName, vaultRootOfCensus } from "@/lib/wallet/summary-counts";
 import type { FamilyModule, HeadResult } from "./module";
 
@@ -149,7 +150,7 @@ const rowOf = (p: WalletPosition) => (p.card as { row: VaultPositionRow }).row;
 function vaultsModule(chainId: typeof MAINNET_CHAIN_ID | typeof BASE_CHAIN_ID): FamilyModule {
   const base = chainId === BASE_CHAIN_ID;
   return {
-    id: base ? "vaults-base" : "vaults",
+    id: base ? VAULT_READ_IDS[1] : VAULT_READ_IDS[0],
     name: "Vault shares",
     chain: chainId,
     summaryChain: base ? "base" : "ethereum",

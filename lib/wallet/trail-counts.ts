@@ -115,6 +115,29 @@ export function vaultUndrawn<C, P extends Pick<WalletCountsPosition, "chain" | "
   return [...byKey.values()];
 }
 
+/** The vault shares modules' read ids, one a chain (families/vaults.ts). */
+export const VAULT_READ_IDS = ["vaults", "vaults-base"];
+
+/** The undrawn vault lines on the chains whose vault shares read answered:
+ *  where it failed or did not answer, the page drew none of that chain's
+ *  shares for a reason other than the draw limit, and its failed-read notice
+ *  says so. */
+export function undrawnWhereVaultsRead<C, U extends { chain: C }>(
+  undrawn: U[],
+  families: { id: string; chain: C; positions: number; headRead: string; error?: string; unanswered?: unknown }[],
+): U[] {
+  const failed = new Set(
+    families
+      .filter(
+        (r) =>
+          VAULT_READ_IDS.includes(r.id) &&
+          (r.error != null || r.unanswered != null || (r.headRead === "failed" && r.positions === 0)),
+      )
+      .map((r) => r.chain),
+  );
+  return undrawn.filter((u) => !failed.has(u.chain));
+}
+
 /** The `?vault=` view's line where it draws none of the shares it counts:
  *  "Rails holds 3 holdings in MetaMorpho vaults for this wallet, and draws
  *  none of them here." `status` is the Status pill's. */

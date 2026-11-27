@@ -29,7 +29,7 @@ import {
   vaultRootOf,
   type WalletCountsPosition,
 } from "@/lib/wallet/summary-counts";
-import { noneDrawnLine, vaultUndrawn } from "@/lib/wallet/trail-counts";
+import { noneDrawnLine, undrawnWhereVaultsRead, vaultUndrawn } from "@/lib/wallet/trail-counts";
 import { WalletFilterBar } from "@/components/wallet/wallet-filter-bar";
 import {
   walletProtocol,
@@ -263,7 +263,7 @@ function Section({
         const n = undrawnCount(u, status);
         return (
           n > 0 && (
-            <p key={u.chain} className="mt-3 text-xs text-rb-500" data-wallet-undrawn={n}>
+            <p key={`${u.family}:${u.chain}`} className="mt-3 text-xs text-rb-500" data-wallet-undrawn={n}>
               {undrawnLine(u, chainMeta(u.chain).name, status)}
             </p>
           )
@@ -315,7 +315,7 @@ function UndrawnSection({
         const n = undrawnCount(u, status);
         return (
           n > 0 && (
-            <p key={u.chain} className="mt-3 text-xs text-rb-500" data-wallet-undrawn={n}>
+            <p key={`${u.family}:${u.chain}`} className="mt-3 text-xs text-rb-500" data-wallet-undrawn={n}>
               {undrawnLine(u, chainMeta(u.chain).name, status)}
             </p>
           )
@@ -501,11 +501,14 @@ export function WalletView({
         ? [{ ...r.undrawn, chain: r.chain }]
         : [],
     ),
-    ...vaultUndrawn(
-      vaultShares,
-      new Set(positions.map((p) => `${CHAINS[p.chain]?.slug}:${p.positionId}`)),
-      (slug) => Object.values(CHAINS).find((c) => c.slug === slug)?.id,
-      sectionSlug,
+    ...undrawnWhereVaultsRead(
+      vaultUndrawn(
+        vaultShares,
+        new Set(positions.map((p) => `${CHAINS[p.chain]?.slug}:${p.positionId}`)),
+        (slug) => Object.values(CHAINS).find((c) => c.slug === slug)?.id,
+        sectionSlug,
+      ),
+      read.families,
     ).filter((u) => !focused || scope.chainOk(u.chain)),
   ];
   const undrawnTotal = undrawn.reduce((n, u) => n + undrawnCount(u, status), 0);
@@ -735,7 +738,7 @@ export function WalletView({
                           const n = undrawnCount(u, status);
                           return (
                             n > 0 && (
-                              <p key={u.chain} className="text-xs text-rb-500" data-wallet-undrawn={n}>
+                              <p key={`${u.family}:${u.chain}`} className="text-xs text-rb-500" data-wallet-undrawn={n}>
                                 {undrawnLine(u, chainMeta(u.chain).name, status)}
                               </p>
                             )
