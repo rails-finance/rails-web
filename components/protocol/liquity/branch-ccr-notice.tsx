@@ -116,7 +116,7 @@ function Headline({ s }: { s: LiquityV2BranchCcr }) {
     <>
       <span className="font-semibold">Safety Mode.</span> The {s.branch} branch&rsquo;s Total Collateral Ratio (TCR) is{" "}
       <Prov info={branchTcrProv(s)}>{tcrPercentText(s.tcrRaw)}</Prov>, below its Critical Collateral Ratio (CCR) of{" "}
-      <Prov info={branchCcrProv(s)}>{whole(s.ccr)}</Prov>, at block {s.blockNumber.toLocaleString("en-US")}.
+      <Prov info={branchCcrProv(s)}>{whole(s.ccr)}</Prov>.
     </>
   );
 }
