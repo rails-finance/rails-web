@@ -92,7 +92,7 @@
 // about size.
 
 import { parseAbi, type PublicClient } from "viem";
-import { chainLogsClient } from "./rpc";
+import { chainLogsClient, servingLogsRpcEnv } from "./rpc";
 import {
   ERC4626_TOPIC,
   addressOfTopic as addrOf,
@@ -110,7 +110,6 @@ import { countRefusedSweeps } from "./vault-sweep-walk";
 import { emptyBlockReads, pinnedBlockTimestamp, readBlockWave } from "./vault-block-reads";
 import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import { fetchHolderLogs } from "@/lib/sources/api/vault-holder-logs-client";
-import { chainMeta } from "@/lib/shared/chains";
 import { YEARN_CHAIN_ID } from "./yearn-ethereum-vault-directory";
 import {
   VAULT_TIMELINE_HORIZON,
@@ -175,7 +174,7 @@ export async function loadYearnEthereumVaultTimeline(
   const address = vault.toLowerCase() as `0x${string}`;
   const who = holder.toLowerCase();
   const blockNumber = BigInt(opts.blockNumber);
-  const lane = chainMeta(YEARN_CHAIN_ID).logsRpcEnv;
+  const lane = servingLogsRpcEnv(YEARN_CHAIN_ID);
   const from = Math.max(0, opts.createdBlock);
 
   const empty = (unread: string | null): YearnVaultTimelineResult => ({

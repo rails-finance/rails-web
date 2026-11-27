@@ -13,7 +13,7 @@
 // failed) the native legs alone come from `alchemy_getAssetTransfers`, pinned
 // to the receipt's block and matched on the hash. Where the store cannot
 // answer, and on Arbitrum, the whole read is the chain's: the receipt, then the
-// asset transfers. That method is Alchemy's own, not JSON-RPC, so it goes to
+// asset transfers. That method is an Alchemy extension, so it goes to
 // `chainTransfersClient`: the chain's transfers URL where one is set, its state
 // URL otherwise. A chain whose URL there is not an Alchemy endpoint answers it
 // with an error, and the read then fails whole rather than reporting no native

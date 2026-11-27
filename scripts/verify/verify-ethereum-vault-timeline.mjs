@@ -270,8 +270,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 // never its value. Pinned here, not read from chains.ts: the file under test is
 // not a source of expectations. Moving chain 1 onto ETHEREUM_LOGS_RPC_URL was
 // measured and declined on 2026-09-08 (rails-ops aave-ethereum-vault-layer.md
-// §Outstanding); a change here must travel with chains.ts line 60 and a reason.
-const EXPECTED_LANE = "ALCHEMY_URL";
+// §Outstanding); a change here must travel with chains.ts and a reason. Two
+// names: chain 1's logs var (the Alchemy eth-mainnet endpoint) where the
+// deployment sets it, the state var it falls back to where it does not.
+const EXPECTED_LANES = ["ETHEREUM_BACKFILL_RPC_URL", "ALCHEMY_URL"];
+const EXPECTED_LANE = EXPECTED_LANES.join(" or ");
 
 const env = Object.fromEntries(
   fs
@@ -1819,7 +1822,7 @@ check(
 const lanes13 = FIXTURES.map((f) => ROUTES.get(`${f.vault}:${f.holder}`).timeline?.reconcile?.lane).filter(Boolean);
 check(
   "13a every drawn timeline names the expected lane, by env var name",
-  lanes13.length > 0 && lanes13.every((l) => l === EXPECTED_LANE),
+  lanes13.length > 0 && lanes13.every((l) => EXPECTED_LANES.includes(l)),
   lanes13.length
     ? `${lanes13.length} timelines: ${[...new Set(lanes13)].join(", ")} (expected ${EXPECTED_LANE})`
     : "no timeline carried a lane",
@@ -1827,7 +1830,7 @@ check(
 const route13 = ROUTES.get(`${FIXTURES[0].vault}:${FIXTURES[0].holder}`);
 check(
   "13b the route states chain 1's serving logs lane, and it is the expected one",
-  route13.lanes?.ethereumLogs?.serving === EXPECTED_LANE,
+  EXPECTED_LANES.includes(route13.lanes?.ethereumLogs?.serving),
   `serving ${route13.lanes?.ethereumLogs?.serving ?? "(absent)"}, expected ${EXPECTED_LANE}`,
 );
 const sourceFiles = (dir) =>
@@ -1846,14 +1849,17 @@ const chain1Callers = [...sourceFiles("lib"), ...sourceFiles("app")]
   .sort();
 // The set is named in full so a new caller goes red here before anyone moves the
 // lane. PWN's collateral-transfer sweep joined the timeline's loader in web
-// `4de7d15f` and stays as the fallback to rails-server's route, so a flip of
-// chain 1's lane would reach it as well.
+// `4de7d15f` and stays as the fallback to rails-server's route; the sBOLD pause
+// sweep and MakerDAO's auction takes read it too, so a flip of chain 1's lane
+// reaches all four.
 const CHAIN1_LOG_CALLERS = [
   "lib/sources/chain/aave-ethereum-vault-timeline.ts",
+  "lib/sources/chain/makerdao-history.ts",
   "lib/sources/chain/pwn-collateral-transfer.ts",
+  "lib/sources/chain/sbold-paused.ts",
 ];
 check(
-  "13c the serving-path callers of chainLogsClient on chain 1 are this timeline's loader and PWN's collateral-transfer sweep, and no other",
+  "13c the serving-path callers of chainLogsClient on chain 1 are the four named, and no other",
   JSON.stringify(chain1Callers) === JSON.stringify(CHAIN1_LOG_CALLERS),
   chain1Callers.join(", ") || "no caller at all",
 );

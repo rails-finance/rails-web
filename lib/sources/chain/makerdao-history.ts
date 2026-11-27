@@ -19,14 +19,16 @@
 //    first, the tab left is the shortfall. Dog.sol / Clipper.sol, makerdao/dss.
 //    A transaction with no Bark for the urn is an older Cat/Flipper liquidation,
 //    answered as not read. Calls: the receipt, one eth_getLogs over the clip
-//    filtered by id, one block header, one eth_call for mat.
+//    filtered by id (on the logs lane), one block header, one eth_call for mat.
 //
-// SERVER-ONLY (ALCHEMY_URL via ./rpc, RAILS_API_URL via ./at-block-api).
+// SERVER-ONLY (ALCHEMY_URL and Ethereum's logs lane via ./rpc, RAILS_API_URL
+// via ./at-block-api).
 
 import { decodeEventLog, formatUnits, getAddress, parseAbi } from "viem";
-import { alchemyClient } from "./rpc";
+import { alchemyClient, chainLogsClient } from "./rpc";
 import { atBlockGet } from "./at-block-api";
 import { MAKER_ADDRESSES } from "@/lib/makerdao/asset-catalog";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { MakerAuctionRead, MakerAuctionTake, MakerIlkAtResponse } from "@/lib/makerdao/chain-history-types";
 
 const SPOTTER_ABI = parseAbi([
@@ -84,7 +86,7 @@ async function readAuctionOnce(txHash: `0x${string}`, urn: string): Promise<Make
   const block = Number(receipt.blockNumber);
   const clip = getAddress(bark.clip);
   const [takeLogs, spotIlk] = await Promise.all([
-    client.getLogs({
+    chainLogsClient(MAINNET_CHAIN_ID).getLogs({
       address: clip,
       event: TAKE_EVENT,
       args: { id: bark.id },

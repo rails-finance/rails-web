@@ -149,7 +149,7 @@
 // a window's arithmetic.
 
 import { decodeAbiParameters, parseAbi, parseAbiItem, toEventSelector, type PublicClient } from "viem";
-import { chainLogsClient, isRateLimited } from "./rpc";
+import { chainLogsClient, isRateLimited, servingLogsRpcEnv } from "./rpc";
 import {
   ERC4626_TOPIC,
   ZERO_ADDRESS as ZERO_ADDR,
@@ -175,7 +175,7 @@ import {
 } from "./vault-block-reads";
 import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import { fetchHolderLogs, fetchVaultNoteLogs, type VaultLogFamily } from "@/lib/sources/api/vault-holder-logs-client";
-import { MAINNET_CHAIN_ID, chainMeta } from "@/lib/shared/chains";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
 import {
   AAVE_VAULT_TAIL_VERSION,
@@ -376,7 +376,7 @@ export async function loadAaveEthereumVaultTimelineWithTail(
   const address = vault.toLowerCase() as `0x${string}`;
   const who = holder.toLowerCase();
   const blockNumber = BigInt(opts.blockNumber);
-  const lane = chainMeta(MAINNET_CHAIN_ID).logsRpcEnv;
+  const lane = servingLogsRpcEnv(MAINNET_CHAIN_ID);
   const tailsAllowed = opts.useTail !== false;
 
   /** The shape every path that draws nothing returns. `notes` are vault-wide

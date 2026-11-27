@@ -5,7 +5,7 @@
 // the asset transfers from the chain (the at-block store answers Ethereum and
 // Base only), against a mocked fetch that records each request's URL. One
 // case checks Base's state client asks an over-range getLogs once
-// (lib/sources/chain/range-refusal.ts; its own cases are range-refusal.test.mjs).
+// (lib/sources/chain/range-refusal.ts; its cases are range-refusal.test.mjs).
 // The modules import through `@/`, so this file resolves `@/` and
 // extensionless paths as arbitrum-over-budget.test.mjs does.
 // Run: npm test

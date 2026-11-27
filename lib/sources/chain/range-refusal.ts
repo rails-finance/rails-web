@@ -11,7 +11,7 @@
 // viem 2.33's `shouldRetry` and delay in utils/buildRequest.ts), except that a
 // range refusal throws on the first answer. A -32005 without that message is
 // still retried. Imports nothing through `@/` and is not server-only, so the
-// Basename resolver's own client can use it and a test loads it directly.
+// Basename resolver's client can use it and a test loads it directly.
 
 import type { Transport } from "viem";
 

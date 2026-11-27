@@ -5,7 +5,8 @@ import { resolveAaveVaultHolder } from "@/lib/aave-vaults/vault-holder";
 import { fetchVaultTail, putVaultTail } from "@/lib/api/fetch-vault-tail";
 import { routeHop } from "@/lib/shared/listing-ssr";
 import { AAVE_VAULT_TAIL_VERSION, type VaultHolderTimeline } from "@/lib/shared/vault-holder-timeline";
-import { chainMeta, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { servingLogsRpcEnv } from "@/lib/sources/chain/rpc";
 import { publicErrorMessage } from "@/lib/api/public-error";
 
 // One Aave vault on Ethereum at one pinned block, and one address's reading of
@@ -128,7 +129,7 @@ export async function GET(request: NextRequest) {
       // statement stays so a future reader can see which lane that is.
       lanes: {
         ethereumLogs: {
-          serving: chainMeta(MAINNET_CHAIN_ID).logsRpcEnv,
+          serving: servingLogsRpcEnv(MAINNET_CHAIN_ID),
           wideLaneVar: "ETHEREUM_LOGS_RPC_URL",
           wideLaneConfigured: Boolean(process.env.ETHEREUM_LOGS_RPC_URL),
         },

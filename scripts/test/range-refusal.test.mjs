@@ -38,7 +38,7 @@ test("the log range policy wording is a refusal too", async (t) => {
   assert.equal(seen.n, 1);
 });
 
-test("a -32005 throttle is retried three times, as viem's own transport does", async (t) => {
+test("a -32005 throttle is retried three times, as viem's transport does", async (t) => {
   const seen = refuse(t, -32005, "request rate exceeded, try again later");
   await assert.rejects(getLogs(client()), (e) => !isRangeRefusal(e) && e.code === -32005);
   assert.equal(seen.n, 4);

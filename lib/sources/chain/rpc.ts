@@ -10,13 +10,14 @@ import "server-only";
 //   chainClient       — the state URL (ChainMeta.rpcEnv), with an optional
 //                       second URL behind it (fallbackRpcEnv).
 //   chainBatchClient  — the same URL with JSON-RPC batching, rate-limit backoff.
-//   chainLogsClient   — the logs lane (logsRpcEnv) for wide-range getLogs.
-//   chainTransfersClient — Alchemy's own `alchemy_*` methods (transfersRpcEnv),
+//   chainLogsClient   — the logs lane (logsRpcEnv) for wide-range getLogs;
+//                       on Ethereum the state URL while that var is unset.
+//   chainTransfersClient — Alchemy's `alchemy_*` methods (transfersRpcEnv),
 //                       the state client when that var is unset.
 //
 // One client PER CHAIN, cached separately: Ethereum reads ALCHEMY_URL, Base
 // BASE_RPC_URL, Arbitrum ARBITRUM_RPC_URL, Sepolia SEPOLIA_RPC_URL (or one
-// derived from ALCHEMY_URL). A chain whose env var is unset throws on first
+// derived from an Alchemy ALCHEMY_URL). A chain whose env var is unset throws on first
 // use, so a misconfigured deploy fails loudly rather than silently pricing from
 // the wrong network — which, unlike a missing price, would be invisible and
 // wrong.
@@ -41,7 +42,7 @@ import {
   type ChainId,
   type ChainMeta,
 } from "@/lib/shared/chains";
-import { rangeRefusalsFailAtOnce } from "./range-refusal";
+import { isRangeRefusal, rangeRefusalsFailAtOnce } from "./range-refusal";
 
 /** Arc, which viem does not define: the values from Arc's docs ("Connect to
  *  Arc"), with Multicall3 at the canonical address (its code answers there). */
@@ -83,11 +84,23 @@ const VIEM_CHAINS: Record<ChainId, Chain> = {
   [SEPOLIA_CHAIN_ID]: sepolia,
 };
 
+const ALCHEMY_MAINNET_HOST = "eth-mainnet.g.alchemy.com";
+
+/** Is `url` an Alchemy eth-mainnet endpoint, read from its host. */
+function isAlchemyMainnet(url: string): boolean {
+  try {
+    return new URL(url).hostname === ALCHEMY_MAINNET_HOST;
+  } catch {
+    return false;
+  }
+}
+
 /** The state-read URL for a chain — its own env var, with ONE derived
  *  fallback: Sepolia's endpoint is the same Alchemy key as mainnet's on a
- *  different host, and the Vercel project does not carry `SEPOLIA_RPC_URL`
- *  yet, so an unset var derives the URL from `ALCHEMY_URL` by swapping the
- *  host. Confined to Sepolia on purpose — a Base URL derived from a mainnet
+ *  different host, so an unset `SEPOLIA_RPC_URL` is derived from an Alchemy
+ *  eth-mainnet `ALCHEMY_URL` by swapping the host. Any other `ALCHEMY_URL`
+ *  derives nothing and Sepolia's reads throw naming `SEPOLIA_RPC_URL`.
+ *  Confined to Sepolia on purpose — a Base URL derived from a mainnet
  *  one would read the wrong network's state at the same addresses and look
  *  right. The URL is never logged: it carries the key. */
 function stateRpcUrl(meta: ChainMeta): string | undefined {
@@ -95,8 +108,20 @@ function stateRpcUrl(meta: ChainMeta): string | undefined {
   if (own) return own;
   if (meta.id !== SEPOLIA_CHAIN_ID) return undefined;
   const mainnetUrl = process.env.ALCHEMY_URL;
-  if (!mainnetUrl || !mainnetUrl.includes("eth-mainnet.g.alchemy.com")) return undefined;
-  return mainnetUrl.replace("eth-mainnet.g.alchemy.com", "eth-sepolia.g.alchemy.com");
+  if (!mainnetUrl || !isAlchemyMainnet(mainnetUrl)) return undefined;
+  const url = new URL(mainnetUrl);
+  url.hostname = "eth-sepolia.g.alchemy.com";
+  return url.toString();
+}
+
+/** The error for a chain with no state URL. On Sepolia it says why none was
+ *  derived. */
+function noStateUrl(meta: ChainMeta): Error {
+  const why =
+    meta.id === SEPOLIA_CHAIN_ID && process.env.ALCHEMY_URL
+      ? "; ALCHEMY_URL is not an Alchemy eth-mainnet URL, so none is derived from it"
+      : "";
+  return new Error(`${meta.rpcEnv} not set — ${meta.name} live-state reads need it for eth_call${why}`);
 }
 
 /** The state-read transport for a chain. One URL: `http` with viem's retries,
@@ -119,7 +144,7 @@ const cache = new Map<ChainId, PublicClient>();
 export function chainClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicClient {
   const meta = chainMeta(chainId);
   const url = stateRpcUrl(meta);
-  if (!url) throw new Error(`${meta.rpcEnv} not set — ${meta.name} live-state reads need it for eth_call`);
+  if (!url) throw noStateUrl(meta);
   let client = cache.get(meta.id);
   if (!client) {
     client = createPublicClient({ chain: VIEM_CHAINS[meta.id], transport: stateTransport(meta, url) });
@@ -130,7 +155,7 @@ export function chainClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicClient {
 
 const transfersCache = new Map<ChainId, PublicClient>();
 
-/** The client for Alchemy's own methods (`alchemy_getAssetTransfers`), which
+/** The client for Alchemy's methods (`alchemy_getAssetTransfers`), which
  *  only an Alchemy endpoint answers. With `ChainMeta.transfersRpcEnv` set, a
  *  plain `http` to that URL, unbatched; unset, `chainClient(chainId)`, so the
  *  read goes where it went before the var existed. */
@@ -177,12 +202,15 @@ const RATE_LIMIT_BACKOFF_MS = [1000, 2000, 4000] as const;
  *  shapes it arrives in: a JSON-RPC error body with code 429 (a batch item), or
  *  an HTTP 429 (a single request, once viem's own short retries are spent). */
 export function isRateLimited(error: unknown): boolean {
+  if (isRangeRefusal(error)) return false;
   let e: unknown = error;
   // viem wraps: a contract read's error carries the RPC error as its `cause`.
   for (let depth = 0; e && typeof e === "object" && depth < 6; depth++) {
     const o = e as { code?: unknown; status?: unknown; message?: unknown; cause?: unknown };
     if (o.code === 429 || o.status === 429) return true;
-    if (typeof o.message === "string" && /compute units per second/i.test(o.message)) return true;
+    // Alchemy's batch-item wording, and the generic wording other providers use.
+    if (typeof o.message === "string" && /compute units per second|too many requests|rate limit/i.test(o.message))
+      return true;
     e = o.cause;
   }
   return false;
@@ -224,7 +252,7 @@ const batchCache = new Map<ChainId, PublicClient>();
 export function chainBatchClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicClient {
   const meta = chainMeta(chainId);
   const url = stateRpcUrl(meta);
-  if (!url) throw new Error(`${meta.rpcEnv} not set — ${meta.name} live-state reads need it for eth_call`);
+  if (!url) throw noStateUrl(meta);
   let client = batchCache.get(meta.id);
   if (!client) {
     client = createPublicClient({
@@ -238,7 +266,7 @@ export function chainBatchClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicCli
   return client;
 }
 
-const logsCache = new Map<ChainId, PublicClient>();
+const logsCache = new Map<string, PublicClient>();
 
 /** The endpoint that answers WIDE-RANGE `eth_getLogs` for a chain (see
  *  `ChainMeta.logsRpcEnv`).
@@ -246,6 +274,10 @@ const logsCache = new Map<ChainId, PublicClient>();
  *  On Base this is its own Alchemy app (`BASE_BACKFILL_RPC_URL`), so a sweep
  *  spends a separate rate budget from the page's `eth_call` reads. Its limit is
  *  on response size, not range: a wallet-filtered whole-life query answers.
+ *
+ *  On Ethereum it is `ETHEREUM_BACKFILL_RPC_URL`, the Alchemy eth-mainnet
+ *  endpoint, and ALCHEMY_URL while that is unset. A log-range refusal fails
+ *  at once (`range-refusal.ts`).
  *
  *  Throws when the var is unset. The callers turn that into a stated reason on
  *  the page rather than an empty timeline, because "no endpoint configured" and
@@ -262,20 +294,32 @@ export function chainLogsClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicClie
 // Those reads now go to the state client, paced. Written down so the next
 // reader does not re-derive it.
 
+/** The env var a chain's getLogs sweeps read on this deployment, by name: the
+ *  logs var, or the state var where the logs var is unset and the chain
+ *  declares `logsFallBackToState`. A receipt names the var, never the URL. */
+export function servingLogsRpcEnv(chainId: ChainId = MAINNET_CHAIN_ID): string {
+  const meta = chainMeta(chainId);
+  if (meta.logsRpcEnv !== meta.rpcEnv && meta.logsFallBackToState && !process.env[meta.logsRpcEnv]) return meta.rpcEnv;
+  return meta.logsRpcEnv;
+}
+
 function logsClientFor(chainId: ChainId): PublicClient {
   const meta = chainMeta(chainId);
-  // Sepolia names the same var for both jobs, so the state fallback covers
-  // its logs endpoint too; every other chain reads its logs var verbatim.
-  const url = meta.logsRpcEnv === meta.rpcEnv ? stateRpcUrl(meta) : process.env[meta.logsRpcEnv];
-  if (!url)
-    throw new Error(`${meta.logsRpcEnv} not set — ${meta.name} history sweeps need a wide-range eth_getLogs endpoint`);
-  let client = logsCache.get(meta.id);
+  const env = servingLogsRpcEnv(chainId);
+  // A var shared with the state reads goes through `stateRpcUrl`, so Sepolia's
+  // derived URL covers its logs too.
+  const url = env === meta.rpcEnv ? stateRpcUrl(meta) : process.env[env];
+  if (!url) throw new Error(`${env} not set — ${meta.name} history sweeps need a wide-range eth_getLogs endpoint`);
+  // Keyed by the var it reads, so a client built on the fallback is not
+  // reused once the logs var is set.
+  const key = `${meta.id} ${env}`;
+  let client = logsCache.get(key);
   if (!client) {
     client = createPublicClient({
       chain: VIEM_CHAINS[meta.id],
-      transport: retryingRateLimits(http(url, { timeout: 45_000 })),
+      transport: retryingRateLimits(rangeRefusalsFailAtOnce(http(url, { timeout: 45_000, retryCount: 0 }))),
     });
-    logsCache.set(meta.id, client);
+    logsCache.set(key, client);
   }
   return client;
 }
