@@ -173,9 +173,9 @@ export const vaultRootName = (root: string | undefined): string | undefined =>
 export const vaultProtocolOf = (p: Pick<WalletCountsPosition, "family" | "href" | "vault">): string | undefined =>
   vaultRootName(vaultRootOf(p));
 
-/** A position's section on the wallet view (W3; ui-jobs 863): its family, a
- *  vault share's its vault protocol's ("vaults-morpho", "vaults-yearn",
- *  "vaults-aave-v3"), or "vaults" for a share whose protocol is not known. */
+/** A position's section on the wallet view (W3; ui-jobs 863): its family; for
+ *  a vault share, its vault protocol's ("vaults-morpho", "vaults-yearn",
+ *  "vaults-aave-v3"), or "vaults" where the protocol is not known. */
 export const sectionSlug = (p: Pick<WalletCountsPosition, "family" | "href" | "vault">): string => {
   const root = vaultRootOf(p);
   return root ? `${p.family}-${root}` : p.family;

@@ -640,7 +640,7 @@ test("vault shares take one section per vault protocol, each with its subtotal (
   assert.equal(by["aave-v3"].name, "Aave V3");
   assert.equal(by["vaults-morpho"].positions.length, 2);
   assert.equal(by["vaults-yearn"].positions.length, 2);
-  // Each section its own census subtotal, footnote and note.
+  // Each section has a census subtotal, footnote and note.
   assert.deepEqual(
     by["vaults-morpho"].band.legs.map((l) => [l.label, l.value, l.footnote.text]),
     [["Subtotal", "$520.00", "as read from 17 Nov 2026 to 18 Nov 2026"]],
@@ -650,7 +650,7 @@ test("vault shares take one section per vault protocol, each with its subtotal (
     by["vaults-yearn"].band.legs.map((l) => [l.label, l.value, l.footnote.text]),
     [["Subtotal", "$40.00", "as read on 18 Nov 2026"]],
   );
-  // A share with no dollars stops its own section's subtotal alone.
+  // A share with no dollars stops only its section's subtotal.
   assert.deepEqual(by["vaults-aave-v3"].band.legs, []);
   assert.equal(by["vaults-aave-v3"].band.note, CENSUS_NO_TOTAL);
   // The wallet total leaves each vault section out, named.
