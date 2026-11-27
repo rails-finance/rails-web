@@ -5,9 +5,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { summaryPositions, countsOf, vaultUndrawn, noneDrawnLine, trailWithVisited } = await import(
-  "../../lib/wallet/trail-counts.ts"
-);
+const { summaryPositions, countsOf, vaultUndrawn, noneDrawnLine, trailWithVisited, undrawnWhereVaultsRead } =
+  await import("../../lib/wallet/trail-counts.ts");
 
 const W = "0x3df83ec9d2b62bb9bb83eba1218a202564bb67da";
 const COMET_A = "0x9c4ec768c28520b50860ea7a15bd7213a9ff58bf";
@@ -124,25 +123,32 @@ test("the counts: by chain and family; closed takes closed, liquidated and redee
   );
 });
 
-test("a vault protocol's undrawn shares: those not drawn, by chain and status", () => {
+test("the undrawn vault shares: those not drawn, by section and chain (ui-jobs 863)", () => {
   const ids = { ethereum: 1, base: 8453 };
   const shares = [
-    row("ethereum", "vaults", "v1"),
-    row("ethereum", "vaults", "v2", "closed"),
-    row("ethereum", "vaults", "v3"),
-    row("base", "vaults", "v4"),
-    row("optimism", "vaults", "v5"),
+    row("ethereum", "vaults", "v1", "open", { vault: "morpho" }),
+    row("ethereum", "vaults", "v2", "closed", { vault: "morpho" }),
+    row("ethereum", "vaults", "v3", "open", { vault: "yearn" }),
+    row("base", "vaults", "v4", "open", { vault: "morpho" }),
+    row("optimism", "vaults", "v5", "open", { vault: "morpho" }),
   ];
-  const u = vaultUndrawn(shares, new Set(["ethereum:v1"]), (slug) => ids[slug]);
+  const sectionOf = (p) => `vaults-${p.vault}`;
+  const u = vaultUndrawn(shares, new Set(["ethereum:v1"]), (slug) => ids[slug], sectionOf);
   assert.deepEqual(u, [
-    { family: "vaults", open: 1, closed: 1, chain: 1 },
-    { family: "vaults", open: 1, closed: 0, chain: 8453 },
+    { family: "vaults-morpho", open: 0, closed: 1, chain: 1 },
+    { family: "vaults-yearn", open: 1, closed: 0, chain: 1 },
+    { family: "vaults-morpho", open: 1, closed: 0, chain: 8453 },
   ]);
   // Every share drawn: nothing undrawn.
   assert.deepEqual(
-    vaultUndrawn(shares.slice(0, 1), new Set(["ethereum:v1"]), (s) => ids[s]),
+    vaultUndrawn(shares.slice(0, 1), new Set(["ethereum:v1"]), (s) => ids[s], sectionOf),
     [],
   );
+});
+
+test("the trail carries a vault share's protocol root", () => {
+  const t = trailWithVisited([], [row(1, "vaults", "v1", "open", { vault: "yearn" })], () => "ethereum");
+  assert.equal(t[0].vault, "yearn");
 });
 
 test("the line where a vault view draws none of the shares it counts", () => {
@@ -151,8 +157,8 @@ test("the line where a vault view draws none of the shares it counts", () => {
     "Rails holds 1,180 holdings in MetaMorpho vaults for this wallet, and draws none of them here.",
   );
   assert.equal(
-    noneDrawnLine(1, "Yearn V3", "open"),
-    "Rails holds 1 open holding in Yearn V3 for this wallet, and draws none of it here.",
+    noneDrawnLine(1, "Yearn V3 vaults", "open"),
+    "Rails holds 1 open holding in Yearn V3 vaults for this wallet, and draws none of it here.",
   );
 });
 
@@ -183,4 +189,31 @@ test("the wallet view's trail adds the positions read at visit that the stored o
   assert.equal("market" in trail[1], false);
   // The stored list stands as it was: the position pages count it alone.
   assert.equal(stored.length, 1);
+});
+
+test("a chain whose vault shares read failed states no undrawn vault line (ui-jobs 863)", () => {
+  const undrawn = [
+    { family: "vaults-morpho", open: 3, closed: 0, chain: 1 },
+    { family: "vaults-yearn", open: 1, closed: 0, chain: 1 },
+    { family: "vaults-morpho", open: 2, closed: 0, chain: 8453 },
+  ];
+  const read = (id, chain, extra = {}) => ({ id, chain, positions: 4, headRead: "ok", ...extra });
+  // Every read answered: every line stands.
+  assert.equal(undrawnWhereVaultsRead(undrawn, [read("vaults", 1), read("vaults-base", 8453)]).length, 3);
+  // Ethereum's read rejected (0 positions, failed, an error): its lines go, Base's stay.
+  const rejected = read("vaults", 1, { positions: 0, headRead: "failed", error: "timeout" });
+  assert.deepEqual(
+    undrawnWhereVaultsRead(undrawn, [rejected, read("vaults-base", 8453)]).map((u) => u.chain),
+    [8453],
+  );
+  // A listing read that did not answer drops that chain's lines too.
+  const unanswered = read("vaults-base", 8453, { positions: 0, headRead: "failed", unanswered: { family: "vaults" } });
+  assert.deepEqual(
+    undrawnWhereVaultsRead(undrawn, [read("vaults", 1), unanswered]).map((u) => u.chain),
+    [1, 1],
+  );
+  // A head read that failed over drawn shares leaves the lines: the draw limit still held them.
+  assert.equal(undrawnWhereVaultsRead(undrawn, [read("vaults", 1, { headRead: "failed" })]).length, 3);
+  // Another family's failed read is not the vault read's.
+  assert.equal(undrawnWhereVaultsRead(undrawn, [read("aave-v3", 1, { positions: 0, headRead: "failed" })]).length, 3);
 });

@@ -15,7 +15,7 @@ export interface CountedFamily<R> {
   summaryChain: WalletCountsPosition["chain"];
   summaryFamily: string;
   /** The family's positions from its rows, as the wallet view shapes them. */
-  shape(rows: R[]): Promise<Pick<WalletCountsPosition, "positionId" | "status" | "href" | "market">[]>;
+  shape(rows: R[]): Promise<Pick<WalletCountsPosition, "positionId" | "status" | "href" | "market" | "vault">[]>;
 }
 
 /** The wallet's counted positions from its summary rows: a family whose
@@ -45,6 +45,7 @@ export async function summaryPositions<R, F extends CountedFamily<R>>(
           status: p.status,
           href: p.href,
           ...(p.market ? { market: p.market } : {}),
+          ...(p.vault ? { vault: p.vault } : {}),
         });
       }
       mine.forEach((r) => taken.add(r));
@@ -88,26 +89,53 @@ export function countsOf(
   };
 }
 
-/** One vault protocol's shares the trail counts and the read did not draw
- *  (`drawn` holds `<chain slug>:<positionId>` of each drawn share), by chain
- *  and status, for a `?vault=` view's undrawn lines. A chain `chainIdOf`
- *  does not know is left out. */
-export function vaultUndrawn<C>(
-  shares: Pick<WalletCountsPosition, "chain" | "positionId" | "status">[],
+/** The vault shares the trail counts and the read did not draw (`drawn`
+ *  holds `<chain slug>:<positionId>` of each drawn share), by section
+ *  (`sectionOf`, one per vault protocol) and chain, for each vault section's
+ *  undrawn lines and a `?vault=` view's. A chain `chainIdOf` does not know is
+ *  left out. */
+export function vaultUndrawn<C, P extends Pick<WalletCountsPosition, "chain" | "positionId" | "status">>(
+  shares: P[],
   drawn: Set<string>,
   chainIdOf: (slug: WalletCountsPosition["chain"]) => C | undefined,
-): { family: "vaults"; open: number; closed: number; chain: C }[] {
-  const byChain = new Map<string, { family: "vaults"; open: number; closed: number; chain: C }>();
+  sectionOf: (p: P) => string,
+): { family: string; open: number; closed: number; chain: C }[] {
+  const byKey = new Map<string, { family: string; open: number; closed: number; chain: C }>();
   for (const p of shares) {
     if (drawn.has(`${p.chain}:${p.positionId}`)) continue;
     const chain = chainIdOf(p.chain);
     if (chain == null) continue;
-    const u = byChain.get(p.chain) ?? { family: "vaults" as const, open: 0, closed: 0, chain };
+    const family = sectionOf(p);
+    const k = `${family}:${p.chain}`;
+    const u = byKey.get(k) ?? { family, open: 0, closed: 0, chain };
     if (p.status === "open") u.open += 1;
     else u.closed += 1;
-    byChain.set(p.chain, u);
+    byKey.set(k, u);
   }
-  return [...byChain.values()];
+  return [...byKey.values()];
+}
+
+/** The vault shares modules' read ids, one a chain (families/vaults.ts). */
+export const VAULT_READ_IDS = ["vaults", "vaults-base"];
+
+/** The undrawn vault lines on the chains whose vault shares read answered:
+ *  where it failed or did not answer, the page drew none of that chain's
+ *  shares for a reason other than the draw limit, and its failed-read notice
+ *  says so. */
+export function undrawnWhereVaultsRead<C, U extends { chain: C }>(
+  undrawn: U[],
+  families: { id: string; chain: C; positions: number; headRead: string; error?: string; unanswered?: unknown }[],
+): U[] {
+  const failed = new Set(
+    families
+      .filter(
+        (r) =>
+          VAULT_READ_IDS.includes(r.id) &&
+          (r.error != null || r.unanswered != null || (r.headRead === "failed" && r.positions === 0)),
+      )
+      .map((r) => r.chain),
+  );
+  return undrawn.filter((u) => !failed.has(u.chain));
 }
 
 /** The `?vault=` view's line where it draws none of the shares it counts:
@@ -143,6 +171,7 @@ export function trailWithVisited<V extends Omit<WalletCountsPosition, "chain"> &
       status: v.status,
       href: v.href,
       ...(v.market ? { market: v.market } : {}),
+      ...(v.vault ? { vault: v.vault } : {}),
     });
   }
   return out;

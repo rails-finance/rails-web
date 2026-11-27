@@ -26,9 +26,10 @@
 // buffer, so the risk sort and "Closest to liquidation" leave it out.
 //
 // A vault share's dollars are the holder census's at its census block (ui-jobs
-// 783), a stored figure: its card states them, and its section states them as
-// a dated subtotal outside the wallet total (`census`). So does a section
-// whose every open position is a stored read with dollars (`storedSubtotal`);
+// 783), a stored figure: its card states them, and its section, one per vault
+// protocol (ui-jobs 863), states them as a dated subtotal outside the wallet
+// total (`census`). So does a section whose every open position is a stored
+// read with dollars (`storedSubtotal`);
 // a section mixing stored and head figures states none (rule 743).
 
 import type { HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
@@ -43,6 +44,7 @@ import { headDepositLeg, headStakeLeg } from "@/lib/wallet/deposit-claim";
 import { scaled } from "@/lib/wallet/summary-row";
 import { formatUsdValue } from "@/lib/utils/format";
 import { walletProtocol } from "@/lib/wallet/wallet-filters";
+import { sectionSlug, vaultProtocolOf } from "@/lib/wallet/summary-counts";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { onEmptiedBranch, recordedCollateralLeg } from "@/lib/wallet/trove-shutdown";
 import { CHAINS } from "@/lib/shared/chains";
@@ -133,8 +135,11 @@ export const undrawnCount = (u: UndrawnCounts, status?: "open" | "closed"): numb
 
 /** The line under a section's cards naming what it does not draw on one
  *  chain, for the Status pill: "1,180 more holdings on Base are not drawn
- *  (80 open); the open ones with the largest census value come first." */
-export function undrawnLine(u: UndrawnCounts, chain: string, status?: "open" | "closed"): string {
+ *  (80 open); the open ones with the largest census value come first." With
+ *  no pill and every undrawn holding of one status, the line names that
+ *  status as the pill would. */
+export function undrawnLine(u: UndrawnCounts, chain: string, pill?: "open" | "closed"): string {
+  const status = pill ?? (u.open === 0 ? "closed" : u.closed === 0 ? "open" : undefined);
   const n = undrawnCount(u, status);
   const num = n.toLocaleString("en-US");
   const noun = `${status ? `${status} ` : ""}${n === 1 ? "holding" : "holdings"}`;
@@ -487,9 +492,10 @@ function shutNames(emptied: WalletPosition[]): string[] {
   return [...byMarket].map(([m, n]) => (n > 1 ? `the ${m}s' recorded collateral` : `the ${m}'s recorded collateral`));
 }
 
-/** One section per protocol, in the order of their riskiest open position;
- *  sections without a ranked buffer after, by collateral; sections with no
- *  open position last, by their latest close. */
+/** One section per protocol, each vault protocol its own (`sectionSlug`;
+ *  ui-jobs 863), in the order of their riskiest open position; sections
+ *  without a ranked buffer after, by collateral; sections with no open
+ *  position last, by their latest close. */
 export function walletSections(
   positions: WalletPosition[],
   opts: {
@@ -499,10 +505,13 @@ export function walletSections(
   },
 ): WalletSection[] {
   const bySlug = new Map<string, WalletPosition[]>();
-  for (const p of positions) bySlug.set(p.family, [...(bySlug.get(p.family) ?? []), p]);
+  for (const p of positions) {
+    const slug = sectionSlug(p);
+    bySlug.set(slug, [...(bySlug.get(slug) ?? []), p]);
+  }
   const sections: WalletSection[] = [];
   for (const [slug, mine] of bySlug) {
-    const name = walletProtocol(slug)?.name ?? mine[0].familyName;
+    const name = vaultProtocolOf(mine[0]) ?? walletProtocol(slug)?.name ?? mine[0].familyName;
     const openAll = mine.filter((p) => p.status === "open");
     const ranked = openAll.filter((p) => !p.notRead && !isDust(p)).sort(byRisk);
     const dust = openAll.filter((p) => !p.notRead && isDust(p)).sort(byRisk);
@@ -652,7 +661,8 @@ export interface WalletTotal {
   /** Where nothing is summed: "No wallet total: Morpho Blue states no dollars". */
   gap?: string;
   /** Beside a figure, what it leaves out: "Leaves out Morpho Blue and
-   *  Fluid (no dollars) and Vault shares (valued at the census blocks)." */
+   *  Fluid (no dollars) and MetaMorpho vaults, Yearn V3 vaults and Aave
+   *  vaults (valued at the census blocks)." */
   leaves?: string;
 }
 

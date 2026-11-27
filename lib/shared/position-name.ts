@@ -108,8 +108,8 @@ export function summaryPositionCrumb(
   const raw = pieces.find((x) => x.toLowerCase().includes(w)) ?? pieces[pieces.length - 1] ?? parts.positionId;
   const holdsWallet = raw.toLowerCase().includes(w);
   let label = parts.market;
-  // A vault share keeps its noun ("Holding"), as the trail has drawn it since
-  // Miles settled the names (ui-jobs 856).
+  // A vault share is named by its share symbol, the row's market (ui-jobs
+  // 862); one without a symbol keeps its noun ("Holding").
   if (!label && holdsWallet && parts.noun !== "Holding") {
     const other = parts.positionId
       .toLowerCase()

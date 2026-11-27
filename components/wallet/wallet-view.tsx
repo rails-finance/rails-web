@@ -21,8 +21,15 @@ import { useRouter } from "next/navigation";
 import { TipLabel } from "@/components/shared/tip-label";
 import { WalletHeader } from "@/components/wallet/wallet-header";
 import { WalletPositionsMenu } from "@/components/shared/wallet-positions-menu";
-import { vaultRoot, vaultRootName, type WalletCountsPosition } from "@/lib/wallet/summary-counts";
-import { noneDrawnLine, vaultUndrawn } from "@/lib/wallet/trail-counts";
+import {
+  VAULT_SHARES_FAMILY,
+  sectionSlug,
+  vaultProtocolOf,
+  vaultRootName,
+  vaultRootOf,
+  type WalletCountsPosition,
+} from "@/lib/wallet/summary-counts";
+import { noneDrawnLine, undrawnWhereVaultsRead, vaultUndrawn } from "@/lib/wallet/trail-counts";
 import { WalletFilterBar } from "@/components/wallet/wallet-filter-bar";
 import {
   walletProtocol,
@@ -256,7 +263,7 @@ function Section({
         const n = undrawnCount(u, status);
         return (
           n > 0 && (
-            <p key={u.chain} className="mt-3 text-xs text-rb-500" data-wallet-undrawn={n}>
+            <p key={`${u.family}:${u.chain}`} className="mt-3 text-xs text-rb-500" data-wallet-undrawn={n}>
               {undrawnLine(u, chainMeta(u.chain).name, status)}
             </p>
           )
@@ -267,6 +274,53 @@ function Section({
           {line}
         </p>
       ))}
+    </section>
+  );
+}
+
+/** A vault protocol's section where the read draws none of its shares
+ *  (W3; ui-jobs 863): its name and count, the line saying none is drawn, and
+ *  the undrawn lines by chain. */
+function UndrawnSection({
+  slug,
+  name,
+  undrawn,
+  status,
+}: {
+  slug: string;
+  name: string;
+  undrawn: Undrawn[];
+  status?: WalletStatus;
+}) {
+  const id = `wallet-section-${slug}`;
+  const total = undrawn.reduce((n, u) => n + undrawnCount(u, status), 0);
+  return (
+    <section
+      aria-labelledby={id}
+      data-wallet-section={slug}
+      data-wallet-open={0}
+      data-wallet-closed={0}
+      data-anatomy="W3"
+    >
+      <h2 id={id} className={`mb-3 ${H2}`}>
+        {name}{" "}
+        <span className="font-medium text-rb-500" data-prov-exempt="">
+          {total.toLocaleString("en-US")}
+        </span>
+      </h2>
+      <p className="text-sm text-foreground/80" data-wallet-reads="">
+        {noneDrawnLine(total, name, status)}
+      </p>
+      {undrawn.map((u) => {
+        const n = undrawnCount(u, status);
+        return (
+          n > 0 && (
+            <p key={`${u.family}:${u.chain}`} className="mt-3 text-xs text-rb-500" data-wallet-undrawn={n}>
+              {undrawnLine(u, chainMeta(u.chain).name, status)}
+            </p>
+          )
+        );
+      })}
     </section>
   );
 }
@@ -395,7 +449,7 @@ export function WalletView({
   /** `?status=`: the Status pill's selection on arrival. */
   status?: WalletStatus;
   /** `?vault=` with the vault shares chosen: one vault protocol's shares
-   *  (`vaultRoot`), the trail's MetaMorpho, Aave vaults or Yearn V3 row
+   *  (`vaultRootOf`), the trail's MetaMorpho, Aave vaults or Yearn V3 row
    *  (ui-jobs 856). */
   vault?: string;
   /** The explorer the reader came from, for the empty state's link back. */
@@ -407,7 +461,7 @@ export function WalletView({
   // AIM (ui-jobs 557): the positions naming an AIM asset (lib/wallet/aim-assets.ts),
   // the reader's own wallet included.
   const positions = useMemo(
-    () => (vault ? read.positions.filter((p) => vaultRoot(p.href) === vault) : read.positions),
+    () => (vault ? read.positions.filter((p) => vaultRootOf(p) === vault) : read.positions),
     [read.positions, vault],
   );
   const scoped = useScopedRows(positions, walletPositionAssetKeys, (p) => p.chain as number);
@@ -431,20 +485,32 @@ export function WalletView({
   const chosen = walletProtocol(read.protocol);
   // The positions the read counted and did not draw.
   // Under Focus, only those on a chain in focus, as the drawn rows.
-  // One vault protocol's shares (`?vault=`): the family's undrawn counts
-  // name no vault, so its shares the trail counts and the read did not draw
-  // stand in their place, by chain (ui-jobs 856).
+  // The vault shares' undrawn counts are the family's, naming no vault
+  // protocol: the shares the trail counts and the read did not draw stand in
+  // their place, by section and chain (ui-jobs 856, 863); on a `?vault=`
+  // view, that protocol's alone; none on another protocol's view, whose
+  // read leaves the vault shares out.
   const trail = read.trail ?? NO_TRAIL;
-  const vaultShares = vault ? trail.filter((p) => p.family === "vaults" && vaultRoot(p.href) === vault) : [];
-  const undrawn: Undrawn[] = vault
-    ? vaultUndrawn(
+  const readsVaults = !chosen || chosen.slug === VAULT_SHARES_FAMILY;
+  const vaultShares = readsVaults
+    ? trail.filter((p) => p.family === VAULT_SHARES_FAMILY && (!vault || vaultRootOf(p) === vault))
+    : [];
+  const undrawn: Undrawn[] = [
+    ...read.families.flatMap((r) =>
+      r.undrawn && r.undrawn.family !== VAULT_SHARES_FAMILY && (!focused || scope.chainOk(r.chain))
+        ? [{ ...r.undrawn, chain: r.chain }]
+        : [],
+    ),
+    ...undrawnWhereVaultsRead(
+      vaultUndrawn(
         vaultShares,
         new Set(positions.map((p) => `${CHAINS[p.chain]?.slug}:${p.positionId}`)),
         (slug) => Object.values(CHAINS).find((c) => c.slug === slug)?.id,
-      ).filter((u) => !focused || scope.chainOk(u.chain))
-    : read.families.flatMap((r) =>
-        r.undrawn && (!focused || scope.chainOk(r.chain)) ? [{ ...r.undrawn, chain: r.chain }] : [],
-      );
+        sectionSlug,
+      ),
+      read.families,
+    ).filter((u) => !focused || scope.chainOk(u.chain)),
+  ];
   const undrawnTotal = undrawn.reduce((n, u) => n + undrawnCount(u, status), 0);
   // On a `?vault=` view the Protocol pill counts that vault protocol's shares.
   const held = vault
@@ -459,6 +525,18 @@ export function WalletView({
   // The reads that stop the wallet total (`total: false` stops none).
   const blocking = unanswered.filter((u) => u.total !== false).map((u) => u.what);
   const sections = walletSections(all, { bands: !filtered, unanswered });
+  // A vault protocol whose shares the trail counts and the read draws none
+  // of (each past its chain's draw limit): its section is its name, its
+  // count and its undrawn lines (ui-jobs 863). A vault share is a deposit.
+  const vaultNames = new Map(vaultShares.map((p) => [sectionSlug(p), vaultProtocolOf(p) ?? "Vault shares"]));
+  const undrawnOnly =
+    byKind && !kinds.includes("deposits")
+      ? []
+      : [...vaultNames].filter(
+          ([slug]) =>
+            !sections.some((s) => s.slug === slug) &&
+            undrawn.some((u) => u.family === slug && undrawnCount(u, status) > 0),
+        );
   const open = sections.flatMap((s) => s.open);
   // Under Focus, only the families on a chain in focus.
   const unread = read.families.filter(
@@ -660,7 +738,7 @@ export function WalletView({
                           const n = undrawnCount(u, status);
                           return (
                             n > 0 && (
-                              <p key={u.chain} className="text-xs text-rb-500" data-wallet-undrawn={n}>
+                              <p key={`${u.family}:${u.chain}`} className="text-xs text-rb-500" data-wallet-undrawn={n}>
                                 {undrawnLine(u, chainMeta(u.chain).name, status)}
                               </p>
                             )
@@ -717,6 +795,15 @@ export function WalletView({
                     s={s}
                     undrawn={undrawn.filter((u) => u.family === s.slug)}
                     notes={notes.filter((n) => n.family === s.slug).map((n) => n.line)}
+                    status={status}
+                  />
+                ))}
+                {undrawnOnly.map(([slug, name]) => (
+                  <UndrawnSection
+                    key={slug}
+                    slug={slug}
+                    name={name}
+                    undrawn={undrawn.filter((u) => u.family === slug)}
                     status={status}
                   />
                 ))}

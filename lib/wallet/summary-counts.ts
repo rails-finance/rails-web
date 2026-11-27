@@ -23,6 +23,15 @@ export interface WalletCountsPosition {
   /** The market or branch the position sits in, as the wallet view names it
    *  ("Core", "WETH"); the positions menu's crumb names read it. */
   market?: string;
+  /** A vault share's asset symbol, for the icon before its name in the
+   *  positions menu (ui-jobs 862). */
+  asset?: string;
+  /** That asset's address, from the census (rails-server's wallet route
+   *  reads it into the card as `assetAddress`). */
+  assetAddress?: string;
+  /** A vault share's protocol root (morpho, aave-v3, yearn) from its census
+   *  family (`vaultRootOfCensus`; ui-jobs 863). Read through `vaultRootOf`. */
+  vault?: string;
 }
 
 export interface WalletCountsFamily {
@@ -112,43 +121,74 @@ export interface MenuProtocol {
  *  family over MetaMorpho, Yearn V3 and Aave's vaults on Ethereum and Base. */
 export const VAULT_SHARES_FAMILY = "vaults";
 
-/** The vault protocols a vault-share row can belong to, by the root of its
- *  holder page (`/<chain>/<root>/vaults/<vault>/<holder>`, lib/vaults/routes.ts). */
+/** The vault protocols a vault-share row can belong to, by their root: the
+ *  `?vault=` value on the wallet view and the root of the holder page
+ *  (`/<chain>/<root>/vaults/<vault>/<holder>`, lib/vaults/routes.ts). */
 const VAULT_ROOTS: Record<string, string> = {
   morpho: "MetaMorpho vaults",
   "aave-v3": "Aave vaults",
-  yearn: "Yearn V3",
+  yearn: "Yearn V3 vaults",
 };
 
-/** A vault-share row's protocol root from its href (morpho, aave-v3, yearn);
- *  undefined for a path outside the vault routes. */
-export function vaultRoot(href: string | null): string | undefined {
+/** Each census family's vault protocol root (the `family` on the stored card
+ *  and the listing row): MetaMorpho's two, Yearn V3, and Aave's static
+ *  aTokens, Umbrella stake tokens and savings GHO. */
+const CENSUS_ROOTS: Record<string, string> = {
+  morpho: "morpho",
+  "morpho-v2": "morpho",
+  "yearn-v3": "yearn",
+  "umbrella-stake": "aave-v3",
+  stata: "aave-v3",
+  sgho: "aave-v3",
+};
+
+/** A census family's vault protocol root (morpho, aave-v3, yearn); undefined
+ *  for a family the census does not write. */
+export const vaultRootOfCensus = (family: string | null | undefined): string | undefined =>
+  family != null && Object.hasOwn(CENSUS_ROOTS, family) ? CENSUS_ROOTS[family] : undefined;
+
+/** A holder page's vault protocol root; undefined for a path outside the
+ *  vault routes. */
+function hrefRoot(href: string | null): string | undefined {
   const m = href ? /^\/[^/]+\/([^/]+)\/vaults\//.exec(href.split("?")[0].toLowerCase()) : null;
   return m && Object.hasOwn(VAULT_ROOTS, m[1]) ? m[1] : undefined;
+}
+
+/** A vault share's protocol root (morpho, aave-v3, yearn), from the census
+ *  family the row carries (`vault`); undefined on another family. A /summary
+ *  answer cached before rows carried it (60 s at most) names the root in its
+ *  href, read here alone. */
+export function vaultRootOf(p: Pick<WalletCountsPosition, "family" | "href" | "vault">): string | undefined {
+  if (p.family !== VAULT_SHARES_FAMILY) return undefined;
+  return p.vault != null && Object.hasOwn(VAULT_ROOTS, p.vault) ? p.vault : hrefRoot(p.href);
 }
 
 /** Whether `root` names a vault protocol (`?vault=` on the wallet view). */
 export const isVaultRoot = (root: string | null | undefined): root is string =>
   root != null && Object.hasOwn(VAULT_ROOTS, root);
 
-/** A vault protocol's name in the menu ("MetaMorpho vaults") by its root. */
-export const vaultRootName = (root: string): string | undefined =>
-  Object.hasOwn(VAULT_ROOTS, root) ? VAULT_ROOTS[root] : undefined;
+/** A vault protocol's name ("MetaMorpho vaults") by its root. */
+export const vaultRootName = (root: string | undefined): string | undefined =>
+  root != null && Object.hasOwn(VAULT_ROOTS, root) ? VAULT_ROOTS[root] : undefined;
 
-/** The menu's name for a vault-share row's protocol ("MetaMorpho vaults"), or
- *  undefined where its href names none (or it has no page). */
-export const vaultProtocolOfHref = (href: string | null): string | undefined => {
-  const root = vaultRoot(href);
-  return root ? VAULT_ROOTS[root] : undefined;
+/** A vault share's protocol name ("MetaMorpho vaults"), or undefined on
+ *  another family or a share whose protocol is not known. */
+export const vaultProtocolOf = (p: Pick<WalletCountsPosition, "family" | "href" | "vault">): string | undefined =>
+  vaultRootName(vaultRootOf(p));
+
+/** A position's section on the wallet view (W3; ui-jobs 863): its family; for
+ *  a vault share, its vault protocol's ("vaults-morpho", "vaults-yearn",
+ *  "vaults-aave-v3"), or "vaults" where the protocol is not known. */
+export const sectionSlug = (p: Pick<WalletCountsPosition, "family" | "href" | "vault">): string => {
+  const root = vaultRootOf(p);
+  return root ? `${p.family}-${root}` : p.family;
 };
 
 /** A position's row in the menu: its chain and family, a vault-share row's
  *  split by its vault protocol, so MetaMorpho vaults, Aave vaults and Yearn V3
  *  each take a row. */
-export const menuKey = (p: Pick<WalletCountsPosition, "chain" | "family" | "href">): string =>
-  p.family === VAULT_SHARES_FAMILY
-    ? `${p.chain}:${p.family}:${vaultRoot(p.href) ?? "other"}`
-    : `${p.chain}:${p.family}`;
+export const menuKey = (p: Pick<WalletCountsPosition, "chain" | "family" | "href" | "vault">): string =>
+  p.family === VAULT_SHARES_FAMILY ? `${p.chain}:${p.family}:${vaultRootOf(p) ?? "other"}` : `${p.chain}:${p.family}`;
 
 export interface WalletProtocolRow<P extends WalletCountsPosition> {
   /** `<chain>:<family>`, and `:<root>` on a vault-share row (`menuKey`). */

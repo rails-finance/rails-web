@@ -20,9 +20,10 @@
 // narrowed view, which spans chains) and the protocol's mark. It links to the
 // narrowed view (`walletTrailCrumb`) and is the page there; where the wallet
 // holds two or more positions in the protocol, across its chains, it opens
-// their list: each position's dot, chain and name (`summaryCrumb`), five at
-// most, then "N more". The position crumb is the detail card's name
-// (`usePositionCardName`) with its lifecycle dot, opening the card's ⋮ menu.
+// their list: each position's dot, chain, a vault share's asset icon and name
+// (`summaryCrumb`), five at most, then "N more". The position crumb is the
+// detail card's name (`usePositionCardName`) with its lifecycle dot, opening
+// the card's ⋮ menu.
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -35,7 +36,9 @@ import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ToolsMenu } from "@/components/shared/tools-menu";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { CHAINS, chainMeta, type ChainId } from "@/lib/shared/chains";
+import { ChainProvider } from "@/lib/shared/chain-context";
 import { menuProtocolOf, protocolEntryOf, summaryCrumb } from "@/lib/wallet/position-protocol";
 import { walletProtocol, walletProtocolHref } from "@/lib/wallet/wallet-filters";
 import {
@@ -449,6 +452,23 @@ export function WalletPositionsMenu({
                       >
                         <ChainGlyph id={chainIdOf(p.chain)} className="size-3.5 shrink-0" />
                       </span>
+                      {/* A vault share's asset, its symbol in the tip: steakUSDC and
+                          gtUSDCp share USDC's mark (ui-jobs 862). The census
+                          address finds a mark the symbol does not (mkUSD,
+                          yPRISMA), under the row's chain. */}
+                      {p.asset && (
+                        <span className="inline-flex shrink-0" title={p.asset} data-wallet-position-asset={p.asset}>
+                          <ChainProvider chainId={chainIdOf(p.chain)}>
+                            <TokenChipIcon
+                              symbol={p.asset}
+                              address={p.assetAddress}
+                              size={14}
+                              filterable={false}
+                              untitled
+                            />
+                          </ChainProvider>
+                        </span>
+                      )}
                       <span className="min-w-0 truncate">{summaryCrumb(p, address)}</span>
                     </>
                   );

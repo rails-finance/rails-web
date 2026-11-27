@@ -7,8 +7,8 @@ import { POSITION_NOUN, PROTOCOLS, listingHrefForWallet, protocolForPathname } f
 import { summaryPositionCrumb } from "@/lib/shared/position-name";
 import {
   VAULT_SHARES_FAMILY,
-  vaultProtocolOfHref,
-  vaultRoot,
+  vaultRootName,
+  vaultRootOf,
   type MenuProtocol,
   type WalletCountsPosition,
 } from "@/lib/wallet/summary-counts";
@@ -31,10 +31,9 @@ export function protocolEntryOf(p: Pick<WalletCountsPosition, "chain" | "family"
 export function menuProtocolOf(p: WalletCountsPosition, address: string): MenuProtocol | undefined {
   const entry = protocolEntryOf(p);
   if (!entry) return undefined;
-  const vault = vaultProtocolOfHref(p.href);
-  const root = vaultRoot(p.href);
+  const root = vaultRootOf(p);
   return {
-    name: vault ?? entry.label,
+    name: vaultRootName(root) ?? entry.label,
     order: PROTOCOLS.indexOf(entry),
     listing: root
       ? walletVaultHref(address, root)

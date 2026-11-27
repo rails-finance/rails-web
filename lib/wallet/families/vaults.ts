@@ -29,7 +29,8 @@ import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { historyBase, storeStamp, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import { holdsNothingSince } from "@/lib/wallet/holds-nothing";
-import { VAULT_SHARES_FAMILY } from "@/lib/wallet/summary-counts";
+import { VAULT_READ_IDS } from "@/lib/wallet/trail-counts";
+import { VAULT_SHARES_FAMILY, vaultRootName, vaultRootOfCensus } from "@/lib/wallet/summary-counts";
 import type { FamilyModule, HeadResult } from "./module";
 
 /** The census families mig 531 writes, as rails-server's `families=` takes them. */
@@ -60,12 +61,9 @@ interface StoredVaultCard {
   shapeDetail?: { codeSize?: number } | null;
 }
 
-/** The vault protocol's name for a census family. */
-export function vaultProtocolName(family: string): string {
-  if (family === "morpho") return "MetaMorpho vaults";
-  if (family === "yearn-v3") return "Yearn V3";
-  return "Aave vaults";
-}
+/** The vault protocol's name for a census family; "Vault shares" for one
+ *  the census does not write. */
+export const vaultProtocolName = (family: string): string => vaultRootName(vaultRootOfCensus(family)) ?? "Vault shares";
 
 /** The stored row as the listing's row: the census lane at the holder's last
  *  transfer, the block its balance last changed at. A holder with no code
@@ -152,7 +150,7 @@ const rowOf = (p: WalletPosition) => (p.card as { row: VaultPositionRow }).row;
 function vaultsModule(chainId: typeof MAINNET_CHAIN_ID | typeof BASE_CHAIN_ID): FamilyModule {
   const base = chainId === BASE_CHAIN_ID;
   return {
-    id: base ? "vaults-base" : "vaults",
+    id: base ? VAULT_READ_IDS[1] : VAULT_READ_IDS[0],
     name: "Vault shares",
     chain: chainId,
     summaryChain: base ? "base" : "ethereum",
@@ -162,10 +160,12 @@ function vaultsModule(chainId: typeof MAINNET_CHAIN_ID | typeof BASE_CHAIN_ID): 
     async shape(rows) {
       return rows.map((r): WalletPosition => {
         const row = storedVaultRow(r, chainId);
+        const vault = vaultRootOfCensus(row.family);
         const p: WalletPosition = {
           chain: chainId,
           family: VAULT_SHARES_FAMILY,
           familyName: vaultProtocolName(row.family),
+          ...(vault ? { vault } : {}),
           market: row.symbol ?? undefined,
           positionId: r.positionId,
           href: r.href,

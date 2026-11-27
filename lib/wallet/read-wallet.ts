@@ -71,7 +71,12 @@ import {
 import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
 import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
-import type { WalletCounts, WalletCountsChain } from "@/lib/wallet/summary-counts";
+import {
+  VAULT_SHARES_FAMILY,
+  vaultRootOfCensus,
+  type WalletCounts,
+  type WalletCountsChain,
+} from "@/lib/wallet/summary-counts";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
 import { countsOf, summaryPositions, trailWithVisited } from "@/lib/wallet/trail-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
@@ -703,6 +708,16 @@ export function readWallet(address: string, readerIp?: string, opts: { protocol?
 // position per Comet; every other row is one position. Kept 60 s per address.
 const countsCache = new Map<string, { at: number; read: Promise<WalletCounts> }>();
 
+/** The stored vault card's census family and symbols (mig 531's census
+ *  fields), and the asset address the wallet route reads into it. */
+const vaultCard = (r: WalletSummaryRow) =>
+  (r.card ?? {}) as {
+    family?: string | null;
+    symbol?: string | null;
+    assetSymbol?: string | null;
+    assetAddress?: string | null;
+  };
+
 /** A summary row's market as the wallet's cards name it, for the positions
  *  menu (ui-jobs 856): Aave V3's market name ("Core"), a Compound V3 Comet's
  *  label ("cUSDCv3", by key or address), a Morpho Blue market's pair from the
@@ -710,6 +725,8 @@ const countsCache = new Map<string, { at: number; read: Promise<WalletCounts> }>
  *  capitals ("USDC"); none for another address or hex id, which the row's id
  *  names instead. */
 function summaryMarketLabel(r: WalletSummaryRow): string | undefined {
+  // A vault share by its share symbol, as its card names it (ui-jobs 862).
+  if (r.family === VAULT_SHARES_FAMILY) return vaultCard(r).symbol?.trim() || undefined;
   const m = r.market?.trim();
   if (!m) return undefined;
   if (r.family === "compound-v3" && (r.chain === "ethereum" || r.chain === "base")) {
@@ -734,6 +751,10 @@ async function countsFromSummary(key: string, summary: Summary, t0: number): Pro
   const positions = await summaryPositions(WALLET_FAMILIES, summary.rows, takesRow, (r) => {
     if (!countedRow(r)) return null;
     const market = summaryMarketLabel(r);
+    const asset = r.family === VAULT_SHARES_FAMILY ? vaultCard(r).assetSymbol?.trim() : undefined;
+    const assetAddress = asset ? vaultCard(r).assetAddress?.trim().toLowerCase() : undefined;
+    // A vault share's protocol, from its census family (ui-jobs 863).
+    const vault = r.family === VAULT_SHARES_FAMILY ? vaultRootOfCensus(vaultCard(r).family) : undefined;
     return {
       chain: r.chain,
       family: r.family,
@@ -741,6 +762,9 @@ async function countsFromSummary(key: string, summary: Summary, t0: number): Pro
       status: walletRowStatus(r),
       href: r.href,
       ...(market ? { market } : {}),
+      ...(asset ? { asset } : {}),
+      ...(assetAddress ? { assetAddress } : {}),
+      ...(vault ? { vault } : {}),
     };
   });
   return {

@@ -14,7 +14,7 @@
 
 import Link from "next/link";
 import { Suspense, use, useState, type ReactNode } from "react";
-import { Link2 } from "lucide-react";
+import { Link2, Vault } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -47,6 +47,7 @@ import type { VaultEarned } from "@/lib/vaults/earned";
 import type { HoldingWorthLine, HoldingWorthPoint, PlainHoldingHistory } from "@/lib/vaults/holding-worth";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import { positionLink } from "@/lib/shared/position-link";
+import { positionName } from "@/lib/shared/position-name";
 
 const ZERO = BigInt(0);
 const units = (raw: string, decimals: number) => Number(raw) / 10 ** decimals;
@@ -105,20 +106,31 @@ const Pending = () => (
   </div>
 );
 
-function MenuRows({ href }: { href: string }) {
+function MenuRows({ href, vaultHref, symbol }: { href: string; vaultHref: string; symbol: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <ToolsMenuItem
-      icon={copied ? <Icon name="check" size={16} /> : <Link2 size={16} className="-rotate-45" />}
-      title="Link to this holding"
-      subtitle={copied ? "Copied" : "Copy the page's address"}
-      onClick={() =>
-        void navigator.clipboard.writeText(positionLink(href)).then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        })
-      }
-    />
+    <>
+      {/* The vault's page. The tag links it too, and goes where the trail
+          names the holding (ui-jobs 862; as Pendle's "Open the market"). */}
+      <ToolsMenuItem
+        icon={<Vault size={16} />}
+        title="Open the vault"
+        subtitle={symbol}
+        href={vaultHref}
+        item="holder-vault"
+      />
+      <ToolsMenuItem
+        icon={copied ? <Icon name="check" size={16} /> : <Link2 size={16} className="-rotate-45" />}
+        title="Link to this holding"
+        subtitle={copied ? "Copied" : "Copy the page's address"}
+        onClick={() =>
+          void navigator.clipboard.writeText(positionLink(href)).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          })
+        }
+      />
+    </>
   );
 }
 
@@ -404,7 +416,9 @@ function plainSlots(p: VaultHoldingPlainCardProps): PositionCardSlots {
   const familyWord = VAULT_FAMILIES[p.family === "yearn" ? "yearn-v3" : familyOfCensus(p.family)].singular;
   const open = BigInt(p.shares.raw) > ZERO;
 
-  const identity = (
+  // The share symbol as the tag: the wallet heading's trail names the holding
+  // by it ("steakUSDC") and the card then leaves the tag out (ui-jobs 862).
+  const tag = (
     <span className="text-sm font-semibold text-foreground" data-card-vault-symbol={c.shareSymbol}>
       <Link href={p.vaultHref} className="hover:underline" prefetch={false}>
         {c.shareSymbol}
@@ -496,12 +510,16 @@ function plainSlots(p: VaultHoldingPlainCardProps): PositionCardSlots {
   return {
     surface: "detail",
     heading: "Holding summary",
-    status: null,
-    lifecycle: false,
-    identity,
+    // The trail's dot: open while the address holds shares (ui-jobs 862).
+    status: open ? null : { word: p.never ? "Never held" : "Closed", tone: "muted" },
+    name: positionName({ market: c.shareSymbol, noun: "Holding", id: c.holder }),
+    tag,
     heads: p.never ? [worthNow] : [side("in"), side("out"), worthNow, profit],
     counters: null,
-    menu: { leading: () => <MenuRows href={p.holdingHref} />, exports: null },
+    menu: {
+      leading: () => <MenuRows href={p.holdingHref} vaultHref={p.vaultHref} symbol={c.shareSymbol} />,
+      exports: null,
+    },
     explainer: {
       // A holding that never was has nothing to explain past its one sentence.
       body: p.never ? null : p.withheld ? (

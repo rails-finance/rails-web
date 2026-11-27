@@ -214,6 +214,10 @@ export interface WalletPosition {
   /** The explorer slug (`aave-v3`, `liquity-v2`). */
   family: string;
   familyName: string;
+  /** A vault share's protocol root (morpho, aave-v3, yearn) from its census
+   *  family (`vaultRootOfCensus`; ui-jobs 863): its wallet section and its
+   *  `?vault=` view. Read through `vaultRootOf`. */
+  vault?: string;
   /** The market or branch the position sits in, for the risk tile and the
    *  History table ("Core", "WETH"). */
   market?: string;
