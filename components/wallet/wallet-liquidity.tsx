@@ -156,8 +156,8 @@ export function LiquiditySection({ read }: { read: Promise<WalletLiquidity> }) {
         ))}
         {through.map((s) => (
           <p key={s.key} className={LINE} data-wallet-liquidity-found-through={s.key}>
-            {s.what}: newer transfers were not read, so a position opened after block{" "}
-            {s.foundThrough!.toLocaleString("en-US")} may be missing.
+            {s.what}: transfers after block {s.foundThrough!.toLocaleString("en-US")} were not read, so a pool whose BPT
+            the wallet received since may be missing.
           </p>
         ))}
         {more.map((s) => (

@@ -28,7 +28,7 @@ export const FRONT_DOOR = {
   unanswered: "The read of this wallet's pools did not answer. Try again in a minute.",
   /** The tail went unread: the pools are those Rails's index names through `block`. */
   foundThrough: (block: string) =>
-    `Rails did not read this wallet's BPT transfers after block ${block}, so a pool whose BPT it received since may be missing. Try again in a minute.`,
+    `Rails did not read this wallet's BPT transfers after block ${block}, so a pool whose BPT the wallet received since may be missing. Try again in a minute.`,
   rowShare: (s: number) => `${share(s)} of the pool`,
   /** A row's gauge stake, part of the row's share: the gauge holds this BPT for the wallet. */
   rowStakedLabel: "Of which staked in a gauge",
