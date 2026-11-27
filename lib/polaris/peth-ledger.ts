@@ -69,7 +69,7 @@ export const PETH_KINDS: Record<string, { effect: PethEffect; label: string }> =
   liquidation_income: { effect: "income", label: "Liquidation proceeds" },
   liquidated: { effect: "exit", label: "CDP liquidated" },
   psm_mint: { effect: "sale", label: "PSM mint" },
-  psm_redeem: { effect: "acquisition", label: "PSM redeem" },
+  psm_redeem: { effect: "acquisition", label: "PSM redemption" },
   cdp_deposit: { effect: "change_of_place", label: "Into a CDP" },
   cdp_withdraw: { effect: "change_of_place", label: "Out of a CDP" },
   sp_gain: { effect: "income", label: "Stability Pool gain" },
@@ -312,6 +312,15 @@ export function pethPlaces(d: PolarisPethResponse): PethPlaces {
 /** The row's key on the page: its transaction (one row per transaction). */
 export const pethRowId = (r: Pick<PethLedgerRow, "tx_hash">): string => r.tx_hash.toLowerCase();
 
+/** A token's lines that moved the address's wallet: a transfer backs each.
+ *  The server's `liquidated` line (a CDP's collateral, which never sat in the
+ *  wallet) and a MultiSwap-only zap line (no log of its own) are left out, so
+ *  before + these = after on a balance sheet side. */
+export const pethWalletLines = (r: PethLedgerRow, token: string): PethLedgerLine[] =>
+  r.lines.filter(
+    (l) => l.token === token && l.rule !== "liquidated" && l.log_index != null && big(l.amount_raw) > ZERO,
+  );
+
 /** The row's lines in the address's tokens, with an amount. */
 export const pethRowLines = (r: PethLedgerRow): PethLedgerLine[] => r.lines.filter((l) => big(l.amount_raw) > ZERO);
 
@@ -351,10 +360,10 @@ export function pethRowBullets(r: PethLedgerRow, names: PethTokenNames): string[
   }
   if (ethIn > ZERO) out.push(`This address paid ${pethAmountText(ethIn)} ETH, counted in ETH in.`);
   if (ethOut > ZERO) out.push(`This address received ${pethAmountText(ethOut)} ETH, counted in ETH out.`);
-  if (fee > ZERO) out.push(`The curve charged ${pethAmountText(fee)} ${P} as its fee.`);
+  if (fee > ZERO) out.push(`The curve took ${pethAmountText(fee)} ${P} as its fee.`);
   const v = r.valuation;
   if (v) {
-    if (!v.price_at_block_filled) out.push("This row's valuation is not read yet.");
+    if (!v.price_at_block_filled) out.push("This transaction's valuation is not stated yet.");
     else if (v.kind === "psm_mint" && v.eth_raw != null)
       out.push(
         `The stablecoin minted was worth ${pethAmountText(big(v.eth_raw))} ETH then, which ETH out does not count.`,

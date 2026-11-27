@@ -57,7 +57,7 @@ import {
 export function pethRefusalText(r: PethRefusal): string {
   const said = `${r.code ?? ""} ${r.reason ?? ""}`.toLowerCase();
   if (/heavy/.test(said))
-    return "This address has too many transactions to replay on one page, so Rails does not draw its pETH account.";
+    return "This address has too many transactions to show on one page, so Rails does not draw its pETH account.";
   if (/protocol|contract/.test(said))
     return "This address is a Polaris contract. Its pETH belongs to the protocol, so it has no account page.";
   return r.reason ? `The index refused this address: ${r.reason}` : "The index refused this address.";
@@ -102,9 +102,7 @@ function PethExplanation({
     items.push(<>pETH received by plain transfer counts in pETH held and in neither ETH figure.</>);
   } else if (ledgerGap === "too_heavy") {
     items.push(
-      <>
-        This address has too many transactions to replay on one page, so ETH in, ETH out and the fees are not stated.
-      </>,
+      <>This address has too many transactions to show on one page, so ETH in, ETH out and the fees are not stated.</>,
     );
   } else {
     items.push(
@@ -113,7 +111,7 @@ function PethExplanation({
   }
   if (ledgerGap == null && unchecked)
     items.push(<>The history may stop short of this address&rsquo;s latest transactions.</>);
-  if (!headRead) items.push(<>The chain did not answer on this read, so the current figures are not stated.</>);
+  if (!headRead) items.push(<>The current figures did not load; reload the page to try again.</>);
   return (
     <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
       {items.map((it, i) => (
@@ -133,6 +131,10 @@ export default function PethView({
   const [data, setData] = useState<PolarisPethResponse | null>(isPethRefusal(initial) ? null : initial);
   const [refused, setRefused] = useState<PethRefusal | null>(isPethRefusal(initial) ? initial : null);
   const [failed, setFailed] = useState(false);
+  // The route answers 404 (no active deployment) or 503 (a deployment column
+  // missing) where the deployment is not set up for this page: a reload does
+  // not change that.
+  const [notSetUp, setNotSetUp] = useState(false);
   const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
 
   useEffect(() => {
@@ -142,7 +144,8 @@ export default function PethView({
       .then((d) => !cancelled && setData(d))
       .catch((err) => {
         if (cancelled) return;
-        if (err instanceof PolarisPethHttpError && err.status >= 400 && err.status < 500 && err.status !== 404)
+        if (err instanceof PolarisPethHttpError && (err.status === 404 || err.status === 503)) setNotSetUp(true);
+        else if (err instanceof PolarisPethHttpError && err.status >= 400 && err.status < 500)
           setRefused({ refused: true, status: err.status, reason: err.reason, code: err.code });
         else setFailed(true);
       });
@@ -223,6 +226,12 @@ export default function PethView({
         </p>
       </div>
     );
+  if (notSetUp)
+    return (
+      <div className="py-8 text-sm text-rb-500" data-peth-not-set-up="">
+        This deployment is not set up for pETH accounts yet.
+      </div>
+    );
   if (!data && !failed) return <DetailBodySkeleton />;
   if (!data || !figures || !places)
     return (
@@ -299,7 +308,7 @@ export default function PethView({
         displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
         emptyLabel={
           ledgerGap === "too_heavy"
-            ? "This address has too many transactions to replay on one page"
+            ? "This address has too many transactions to show on one page"
             : ledgerGap === "reading"
               ? "The history of this address is still being read"
               : "No pETH, fpETH or vpETH transactions recorded for this address"

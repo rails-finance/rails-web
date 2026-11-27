@@ -33,8 +33,8 @@ const W = POLARIS_WETH;
 /** Why a head figure is not on the card. */
 export const PETH_UNREAD = {
   ledger: "History still being read",
-  heavy: "Too many transactions to replay",
-  head: "The chain did not answer",
+  heavy: "Too many transactions to show",
+  head: "The current figures did not load; reload the page to try again.",
 } as const;
 
 function PethMenuRows({ address }: { address: string }) {

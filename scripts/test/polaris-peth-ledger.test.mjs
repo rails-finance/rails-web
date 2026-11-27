@@ -19,6 +19,7 @@ import {
   pethLedgerGap,
   pethLedgerUnchecked,
   pethLineToken,
+  pethWalletLines,
   pethScannedTo,
   pethPlaces,
   pethRowBullets,
@@ -236,4 +237,42 @@ test("a zap line names a catalog token, and ETH for the native address", () => {
   assert.equal(pethLineToken("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", named, VENUES).symbol, "ETH");
   // A token the catalog does not name stays a short address.
   assert.match(pethLineToken("0x1111111111111111111111111111111111111111", named, VENUES).symbol, /^0x1111…1111$/);
+});
+
+test("a liquidated CDP's row: the wallet's pETH side adds up without the CDP's collateral", () => {
+  const line = (rule, direction, amount_raw, log_index, token = "peth") => ({
+    rule,
+    effect: "exit",
+    token,
+    direction,
+    amount_raw,
+    counterparty: "0x1111111111111111111111111111111111111111",
+    counterparty_role: null,
+    counterparty_code_size: null,
+    log_index,
+  });
+  const row = {
+    ...fx("cdp").rows[0],
+    kind: "liquidated",
+    effect: "exit",
+    peth_delta_raw: "0",
+    balances: {
+      peth: { before_raw: "5000000000000000000", after_raw: "5000000000000000000" },
+      fpeth: { before_raw: "0", after_raw: "0" },
+      vpeth: { before_raw: "0", after_raw: "0" },
+    },
+    // The server's liquidated line (no transfer of the wallet's) and a
+    // MultiSwap-only zap line (no log of its own).
+    lines: [line("liquidated", "out", "3888490000000000000", 41), line("zap_in", "in", "1000", null)],
+  };
+  const wallet = pethWalletLines(row, "peth");
+  assert.deepEqual(wallet, []);
+  const moved = wallet.reduce((s, l) => s + (l.direction === "in" ? 1n : -1n) * BigInt(l.amount_raw), 0n);
+  assert.equal(BigInt(row.balances.peth.before_raw) + moved, BigInt(row.balances.peth.after_raw));
+  // A transfer-backed line stays on the side.
+  const withTransfer = { ...row, lines: [...row.lines, line("wallet_send", "out", "1000000000000000000", 7)] };
+  assert.deepEqual(
+    pethWalletLines(withTransfer, "peth").map((l) => l.rule),
+    ["wallet_send"],
+  );
 });

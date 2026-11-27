@@ -24,9 +24,9 @@ export function pethStoredAsOf(d: Pick<PolarisPethResponse, "ledger" | "scanned_
 }
 
 /** The words a stored place's note ends with: ", as of 27 November 2026", or
- *  ", as of the last block read" where the route states no time. */
+ *  ", as of the last read" where the route states no time. */
 export function pethAsOfWords(asOf: PethStoredAsOf | null): string {
   if (!asOf) return "";
   const t = asOf.timestamp ? new Date(asOf.timestamp) : null;
-  return `, as of ${t && !Number.isNaN(t.getTime()) ? formatDateLong(t) : "the last block read"}`;
+  return `, as of ${t && !Number.isNaN(t.getTime()) ? formatDateLong(t) : "the last read"}`;
 }

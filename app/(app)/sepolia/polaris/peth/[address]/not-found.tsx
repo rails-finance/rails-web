@@ -6,12 +6,11 @@ export default function PolarisPethNotFound() {
   return (
     <RouteNotFound
       session="polaris"
-      heading="Not an address"
+      heading="Not a pETH account"
       backHref={POLARIS_BASE_PATH}
       backLabel="Browse Polaris positions"
     >
-      A pETH account is named by an address or an ENS name. Either the URL does not carry one, or the name points to no
-      address.
+      A Polaris pETH account is named by an address or an ENS name.
     </RouteNotFound>
   );
 }

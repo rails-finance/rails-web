@@ -186,7 +186,7 @@ export function PolarisPethPlaces({
             <Place
               id="sp"
               label="Stability Pool deposits"
-              note={`pETH gains unclaimed at each deposit's last touch${asOfWords}. Gains paid in since are not included.`}
+              note={`pETH gains unclaimed at each deposit's last touch${asOfWords}. Gains paid in since are not counted.`}
               figure={
                 p.sp ? (
                   <Figure

@@ -112,7 +112,7 @@ test("an unread head dates the stored places by the last block read", async () =
   assert.equal(pethAsOfWords(null), "");
 });
 
-test("with no time from the route, the note names the last block read", async () => {
+test("with no time from the route, the note names the last read", async () => {
   const { pethStoredAsOf, pethAsOfWords } = await import("../../lib/polaris/peth-as-of.ts");
   const asOf = pethStoredAsOf({
     ledger: {
@@ -124,7 +124,7 @@ test("with no time from the route, the note names the last block read", async ()
     },
   });
   assert.equal(asOf.timestamp, null);
-  assert.equal(pethAsOfWords(asOf), ", as of the last block read");
+  assert.equal(pethAsOfWords(asOf), ", as of the last read");
 });
 
 test("a not-decoded vpETH move titles with its vpETH and keeps its one bullet", async () => {

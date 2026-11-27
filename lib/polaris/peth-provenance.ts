@@ -44,7 +44,7 @@ type LedgerSum = "ethIn" | "ethOut" | "curveFees";
 const LEDGER_SUM: Record<LedgerSum, { summary: string; formula: string }> = {
   ethIn: {
     summary:
-      "ETH in — the ETH and WETH this address paid for pETH and fpETH on its curve buys, its zap trades from ETH or WETH and its fpETH buys. A zap trade counts the dust the router refunds, so it can read high by that dust.",
+      "ETH in — the ETH and WETH this address paid for pETH and fpETH on its curve buys, its zap trades from ETH or WETH and its fpETH buys. A zap trade counts the dust the router refunds, so it can read slightly high.",
     formula: "Σ reserveIn (BcTokensBought) + Σ amountIn (MultiSwap, ETH or WETH in) + Σ BuyFpToken WETH",
   },
   ethOut: {
@@ -210,12 +210,36 @@ export function pethLpProv(venue: PolarisVenueKey, block: string | null): Proven
 
 /** A line of a row: the Transfer log it was read from. */
 export function pethLineProv(row: PethLedgerRow, line: PethLedgerLine, symbol: string): Provenance {
+  if (line.rule === "liquidated") return pethLiquidationProv(row, line);
+  if (line.log_index == null)
+    return {
+      kind: "chain",
+      pclass: "emitted",
+      verify: { kind: "recompute", text: "To check: open the transaction and read the zap router's MultiSwap." },
+      summary: `${pethKindLabel(line.rule)} — the ${symbol} the zap router swapped for this address.`,
+      via: `${VIA} · polaris_zap_swap`,
+      source: { block: row.block_number, txHash: row.tx_hash },
+    };
   return {
     kind: "chain",
     pclass: "emitted",
     verify: { kind: "recompute", text: "To check: open the transaction and read the transfer." },
     summary: `${pethKindLabel(line.rule)} — ${symbol} ${line.direction === "in" ? "to this address from" : "from this address to"} ${NAMED[line.counterparty] ?? line.counterparty_role ?? line.counterparty}.`,
     via: `${VIA} · polaris_token_transfer${line.log_index != null ? ` log ${line.log_index}` : ""}`,
+    source: { block: row.block_number, txHash: row.tx_hash },
+  };
+}
+
+/** A CDP of this address's liquidated: the collateral the Liquidation event
+ *  took, which left the CDP with no transfer of the address's. */
+export function pethLiquidationProv(row: PethLedgerRow, line: PethLedgerLine): Provenance {
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    verify: { kind: "recompute", text: "To check: open the transaction and read the Liquidation event for the CDP." },
+    summary: "CDP liquidated — the pETH collateral the liquidation took.",
+    formula: "collLiquidated (Liquidation)",
+    via: `${VIA} · polaris_liquidation${line.log_index != null ? ` log ${line.log_index}` : ""}`,
     source: { block: row.block_number, txHash: row.tx_hash },
   };
 }
@@ -280,8 +304,8 @@ export function pethRowValuationProv(row: PethLedgerRow, leg: "eth" | "spot" | "
           : "the XAU/USD and ETH/USD medianisers' previewExternalPrice()",
       ),
       summary: usdp
-        ? "The USDp this PSM mint paid, in ETH at the USDp market's ETH price at its block. A valuation, which ETH out does not count."
-        : "The GOLDp this PSM mint paid, in ETH at the gold and ETH prices the protocol's medianisers state at its block. A valuation, which ETH out does not count.",
+        ? "The USDp this PSM mint paid, in ETH at the USDp market's ETH price at its block. ETH out does not count this valuation."
+        : "The GOLDp this PSM mint paid, in ETH at the gold and ETH prices the protocol's medianisers state at its block. ETH out does not count this valuation.",
       contract: usdp
         ? { name: "Polaris USDp PriceFeed", address: m.priceFeed }
         : { name: "Polaris XAU/USD Medianiser", address: POLARIS_CORE.xauUsdMedianiser },
@@ -296,8 +320,8 @@ export function pethRowValuationProv(row: PethLedgerRow, leg: "eth" | "spot" | "
     v?.kind === "psm_mint"
       ? `The pETH this PSM mint gave up, at the curve's ${at} at its block.`
       : v?.kind === "polar_conversion"
-        ? "The pETH this conversion burned for POLAR, at the curve's floor at its block. A valuation, which ETH out does not count."
-        : `The pETH that arrived with no ETH paid, at the curve's ${at} at its block. A valuation.`;
+        ? "The pETH this conversion burned for POLAR, at the curve's floor at its block. ETH out does not count this valuation."
+        : `The pETH that arrived with no ETH paid, valued at the curve's ${at} at its block.`;
   return {
     kind: "chain-derived",
     pclass: "oracle",

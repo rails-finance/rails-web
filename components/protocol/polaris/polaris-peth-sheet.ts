@@ -7,6 +7,10 @@
 // panel carries the account's running ETH in, ETH out and curve fees through
 // the row, each swapping to what this row added.
 //
+// A side draws only the lines a wallet transfer backs (`pethWalletLines`), so
+// before + moves = after: a liquidated CDP's collateral is a footnote with
+// its Liquidation receipt, and pool shares, which no side draws, get a note.
+//
 // The route states `balances` and `to_date` only when its status is "ok"; a
 // row without them, and an LP-only row, keep their cells. A not-decoded vpETH
 // move with Morpho Blue draws on the vpETH side (the route's vpETH delta and
@@ -23,8 +27,8 @@ import {
 } from "@/components/shared/event-sheet";
 import type { Provenance } from "@/components/shared/provenance";
 import { FPETH, PETH, VPETH } from "@/lib/polaris/asset-catalog";
-import { big, exactUnits, pethAmountText, pethKindLabel, ZERO } from "@/lib/polaris/peth-ledger";
-import { pethLineProv, pethRowEthProv } from "@/lib/polaris/peth-provenance";
+import { big, exactUnits, pethAmountText, pethKindLabel, pethWalletLines, ZERO } from "@/lib/polaris/peth-ledger";
+import { pethLineProv, pethLiquidationProv, pethRowEthProv } from "@/lib/polaris/peth-provenance";
 import type { PethLedgerRow } from "@/lib/sources/api/polaris-peth";
 
 const TOKENS = [
@@ -41,6 +45,9 @@ const WORDS = {
   ethIn: "ETH in",
   ethOut: "ETH out",
   fees: "Curve fees paid",
+  liquidated: "taken from this address's CDP in a liquidation",
+  liquidatedName: "CDP liquidated",
+  lpNote: "Pool shares are not drawn on this sheet.",
 };
 
 const TIPS = {
@@ -50,6 +57,7 @@ const TIPS = {
   ethIn: "The ETH and WETH this address paid for pETH and fpETH, through this transaction.",
   ethOut: "The ETH and WETH that reached this address, through this transaction.",
   fees: "The fees the bonding curve took on this address's trades, through this transaction, in pETH.",
+  liquidated: "The collateral sat in the CDP, so the wallet's pETH side does not change.",
 };
 
 const VIA = "GET /api/polaris/peth/<address>";
@@ -57,7 +65,7 @@ const VIA = "GET /api/polaris/peth/<address>";
 const balanceProv = (row: PethLedgerRow, symbol: string, when: "before" | "after"): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `${symbol} ${when === "before" ? "before" : "after"} this event — the ${symbol} this address held just ${when} this transaction, from its stored transfers.`,
+  summary: `${symbol} ${when === "before" ? "before" : "after"} this event — the ${symbol} this address held just ${when} this transaction.`,
   formula: `Σ ${symbol} transfers in − out, ${when === "before" ? "before" : "through"} this transaction`,
   via: `${VIA} · balances`,
   source: { block: row.block_number, txHash: row.tx_hash },
@@ -97,7 +105,7 @@ export function polarisPethSheet(row: PethLedgerRow): EventSheet | undefined {
     if (!bal) continue;
     const before = big(bal.before_raw);
     const after = big(bal.after_raw);
-    const lines = row.lines.filter((l) => l.token === key && big(l.amount_raw) > ZERO);
+    const lines = pethWalletLines(row, key);
     if (before === ZERO && after === ZERO && lines.length === 0) continue;
     const fig = (raw: bigint, text: string, info: Provenance) => ({
       text,
@@ -186,5 +194,26 @@ export function polarisPethSheet(row: PethLedgerRow): EventSheet | undefined {
       ],
     });
   }
-  return { sides, panels };
+  // A liquidated CDP's collateral, a line under the panels with its receipt.
+  const footnotes = row.lines
+    .filter((l) => l.rule === "liquidated" && big(l.amount_raw) > ZERO)
+    .map((l, i) => ({
+      key: `liquidated-${i}`,
+      amount: {
+        text: pethAmountText(big(l.amount_raw)),
+        symbol: PETH.symbol,
+        info: pethLiquidationProv(row, l),
+        value: exactUnits(big(l.amount_raw)),
+      },
+      words: WORDS.liquidated,
+      tip: TIPS.liquidated,
+      name: WORDS.liquidatedName,
+    }));
+  const lp = row.lines.some((l) => l.token.startsWith("lp_"));
+  return {
+    sides,
+    panels,
+    ...(footnotes.length > 0 ? { footnotes } : {}),
+    ...(lp ? { note: WORDS.lpNote } : {}),
+  };
 }
