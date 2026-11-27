@@ -38,6 +38,7 @@ import { createPublicClient, http, namehash, getAddress, type Address, type Chai
 import { base } from "viem/chains";
 import { normalize } from "viem/ens";
 import { serverNameAddress } from "@/lib/sources/api/names-at-block";
+import { rangeRefusalsFailAtOnce } from "@/lib/sources/chain/range-refusal";
 
 // Widened to the generic `Chain` type, matching lib/sources/chain/rpc.ts's own
 // pattern: `base`'s OP-stack-specific transaction shape otherwise infers a
@@ -75,7 +76,10 @@ function client(): PublicClient {
   if (cachedClient) return cachedClient;
   const url = process.env.BASE_RPC_URL;
   if (!url) throw new Error("BASE_RPC_URL not set — Basenames resolution needs it for eth_call");
-  cachedClient = createPublicClient({ chain: BASE_CHAIN, transport: http(url) });
+  cachedClient = createPublicClient({
+    chain: BASE_CHAIN,
+    transport: rangeRefusalsFailAtOnce(http(url, { retryCount: 0 })),
+  });
   return cachedClient;
 }
 

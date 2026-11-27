@@ -76,6 +76,11 @@ export interface ChainMeta {
    *  call the first one refused or did not answer. Absent on every chain but
    *  Arbitrum. */
   fallbackRpcEnv?: string;
+  /** Optional server env var holding an Alchemy endpoint for Alchemy's own
+   *  `alchemy_*` methods (`alchemy_getAssetTransfers`), which a non-Alchemy
+   *  state provider does not serve. Unset, `chainTransfersClient` uses the
+   *  state client, so the state URL must then be Alchemy's for those reads. */
+  transfersRpcEnv?: string;
   /** A test network. Absent (false) on every production chain. Surfaces that
    *  state figures as money read this to say "testnet" once, where a reader
    *  would otherwise take a Sepolia balance for a real one. */
@@ -91,6 +96,7 @@ export const CHAINS: Record<ChainId, ChainMeta> = {
     explorerBase: "https://etherscan.io",
     rpcEnv: "ALCHEMY_URL",
     logsRpcEnv: "ALCHEMY_URL",
+    transfersRpcEnv: "ETHEREUM_TRANSFERS_RPC_URL",
   },
   8453: {
     id: 8453,
@@ -104,6 +110,7 @@ export const CHAINS: Record<ChainId, ChainMeta> = {
     // public gateway, which since at least 2026-09-07 refuses any range over
     // 1,000 blocks — every chunk of every Base sweep failed and became a gap.
     logsRpcEnv: "BASE_BACKFILL_RPC_URL",
+    transfersRpcEnv: "BASE_TRANSFERS_RPC_URL",
   },
   42161: {
     id: 42161,
@@ -116,6 +123,9 @@ export const CHAINS: Record<ChainId, ChainMeta> = {
     logsRpcEnv: "ARBITRUM_LOGS_RPC_URL",
     // The Alchemy Arbitrum app; the Tenderly gateway in `rpcEnv` answers first.
     fallbackRpcEnv: "ARBITRUM_FALLBACK_RPC_URL",
+    // Set to the same Alchemy Arbitrum app, asset transfers go there first
+    // instead of reaching it after the Tenderly gateway refuses the method.
+    transfersRpcEnv: "ARBITRUM_TRANSFERS_RPC_URL",
   },
   10: {
     id: 10,

@@ -11,6 +11,8 @@ import "server-only";
 //                       second URL behind it (fallbackRpcEnv).
 //   chainBatchClient  — the same URL with JSON-RPC batching, rate-limit backoff.
 //   chainLogsClient   — the logs lane (logsRpcEnv) for wide-range getLogs.
+//   chainTransfersClient — Alchemy's own `alchemy_*` methods (transfersRpcEnv),
+//                       the state client when that var is unset.
 //
 // One client PER CHAIN, cached separately: Ethereum reads ALCHEMY_URL, Base
 // BASE_RPC_URL, Arbitrum ARBITRUM_RPC_URL, Sepolia SEPOLIA_RPC_URL (or one
@@ -39,6 +41,7 @@ import {
   type ChainId,
   type ChainMeta,
 } from "@/lib/shared/chains";
+import { rangeRefusalsFailAtOnce } from "./range-refusal";
 
 /** Arc, which viem does not define: the values from Arc's docs ("Connect to
  *  Arc"), with Multicall3 at the canonical address (its code answers there). */
@@ -96,7 +99,8 @@ function stateRpcUrl(meta: ChainMeta): string | undefined {
   return mainnetUrl.replace("eth-mainnet.g.alchemy.com", "eth-sepolia.g.alchemy.com");
 }
 
-/** The state-read transport for a chain. One URL: a plain `http`. A chain that
+/** The state-read transport for a chain. One URL: `http` with viem's retries,
+ *  a range refusal excepted (`range-refusal.ts`). A chain that
  *  declares `fallbackRpcEnv` with the var set: `fallback([primary, second])`,
  *  primary first, ranking off. Each URL is tried once (`retryCount: 0`) so a
  *  429, 5xx, timeout or network error on the primary passes to the second for
@@ -104,7 +108,7 @@ function stateRpcUrl(meta: ChainMeta): string | undefined {
  *  is unset the chain keeps its single transport. */
 export function stateTransport(meta: ChainMeta, url: string): Transport {
   const second = meta.fallbackRpcEnv ? process.env[meta.fallbackRpcEnv] : undefined;
-  if (!second) return http(url);
+  if (!second) return rangeRefusalsFailAtOnce(http(url, { retryCount: 0 }));
   return fallback([http(url, { retryCount: 0 }), http(second, { retryCount: 0 })], { rank: false });
 }
 
@@ -120,6 +124,24 @@ export function chainClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicClient {
   if (!client) {
     client = createPublicClient({ chain: VIEM_CHAINS[meta.id], transport: stateTransport(meta, url) });
     cache.set(meta.id, client);
+  }
+  return client;
+}
+
+const transfersCache = new Map<ChainId, PublicClient>();
+
+/** The client for Alchemy's own methods (`alchemy_getAssetTransfers`), which
+ *  only an Alchemy endpoint answers. With `ChainMeta.transfersRpcEnv` set, a
+ *  plain `http` to that URL, unbatched; unset, `chainClient(chainId)`, so the
+ *  read goes where it went before the var existed. */
+export function chainTransfersClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicClient {
+  const meta = chainMeta(chainId);
+  const url = meta.transfersRpcEnv ? process.env[meta.transfersRpcEnv] : undefined;
+  if (!url) return chainClient(chainId);
+  let client = transfersCache.get(meta.id);
+  if (!client) {
+    client = createPublicClient({ chain: VIEM_CHAINS[meta.id], transport: http(url) });
+    transfersCache.set(meta.id, client);
   }
   return client;
 }
@@ -207,7 +229,9 @@ export function chainBatchClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicCli
   if (!client) {
     client = createPublicClient({
       chain: VIEM_CHAINS[meta.id],
-      transport: retryingRateLimits(http(url, { batch: { batchSize: 60, wait: 8 } })),
+      transport: retryingRateLimits(
+        rangeRefusalsFailAtOnce(http(url, { batch: { batchSize: 60, wait: 8 }, retryCount: 0 })),
+      ),
     });
     batchCache.set(meta.id, client);
   }

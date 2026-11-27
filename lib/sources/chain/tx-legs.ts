@@ -13,9 +13,11 @@
 // failed) the native legs alone come from `alchemy_getAssetTransfers`, pinned
 // to the receipt's block and matched on the hash. Where the store cannot
 // answer, and on Arbitrum, the whole read is the chain's: the receipt, then the
-// asset transfers. That method is Alchemy's own, not JSON-RPC: a chain whose
-// state URL is not an Alchemy endpoint answers it with an error, and the read
-// then fails whole rather than reporting no native leg. The balance difference
+// asset transfers. That method is Alchemy's own, not JSON-RPC, so it goes to
+// `chainTransfersClient`: the chain's transfers URL where one is set, its state
+// URL otherwise. A chain whose URL there is not an Alchemy endpoint answers it
+// with an error, and the read then fails whole rather than reporting no native
+// leg. The balance difference
 // across the block is the named fallback and is not built: the wallet's other
 // transactions in the block muddy it. Token names and decimals are read here
 // in every case. Where legs back come in two or more tokens, each is priced at
@@ -27,7 +29,7 @@
 // this process's own upstream calls, never the store's.
 
 import { decodeEventLog, parseAbi, type Hex } from "viem";
-import { chainClient } from "./rpc";
+import { chainClient, chainTransfersClient } from "./rpc";
 import { resolveErc20Meta } from "./erc20-meta";
 import { aaveOraclePricesAtBlock } from "./aave-oracle-prices";
 import { fetchStoredTxLegs } from "@/lib/sources/api/tx-legs-at-block";
@@ -103,7 +105,7 @@ async function assetTransfers(
   blockNumber: number,
 ): Promise<RawNative[]> {
   const block = `0x${blockNumber.toString(16)}`;
-  const res = (await chainClient(chainId).request({
+  const res = (await chainTransfersClient(chainId).request({
     method: "alchemy_getAssetTransfers" as never,
     params: [
       {
