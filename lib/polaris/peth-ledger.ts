@@ -356,14 +356,21 @@ export function pethRowBullets(r: PethLedgerRow, names: PethTokenNames): string[
     if (raw > ZERO) out.push(`${pethAmountText(raw)} ${sym} reached this address.`);
     if (raw < ZERO) out.push(`${pethAmountText(raw)} ${sym} left this address.`);
   }
-  // ETH in counts only zaps into pETH or fpETH (Miles, 27 Nov 2026): a zap
-  // into vpETH or a stablecoin is a separate row and counts in no ETH figure.
-  const zapOut = r.zap ? r.zap.token_out.toLowerCase() : null;
-  const zapElsewhere = zapOut != null && zapOut !== names.peth.address && zapOut !== names.fpeth.address;
-  if (ethIn > ZERO && zapElsewhere)
-    out.push(`This zap to ${pethLineToken(zapOut, names, {}).symbol} is in no ETH figure or valuation.`);
-  else if (ethIn > ZERO) out.push(`This address paid ${pethAmountText(ethIn)} ETH, counted in ETH in.`);
+  // ETH in and ETH out count only zaps into or out of pETH or fpETH (Miles,
+  // 27 Nov 2026): a zap into or out of vpETH or a stablecoin is a separate
+  // row and counts in no ETH figure.
+  // The bullets key on the zap's tokens, so a row that also holds a curve
+  // trade keeps its counted ETH.
+  const lc = (t: string) => t.toLowerCase();
+  const ethLike = (t: string) => NATIVE.includes(lc(t)) || lc(t) === names.weth.address;
+  const notPeth = (t: string) => lc(t) !== names.peth.address && lc(t) !== names.fpeth.address;
+  const symbolOf = (t: string) => pethLineToken(lc(t), names, {}).symbol;
+  if (ethIn > ZERO) out.push(`This address paid ${pethAmountText(ethIn)} ETH, counted in ETH in.`);
+  if (r.zap && ethLike(r.zap.token_in) && notPeth(r.zap.token_out) && !ethLike(r.zap.token_out))
+    out.push(`This zap to ${symbolOf(r.zap.token_out)} is in no ETH figure or valuation.`);
   if (ethOut > ZERO) out.push(`This address received ${pethAmountText(ethOut)} ETH, counted in ETH out.`);
+  if (r.zap && ethLike(r.zap.token_out) && notPeth(r.zap.token_in) && !ethLike(r.zap.token_in))
+    out.push(`This zap from ${symbolOf(r.zap.token_in)} is in no ETH figure or valuation.`);
   if (fee > ZERO) out.push(`The curve took ${pethAmountText(fee)} ${P} as its fee.`);
   const v = r.valuation;
   if (v) {

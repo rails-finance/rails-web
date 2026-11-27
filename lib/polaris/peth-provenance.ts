@@ -44,13 +44,14 @@ type LedgerSum = "ethIn" | "ethOut" | "curveFees";
 const LEDGER_SUM: Record<LedgerSum, { summary: string; formula: string }> = {
   ethIn: {
     summary:
-      "ETH in — the ETH and WETH this address paid for pETH and fpETH on its curve buys, its zap trades from ETH or WETH and its fpETH buys. A zap trade counts the dust the router refunds, so it can read slightly high.",
-    formula: "Σ reserveIn (BcTokensBought) + Σ amountIn (MultiSwap, ETH or WETH in) + Σ BuyFpToken WETH",
+      "ETH in — the ETH and WETH this address paid for pETH and fpETH on its curve buys, its zap trades from ETH or WETH into pETH or fpETH and its fpETH buys. A zap trade counts the dust the router refunds, so it can read slightly high.",
+    formula:
+      "Σ reserveIn (BcTokensBought) + Σ amountIn (MultiSwap, ETH or WETH in, pETH or fpETH out) + Σ BuyFpToken WETH",
   },
   ethOut: {
     summary:
-      "ETH out — the ETH and WETH that reached this address from its curve sales, its zap trades to ETH or WETH and its fpETH redemptions. PSM mints and POLAR conversions are valued on their rows and not counted here.",
-    formula: "Σ reserveOut (BcTokensSold) + Σ amountOut (MultiSwap, ETH or WETH out) + Σ Redeem WETH",
+      "ETH out — the ETH and WETH this address received from its curve sales, its zap trades from pETH or fpETH to ETH or WETH and its fpETH redemptions. PSM mints and POLAR conversions are valued on their rows and not counted here.",
+    formula: "Σ reserveOut (BcTokensSold) + Σ amountOut (MultiSwap, pETH or fpETH in, ETH or WETH out) + Σ Redeem WETH",
   },
   curveFees: {
     summary:

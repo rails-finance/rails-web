@@ -102,7 +102,7 @@ export function PolarisPethPlaces({
   const registry = useReceiptRegistry();
   const asOfWords = pethAsOfWords(storedAsOf === true);
   const asOfReceipt = storedAsOf
-    ? " The chain did not answer, so this is the stored index as of its last read; later changes are not counted."
+    ? " The chain did not answer, so this is the stored index; later changes are not counted."
     : "";
   const headUnread = unread(headRead ? "Not read" : PETH_UNREAD.head);
   const lpTotal = p.lp.every((x) => x.share != null) ? p.lp.reduce((s, x) => s + (x.share ?? ZERO), ZERO) : null;

@@ -1,7 +1,7 @@
 // When a Polaris pETH account's stored places are "as of" (ui-jobs 865): with
 // the head unread (`ledger.complete` null), the CDPs, deposits and loans the
-// stored index states hold as of its last read. They come from the
-// twelve-contract lane's tables, whose read the route does not state (its
+// stored index states hold as of its last read. They come from
+// another lane's tables, whose read the route does not state (its
 // `ledger` block is the pETH lane's watermark), so the note names no date and
 // the receipt names no block.
 

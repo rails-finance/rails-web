@@ -2,8 +2,8 @@
 
 // A Polaris pETH account's card, on the position card shell (P1; the
 // redeemer's card is the sibling, components/protocol/liquity/redeemer-card.tsx):
-// the headlines are the ETH the address paid for pETH and the ETH that
-// reached it (ETH and WETH only), the curve fees it paid, and the pETH it
+// the headlines are the ETH and WETH the address paid for pETH and fpETH and
+// received for them, the curve fees it paid, and the pETH it
 // holds at the head; the panel values that holding at the curve's spot and
 // floor, the gap between them, and the two prices (ui-jobs 865). No profit or
 // loss, no percentage, no gain or loss colour (the equity-at-the-feed ruling).
@@ -133,7 +133,15 @@ export function polarisPethSlots({
       "ethIn",
       "The ETH and WETH this address paid for pETH and fpETH.",
     ),
-    ledgerHead("eth-out", "ETH out", f.ethOut, ETH, W.address, "ethOut", "The ETH and WETH that reached this address."),
+    ledgerHead(
+      "eth-out",
+      "ETH out",
+      f.ethOut,
+      ETH,
+      W.address,
+      "ethOut",
+      "The ETH and WETH this address received for pETH and fpETH.",
+    ),
     ledgerHead(
       "curve-fees",
       "Curve fees paid",

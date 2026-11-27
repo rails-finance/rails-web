@@ -55,7 +55,7 @@ const TIPS = {
   before: (symbol: string) => `The ${symbol} this address held just before this transaction.`,
   after: (symbol: string) => `The ${symbol} this address held just after this transaction.`,
   ethIn: "The ETH and WETH this address paid for pETH and fpETH, through this transaction.",
-  ethOut: "The ETH and WETH that reached this address, through this transaction.",
+  ethOut: "The ETH and WETH this address received for pETH and fpETH, through this transaction.",
   fees: "The fees the bonding curve took on this address's trades, through this transaction, in pETH.",
   liquidated: "The collateral sat in the CDP.",
 };
@@ -78,7 +78,7 @@ const toDateProv = (row: PethLedgerRow, what: "ethIn" | "ethOut" | "fees"): Prov
     what === "ethIn"
       ? "ETH in to date — the ETH and WETH this address paid for pETH and fpETH, through this transaction."
       : what === "ethOut"
-        ? "ETH out to date — the ETH and WETH that reached this address, through this transaction."
+        ? "ETH out to date — the ETH and WETH this address received for pETH and fpETH, through this transaction."
         : "Curve fees to date — the fees the bonding curve took on this address's trades, through this transaction, in pETH.",
   formula:
     what === "fees" ? "Σ feeAmount through this row" : `Σ ${what === "ethIn" ? "ETH in" : "ETH out"} through this row`,

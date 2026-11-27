@@ -279,6 +279,8 @@ test("a liquidated CDP's row: the wallet's pETH side adds up without the CDP's c
 test("a zap into vpETH or a stablecoin is in no ETH figure; a zap into pETH counts in ETH in", () => {
   const usdp = "0x899d225d779f41fa1ab422ab1b8a9408296dd5c6";
   const named = { ...NAMES, others: { [usdp]: { symbol: "USDp", address: usdp } } };
+  // Rows as the server states them once ETH in counts zaps into pETH or fpETH
+  // alone: a zap into another token carries no ETH in.
   const base = {
     ...fx("cdp").rows[0],
     kind: "zap_in",
@@ -287,7 +289,7 @@ test("a zap into vpETH or a stablecoin is in no ETH figure; a zap into pETH coun
     peth_delta_raw: "0",
     fpeth_delta_raw: "0",
     vpeth_delta_raw: "0",
-    eth_in_raw: "1000000000000000000",
+    eth_in_raw: "0",
     eth_out_raw: "0",
     curve_fee_raw: "0",
   };
@@ -298,12 +300,49 @@ test("a zap into vpETH or a stablecoin is in no ETH figure; a zap into pETH coun
   assert.deepEqual(pethRowBullets({ ...base, zap: zap(usdp) }, named), [
     "This zap to USDp is in no ETH figure or valuation.",
   ]);
-  assert.deepEqual(pethRowBullets({ ...base, zap: zap(NAMES.peth.address) }, named), [
-    "This address paid 1 ETH, counted in ETH in.",
-  ]);
+  assert.deepEqual(
+    pethRowBullets({ ...base, eth_in_raw: "1000000000000000000", zap: zap(NAMES.peth.address) }, named),
+    ["This address paid 1 ETH, counted in ETH in."],
+  );
+  // A curve buy and an ETH→vpETH zap in one transaction: both bullets.
+  assert.deepEqual(
+    pethRowBullets(
+      { ...base, kind: "curve_buy", eth_in_raw: "3000000000000000000", zap: zap(NAMES.vpeth.address) },
+      named,
+    ),
+    ["This address paid 3 ETH, counted in ETH in.", "This zap to vpETH is in no ETH figure or valuation."],
+  );
 });
 
 test("each venue's LP token is named by its pool", () => {
   const symbols = ["lp_tripool", "lp_polar_peth", "lp_peth_weth"].map((t) => pethLineToken(t, NAMES, VENUES).symbol);
   assert.deepEqual(symbols, ["pETH/fpETH/vpETH LP", "pETH/POLAR LP", "pETH/WETH LP"]);
+});
+
+test("a zap from vpETH or a stablecoin to ETH is in no ETH figure; a zap from pETH counts in ETH out", () => {
+  const usdp = "0x899d225d779f41fa1ab422ab1b8a9408296dd5c6";
+  const named = { ...NAMES, others: { [usdp]: { symbol: "USDp", address: usdp } } };
+  const base = {
+    ...fx("cdp").rows[0],
+    kind: "zap_out",
+    effect: "sale",
+    valuation: null,
+    peth_delta_raw: "0",
+    fpeth_delta_raw: "0",
+    vpeth_delta_raw: "0",
+    eth_in_raw: "0",
+    eth_out_raw: "0",
+    curve_fee_raw: "0",
+  };
+  const zap = (token_in) => ({ token_in, token_out: NAMES.weth.address, amount_in: "1", amount_out: "1" });
+  assert.deepEqual(pethRowBullets({ ...base, zap: zap(NAMES.vpeth.address) }, named), [
+    "This zap from vpETH is in no ETH figure or valuation.",
+  ]);
+  assert.deepEqual(pethRowBullets({ ...base, zap: zap(usdp) }, named), [
+    "This zap from USDp is in no ETH figure or valuation.",
+  ]);
+  assert.deepEqual(
+    pethRowBullets({ ...base, eth_out_raw: "2000000000000000000", zap: zap(NAMES.peth.address) }, named),
+    ["This address received 2 ETH, counted in ETH out."],
+  );
 });

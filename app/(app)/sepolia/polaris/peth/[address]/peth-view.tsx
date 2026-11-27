@@ -88,7 +88,8 @@ function PethExplanation({
       </>,
     );
   if (ledgerGap == null) {
-    if (f.ethOut != null) items.push(<>This address received {strong(eth(f.ethOut)!)}, in ETH or WETH.</>);
+    if (f.ethIn != null) items.push(<>This address paid {strong(eth(f.ethIn)!)} for pETH and fpETH.</>);
+    if (f.ethOut != null) items.push(<>This address received {strong(eth(f.ethOut)!)} for pETH and fpETH.</>);
     if (f.curveFees != null)
       items.push(
         <>
