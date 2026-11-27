@@ -76,3 +76,50 @@ export function positionTitle(
 ): string {
   return `${explorer} · ${positionName(parts).text}`;
 }
+
+/** The position's crumb in the wallet heading's trail (H13.4): the name
+ *  without an id that is the wallet's address, which the heading names
+ *  ("Core" for an Aave V3 account, its chain with no market), else the
+ *  whole name ("ETH-A · Vault #31951"). A Trove drops its noun and keeps the
+ *  branch and id ("WETH · #31245"; Miles, 26 Nov 2026, ui-jobs 856). */
+export function positionCrumb(name: PositionName, wallet: string, chainName?: string): string {
+  // A lending account keyed by the wallet with no market (noun "Position")
+  // takes its chain's name: "Arbitrum" for Aave V3 there (Miles, 27 Nov
+  // 2026, ui-jobs 856). Any other noun stands as itself.
+  if (name.id.toLowerCase() === shortPositionId(wallet).toLowerCase())
+    return name.market ?? (name.noun === "Position" ? chainName : undefined) ?? name.noun;
+  if (name.noun === "Trove") return name.market ? `${name.market} · ${name.id}` : name.id;
+  return name.text;
+}
+
+/** A wallet summary row's crumb in the trail's protocol menu (H13.5; ui-jobs
+ *  856): `positionCrumb` from the row's market, its family's noun and the id
+ *  its `positionId` holds besides the market. An id that holds the wallet
+ *  ("0x…:core", "<market>-0x…", "<comet>:0x…") is the wallet's, and with no
+ *  market named the other hex id in it names the market, so a wallet's
+ *  Morpho Blue markets or Comets read apart. */
+export function summaryPositionCrumb(
+  parts: { positionId: string; market?: string; noun: string; chainName?: string },
+  wallet: string,
+): string {
+  const w = wallet.toLowerCase();
+  const market = parts.market?.toLowerCase();
+  const pieces = parts.positionId.split(":").filter((x) => x.toLowerCase() !== market);
+  const raw = pieces.find((x) => x.toLowerCase().includes(w)) ?? pieces[pieces.length - 1] ?? parts.positionId;
+  const holdsWallet = raw.toLowerCase().includes(w);
+  let label = parts.market;
+  // A vault share keeps its noun ("Holding"), as the trail has drawn it since
+  // Miles settled the names (ui-jobs 856).
+  if (!label && holdsWallet && parts.noun !== "Holding") {
+    const other = parts.positionId
+      .toLowerCase()
+      .split(/[:-]/)
+      .find((x) => x !== w && /^(0x)?[0-9a-f]{8,}$/.test(x));
+    if (other) label = shortPositionId(other.startsWith("0x") ? other : `0x${other}`);
+  }
+  return positionCrumb(
+    positionName({ market: label, noun: parts.noun, id: holdsWallet ? w : raw }),
+    w,
+    parts.chainName,
+  );
+}

@@ -36,6 +36,7 @@ export async function AaveV4ArcWallet({ wallet: raw }: { wallet: string }) {
     <div className="py-8" data-anatomy="U3" data-aave-v4-arc-wallet={wallet}>
       <header className="mb-5">
         <DetailTopRow
+          walletPage
           session={session}
           fallbackHref={home}
           showStamp={false}

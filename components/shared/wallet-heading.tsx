@@ -8,18 +8,23 @@
 // the right end.
 //
 // On a position page (`PositionWalletHeading`) the h1 is the address menu's
-// trigger, the address kind sits beside it, and under it the menu of the
-// wallet's positions on Rails (H13.2). The protocol is named by the
-// card's sidebar (decision 0052 point 2). Tools takes the right end where the
-// page passes it; on a page that draws no detail card the price strip and
-// the recency stamp stand before it (ui-jobs 430), and below sm the strip
-// wraps under the name block, flush right. DOM order is address, strip, Tools.
+// trigger, the address kind sits beside it, and under it the trail (H13.4):
+// the menu of the wallet's positions on Rails (H13.2), the protocol, and the
+// position the card names. The facehash links to the wallet dashboard.
+// Tools takes the right end where the page passes it.
+//
+// Under the heading every page holds one row (`HeadingRow`, H7; Miles, 25
+// Nov 2026, ui-jobs 856), 38px tall whether or not anything stands in it,
+// so the heading sits the same distance from the content on every page
+// type: Back at its left where the page keeps one, the recency and the
+// price strip at its right where the page draws no detail card.
 //
 // The heading draws before the position loads, with Tools in place, so the
 // inspector is reachable on a view that never resolves; the wallet joins it
 // when the page knows it (an id-keyed page learns its owner from the read).
 
 import { FileCode2, KeyRound, type LucideIcon } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { Facehash } from "@/components/shared/facehash";
 import { RevealTip } from "@/components/shared/reveal-tip";
@@ -35,6 +40,27 @@ import { fetchAddressKind, type AddressKind } from "@/lib/api/fetch-address-kind
 import { ProtocolGlyph, ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { managerProv } from "@/lib/shared/manager-provenance";
+import {
+  usePositionCardMenu,
+  usePositionCardName,
+  useRegisterPositionTrail,
+} from "@/components/shared/position-card-strip";
+import { positionCrumb } from "@/lib/shared/position-name";
+import type { TrailPage } from "@/lib/wallet/summary-counts";
+
+/** The facehash at 28px below md and 40px from md. */
+function face(address: string) {
+  return (
+    <>
+      <span className="flex md:hidden">
+        <Facehash address={address} size={28} />
+      </span>
+      <span className="hidden md:flex">
+        <Facehash address={address} size={40} />
+      </span>
+    </>
+  );
+}
 
 /** The shell both surfaces draw. `title` is the name line (the h1 and what
  *  sits beside it), `lines` the text-xs lines under it, `end` the controls at
@@ -44,12 +70,16 @@ export function WalletHeading({
   title,
   lines,
   end,
+  dashboard,
   className = "",
   ...data
 }: {
   /** The wallet; unset while the page has not read it, which keeps the
    *  facehash's place. */
   address?: string | null;
+  /** The wallet dashboard, which the facehash links to; absent on the
+   *  dashboard. */
+  dashboard?: string;
   title: ReactNode;
   lines?: ReactNode;
   end?: ReactNode;
@@ -57,22 +87,70 @@ export function WalletHeading({
 } & { [k: `data-${string}`]: string | undefined }) {
   return (
     <div className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 ${className}`} {...data}>
-      {/* From md the 21px gap puts the name block on the cards' content edge:
-          the 40px bar, the card's 1px border and its 20px padding. */}
-      <div className="flex min-w-0 flex-auto basis-0 items-center gap-3 sm:basis-auto md:gap-[21px]">
-        {address ? (
-          <Facehash address={address} size={40} />
+      {/* Below md a grid (Miles, 26 Nov 2026, ui-jobs 856): a 28px facehash
+          beside the name line, and the lines under both from the column's
+          left edge, so the trail takes the whole width. From md the 40px
+          facehash beside the name block, the 21px gap putting the block on
+          the cards' content edge: the 40px bar, the card's 1px border and
+          its 20px padding. */}
+      <div className="grid min-w-0 flex-auto basis-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-2.5 sm:basis-auto md:flex md:gap-[21px]">
+        {address && dashboard ? (
+          <Link
+            href={dashboard}
+            prefetch={false}
+            aria-label="Wallet dashboard"
+            title="Wallet dashboard"
+            className="flex shrink-0 rounded-[9px] focus-ring max-md:rounded-md"
+            data-wallet-facehash-link=""
+          >
+            {face(address)}
+          </Link>
+        ) : address ? (
+          <span className="flex shrink-0">{face(address)}</span>
         ) : (
-          <span className="block size-10 shrink-0 rounded-[9px] bg-rb-300/40 dark:bg-rb-700/40" aria-hidden />
+          <span
+            className="block size-7 shrink-0 rounded-md bg-rb-300/40 md:size-10 md:rounded-[9px] dark:bg-rb-700/40"
+            aria-hidden
+          />
         )}
-        <div className="flex min-w-0 flex-col gap-0.5">
+        <div className="contents md:flex md:min-w-0 md:flex-col md:gap-0.5">
           <div className="flex min-h-7 min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-rb-500">
             {title}
           </div>
-          {lines}
+          {lines && <div className="col-span-2 flex min-w-0 flex-col gap-0.5">{lines}</div>}
         </div>
       </div>
       {end}
+    </div>
+  );
+}
+
+/** The row under the wallet heading (H7): `start` (Back) at the left,
+ *  `end` (the recency and prices) at the right, held at 38px when empty. */
+export function HeadingRow({
+  start,
+  end,
+  endFirstOnPhone = false,
+}: {
+  start?: ReactNode;
+  end?: ReactNode;
+  /** Below 768px `end` stands at the row's left (the trail's recency). */
+  endFirstOnPhone?: boolean;
+}) {
+  return (
+    <div
+      className="mt-2 flex min-h-[38px] flex-wrap items-center justify-between gap-x-2 gap-y-1"
+      data-anatomy="H7"
+      data-heading-row=""
+    >
+      <div className="flex min-w-0 items-center">{start}</div>
+      {end && (
+        <div
+          className={`ml-auto flex shrink-0 items-center gap-1 sm:gap-2 ${endFirstOnPhone ? "max-md:order-first max-md:ml-0" : ""}`}
+        >
+          {end}
+        </div>
+      )}
     </div>
   );
 }
@@ -249,9 +327,16 @@ export function PositionWalletHeading({
   owner,
   session,
   tools,
-  strip,
+  page = "position",
+  className,
+  onCrumb,
 }: {
   owner: PositionOwner;
+  /** Told whether the trail found the page's protocol (H13.4). */
+  onCrumb?: (found: boolean) => void;
+  /** What the page is, for the trail (H13.4). */
+  page?: TrailPage;
+  className?: string;
   /** The page's explorer: the chain of the address kind, and the default for
    *  the listing link. Absent on a page no explorer owns (ui-jobs 765): the
    *  chain is `owner.chain` and the label links nowhere by default. */
@@ -259,9 +344,6 @@ export function PositionWalletHeading({
   /** The Tools menu with the page's export shapes; absent or false for none
    *  (a page whose card carries the menu, ui-jobs 270). */
   tools?: ReactNode;
-  /** The price and recency strip, before Tools (ui-jobs 272), on a page that
-   *  draws no detail card (ui-jobs 430). */
-  strip?: ReactNode;
 }) {
   const filterProtocol = owner.filterProtocol === null ? undefined : (owner.filterProtocol ?? session);
   const bookmark = owner.bookmark !== false;
@@ -269,6 +351,12 @@ export function PositionWalletHeading({
   // A wallet is its address menu (ui-jobs 271); a vault or a page that links
   // the address elsewhere (PWN's other side) keeps the pill.
   const plain = !owner.vault && !owner.href;
+  // The detail card's name, as the trail's last crumb.
+  const card = usePositionCardName();
+  const cardMenu = usePositionCardMenu();
+  const position = card && owner.wallet ? positionCrumb(card.name, owner.wallet, card.chainName) : null;
+  // The trail names the position on a position page: the card leaves it out.
+  useRegisterPositionTrail(page === "position" && !!owner.wallet);
   const pill = owner.wallet ? (
     plain ? (
       <WalletMenu wallet={owner.wallet} ensName={owner.ensName ?? null} bookmark={bookmark} heading />
@@ -288,6 +376,8 @@ export function PositionWalletHeading({
   return (
     <WalletHeading
       address={owner.wallet}
+      dashboard={owner.wallet ? `/wallet/${owner.wallet.toLowerCase()}` : undefined}
+      className={className}
       data-anatomy="H13"
       data-position-wallet-row=""
       title={
@@ -311,26 +401,22 @@ export function PositionWalletHeading({
       // wallet, it stays empty.
       lines={
         owner.wallet ? (
-          <WalletPositionsMenu wallet={owner.wallet} />
+          <WalletPositionsMenu
+            wallet={owner.wallet}
+            page={page}
+            position={position}
+            status={card?.status}
+            mark={card?.mark}
+            cardMenu={cardMenu}
+            onCrumb={onCrumb}
+          />
         ) : (
           <div className="flex h-5 items-center" data-wallet-positions-held="">
             {owner.pending && <SkeletonBar width={72} />}
           </div>
         )
       }
-      end={
-        <>
-          {strip && (
-            <span
-              className="order-last flex min-h-7 basis-full shrink-0 items-center justify-end gap-1 sm:order-none sm:ml-auto sm:basis-auto sm:gap-2"
-              data-position-strip=""
-            >
-              {strip}
-            </span>
-          )}
-          {tools && <span className="ml-auto flex min-h-7 shrink-0 items-center">{tools}</span>}
-        </>
-      }
+      end={<>{tools && <span className="ml-auto flex min-h-7 shrink-0 items-center">{tools}</span>}</>}
     />
   );
 }

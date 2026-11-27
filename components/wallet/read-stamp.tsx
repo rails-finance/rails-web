@@ -12,7 +12,7 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { Box, CalendarClock } from "lucide-react";
 import { BlockClockIcon } from "@/components/icons/block-clock-icon";
-import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST } from "@/lib/shared/ui-grammar";
 import { nextReading, stampTime, storedReading, storeReading, type Reading } from "@/lib/shared/recency-reading";
 
 export function compactAge(seconds: number): string {
@@ -73,7 +73,7 @@ export function ReadStamp({
       data-read-block={block}
       onClick={toggle}
       aria-label={`${label} ${[age ? `${age} ago` : null, blockText ? `at block ${blockText}` : null].filter(Boolean).join(", ")}`}
-      className={`${CTRL_GHOST} ${CTRL_OFF} h-7 gap-1.5 rounded-md px-1.5 text-[11px] tabular-nums`}
+      className={`${CTRL_GHOST} h-7 gap-1.5 rounded-sm text-[11px] tabular-nums text-rb-500 hover:text-foreground focus-ring`}
     >
       <Icon size={12} aria-hidden />
       <span aria-hidden>{text}</span>

@@ -6,8 +6,9 @@
 // chevron is hidden until its row is hovered or focused; on a touch screen it
 // always shows, muted.
 //
-// Liquity V2 (the story Trove): the position card's heading row (the price
-// strip since ui-jobs 430) with the card menu (C17) at its right end, no card chevron, the Collateral,
+// Liquity V2 (the story Trove): the position card's price strip in its footer
+// row and the card menu opened from the wallet trail's position crumb (both
+// since ui-jobs 856), no card chevron, the Collateral,
 // Debt and Collateral ratio rows each on a chevron (the first two open
 // by default, the ratio closed, remembered per row, the card-wide key of 209
 // dropped on read); the Lifetime flows header's chevron after its heading and
@@ -156,32 +157,42 @@ const headerLayout = (card) =>
     .first()
     .waitFor({ timeout: 60000 })
     .catch(() => {});
-  // ui-jobs 430: the heading row carries the page's price strip in place of
-  // "Position summary". The strip is handed to the card after it mounts
-  // (position-card-strip.tsx: the wallet heading draws it until a card's slot
-  // registers), so it is waited for.
+  // ui-jobs 856: with the wallet trail drawn, the page's price strip stands
+  // in the card's footer row. The strip is handed to the card after it mounts
+  // (position-card-strip.tsx), so it is waited for.
   await card
-    .locator("[data-card-header] [data-position-strip] [data-latest-prices]")
+    .locator("[data-position-strip] [data-latest-prices]")
     .first()
     .waitFor({ state: "attached", timeout: 60000 })
     .catch(() => {});
-  const strip = await card.locator("[data-card-header] [data-position-strip] [data-latest-prices]").count();
-  check("1a. the position card's heading row carries the price strip", strip === 1, `${strip} strip`);
-  const menuPlace = await card
-    .evaluate((c) => {
-      const header = c.querySelector("[data-card-header]");
-      const menu = c.querySelector("[data-card-menu]");
-      if (!header || !menu) return null;
+  const stripPlace = await card
+    .evaluate((c) => ({
+      inCard: c.querySelectorAll("[data-position-strip] [data-latest-prices]").length,
+      inHeader: c.querySelectorAll("[data-card-header] [data-position-strip]").length,
+    }))
+    .catch(() => null);
+  check(
+    "1a. the position card carries the price strip in its footer row, none in its heading row",
+    !!stripPlace && stripPlace.inCard === 1 && stripPlace.inHeader === 0,
+    JSON.stringify(stripPlace),
+  );
+  // ui-jobs 856: the card ⋮ menu opens from the trail's position crumb.
+  const menuPlace = await page
+    .evaluate(() => {
+      const crumb = document.querySelector("[data-wallet-trail-position]");
+      const menu = crumb?.querySelector("[data-position-crumb-menu][data-card-menu]");
+      const card = document.querySelector('[data-anatomy~="P1"]');
       return {
-        inHeader: header.contains(menu),
-        rightGap: Math.round(header.getBoundingClientRect().right - menu.getBoundingClientRect().right),
-        inFoot: !!c.querySelector('[data-anatomy="C3"]')?.parentElement?.querySelector("[data-card-menu]"),
+        crumb: !!crumb,
+        crumbMenu: !!menu,
+        crumbButton: !!menu?.querySelector(":scope > button[aria-haspopup]"),
+        inCard: card?.querySelectorAll("[data-card-menu]").length ?? -1,
       };
     })
     .catch(() => null);
   check(
-    "1b. the card ⋮ (C17) stands at the heading's right end",
-    !!menuPlace && menuPlace.inHeader && menuPlace.rightGap <= 2,
+    "1b. the card ⋮ (C17) opens from the trail's position crumb, none in the card",
+    !!menuPlace && menuPlace.crumbMenu && menuPlace.crumbButton && menuPlace.inCard === 0,
     JSON.stringify(menuPlace),
   );
   const oldChevron = await page.locator("[data-card-disclosure-toggle], [data-card-chevron]").count();
@@ -190,25 +201,25 @@ const headerLayout = (card) =>
   // ([data-card-row-toggle]); 322/330 made every card line a stat (C18) and
   // retired the toggle with the card chevron (C9, ui-jobs 295).
 
-  // The ⋮ opens its menu. Pressed until it does: a press before hydration is
-  // lost with no trace.
+  // The crumb opens the card menu. Pressed until it does: a press before
+  // hydration is lost with no trace.
   let menuOpen = false;
   for (let i = 0; i < 6 && !menuOpen; i++) {
-    await card
-      .locator("[data-card-menu] > button")
+    await page
+      .locator("[data-wallet-trail-position] [data-card-menu] > button")
       .click({ timeout: 10000 })
       .catch(() => {});
     menuOpen = await page
-      .locator('[data-card-menu] [role="menu"]')
+      .locator('[data-position-crumb-menu] [role="menu"]')
       .waitFor({ state: "visible", timeout: 5000 })
       .then(() => true)
       .catch(() => false);
   }
-  check("1g. a press on the card ⋮ opens its menu", menuOpen);
+  check("1g. a press on the position crumb opens the card menu", menuOpen);
   // ui-jobs 530: C17 carries "Save position" after the identity rows, before
   // the exports and the provenance row.
   const c17Rows = await page
-    .locator('[data-card-menu] [role="menu"] [role="menuitem"]')
+    .locator('[data-position-crumb-menu] [role="menu"] [role="menuitem"]')
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-menu-item") ?? e.textContent.trim().split("\n")[0]));
   const saveAt = c17Rows.indexOf("save-position");
   const exportAt = c17Rows.findIndex((t) => /^Copy (Position|Account)/.test(t));
@@ -477,8 +488,13 @@ const headerLayout = (card) =>
     .catch(() => null);
   check("4e. T6 holds the ? and no ⋮", !!t6 && !t6.menu && t6.help >= 1, JSON.stringify(t6));
   // 4f repointed (322/330): the card rows' open state left with their toggles.
-  const summary = await page.locator("[data-card-header] [data-position-strip]").count();
-  check("4f. the position card: the price strip in its heading row", summary === 1, `${summary} strip`);
+  const summary = await page.locator('[data-anatomy~="P1"] [data-position-strip]').count();
+  const inHead = await page.locator("[data-card-header] [data-position-strip]").count();
+  check(
+    "4f. the position card: the price strip in its footer row",
+    summary === 1 && inHead === 0,
+    `${summary} strip, ${inHead} in the heading row`,
+  );
   check("4g. no page error", errors.length === 0, errors.join("; "));
   await ctx.close();
 }

@@ -198,8 +198,21 @@ const noDollar = (name, text) => {
     new RegExp(`${rx(interest)}% a year`).test(text) && /charged at each mint/i.test(text),
   );
   // The two-axis pill rule: the DETAIL page carries the neutral mode word;
-  // the green OPEN lifecycle pill is the listing's (checked in Section 2).
-  check("detail status pill is the neutral mode word (Minting)", /\bMinting\b/.test(text));
+  // the green Open lifecycle dot is the listing's (checked in Section 2). The
+  // word is the status dot's `title`: the wallet trail's where the trail
+  // names the position, else the card's (ui-jobs 856).
+  const detailStatus = await page.evaluate(() =>
+    [
+      ...document.querySelectorAll(
+        "[data-wallet-trail-position] [data-wallet-trail-status], [data-position-card-shell] [data-card-status-dot]",
+      ),
+    ].map((e) => e.getAttribute("title") ?? e.getAttribute("data-status-word") ?? ""),
+  );
+  check(
+    "detail status pill is the neutral mode word (Minting)",
+    detailStatus.some((w) => /^Minting\b/.test(w)),
+    detailStatus.join(", ") || "no status dot",
+  );
   noDollar("chain-lane detail", text);
   check("no 'health factor' vocabulary", !/health factor/i.test(text));
 }
@@ -208,7 +221,13 @@ const noDollar = (name, text) => {
 {
   // D. the listing, resting view (status=open server-side).
   const text = await textOf(EXPLORER, "text=ZCHF");
-  check("listing renders real open rows (OPEN pill + Hub tag)", /\bOPEN\b/.test(text) && /Hub V[12]/.test(text));
+  // The lifecycle pill is a status dot since ui-jobs 856.
+  const openDots = await page.locator(`${ROW} [data-card-status-dot="open"]`).count();
+  check(
+    "listing renders real open rows (Open status dot + Hub tag)",
+    openDots > 0 && /Hub V[12]/.test(text),
+    `${openDots} open dots`,
+  );
   noDollar("listing", text);
   // The resting listing's denied count — the other half of the filter claim
   // below. Read here, while we are already on the unfiltered page.

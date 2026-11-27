@@ -28,6 +28,7 @@ export async function BalancerWalletPositions({ chainId, wallet: raw }: { chainI
       <div className="py-8" data-balancer-wallet-page={wallet}>
         <header className="mb-5">
           <DetailTopRow
+            walletPage
             session={session}
             fallbackHref={home}
             showStamp={false}

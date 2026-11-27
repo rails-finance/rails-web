@@ -10,7 +10,8 @@
 // back to that explorer's listing.
 // `?protocol=<slug>` reads that protocol alone (ui-jobs 738), and is where a
 // wallet search on the Liquity V2 and fork listings lands. `?kind=` is the
-// Kind pill's selection, `?status=` the Status pill's.
+// Kind pill's selection, `?status=` the Status pill's. `?vault=` with
+// `?protocol=vaults` keeps one vault protocol's shares (ui-jobs 856).
 
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
@@ -31,6 +32,7 @@ import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { resolveEnsAddress, resolveEnsNames } from "@/lib/ens/resolve-ens";
 import { readCowWalletEntry } from "@/lib/sources/api/cow";
 import { readWalletLiquidity } from "@/lib/wallet/liquidity/read-liquidity";
+import { isVaultRoot, VAULT_SHARES_FAMILY } from "@/lib/wallet/summary-counts";
 
 export const dynamic = "force-dynamic";
 // The read's budget (8 s) sits under it.
@@ -94,6 +96,8 @@ export default async function WalletPage({ params, searchParams }: Props) {
 
   const ip = await readerIpFromHeaders();
   const protocol = walletProtocol(sp.get("protocol"))?.slug;
+  const vaultParam = sp.get("vault");
+  const vault = protocol === VAULT_SHARES_FAMILY && isVaultRoot(vaultParam) ? vaultParam : undefined;
 
   // The CoW row (W7) streams in after the page: started here, awaited by the
   // view under its own Suspense, never by the page; not read where one
@@ -123,6 +127,7 @@ export default async function WalletPage({ params, searchParams }: Props) {
       back={back}
       kinds={parseKinds(sp.get("kind") ?? undefined)}
       status={parseStatus(sp.get("status") ?? undefined)}
+      vault={vault}
     />
   );
 }

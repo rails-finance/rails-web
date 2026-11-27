@@ -40,6 +40,7 @@ export async function AerodromeWalletPositions({
     <div className="py-8" data-anatomy="U3" data-aerodrome-wallet={wallet}>
       <header className="mb-5">
         <DetailTopRow
+          walletPage
           session={session}
           fallbackHref={home}
           showStamp={false}

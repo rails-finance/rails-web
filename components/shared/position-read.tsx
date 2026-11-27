@@ -123,6 +123,7 @@ export function PositionReadStamp() {
     <span
       className="text-[11px] text-rb-500 tabular-nums"
       data-anatomy="C5.1"
+      data-card-head-part=""
       data-position-read={read.kind}
       data-position-read-block={read.block ?? undefined}
       // The block and the time are the read's own coordinates.

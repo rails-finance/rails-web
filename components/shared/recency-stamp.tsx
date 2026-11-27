@@ -26,7 +26,7 @@ import { Box, CalendarClock } from "lucide-react";
 import { BlockClockIcon } from "@/components/icons/block-clock-icon";
 import { useChainHeadRead } from "@/hooks/useChainHead";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
-import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST } from "@/lib/shared/ui-grammar";
 import { nextReading, stampTime, storedReading, storeReading, type Reading } from "@/lib/shared/recency-reading";
 import { readTimeText } from "@/lib/shared/position-read";
 
@@ -66,7 +66,7 @@ export function RecencyStamp({ className, compact = false }: { className?: strin
 
   if (!head)
     return failed ? null : (
-      <span className="inline-flex h-7 w-16 items-center justify-end px-1.5" data-recency-pending="">
+      <span className="inline-flex h-7 w-14 items-center justify-end" data-recency-pending="">
         <SkeletonBar width={44} />
       </span>
     );
@@ -87,9 +87,10 @@ export function RecencyStamp({ className, compact = false }: { className?: strin
       data-prov-exempt
       onClick={toggle}
       aria-label={`${head.source === "index" ? `Indexed to block ${block}, minted ${age} ago` : `Chain head minted ${age} ago, block ${block}`}, ${readTimeText(head.blockTimestamp)}. Press to show the ${nextName}.`}
-      // The control grammar: the stamp reads as pressable. Same height and
-      // radius as the price trigger beside it, one type size down.
-      className={`${className ?? `${CTRL_GHOST} ${CTRL_OFF} h-7 gap-1.5 rounded-md px-1.5 text-[11px] tabular-nums`} reveal-in`}
+      // Text only, no button shape or padding (Miles, 26 Nov 2026, ui-jobs
+      // 856): the reading brightens on hover. Same height as the price
+      // trigger beside it, one type size down.
+      className={`${className ?? `${CTRL_GHOST} h-7 gap-1.5 rounded-sm text-[11px] tabular-nums text-rb-500 hover:text-foreground focus-ring`} reveal-in`}
     >
       <Icon size={12} aria-hidden className={compact ? "hidden sm:block" : undefined} />
       <span aria-hidden>{text}</span>

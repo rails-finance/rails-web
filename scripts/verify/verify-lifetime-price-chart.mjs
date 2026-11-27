@@ -2717,8 +2717,13 @@ async function checkFamilyLine(page, tag, pg) {
   const today = Math.floor(Date.now() / 86_400_000);
   const open = end.day >= today - 1 && line.observed.includes(end.day);
   if (kind === "vault") {
+    // The strip's first price: inline since ui-jobs 856, else in the
+    // trigger button where a strip draws it there.
     const card = await page
-      .$eval("[data-latest-prices] button .tabular-nums", (e) => e.textContent?.trim() ?? "")
+      .$eval("[data-latest-prices]", (s) => {
+        const e = s.querySelector("[data-latest-price] .tabular-nums") ?? s.querySelector("button .tabular-nums");
+        return e?.textContent?.trim() ?? "";
+      })
       .catch(() => "");
     const unit = card.replace(/^[\d.,K]+\s*/, "");
     if (open)

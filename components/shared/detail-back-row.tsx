@@ -8,19 +8,20 @@
 // branches) instead of re-rolling the row.
 
 import { LifecycleLine } from "@/components/shared/lifecycle-line";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { ArrowLeft } from "lucide-react";
 import { NAV_BUTTON, PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { listingHrefForWallet, protocolForSession } from "@/lib/shared/protocols";
+import { walletProtocol } from "@/lib/wallet/wallet-filters";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { LatestPrices, type LatestPriceAsset, type PricesAt } from "@/components/shared/latest-prices";
 import { usePublishTodayPrices } from "@/components/shared/price-basis";
 import { usePublishPositionCardStrip } from "@/components/shared/position-card-strip";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
-import { PositionWalletHeading, type PositionOwner } from "@/components/shared/wallet-heading";
+import { HeadingRow, PositionWalletHeading, type PositionOwner } from "@/components/shared/wallet-heading";
 import { usePublishHeadingWallet } from "@/components/shared/event-page-aside";
 
 /** The one back affordance on every detail page. NAV_BUTTON pill + ArrowLeft(14)
@@ -128,7 +129,19 @@ export function closingPricesAt<E extends { blockNumber: number; timestamp: numb
  *
  *  An event page (a route with `eventId`) is about one event: its heading
  *  draws no prices, no recency stamp and no Tools (ui-jobs 236's design
- *  round, 6 Nov 2026); the event's ⋮ beside its h1 carries the actions. */
+ *  round, 6 Nov 2026); the event's ⋮ beside its h1 carries the actions.
+ *
+ *  The heading's trail (H13.4; Miles, 25 Nov 2026) replaces Back on a
+ *  position page with an owner whose protocol the wallet view reads
+ *  (`walletProtocol`), where Back would land on the wallet's positions in
+ *  the protocol: no `fallbackHref` (the listing searched by the wallet), or
+ *  one naming the wallet (the family's wallet page). The trail's protocol
+ *  crumb opens the wallet view narrowed to the protocol, and the heading
+ *  takes Back's row. Back returns where the summary has no row for the page
+ *  (`onCrumb`). It stays on an event page, whose parent is the position, and
+ *  where `fallbackHref` is a listing the trail does not hold. A wallet page
+ *  (`walletPage`) is the protocol crumb and draws Back only where the trail
+ *  finds none. */
 export function DetailTopRow({
   session,
   wallet,
@@ -142,6 +155,7 @@ export function DetailTopRow({
   tools = true,
   fallbackHref,
   card = false,
+  walletPage = false,
   children,
 }: {
   /** The page's explorer; absent on a page no explorer owns (sBOLD's holder
@@ -173,6 +187,9 @@ export function DetailTopRow({
    *  so the server's paint does not stand it in the heading for the card to
    *  take after hydration (below sm a line of the heading's height). */
   card?: boolean;
+  /** The page lists the wallet's positions in one protocol: the trail's
+   *  protocol crumb is the page. */
+  walletPage?: boolean;
   children?: ReactNode;
 }) {
   const eventPage = useParams<{ eventId?: string }>()?.eventId != null;
@@ -204,64 +221,111 @@ export function DetailTopRow({
     );
   const priced = prices(true);
   const stamped = showStamp && !closed && !eventPage;
+  // With the trail drawn (a position page that knows its wallet; ui-jobs
+  // 856), the card takes the price alone, into its footer row before the
+  // counts, and the recency stays in the row under the heading (H7).
+  const trailing = owner != null && !eventPage && !walletPage && !!owner.wallet;
   const claimed = usePublishPositionCardStrip(
     // In the card the stamp stands before the price, next to the ⋮.
     owner && (priced || stamped) ? (
-      <>
-        {stamped && <RecencyStamp />}
-        {priced}
-      </>
+      trailing ? (
+        priced || null
+      ) : (
+        <>
+          {stamped && <RecencyStamp />}
+          {priced}
+        </>
+      )
     ) : null,
   );
   const inCard = claimed || card;
+  const page = eventPage ? "event" : walletPage ? "wallet" : "position";
+  // The trail's protocol crumb goes where Back's fallback would: Back
+  // goes. Where that rests on the summary read, Back stays out until the
+  // read settles and lands in the row held under the heading (HeadingRow).
+  // Keyed by the owner: a new wallet's trail starts pending (ui-jobs 856).
+  const ownerWallet = owner?.wallet?.toLowerCase();
+  const [told, setTold] = useState<{ wallet: string | undefined; crumb: "found" | "none" } | null>(null);
+  const crumb = told && told.wallet === ownerWallet ? told.crumb : "pending";
+  const trailed =
+    owner != null &&
+    page === "position" &&
+    entry != null &&
+    walletProtocol(entry.slug) != null &&
+    (fallbackHref == null || (ownerWallet != null && fallbackHref.toLowerCase().includes(ownerWallet)));
+  const unowned = owner != null && !owner.wallet && !owner.pending;
+  // A wallet page whose trail draws its protocol crumb has no Back; where
+  // the summary holds no row for it (Pendle, Uniswap and the other families
+  // without one) Back stays, as on a position page (ui-jobs 856).
+  const back = page === "wallet" ? unowned || crumb === "none" : !trailed || unowned || crumb === "none";
+  const heading = owner && (
+    // In the row's scope: a holder can carry a receipt (Polaris).
+    <ProvReceiptsScope registry={registry}>
+      <PositionWalletHeading
+        owner={owner}
+        session={session}
+        page={page}
+        onCrumb={(found) => setTold({ wallet: ownerWallet, crumb: found ? "found" : "none" })}
+        // The heading is the column's first row, clear of the profile
+        // control (H20) at the top right from md.
+        className={PROFILE_CLEARANCE}
+        tools={tools && !eventPage ? children : false}
+      />
+      {/* A closing or closed explorer's state under the heading (H24.1; ui-jobs 621). */}
+      {lifecycleId && <LifecycleLine id={lifecycleId} className="mt-2" />}
+      {/* The row under the heading (H7), held on every page: Back where the
+          page keeps it, and with no card to hold them the price and the
+          chain's recency, price first (ui-jobs 272). */}
+      <HeadingRow
+        start={
+          back && (
+            <span className="flex" data-back-row="">
+              <DetailBackButton session={session} wallet={wallet} fallbackHref={fallbackHref} compact />
+            </span>
+          )
+        }
+        // On a phone the trail's recency stands at the row's left.
+        endFirstOnPhone={trailing}
+        end={
+          trailing ? (
+            (stamped || (!inCard && priced)) && (
+              <>
+                {!inCard && priced && (
+                  <span className="flex items-center gap-1 sm:gap-2" data-position-strip="">
+                    {priced}
+                  </span>
+                )}
+                {stamped && <RecencyStamp />}
+              </>
+            )
+          ) : !inCard && (priced || stamped) ? (
+            <span className="flex items-center gap-1 sm:gap-2" data-position-strip="">
+              {priced}
+              {stamped && <RecencyStamp />}
+            </span>
+          ) : undefined
+        }
+      />
+    </ProvReceiptsScope>
+  );
+  if (heading) return <div className="mb-4">{heading}</div>;
+  // A page without the heading: Back's row, with the strip and Tools.
   return (
-    // With the heading, the gap to the card (16px, in place of the page's
-    // space-y-6 margin) is smaller than the gap above the heading (24px), so
-    // the heading reads with the card.
-    <div className={owner ? "mb-4" : undefined}>
+    <div>
       <div
         className={`flex min-h-[38px] flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2 ${PROFILE_CLEARANCE}`}
         data-anatomy="H7"
         data-back-row
       >
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-          <DetailBackButton session={session} wallet={wallet} fallbackHref={fallbackHref} compact={!owner} />
+          <DetailBackButton session={session} wallet={wallet} fallbackHref={fallbackHref} compact />
           {/* A page without a heading keeps the strip beside Back. */}
-          {!owner && (
-            <>
-              {stamped && <RecencyStamp compact />}
-              <ProvReceiptsScope registry={registry}>{prices(false)}</ProvReceiptsScope>
-            </>
-          )}
+          {stamped && <RecencyStamp compact />}
+          <ProvReceiptsScope registry={registry}>{prices(false)}</ProvReceiptsScope>
         </div>
         {/* The page's Tools menu, once the caller has export shapes to give. */}
-        {!owner && !eventPage && children}
+        {!eventPage && children}
       </div>
-      {owner && (
-        <div className="mt-6">
-          {/* In the row's scope: a holder can carry a receipt (Polaris). With
-              no card to hold them, the price and the chain's recency ride the
-              heading's right end, price first (ui-jobs 272); Back stays alone
-              above. */}
-          <ProvReceiptsScope registry={registry}>
-            <PositionWalletHeading
-              owner={owner}
-              session={session}
-              tools={tools && !eventPage ? children : false}
-              strip={
-                !inCard && (priced || stamped) ? (
-                  <>
-                    {priced}
-                    {stamped && <RecencyStamp />}
-                  </>
-                ) : undefined
-              }
-            />
-            {/* A closing or closed explorer's state under the heading (H24.1; ui-jobs 621). */}
-            {lifecycleId && <LifecycleLine id={lifecycleId} className="mt-2" />}
-          </ProvReceiptsScope>
-        </div>
-      )}
     </div>
   );
 }

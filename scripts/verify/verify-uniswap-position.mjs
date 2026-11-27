@@ -11,7 +11,7 @@
 //      each once, with no sideways scroll at 390px.
 //   2. The card's status word (`data-card-status`): "out of range" outside the range,
 //      "live" inside it (words.ts `cardStatus`).
-//   3. The header's Worth chip writes the card's Value figure character for character.
+//   3. The price strip's Worth price writes the card's Value figure character for character.
 //   4. The readout's (i) opens to How it compares, This position and The pool, inside
 //      one phone screen (844px).
 //   5. The fixture's own shape:
@@ -131,7 +131,12 @@ for (const f of FIXTURES) {
         while (n && header && n.parentElement !== header) n = n.parentElement;
         return t(n?.nextElementSibling);
       })(),
-      chip: t(document.querySelector("[data-latest-prices] button")),
+      // The strip's first price, its label and figure: inline since ui-jobs
+      // 856, else in the trigger button where a strip draws it there.
+      chip: t(
+        document.querySelector("[data-latest-prices] [data-latest-price]") ??
+          document.querySelector("[data-latest-prices] button"),
+      ),
       worth: t(worthHead),
       holds: t(holdsHead),
       sw: document.scrollingElement.scrollWidth,

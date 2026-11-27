@@ -62,6 +62,7 @@ export async function UniswapWalletPositions({
     <div className="py-8" data-anatomy="U3" data-uniswap-wallet={wallet}>
       <header className="mb-5">
         <DetailTopRow
+          walletPage
           session={session}
           fallbackHref={home}
           showStamp={false}

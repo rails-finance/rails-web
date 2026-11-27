@@ -137,6 +137,9 @@ export function ToolsMenu({
   label,
   heading,
   noun = "position",
+  trigger,
+  current = false,
+  hooks,
   children,
 }: {
   /** `tools`: the spanner trigger of a page row. `card`: the position card's
@@ -145,14 +148,24 @@ export function ToolsMenu({
    *  same for a section's header. `view`: the listing's ⋮ at the
    *  right end of its sort and filter row (N1.7, ui-jobs 521), named like
    *  `event`. */
-  variant?: "tools" | "card" | "event" | "panel" | "view";
+  variant?: "tools" | "card" | "event" | "panel" | "view" | "crumb";
+  /** The `crumb` menu's trigger content, handed whether the menu is open: the
+   *  card menu's rows opened from the wallet heading's position crumb
+   *  (H13.4; ui-jobs 856), its panel opening left. */
+  trigger?: (open: boolean) => ReactNode;
+  /** The `crumb` menu's trigger is the current page (`aria-current`). */
+  current?: boolean;
+  /** The `crumb` menu's wrapper hooks, in place of the card menu's: the
+   *  trail's positions and protocol menus (H13.2, H13.5). */
+  hooks?: Record<string, string>;
   /** Rows above the export shapes (the card's ID, NFT and page link), handed
    *  the menu's close like `children`. */
   leading?: (close: () => void) => ReactNode;
   /** What the caller's shapes act on, added to the trigger's accessible
    *  name ("Tools: Export this position"). */
   ariaLabel?: string;
-  /** The `event` menu's accessible name and its sheet's heading. */
+  /** The `event` menu's accessible name and its sheet's heading; the
+   *  `crumb` menu's accessible name. */
   label?: string;
   /** The family's unit, naming the card and Tools menus ("Position menu",
    *  Compound V3's "Account menu"); lower case. */
@@ -172,7 +185,8 @@ export function ToolsMenu({
   // The event, panel and view menus: the card menu's trigger and rows, named
   // by `label` and `heading`.
   const eventMenu = variant === "event" || variant === "panel" || variant === "view";
-  const card = variant === "card" || eventMenu;
+  const crumb = variant === "crumb";
+  const card = variant === "card" || eventMenu || crumb;
   const isPhone = useMediaQuery(PHONE_QUERY);
   const sheet = card && isPhone;
   const close = () => setOpen(false);
@@ -205,13 +219,16 @@ export function ToolsMenu({
     };
   }, [open, sheet]);
 
-  // The first row takes focus as the menu opens, so the arrows move from
-  // there; in the sheet, after the sheet has focused its panel.
+  // The first enabled row takes focus as the menu opens, so the arrows move
+  // from there; in the sheet, after the sheet has focused its panel. A row
+  // that is the page (aria-disabled) is passed over (ui-jobs 856).
   useEffect(() => {
     if (!open) return;
     const t = window.setTimeout(() =>
       menuRef.current
-        ?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]), [role="menuitemcheckbox"]:not([disabled])')
+        ?.querySelector<HTMLElement>(
+          '[role="menuitem"]:not([disabled]):not([aria-disabled="true"]), [role="menuitemcheckbox"]:not([disabled]):not([aria-disabled="true"])',
+        )
         ?.focus({ preventScroll: true }),
     );
     return () => window.clearTimeout(t);
@@ -228,7 +245,7 @@ export function ToolsMenu({
   if (!leading && !children) return null;
 
   if (card) {
-    const name = eventMenu ? (label ?? "") : `${noun[0].toUpperCase()}${noun.slice(1)} menu`;
+    const name = eventMenu || (crumb && label) ? (label ?? "") : `${noun[0].toUpperCase()}${noun.slice(1)} menu`;
     const wrapperData =
       variant === "panel"
         ? { "data-panel-menu": "" }
@@ -236,27 +253,45 @@ export function ToolsMenu({
           ? { "data-view-menu": "", "data-anatomy": "N1.7" }
           : eventMenu
             ? { "data-event-menu": "" }
-            : { "data-export-menu": "", "data-tools-menu": "", "data-card-menu": "", "data-anatomy": "C17" };
+            : crumb
+              ? (hooks ?? {
+                  "data-export-menu": "",
+                  "data-tools-menu": "",
+                  "data-card-menu": "",
+                  "data-position-crumb-menu": "",
+                  // The card's menu opened from the position crumb keeps
+                  // its anatomy (ui-jobs 856).
+                  "data-anatomy": "C17",
+                })
+              : { "data-export-menu": "", "data-tools-menu": "", "data-card-menu": "", "data-anatomy": "C17" };
     return (
-      <div ref={ref} className="relative flex" {...wrapperData}>
+      <div ref={ref} className={crumb ? "relative flex min-w-0" : "relative flex"} {...wrapperData}>
         <button
           ref={triggerRef}
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-haspopup="menu"
+          aria-current={crumb && current ? "page" : undefined}
           aria-label={copied ? "Copied" : ariaLabel ? `${name}: ${ariaLabel}` : name}
           // A 28px glyph with a 44px press area: the after: box reaches past
           // the button without moving the strip.
           className={
-            variant === "view"
-              ? // The listing's ⋮ as a neutral pill button, beside the sort
-                // (ui-jobs 735).
-                `${PILL_NEUTRAL} inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:size-10`
-              : `${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} relative h-7 w-7 justify-center rounded-md after:absolute after:-inset-2 after:content-['']`
+            crumb
+              ? // The crumb's words: a 20px row with a 36px press area. No
+                // max-w-full: the -mx-1 makes the wrapper 8px narrower than
+                // the button, and a 100% cap cut the name by that much.
+                `group/crumb relative -mx-1 flex h-5 min-w-0 cursor-pointer items-center gap-1 rounded-md px-1 text-left transition-colors focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']`
+              : variant === "view"
+                ? // The listing's ⋮ as a neutral pill button, beside the sort
+                  // (ui-jobs 735).
+                  `${PILL_NEUTRAL} inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:size-10`
+                : `${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} relative h-7 w-7 justify-center rounded-md after:absolute after:-inset-2 after:content-['']`
           }
         >
-          {copied ? (
+          {crumb && trigger ? (
+            trigger(open)
+          ) : copied ? (
             <Check className="h-4 w-4" aria-hidden="true" />
           ) : (
             <EllipsisVertical className="h-4 w-4" aria-hidden="true" />
@@ -267,7 +302,11 @@ export function ToolsMenu({
             <MobileSheet
               label={name}
               onClose={closeToTrigger}
-              header={<div className={`${OVERLAY_HEADING} px-1 pb-2`}>{eventMenu ? heading : "Position"}</div>}
+              header={
+                <div className={`${OVERLAY_HEADING} px-1 pb-2`}>
+                  {eventMenu || (crumb && heading) ? heading : "Position"}
+                </div>
+              }
             >
               <div
                 ref={menuRef}
@@ -282,7 +321,7 @@ export function ToolsMenu({
           ) : (
             <div
               ref={menuRef}
-              className="overlay-panel absolute right-0 top-full z-[var(--z-dropdown)] mt-2 min-w-[260px] overflow-hidden py-1"
+              className={`overlay-panel absolute ${crumb ? "left-0 max-h-[70vh] w-max max-w-[min(22rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain" : "right-0 overflow-hidden"} top-full z-[var(--z-dropdown)] mt-2 min-w-[260px] py-1`}
               role="menu"
               aria-label={name}
               onKeyDown={moveFocus}

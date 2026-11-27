@@ -105,6 +105,7 @@ export function CompoundBaseWalletOverview({
         what="This wallet"
       >
         <DetailTopRow
+          walletPage
           session="compound-base"
           wallet={wallet}
           owner={{ wallet, chain: 8453 }}

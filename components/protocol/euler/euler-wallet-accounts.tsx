@@ -37,6 +37,7 @@ export async function EulerWalletAccounts({ chain, wallet: raw }: { chain: Euler
         <div className="py-8" data-anatomy="J3" data-euler-wallet={wallet}>
           <header className="mb-5">
             <DetailTopRow
+              walletPage
               session={session}
               fallbackHref={home}
               showStamp={false}

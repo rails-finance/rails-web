@@ -138,11 +138,12 @@ const context = await browser.newContext({
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1500);
 
-  // The position's number, its NFT and a link sit at the head of the card's ⋮
-  // ("Position menu"; ui-jobs 405 took the identity-row buttons out).
-  const menuBtn = card(page)
-    .getByRole("button", { name: /Position menu/ })
-    .first();
+  // The position's number, its NFT and a link sit at the head of the card
+  // menu (ui-jobs 405 took the identity-row buttons out). It opens from the
+  // card's ⋮, or from the wallet trail's position crumb where the trail names
+  // the position (ui-jobs 856), named "<name>, <Status>: position menu" or
+  // "<name>: position menu".
+  const menuBtn = page.getByRole("button", { name: /^Position menu|: position menu/ }).first();
   const item = (name) => page.getByRole("menuitem", { name }).first();
   const ensureMenu = async () => {
     if ((await item(/^Position #8/).count()) === 0) {

@@ -29,6 +29,7 @@ export async function FluidBaseWalletPositions({ wallet: raw }: { wallet: string
     <div className="py-8" data-anatomy="U3" data-fluid-base-wallet={wallet}>
       <header className="mb-5">
         <DetailTopRow
+          walletPage
           session={session}
           fallbackHref={home}
           showStamp={false}

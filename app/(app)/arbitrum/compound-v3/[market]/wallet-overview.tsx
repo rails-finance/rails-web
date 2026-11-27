@@ -101,6 +101,7 @@ export function CompoundArbitrumWalletOverview({
         what="This wallet"
       >
         <DetailTopRow
+          walletPage
           session="compound-v3-arbitrum"
           wallet={wallet}
           owner={{ wallet, chain: 42161 }}

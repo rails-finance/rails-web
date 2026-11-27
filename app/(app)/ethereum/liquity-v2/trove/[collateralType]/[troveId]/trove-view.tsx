@@ -311,7 +311,18 @@ export default function TroveView({
   const ccrBranch = normalizeCcrBranch(collateralType);
   const branchNotice =
     troveData?.status === "open" && shutdown == null && ccrBranch ? (
-      <BranchCcrNotice state={branchCcr[ccrBranch]} anatomy="C23·liquity" />
+      <BranchCcrNotice
+        state={branchCcr[ccrBranch]}
+        anatomy="C23·liquity"
+        trove={{
+          id: troveId,
+          delegated: troveData.batch.isMember,
+          // The page's "open" takes in dormant (zombie) Troves; the notice gives them their own line.
+          isZombie: troveData.isZombie,
+          // getLatestTroveData's entire collateral and debt, what closeTrove takes out (ui-jobs 858).
+          figures: liveState ? { collRaw: liveState.collateral.entireRaw, debtRaw: liveState.debt.entireRaw } : null,
+        }}
+      />
     ) : null;
 
   // The claim that paid the surplus out, as its own row (the index has none).

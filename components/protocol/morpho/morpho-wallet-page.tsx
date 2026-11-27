@@ -162,6 +162,7 @@ export function MorphoWalletView({
     <CaptureSourceProvider value={captureSource}>
       <div className="py-8 space-y-6">
         <DetailTopRow
+          walletPage
           session={d.session}
           wallet={wallet}
           owner={{ wallet, chain: d.chainId, vault: vaultNote }}

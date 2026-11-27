@@ -71,7 +71,7 @@
 //       backend orders and what the page says it orders), lastActivity desc is
 //       descending by last block, and the DOM's order is the API's order
 //   L5  the closed card: a DERIVED address whose balance this script reads as
-//       zero draws no Shares and no Claim figure, carries the CLOSED pill, and
+//       zero draws no Shares and no Claim figure, carries the Closed status dot, and
 //       states "Closed by" at this script's own last log block
 //   L6  each never-held vault is STATED on the roster page as "no holder yet"
 //       and contributes no row
@@ -832,6 +832,8 @@ async function readListingDom(qs = "") {
         liveBlock: e.getAttribute("data-live-block"),
         valueUsdE8: e.getAttribute("data-value-usd-e8"),
         pricedBlock: e.getAttribute("data-priced-block"),
+        // The status dot (C6, ui-jobs 856): its `title` is the status word.
+        statusWord: e.querySelector("[data-card-status-dot]")?.getAttribute("title") ?? null,
         stats,
         vaultSymbol: symbolEl?.getAttribute("data-card-vault-symbol") ?? null,
         symbolLeadsPill: symbolEl && pillEl ? (symbolEl.compareDocumentPosition(pillEl) & 4) === 4 : null,
@@ -1229,7 +1231,7 @@ if (MEMBERSHIP) closedHolder = ownParticipants.find((_, i) => ownBalances[i] ===
 if (!MEMBERSHIP)
   for (const name of [
     "L5a the derived closed fixture holds ZERO at the page's own block",
-    "L5b the closed card carries the CLOSED pill and no Shares or Claim figure",
+    "L5b the closed card carries the Closed status dot and no Shares or Claim figure",
     "L5c the closed card states 'Closed by' at this script's OWN last log block",
   ])
     skip(
@@ -1239,7 +1241,7 @@ if (!MEMBERSHIP)
 else if (!closedHolder)
   for (const name of [
     "L5a the derived closed fixture holds ZERO at the page's own block",
-    "L5b the closed card carries the CLOSED pill and no Shares or Claim figure",
+    "L5b the closed card carries the Closed status dot and no Shares or Claim figure",
     "L5c the closed card states 'Closed by' at this script's OWN last log block",
   ])
     skip(name, `every one of the ${ownParticipants.length} participants this script swept still holds a balance`);
@@ -1270,10 +1272,10 @@ else {
   const f5Dom = await readListingDom(`vault=${MEMBERSHIP}&q=${closedHolder}`);
   const f5Card = f5Dom.cards.find((c) => c.holder === closedHolder);
   check(
-    "L5b the closed card carries the CLOSED pill and no Shares or Claim figure",
+    "L5b the closed card carries the Closed status dot and no Shares or Claim figure",
     f5Card != null &&
       f5Card.status === "closed" &&
-      /CLOSED/.test(f5Card.text) &&
+      f5Card.statusWord === "Closed" &&
       !/Shares ·/.test(f5Card.text) &&
       !/Claim ·/.test(f5Card.text),
     f5Card ? f5Card.text.slice(0, 140) : "no card",

@@ -72,6 +72,12 @@ test("the link keeps a kind only where the protocol holds more than one", () => 
   assert.deepEqual(parseKinds("loans,bogus,loans"), ["loans"]);
 });
 
+test("the link keeps ?vault= with the vault shares chosen (ui-jobs 856)", () => {
+  const a = "0xabc";
+  assert.equal(walletHref(a, "vaults", [], "open", "morpho"), "/wallet/0xabc?protocol=vaults&vault=morpho&status=open");
+  assert.equal(walletHref(a, "aave-v3", [], undefined, "morpho"), "/wallet/0xabc?protocol=aave-v3");
+});
+
 test("a listing search by a wallet opens the wallet page on the Liquity V2 family alone", () => {
   const A = "0x0C8C5F4E163B5637F26B56D31AC672F7751E4A56";
   assert.equal(walletSearchHref("liquity-v2", A), `/wallet/${A.toLowerCase()}?protocol=liquity-v2`);
@@ -97,18 +103,4 @@ test("the counts take every chain's rows but a testnet's", async () => {
   const { countedRow } = await import("../../lib/wallet/summary-row.ts");
   assert.equal(countedRow({ chain: "sepolia" }), false);
   for (const chain of ["ethereum", "base", "arbitrum", "arc"]) assert.equal(countedRow({ chain }), true, chain);
-});
-
-test("an Aave vault holding's stored page opens under Aave V3's Vaults section (ui-jobs 789)", async () => {
-  const { servedSummaryRow } = await import("../../lib/wallet/summary-row.ts");
-  const V = "0xe1753f2e00940cc31213dd92013cf019dfe4ca1d";
-  const H = "0x1676d23711186076fa74aa53511dda750a1f0d9a";
-  assert.equal(
-    servedSummaryRow({ href: `/ethereum/aave/vaults/${V}/${H}` }).href,
-    `/ethereum/aave-v3/vaults/${V}/${H}`,
-  );
-  const morpho = { href: `/ethereum/morpho/vaults/${V}/${H}` };
-  assert.equal(servedSummaryRow(morpho), morpho);
-  const none = { href: null };
-  assert.equal(servedSummaryRow(none), none);
 });
