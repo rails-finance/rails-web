@@ -128,7 +128,7 @@ export function PolarisPethPlaces({
             The list below gives one figure for each place, in that place&rsquo;s token, and links each CDP, deposit and
             loan to its page.
           </p>
-          <ul className="mt-3 divide-y divide-edge-raised">
+          <ul className="mt-3 divide-y divide-[var(--edge-raised)]">
             <Place
               id="wallet"
               label="In the wallet"
