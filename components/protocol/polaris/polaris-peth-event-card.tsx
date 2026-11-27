@@ -15,7 +15,14 @@ import type { SpineTokenRow } from "@/components/shared/spine-column";
 import { BlockRef } from "@/components/shared/block-ref";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { explorerUrl, SEPOLIA_CHAIN_ID } from "@/lib/shared/chains";
-import { FPETH, PETH, POLARIS_VENUES, POLARIS_WETH, VPETH } from "@/lib/polaris/asset-catalog";
+import {
+  FPETH,
+  PETH,
+  POLARIS_TOKENS_BY_ADDRESS,
+  POLARIS_VENUES,
+  POLARIS_WETH,
+  VPETH,
+} from "@/lib/polaris/asset-catalog";
 import {
   big,
   exactUnits,
@@ -42,6 +49,7 @@ export const PETH_NAMES: PethTokenNames = {
   fpeth: { symbol: FPETH.symbol, address: FPETH.address },
   vpeth: { symbol: VPETH.symbol, address: VPETH.address },
   weth: { symbol: POLARIS_WETH.symbol, address: POLARIS_WETH.address },
+  others: POLARIS_TOKENS_BY_ADDRESS,
 };
 
 const EFFECT_WORD = Object.fromEntries(PETH_EFFECTS.map((e) => [e.key, e.label]));

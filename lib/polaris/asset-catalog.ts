@@ -122,6 +122,13 @@ export const POLARIS_VENUES: Record<PolarisVenueKey, PolarisVenue> = {
   },
 };
 
+/** POLAR — the share system's token, which a POLAR conversion pays out. */
+export const POLAR: PolarisTokenMeta = {
+  symbol: "POLAR",
+  address: "0x5543ca71ed8c88daf217488b1808994e080d925b",
+  decimals: 18,
+};
+
 /** The deployment these addresses belong to: the `polaris_deployments` id the
  *  deposit and loan proxies pass as `deployment`, so the pages keep naming it
  *  once a redeploy adds a second row. */
@@ -209,3 +216,20 @@ export function normalizeCdpId(raw: string | null | undefined): string | null {
   const s = (raw ?? "").trim();
   return /^(0|[1-9][0-9]*)$/.test(s) ? s : null;
 }
+
+/** Every token this deployment names, by lower-cased address: the pETH
+ *  account page names a zap line's token through it. */
+export const POLARIS_TOKENS_BY_ADDRESS: Record<string, PolarisTokenMeta> = Object.fromEntries(
+  [
+    PETH,
+    FPETH,
+    VPETH,
+    SVPETH,
+    POLARIS_WETH,
+    POLAR,
+    ...POLARIS_MARKETS.flatMap((m) => [
+      POLARIS_MARKET_CONFIG[m].stable,
+      { ...POLARIS_MARKET_CONFIG[m].vault, decimals: 18 as const },
+    ]),
+  ].map((t) => [t.address.toLowerCase(), t]),
+);

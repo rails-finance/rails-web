@@ -145,7 +145,12 @@ export interface PethTokenNames {
   fpeth: { symbol: string; address: string };
   vpeth: { symbol: string; address: string };
   weth: { symbol: string; address: string };
+  /** Every other token the deployment names (USDp, GOLDp, POLAR, svpETH…),
+   *  by lower-cased address, so a zap line never shows a raw address for one. */
+  others?: Record<string, { symbol: string; address: string }>;
 }
+
+const NATIVE = ["0x0000000000000000000000000000000000000000", "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"];
 
 /** A line's token as a symbol and address; an LP token names its venue's
  *  pool, and an address the deployment does not name stays an address. */
@@ -166,6 +171,9 @@ export function pethLineToken(
   const t = token.toLowerCase();
   if (t === names.weth.address) return names.weth;
   for (const n of [names.peth, names.fpeth, names.vpeth]) if (t === n.address) return n;
+  if (NATIVE.includes(t)) return { symbol: "ETH", address: names.weth.address };
+  const other = names.others?.[t];
+  if (other) return other;
   return { symbol: `${t.slice(0, 6)}…${t.slice(-4)}`, address: t };
 }
 

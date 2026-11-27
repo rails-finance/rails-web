@@ -124,8 +124,13 @@ export interface PethLedgerRow {
   valuation: PethValuation | null;
   zap: { token_in: string; token_out: string; amount_in: string; amount_out: string } | null;
   /** The address's balance of each token just before and just after this
-   *  transaction, from its stored transfers; null unless status is "ok". */
-  balances?: Record<"peth" | "fpeth" | "vpeth", { before_raw: string; after_raw: string }> | null;
+   *  transaction, from its stored transfers; null unless status is "ok".
+   *  A token's entry may be null, which draws no side for it. */
+  balances?: {
+    peth: { before_raw: string; after_raw: string } | null;
+    fpeth: { before_raw: string; after_raw: string } | null;
+    vpeth?: { before_raw: string; after_raw: string } | null;
+  } | null;
   /** ETH in, ETH out and curve fees through this transaction; null unless
    *  status is "ok". */
   to_date?: { eth_in_raw: string; eth_out_raw: string; curve_fees_raw: string } | null;
@@ -139,6 +144,10 @@ export interface PethLedgerState {
   scanned_to_block: string | null;
   deploy_block: string | null;
   head_block: string | null;
+  /** The time of the last block the lane read (unix seconds), where the
+   *  route states it: the date a stored holding is "as of" when the head is
+   *  unread. */
+  scanned_to_timestamp?: string | null;
   /** How far behind the head the lane may sit and still read as complete. */
   fresh_within_blocks?: number;
 }

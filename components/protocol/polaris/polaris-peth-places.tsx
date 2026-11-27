@@ -33,6 +33,7 @@ import {
   pethValuedProv,
 } from "@/lib/polaris/peth-provenance";
 import { RawFigure } from "./polaris-sp-loan-parts";
+import { formatDateLong } from "@/lib/date";
 import { PETH_UNREAD } from "./polaris-peth-card";
 
 function Figure({ raw, symbol, address, info }: { raw: bigint; symbol: string; address: string; info: Provenance }) {
@@ -89,12 +90,23 @@ export function PolarisPethPlaces({
   places: p,
   headRead,
   headBlock,
+  storedAsOf,
 }: {
   places: PethPlaces;
   headRead: boolean;
   headBlock: string | null;
+  /** Set when the head was not read (`ledger.complete` null): the places the
+   *  stored ledger states (CDPs, deposits, loans) are as of the last block the
+   *  lane read, the date in the note and the block in the receipt. */
+  storedAsOf?: { block: string | null; timestamp: number | null } | null;
 }) {
   const registry = useReceiptRegistry();
+  const asOfWords = storedAsOf
+    ? `, as of ${storedAsOf.timestamp != null ? formatDateLong(storedAsOf.timestamp) : "the last block read"}`
+    : "";
+  const asOfReceipt = storedAsOf
+    ? ` The chain did not answer, so this is the stored ledger through ${storedAsOf.block ? `block ${storedAsOf.block}` : "its last block read"}; later changes are not counted.`
+    : "";
   const headUnread = unread(headRead ? "Not read" : PETH_UNREAD.head);
   const lpTotal = p.lp.every((x) => x.share != null) ? p.lp.reduce((s, x) => s + (x.share ?? ZERO), ZERO) : null;
   const lpHeld = p.lp.filter((x) => x.lp != null && x.lp > ZERO);
@@ -138,7 +150,7 @@ export function PolarisPethPlaces({
             <Place
               id="cdp"
               label="CDP collateral"
-              note="At each CDP's last touch."
+              note={`At each CDP's last touch${asOfWords}.`}
               figure={
                 p.cdp ? (
                   <Figure
@@ -149,7 +161,8 @@ export function PolarisPethPlaces({
                       kind: "chain-derived",
                       pclass: "emitted",
                       summary:
-                        "CDP collateral — the sum of each CDP's collateral at its last touch, for the CDPs this address holds.",
+                        "CDP collateral — the sum of each CDP's collateral at its last touch, for the CDPs this address holds." +
+                        asOfReceipt,
                       formula: "Σ newColl (last CDPUpdated of each CDP held)",
                       via: "GET /api/polaris/peth/<address> · polaris_cdp_updated",
                     }}
@@ -175,7 +188,7 @@ export function PolarisPethPlaces({
             <Place
               id="sp"
               label="Stability Pool deposits"
-              note="pETH gains unclaimed at each deposit's last touch. Gains paid in since are not included."
+              note={`pETH gains unclaimed at each deposit's last touch${asOfWords}. Gains paid in since are not included.`}
               figure={
                 p.sp ? (
                   <Figure
@@ -186,7 +199,8 @@ export function PolarisPethPlaces({
                       kind: "chain-derived",
                       pclass: "emitted",
                       summary:
-                        "Stability Pool pETH — the sum of the pETH gains each deposit this address holds left unclaimed at its last touch. pETH paid in since is not counted.",
+                        "Stability Pool pETH — the sum of the pETH gains each deposit this address holds left unclaimed at its last touch. pETH paid in since is not counted." +
+                        asOfReceipt,
                       formula: "Σ stashed pETH (last DepositUpdated of each deposit held)",
                       via: "GET /api/polaris/peth/<address> · polaris_sp_deposit_updated",
                     }}
@@ -212,7 +226,7 @@ export function PolarisPethPlaces({
             <Place
               id="loans"
               label="Reserve-loan collateral"
-              note="fpETH, the floor part of pETH, held by the loans."
+              note={`fpETH, the floor part of pETH, held by the loans${asOfWords}.`}
               figure={
                 p.loans ? (
                   <Figure
@@ -223,7 +237,8 @@ export function PolarisPethPlaces({
                       kind: "chain-derived",
                       pclass: "indexed",
                       summary:
-                        "Reserve-loan collateral — the sum of the fpETH collateral of each open loan this address holds.",
+                        "Reserve-loan collateral — the sum of the fpETH collateral of each open loan this address holds." +
+                        asOfReceipt,
                       formula: "Σ (LoanOpened fpCollateral + Σ LoanAdjusted collChange)",
                       via: "GET /api/polaris/peth/<address> · polaris_loan_opened + polaris_loan_adjusted",
                     }}

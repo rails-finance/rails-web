@@ -18,6 +18,7 @@ import {
   pethLedgerComplete,
   pethLedgerGap,
   pethLedgerUnchecked,
+  pethLineToken,
   pethScannedTo,
   pethPlaces,
   pethRowBullets,
@@ -225,4 +226,13 @@ test("a pool share sent to another holder is an exit with its one bullet", () =>
     curve_fee_raw: "0",
   };
   assert.deepEqual(pethRowBullets(row, NAMES), ["This address sent its pool share to another address."]);
+});
+
+test("a zap line names a catalog token, and ETH for the native address", () => {
+  const usdp = "0x899d225d779f41fa1ab422ab1b8a9408296dd5c6";
+  const named = { ...NAMES, others: { [usdp]: { symbol: "USDp", address: usdp } } };
+  assert.equal(pethLineToken(usdp, named, VENUES).symbol, "USDp");
+  assert.equal(pethLineToken("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", named, VENUES).symbol, "ETH");
+  // A token the catalog does not name stays a short address.
+  assert.match(pethLineToken("0x1111111111111111111111111111111111111111", named, VENUES).symbol, /^0x1111…1111$/);
 });

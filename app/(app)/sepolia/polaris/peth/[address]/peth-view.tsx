@@ -281,7 +281,20 @@ export default function PethView({
               <PethExplanation f={figures} ledgerGap={ledgerGap} headRead={headRead} unchecked={unchecked} />
             }
           />
-          <PolarisPethPlaces places={places} headRead={headRead} headBlock={headBlock} />
+          <PolarisPethPlaces
+            places={places}
+            headRead={headRead}
+            headBlock={headBlock}
+            storedAsOf={
+              unchecked
+                ? {
+                    block: scannedTo,
+                    timestamp:
+                      data.ledger?.scanned_to_timestamp != null ? Number(data.ledger.scanned_to_timestamp) : null,
+                  }
+                : null
+            }
+          />
         </>
       )}
       <ChainTruthTimeline
