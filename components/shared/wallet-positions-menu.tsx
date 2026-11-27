@@ -21,8 +21,9 @@
 // narrowed view (`walletTrailCrumb`) and is the page there; where the wallet
 // holds two or more positions in the protocol, across its chains, it opens
 // their list: each position's dot, chain, a vault share's asset icon and name
-// (`summaryCrumb`), five at most, then "N more". The position crumb is the detail card's name
-// (`usePositionCardName`) with its lifecycle dot, opening the card's ⋮ menu.
+// (`summaryCrumb`), five at most, then "N more". The position crumb is the
+// detail card's name (`usePositionCardName`) with its lifecycle dot, opening
+// the card's ⋮ menu.
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";

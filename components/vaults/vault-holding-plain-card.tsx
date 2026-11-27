@@ -110,8 +110,8 @@ function MenuRows({ href, vaultHref, symbol }: { href: string; vaultHref: string
   const [copied, setCopied] = useState(false);
   return (
     <>
-      {/* The vault's page, which the tag links where no trail names the
-          holding (ui-jobs 862; Pendle's "Open the market"). */}
+      {/* The vault's page. The tag links it too, and goes where the trail
+          names the holding (ui-jobs 862; as Pendle's "Open the market"). */}
       <ToolsMenuItem
         icon={<Vault size={16} />}
         title="Open the vault"
