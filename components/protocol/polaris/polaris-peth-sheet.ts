@@ -7,9 +7,11 @@
 // panel carries the account's running ETH in, ETH out and curve fees through
 // the row, each swapping to what this row added.
 //
-// The route states `balances` and `to_date` only when its status is "ok". A
-// row without them, an LP-only row, and a move Rails does not decode keep
-// their cells.
+// The route states `balances` and `to_date` only when its status is "ok"; a
+// row without them, and an LP-only row, keep their cells. A not-decoded vpETH
+// move with Morpho Blue draws on the vpETH side (the route's vpETH delta and
+// balances carry it since server 66fc0884); the To date panel's ETH figures
+// do not count it.
 
 import {
   SHEET_NO_USD,
@@ -21,7 +23,7 @@ import {
 } from "@/components/shared/event-sheet";
 import type { Provenance } from "@/components/shared/provenance";
 import { FPETH, PETH, VPETH } from "@/lib/polaris/asset-catalog";
-import { big, exactUnits, pethAmountText, pethKindLabel, pethRowEffect, ZERO } from "@/lib/polaris/peth-ledger";
+import { big, exactUnits, pethAmountText, pethKindLabel, ZERO } from "@/lib/polaris/peth-ledger";
 import { pethLineProv, pethRowEthProv } from "@/lib/polaris/peth-provenance";
 import type { PethLedgerRow } from "@/lib/sources/api/polaris-peth";
 
@@ -80,7 +82,7 @@ const signed = (raw: bigint) => `${raw < ZERO ? "−" : "+"}${pethAmountText(raw
 
 /** The row's sheet, or undefined where it keeps its cells. */
 export function polarisPethSheet(row: PethLedgerRow): EventSheet | undefined {
-  if (!row.balances || pethRowEffect(row) === "not_decoded") return undefined;
+  if (!row.balances) return undefined;
   const ethIn = big(row.eth_in_raw);
   const ethOut = big(row.eth_out_raw);
   let inNoted = false;

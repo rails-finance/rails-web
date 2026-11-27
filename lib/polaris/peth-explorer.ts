@@ -5,7 +5,7 @@
 import type { EventPageContract, EventPageSlot } from "@/lib/shared/explorer-adapter";
 import { makeEventTitle } from "@/lib/shared/event-title";
 import { formatDateLong } from "@/lib/date";
-import { PETH } from "@/lib/polaris/asset-catalog";
+import { FPETH, PETH, VPETH } from "@/lib/polaris/asset-catalog";
 import { polarisPethAccountHref } from "@/lib/polaris/routes";
 import { big, PETH_EFFECTS, pethKindLabel, pethRowEffect, units, ZERO } from "@/lib/polaris/peth-ledger";
 import type { PethLedgerRow } from "@/lib/sources/api/polaris-peth";
@@ -27,15 +27,31 @@ export interface PolarisPethEventPageInput extends EventPageSlot {
 
 export function polarisPethEventPage({ address, row, event, ...slot }: PolarisPethEventPageInput): EventPageContract {
   const label = row ? pethKindLabel(row.kind) : event.actionLabel;
-  const d = row ? big(row.peth_delta_raw) : ZERO;
+  // The headline: the pETH the row moved, else its fpETH, else its vpETH
+  // (a not-decoded Morpho Blue row moves vpETH alone).
+  const head = row
+    ? [
+        { raw: big(row.peth_delta_raw), token: PETH },
+        { raw: big(row.fpeth_delta_raw), token: FPETH },
+        { raw: big(row.vpeth_delta_raw), token: VPETH },
+      ].find((m) => m.raw !== ZERO)
+    : undefined;
   return {
     heading: label,
     title: makeEventTitle(
       event,
       label,
-      // The kind and the pETH it moved, unlabelled, as a Trove event's title
-      // reads ("Repay 5K USDC"): the kind word carries the direction.
-      d !== ZERO ? [{ value: units(d < ZERO ? -d : d), symbol: PETH.symbol, address: PETH.address }] : [],
+      // The kind and the amount it moved, unlabelled, as a Trove event's
+      // title reads ("Repay 5K USDC"): the kind word carries the direction.
+      head
+        ? [
+            {
+              value: units(head.raw < ZERO ? -head.raw : head.raw),
+              symbol: head.token.symbol,
+              address: head.token.address,
+            },
+          ]
+        : [],
     ),
     facts: [
       {

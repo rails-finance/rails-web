@@ -126,3 +126,43 @@ test("with no time from the route, the note names the last block read", async ()
   assert.equal(asOf.timestamp, null);
   assert.equal(pethAsOfWords(asOf), ", as of the last block read");
 });
+
+test("a not-decoded vpETH move titles with its vpETH and keeps its one bullet", async () => {
+  const { polarisPethEventPage } = await import("../../lib/polaris/peth-explorer.ts");
+  const { eventTitleWords } = await import("../../lib/shared/event-title.ts");
+  const { pethRowBullets } = await import("../../lib/polaris/peth-ledger.ts");
+  const base = d.rows.find((r) => r.kind === "curve_buy");
+  const row = {
+    ...base,
+    kind: "morpho_vpeth_not_decoded",
+    effect: "not_decoded",
+    valuation: null,
+    eth_in_raw: "0",
+    eth_out_raw: "0",
+    curve_fee_raw: "0",
+    peth_delta_raw: "0",
+    fpeth_delta_raw: "0",
+    vpeth_delta_raw: "200000000000000",
+    lines: [
+      {
+        rule: "morpho_vpeth_not_decoded",
+        effect: "not_decoded",
+        token: "vpeth",
+        direction: "in",
+        amount_raw: "200000000000000",
+        counterparty: "0x3d6616fef672755a36d6a7c313d25a5266008cd7",
+        counterparty_role: "morpho_blue",
+        counterparty_code_size: null,
+        log_index: 1,
+      },
+    ],
+  };
+  const event = pethTimelineEvent(row, NAMES, {});
+  assert.equal(
+    eventTitleWords(polarisPethEventPage({ address: d.address, row, event }).title),
+    "Morpho Blue market (not decoded) <0.01 vpETH",
+  );
+  assert.deepEqual(pethRowBullets(row, NAMES), [
+    "Rails does not read this Morpho Blue market yet, so this vpETH move counts in no ETH figure or valuation.",
+  ]);
+});
