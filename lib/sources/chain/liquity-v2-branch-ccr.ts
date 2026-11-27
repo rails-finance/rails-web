@@ -2,7 +2,7 @@
 // (rails-ops TO-DO-ui-jobs 747): one multicall at the head block, per branch
 // TroveManager.getEntireBranchColl / getEntireBranchDebt, the PriceFeed's
 // fetchPrice (simulated, lastGoodPrice where it fails) and BorrowerOperations'
-// CCR / SCR / MCR / hasBeenShutDown. Settled in lib/liquity-v2/branch-ccr.ts.
+// CCR / SCR / MCR / BCR / hasBeenShutDown. Settled in lib/liquity-v2/branch-ccr.ts.
 // The head read is kept 30 s; a read at a named block is kept by block
 // (lib/liquity-v2/block-keyed-cache.ts); one read in flight per key.
 //
@@ -34,9 +34,10 @@ const BO_ABI = parseAbi([
   "function CCR() view returns (uint256)",
   "function SCR() view returns (uint256)",
   "function MCR() view returns (uint256)",
+  "function BCR() view returns (uint256)",
   "function hasBeenShutDown() view returns (bool)",
 ]);
-const CALLS_PER_BRANCH = 8;
+const CALLS_PER_BRANCH = 9;
 
 const TTL_MS = 30_000;
 let cached: { at: number; value: LiquityV2BranchCcrResponse } | null = null;
@@ -110,6 +111,7 @@ async function read(atBlock?: number): Promise<LiquityV2BranchCcrResponse> {
         { address: bo, abi: BO_ABI, functionName: "SCR" } as const,
         { address: bo, abi: BO_ABI, functionName: "MCR" } as const,
         { address: bo, abi: BO_ABI, functionName: "hasBeenShutDown" } as const,
+        { address: bo, abi: BO_ABI, functionName: "BCR" } as const,
       ]),
     });
     const out = emptyBranches();
@@ -126,6 +128,7 @@ async function read(atBlock?: number): Promise<LiquityV2BranchCcrResponse> {
       const scr = r(5) as bigint | null;
       const mcr = r(6) as bigint | null;
       const shut = r(7) as boolean | null;
+      const bcr = r(8) as bigint | null;
       const fetchedOk = fetched != null && fetched[0] > BigInt(0);
       const price = fetchedOk ? fetched[0] : lastGood;
       if (coll == null || debt == null || price == null || ccr == null || scr == null || mcr == null) return;
@@ -141,6 +144,7 @@ async function read(atBlock?: number): Promise<LiquityV2BranchCcrResponse> {
         ccrRaw: ccr.toString(),
         scrRaw: scr.toString(),
         mcrRaw: mcr.toString(),
+        bcrRaw: bcr == null ? null : bcr.toString(),
         shutDown: shut,
       };
     });

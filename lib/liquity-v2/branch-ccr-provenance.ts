@@ -1,11 +1,14 @@
 // Receipts for a Liquity V2 branch below its critical ratio (rails-ops
-// TO-DO-ui-jobs 747): the TCR, the CCR, and the price at which the TCR meets
-// the SCR, each at the block the branch was read at
-// (lib/sources/chain/liquity-v2-branch-ccr.ts).
+// TO-DO-ui-jobs 747, 858): the TCR, the CCR, the price at which the TCR meets
+// the SCR, and a batched Trove's floor (MCR + BCR), each at the block the
+// branch was read at (lib/sources/chain/liquity-v2-branch-ccr.ts); and the
+// TCR one Trove's close would leave, from two reads: the branch at its block
+// and the Trove's getLatestTroveData at the chain head (/api/trove/state),
+// so that receipt names each read's block and carries no single source block.
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { formatExactFromString, formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
-import type { LiquityV2BranchCcr } from "./branch-ccr";
+import { tcrPercentText, type LiquityV2BranchCcr, type TroveCloseCheck } from "./branch-ccr";
 
 const VIA = "GET /api/chain/liquity-v2/branch-ccr";
 const blockOf = (n: number) => n.toLocaleString("en-US");
@@ -49,7 +52,7 @@ const priceRow = (s: LiquityV2BranchCcr): ProvInput => ({
       : `block ${blockOf(s.blockNumber)}; fetchPrice did not answer`,
   contract: pf(s),
 });
-const constRow = (s: LiquityV2BranchCcr, name: "CCR" | "SCR", raw: string): ProvInput => ({
+const constRow = (s: LiquityV2BranchCcr, name: "CCR" | "SCR" | "MCR" | "BCR", raw: string): ProvInput => ({
   label: `BorrowerOperations.${name}()`,
   value: `${raw} (${pct(Number(raw) / 1e18, 0)})`,
   kind: "chain",
@@ -109,5 +112,68 @@ export function branchShutdownPriceProv(s: LiquityV2BranchCcr): Provenance {
       text: `To check: ask any Ethereum archive node, at block ${blockOf(s.blockNumber)}, for SCR() on the BorrowerOperations and getEntireBranchDebt() and getEntireBranchColl() on the TroveManager; multiply SCR by debt and divide by collateral (${formatUsdValue(s.shutdownPrice)}).`,
     },
     source: { block: s.blockNumber },
+  };
+}
+
+/** A batched Trove's floor, MCR + BCR: every adjustment of a Trove in a batch
+ *  must leave its ICR at or above it. Null where BCR did not answer. */
+export function branchBatchFloorProv(s: LiquityV2BranchCcr): Provenance | null {
+  if (s.bcrRaw == null) return null;
+  const floor = (BigInt(s.mcrRaw) + BigInt(s.bcrRaw)).toString();
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `${s.branch} branch floor for a delegated rate — the collateral ratio, ${pct(Number(floor) / 1e18, 0)} at block ${blockOf(s.blockNumber)}, that each change to a Trove with a delegated rate must leave it at or above (BorrowerOperations._requireICRisAboveMCRPlusBCR).`,
+    contract: bo(s),
+    via: `${VIA} · block ${blockOf(s.blockNumber)}`,
+    formula: "MCR + BCR",
+    inputs: [constRow(s, "MCR", s.mcrRaw), constRow(s, "BCR", s.bcrRaw)],
+    verify: {
+      kind: "recompute",
+      text: `To check: ask any Ethereum archive node for MCR() and BCR() on the ${s.branch} BorrowerOperations and add them.`,
+    },
+    source: { block: s.blockNumber },
+  };
+}
+
+/** The branch's TCR once this Trove is closed, which closeTrove compares with
+ *  the CCR (_requireNewTCRisAboveCCR). */
+export function troveCloseTcrProv(s: LiquityV2BranchCcr, c: TroveCloseCheck, troveId: string): Provenance {
+  const troveVia = `GET /api/trove/state/${s.branch}/${troveId}`;
+  const troveNote = "chain head, read when this page loaded";
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `${s.branch} branch TCR after this Trove's close — the branch's collateral and debt without this Trove, at ${priceLabel(s)}, give ${tcrPercentText(c.newTcrRaw)} against the CCR of ${pct(s.ccr, 0)}. BorrowerOperations.closeTrove reverts while this ratio is below the CCR. Two reads: the branch at block ${blockOf(s.blockNumber)}, the Trove at the chain head when this page loaded.`,
+    contract: bo(s),
+    via: `two reads: ${VIA} · block ${blockOf(s.blockNumber)}; ${troveVia} · chain head`,
+    formula: "(getEntireBranchColl − entireColl) × price ÷ (getEntireBranchDebt − entireDebt) ≥ CCR",
+    inputs: [
+      collRow(s),
+      {
+        label: "TroveManager.getLatestTroveData().entireColl",
+        value: `${exact(c.collRaw)} ${s.branch}`,
+        kind: "chain",
+        pclass: "state",
+        note: troveNote,
+        contract: tm(s),
+      },
+      priceRow(s),
+      debtRow(s),
+      {
+        label: "TroveManager.getLatestTroveData().entireDebt",
+        value: `${exact(c.debtRaw)} BOLD`,
+        kind: "chain",
+        pclass: "state",
+        note: troveNote,
+        contract: tm(s),
+      },
+      constRow(s, "CCR", s.ccrRaw),
+    ],
+    verify: {
+      kind: "recompute",
+      text: `To check: ask any Ethereum archive node, at block ${blockOf(s.blockNumber)}, for getEntireBranchColl() and getEntireBranchDebt() on the ${s.branch} TroveManager and fetchPrice() on the PriceFeed, and at the chain head for getLatestTroveData(${troveId}) on the same TroveManager; take the Trove's entireColl and entireDebt from the branch's, multiply the collateral left by the price, divide by the debt left and compare with CCR().`,
+    },
+    // No source block: the receipt rests on two reads, each named on its rows.
   };
 }
