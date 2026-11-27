@@ -661,8 +661,8 @@ export interface WalletTotal {
   /** Where nothing is summed: "No wallet total: Morpho Blue states no dollars". */
   gap?: string;
   /** Beside a figure, what it leaves out: "Leaves out Morpho Blue and
-   *  Fluid (no dollars) and MetaMorpho vaults, Yearn V3 and Aave vaults
-   *  (valued at the census blocks)." */
+   *  Fluid (no dollars) and MetaMorpho vaults, Yearn V3 vaults and Aave
+   *  vaults (valued at the census blocks)." */
   leaves?: string;
 }
 

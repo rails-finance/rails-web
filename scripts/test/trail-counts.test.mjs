@@ -157,8 +157,8 @@ test("the line where a vault view draws none of the shares it counts", () => {
     "Rails holds 1,180 holdings in MetaMorpho vaults for this wallet, and draws none of them here.",
   );
   assert.equal(
-    noneDrawnLine(1, "Yearn V3", "open"),
-    "Rails holds 1 open holding in Yearn V3 for this wallet, and draws none of it here.",
+    noneDrawnLine(1, "Yearn V3 vaults", "open"),
+    "Rails holds 1 open holding in Yearn V3 vaults for this wallet, and draws none of it here.",
   );
 });
 

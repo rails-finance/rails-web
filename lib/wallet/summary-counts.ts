@@ -127,7 +127,7 @@ export const VAULT_SHARES_FAMILY = "vaults";
 const VAULT_ROOTS: Record<string, string> = {
   morpho: "MetaMorpho vaults",
   "aave-v3": "Aave vaults",
-  yearn: "Yearn V3",
+  yearn: "Yearn V3 vaults",
 };
 
 /** Each census family's vault protocol root (the `family` on the stored card

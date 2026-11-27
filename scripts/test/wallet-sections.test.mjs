@@ -634,7 +634,7 @@ test("vault shares take one section per vault protocol, each with its subtotal (
   const by = Object.fromEntries(s.map((x) => [x.slug, x]));
   assert.deepEqual(Object.keys(by).sort(), ["aave-v3", "vaults-aave-v3", "vaults-morpho", "vaults-yearn"]);
   assert.equal(by["vaults-morpho"].name, "MetaMorpho vaults");
-  assert.equal(by["vaults-yearn"].name, "Yearn V3");
+  assert.equal(by["vaults-yearn"].name, "Yearn V3 vaults");
   assert.equal(by["vaults-aave-v3"].name, "Aave vaults");
   // Aave V3's lending section stands apart from Aave's vaults.
   assert.equal(by["aave-v3"].name, "Aave V3");
@@ -657,7 +657,7 @@ test("vault shares take one section per vault protocol, each with its subtotal (
   const t = walletTotal(s, "collateral");
   assert.equal(t.figure.usd, 100);
   assert.match(t.leaves, /^Leaves out /);
-  for (const name of ["MetaMorpho vaults", "Yearn V3", "Aave vaults"]) assert.ok(t.leaves.includes(name), name);
+  for (const name of ["MetaMorpho vaults", "Yearn V3 vaults", "Aave vaults"]) assert.ok(t.leaves.includes(name), name);
   assert.ok(t.leaves.endsWith("(valued at the census blocks)."));
 });
 

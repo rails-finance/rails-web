@@ -217,7 +217,7 @@ test("vault rows take one menu row per vault protocol and chain, each named", ()
   assert.equal(rows["ethereum:vaults:aave-v3"].name, "Aave vaults");
   assert.equal(rows["ethereum:vaults:aave-v3"].listing, `/ethereum/aave-v3/vaults/positions?q=${W}`);
   // Yearn V3 has no holder listing: the wallet view's vault shares.
-  assert.equal(rows["ethereum:vaults:yearn"].name, "Yearn V3");
+  assert.equal(rows["ethereum:vaults:yearn"].name, "Yearn V3 vaults");
   assert.equal(rows["ethereum:vaults:yearn"].listing, `${DASHBOARD}?protocol=vaults`);
   assert.equal(rows["base:vaults:morpho"].name, "MetaMorpho vaults");
 });
@@ -240,7 +240,7 @@ test("a vault share's protocol comes from its census family (ui-jobs 863)", () =
   // The carried root wins over the href; a row of another family has none.
   const share = { ...vault("ethereum", "morpho", 1), vault: "yearn" };
   assert.equal(vaultRootOf(share), "yearn");
-  assert.equal(vaultProtocolOf(share), "Yearn V3");
+  assert.equal(vaultProtocolOf(share), "Yearn V3 vaults");
   assert.equal(vaultRootOf({ ...pos("morpho", "open", 1), vault: "morpho" }), undefined);
   // A /summary answer cached before rows carried the root: read from the href.
   const { vault: _, ...cached } = vault("ethereum", "aave-v3", 2);

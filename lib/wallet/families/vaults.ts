@@ -155,7 +155,7 @@ function vaultsModule(chainId: typeof MAINNET_CHAIN_ID | typeof BASE_CHAIN_ID): 
     chain: chainId,
     summaryChain: base ? "base" : "ethereum",
     summaryFamily: VAULT_SHARES_FAMILY,
-    lineNames: base ? ["MetaMorpho vaults"] : ["MetaMorpho vaults", "Yearn V3", "Aave vaults"],
+    lineNames: base ? ["MetaMorpho vaults"] : ["MetaMorpho vaults", "Yearn V3 vaults", "Aave vaults"],
     drawLimit: VAULT_DRAW_LIMIT,
     async shape(rows) {
       return rows.map((r): WalletPosition => {
