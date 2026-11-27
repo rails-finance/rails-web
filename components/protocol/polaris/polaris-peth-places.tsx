@@ -18,6 +18,7 @@ import {
   POLARIS_MARKET_CONFIG,
   POLARIS_VENUES,
   POLARIS_WETH,
+  SVPETH,
   VPETH,
   type PolarisVenueKey,
 } from "@/lib/polaris/asset-catalog";
@@ -310,6 +311,33 @@ export function PolarisPethPlaces({
                     address={VPETH.address}
                     info={pethHeadProv("vpethHeld", headBlock)}
                   />
+                ) : (
+                  headUnread
+                )
+              }
+            />
+            <Place
+              id="svpeth"
+              label="svpETH in the wallet"
+              note="Staked vpETH, shown with the vpETH it converts to. Not valued here."
+              figure={
+                p.svpeth ? (
+                  <span className="flex flex-col items-end gap-0.5">
+                    <Figure
+                      raw={p.svpeth.raw}
+                      symbol={SVPETH.symbol}
+                      address={SVPETH.address}
+                      info={pethHeadProv("svpethHeld", headBlock)}
+                    />
+                    {p.svpeth.vpeth != null && p.svpeth.raw > ZERO && (
+                      <Figure
+                        raw={p.svpeth.vpeth}
+                        symbol={VPETH.symbol}
+                        address={VPETH.address}
+                        info={pethHeadProv("svpethVpeth", headBlock)}
+                      />
+                    )}
+                  </span>
                 ) : (
                   headUnread
                 )

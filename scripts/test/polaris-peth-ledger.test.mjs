@@ -154,3 +154,24 @@ test("an unread head serves the stored ledger, its freshness unchecked", () => {
   assert.equal(pethScannedTo(d), "12224000");
   assert.equal(pethLedgerUnchecked({ ...d, ledger: { ...d.ledger, complete: true } }), false);
 });
+
+test("svpETH is a place with the vpETH it converts to, and the vPETH moves are changes of place", () => {
+  const base = fx("cdp");
+  const d = {
+    ...base,
+    rollup: {
+      ...base.rollup,
+      wallet_svpeth: {
+        raw: "2000000000000000000",
+        vpeth_raw: "2100000000000000000",
+        valued: false,
+        block: "1",
+        source: "x",
+      },
+    },
+  };
+  assert.deepEqual(pethPlaces(d).svpeth, { raw: BigInt("2000000000000000000"), vpeth: BigInt("2100000000000000000") });
+  assert.equal(pethPlaces(base).svpeth, null);
+  for (const k of ["svpeth_stake", "svpeth_vpeth_in", "morpho_supply", "morpho_withdraw"])
+    assert.equal(PETH_KINDS[k].effect, "change_of_place");
+});

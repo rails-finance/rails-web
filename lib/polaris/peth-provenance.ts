@@ -78,7 +78,7 @@ export function pethLedgerSumProv(what: LedgerSum, scannedTo: string | null, unc
   };
 }
 
-type HeadRead = "pethHeld" | "spot" | "floor" | "fpethHeld" | "vpethHeld";
+type HeadRead = "pethHeld" | "spot" | "floor" | "fpethHeld" | "vpethHeld" | "svpethHeld" | "svpethVpeth";
 
 const HEAD: Record<HeadRead, { method: string; summary: string; contract: Provenance["contract"] }> = {
   pethHeld: {
@@ -105,6 +105,16 @@ const HEAD: Record<HeadRead, { method: string; summary: string; contract: Proven
     method: "balanceOf(address)",
     summary: "vpETH in the wallet — the vpETH this address holds at the head block. It is not valued.",
     contract: vpeth,
+  },
+  svpethHeld: {
+    method: "balanceOf(address)",
+    summary: "svpETH in the wallet — the svpETH shares this address holds at the head block. They are not valued.",
+    contract: { name: "Polaris svpETH vault", address: SVPETH.address },
+  },
+  svpethVpeth: {
+    method: "convertToAssets(balanceOf(address))",
+    summary: "svpETH as vpETH — the vpETH this address's svpETH shares convert to at the head block. It is not valued.",
+    contract: { name: "Polaris svpETH vault", address: SVPETH.address },
   },
 };
 

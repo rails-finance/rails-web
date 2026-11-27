@@ -66,6 +66,9 @@ export interface PethRollup {
   wallet_fpeth: PethHeadStamp & { raw: string | null; at_floor_raw: string | null };
   lp: PethLpPlace[];
   wallet_vpeth: PethHeadStamp & { raw: string | null; valued: false };
+  /** svpETH shares and the vpETH they convert to; absent on a server before
+   *  47579eb0, null with the head unread. */
+  wallet_svpeth?: (PethHeadStamp & { raw: string | null; vpeth_raw: string | null; valued: false }) | null;
 }
 
 export type PethEffect = "acquisition" | "sale" | "fee" | "change_of_place" | "income" | "exit";

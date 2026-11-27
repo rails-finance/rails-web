@@ -73,6 +73,10 @@ export const PETH_KINDS: Record<string, { effect: PethEffect; label: string }> =
   cdp_withdraw: { effect: "change_of_place", label: "Out of a CDP" },
   sp_gain: { effect: "income", label: "Stability Pool gain" },
   svpeth_reward: { effect: "income", label: "svpETH reward" },
+  svpeth_stake: { effect: "change_of_place", label: "Staked in svpETH" },
+  svpeth_vpeth_in: { effect: "change_of_place", label: "Unstaked from svpETH" },
+  morpho_supply: { effect: "change_of_place", label: "Supplied to Morpho" },
+  morpho_withdraw: { effect: "change_of_place", label: "Withdrawn from Morpho" },
   surplus_claim: { effect: "change_of_place", label: "Surplus claimed" },
   split: { effect: "change_of_place", label: "Split" },
   merge: { effect: "change_of_place", label: "Merge" },
@@ -237,6 +241,8 @@ export interface PethPlaces {
   fpeth: { raw: bigint; atFloor: bigint | null } | null;
   lp: { venue: string; address: string; share: bigint | null; lp: bigint | null }[];
   vpeth: bigint | null;
+  /** svpETH shares and the vpETH they convert to; null where not read. */
+  svpeth: { raw: bigint; vpeth: bigint | null } | null;
 }
 
 export function pethPlaces(d: PolarisPethResponse): PethPlaces {
@@ -286,6 +292,8 @@ export function pethPlaces(d: PolarisPethResponse): PethPlaces {
       lp: orNull(x.lp_balance_raw),
     })),
     vpeth: orNull(r.wallet_vpeth.raw),
+    svpeth:
+      r.wallet_svpeth?.raw != null ? { raw: big(r.wallet_svpeth.raw), vpeth: orNull(r.wallet_svpeth.vpeth_raw) } : null,
   };
 }
 
