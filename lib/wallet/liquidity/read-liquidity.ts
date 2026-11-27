@@ -18,6 +18,7 @@ import {
   type LiquiditySource,
 } from "@/lib/wallet/liquidity/sources";
 import { balancerCardRead, slipstreamCardRead, uniCardRead } from "@/lib/wallet/liquidity/cards";
+import { foundThrough } from "@/lib/balancer/provenance";
 import { PROTOCOLS } from "@/lib/shared/protocols";
 import type { ChainId } from "@/lib/shared/chains";
 import type { UniPositionsRead } from "@/lib/uniswap/types";
@@ -155,11 +156,13 @@ async function readSource(
   // fields by design and are on the explorer's wallet page.
   const headRows = (answer.data as { headRows?: number }).headRows ?? LIQUIDITY_HEAD_ROWS;
   const failed = all.slice(0, headRows).filter((n) => !n.card).length;
+  const through = s.kind === "balancer" ? foundThrough(answer.data as Partial<BalPositionsRead>) : null;
   return {
     read: {
       ...base,
       state: "ok",
       truncated: answer.data.truncated === true,
+      ...(through != null ? { foundThrough: through } : {}),
       held: all.length,
       drawn: positions.length,
       failed,

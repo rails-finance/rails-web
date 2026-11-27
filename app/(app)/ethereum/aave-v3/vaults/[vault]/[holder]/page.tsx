@@ -83,8 +83,24 @@ type Props = {
 };
 
 /** One read per request: `generateMetadata` and the page both await this, and
- *  React's cache() collapses the two into one chain read. */
-const load = cache((vault: string, holder: string | undefined) => loadAaveEthereumVault(vault, holder));
+ *  React's cache() collapses the two into one chain read. The key is lowercased,
+ *  so the metadata's typed address and the page's resolved one are one key. Under
+ *  an ENS name the metadata reads the vault without a holder, a second read. */
+const loadVault = cache((vault: string, holder: string | undefined) => loadAaveEthereumVault(vault, holder));
+const load = (vault: string, holder: string | undefined) => loadVault(vault.toLowerCase(), holder?.toLowerCase());
+
+/** The holder's stored tail, one GET per request. It needs only the two addresses, so
+ *  the page starts it beside the vault read and loadHistory takes the same promise. */
+const loadTailCached = cache(async (vault: string, holder: string) =>
+  fetchVaultTail({
+    chainId: MAINNET_CHAIN_ID,
+    vault,
+    holder,
+    loaderVersion: AAVE_VAULT_TAIL_VERSION,
+    ...((await ssrHop()) ?? undefined),
+  }),
+);
+const loadTail = (vault: string, holder: string) => loadTailCached(vault.toLowerCase(), holder.toLowerCase());
 
 const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -105,13 +121,7 @@ const loadHistory = cache(async (data: AaveEthereumVaultResponse, holder: string
   // whole-life sweep and nothing else — the gate below runs on the merged rows
   // either way (lib/sources/chain/aave-ethereum-vault-timeline.ts).
   const hop = (await ssrHop()) ?? undefined;
-  const tail = await fetchVaultTail({
-    chainId: MAINNET_CHAIN_ID,
-    vault: data.vault.address,
-    holder,
-    loaderVersion: AAVE_VAULT_TAIL_VERSION,
-    ...hop,
-  });
+  const tail = await loadTail(data.vault.address, holder);
 
   const { timeline, store, allEvents, continueBuild } = await loadAaveEthereumVaultTimelineWithTail(
     data.vault.address,
@@ -412,8 +422,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const address = vault.toLowerCase();
   if (!ADDRESS.test(address)) return { title: "Vault · Ethereum" };
   // Metadata is about the VAULT and the address AS TYPED: metadata must not
-  // make a network call of its own, so no name is resolved here.
-  const data = await load(address, undefined);
+  // make a network call of its own, so no name is resolved here. A typed address
+  // is the page's own read key, so the two share one vault read.
+  const data = await load(address, ADDRESS.test(holder) ? holder : undefined);
   if (!data.served) return { title: "Vault · Ethereum" };
   const name = data.vault.name || shortAddr(address);
   const subject = ADDRESS.test(holder) ? shortAddr(holder.toLowerCase()) : decodeURIComponent(holder);
@@ -438,6 +449,8 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
 
   const typed = decodeURIComponent(holder);
   const lookup = await resolveAaveVaultHolder(typed);
+  // The tail GET runs beside the vault read.
+  if (lookup.address) void loadTail(address, lookup.address);
   const data = await load(address, lookup.address ?? undefined);
   // `served: false` is a CHAIN answer — the enumerators ran and did not name
   // this address. A read that FAILED leaves it true, so a bad minute on the RPC

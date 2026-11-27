@@ -329,7 +329,8 @@ export const poolCallerProv = (eventType: string, coords: V3Coords, caller: stri
  *  the other leg, read from the transaction's receipt. An ERC-20 leg is its
  *  Transfer log; the chain's native coin leaves no log, and its leg is the
  *  value transfer the transaction's internal transfers list (read from the
- *  stored call tree, or Alchemy's alchemy_getAssetTransfers).
+ *  stored call tree, or Alchemy's alchemy_getAssetTransfers on the chain's
+ *  transfers endpoint).
  *  The `paired` leaf states the pairing as Rails' inference. */
 /** The pairing as Rails' inference, with the rulings that chose the leg
  *  (lib/shared/tx-legs.ts): the largest of several, fee legs left out, a

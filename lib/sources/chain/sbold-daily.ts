@@ -11,7 +11,7 @@
 // from a block with timestamp t < T, the block (T − t) / 12 later is at or
 // past T, since Ethereum's blocks are at least 12 seconds apart; from one at
 // or past T, the block (t − T) / 12 earlier bounds it from below. Waves of
-// header reads go out for every missing day at once, batched.
+// header reads go out for up to DAYS_AT_ONCE missing days at once, batched.
 //
 // RULE: a failed day read leaves a gap, never a zero; a failed getter leaves
 // a gap in its line alone. Days whose last block is at or before the vault's
@@ -34,6 +34,10 @@ const DAY_S = 86_400;
 /** Two epochs (64 slots of 12 s): a day ending closer to head than this is not cached. */
 const FINAL_S = 64 * 12;
 const SLOT_S = 12;
+/** Days read at once on a cache miss. Each open day's search sends one
+ *  header read per wave, so a cold fill stays near this many requests per
+ *  round trip on the state URL. */
+const DAYS_AT_ONCE = 6;
 /** Blocks read with the same three getters beside the days. */
 const SBOLD_MARKED_BLOCKS = [26_441_800, 26_442_100] as const;
 
@@ -190,14 +194,18 @@ async function fillDays(today: number): Promise<{ points: SboldPoint[]; cost: Co
         return { number: Number(b.number), time: Number(b.timestamp) };
       }));
   const days = Array.from({ length: YIELD_WINDOW_DAYS + 1 }, (_, i) => today - YIELD_WINDOW_DAYS - 1 + i);
-  const read = await Promise.all(
-    days.map((d) =>
-      cachedDay(d, head, cost).catch((e) => {
+  const read: (SboldPoint | null)[] = days.map(() => null);
+  let next = 0;
+  const worker = async () => {
+    while (next < days.length) {
+      const i = next++;
+      read[i] = await cachedDay(days[i], head, cost).catch((e) => {
         console.error("sBOLD daily read failed:", e);
         return null;
-      }),
-    ),
-  );
+      });
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(DAYS_AT_ONCE, days.length) }, worker));
   return { points: read.filter((p): p is SboldPoint => p != null), cost };
 }
 
