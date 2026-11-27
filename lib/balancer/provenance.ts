@@ -288,7 +288,7 @@ export function finderProv(r: BalPositionsRead): Provenance {
       `Rails's index of the Vault's BPT Transfer events naming this wallet, blocks ${n(idx.from)} to ${n(idx.to)}: ${n(idx.logs)} transfers across ${n(idx.pools)} pools`,
     tail &&
       (unread
-        ? `the Vault's Transfer logs to this wallet above block ${n(through)} were not read (${tail.unread === "slow" ? "the chain's log read was too slow" : "the chain's log read failed"}), so a pool the wallet joined after block ${n(through)} may be missing`
+        ? `the Vault's Transfer logs to this wallet above that block were not read (${tail.unread === "slow" ? "the chain's log read did not answer in time" : "the chain's log read failed"}), so a pool whose BPT the wallet received since may be missing`
         : `the Vault's Transfer logs to this wallet, blocks ${n(tail.from)} to ${n(tail.to)}: ${n(tail.logs)} across ${n(tail.pools)} pools`),
   ].filter(Boolean);
   return {

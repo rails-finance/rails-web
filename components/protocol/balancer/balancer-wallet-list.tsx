@@ -83,7 +83,7 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
       )}
       {r.positions.length === 0 ? (
         <p className="mt-3 text-sm text-rb-500" data-balancer-none="">
-          {through != null ? FRONT_DOOR.noneThrough(through.toLocaleString("en-US")) : FRONT_DOOR.none}
+          {FRONT_DOOR.none}
         </p>
       ) : (
         <>

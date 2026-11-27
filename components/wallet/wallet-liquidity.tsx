@@ -156,8 +156,8 @@ export function LiquiditySection({ read }: { read: Promise<WalletLiquidity> }) {
         ))}
         {through.map((s) => (
           <p key={s.key} className={LINE} data-wallet-liquidity-found-through={s.key}>
-            {s.what}: positions found through block {s.foundThrough!.toLocaleString("en-US")}; newer transfers did not
-            answer, so a position opened since may be missing.
+            {s.what}: newer transfers were not read, so a position opened after block{" "}
+            {s.foundThrough!.toLocaleString("en-US")} may be missing.
           </p>
         ))}
         {more.map((s) => (
