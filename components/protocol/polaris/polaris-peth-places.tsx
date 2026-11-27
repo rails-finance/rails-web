@@ -11,7 +11,7 @@ import type { ReactNode } from "react";
 import { SectionSidebar } from "@/components/shared/section-sidebar";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { TokenFigure } from "@/components/shared/token-figure";
-import { INLINE_LINK, POSITION_CARD_FRAME, SECTION_HEADING } from "@/lib/shared/ui-grammar";
+import { CARD_PAD_X, INLINE_LINK, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import {
   FPETH,
   PETH,
@@ -101,15 +101,24 @@ export function PolarisPethPlaces({
   return (
     <SectionSidebar section="flows">
       <ProvReceiptsScope registry={registry}>
-        <section className={POSITION_CARD_FRAME} data-anatomy="C24·polaris" aria-labelledby="peth-places-heading">
-          <h2 id="peth-places-heading" className={SECTION_HEADING}>
-            Where this address&rsquo;s pETH sits
-          </h2>
-          <p className="mt-1 text-xs text-rb-500">
+        {/* The Lifetime flows panel's frame and heading row (P2, F1): the
+            page's sections read as one family. */}
+        <section
+          className={`rounded-2xl bg-raised ${CARD_PAD_X} py-4`}
+          data-prov-scope="peth-places"
+          data-anatomy="C24·polaris"
+          aria-labelledby="peth-places-heading"
+        >
+          <div className="flex min-h-[28px] items-center">
+            <h2 id="peth-places-heading" className={`${SECTION_HEADING} text-rb-500`}>
+              Where this address&rsquo;s pETH sits
+            </h2>
+          </div>
+          <p className="mt-1 text-sm leading-relaxed text-rb-500">
             The list below gives one figure for each place, in that place&rsquo;s token, and links each CDP, deposit and
             loan to its page.
           </p>
-          <ul className="mt-3 divide-y divide-rb-300/40 dark:divide-rb-700/60">
+          <ul className="mt-3 divide-y divide-edge-raised">
             <Place
               id="wallet"
               label="In the wallet"

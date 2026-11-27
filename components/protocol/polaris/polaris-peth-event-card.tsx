@@ -33,6 +33,7 @@ import {
 } from "@/lib/polaris/peth-ledger";
 import { pethLineProv, pethRowEthProv, pethRowPriceProv, pethRowValuationProv } from "@/lib/polaris/peth-provenance";
 import type { PethLedgerRow } from "@/lib/sources/api/polaris-peth";
+import { polarisPethSheet } from "./polaris-peth-sheet";
 
 const short = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
 
@@ -253,7 +254,8 @@ export function PolarisPethEventCard({
     },
     caption: label,
     cells,
-    ledgers: { none: "A pETH account row holds no balance." },
+    sheet: polarisPethSheet(row),
+    ledgers: { none: "Each token's balance is its side's total." },
     explainer: {
       body:
         bullets.length > 0 ? (

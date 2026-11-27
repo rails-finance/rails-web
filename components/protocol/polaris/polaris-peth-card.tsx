@@ -227,7 +227,7 @@ export function polarisPethSlots({
     status: null,
     lifecycle: false,
     heads,
-    tag: <ListingTag market="pETH account" id={address} />,
+    tag: <ListingTag market="pETH account" />,
     counters: { lastActivityAt: lastAt, eventCount: null, liquidationCount: null, order: "age-last" },
     name: positionName({ noun: "pETH account", id: address }),
     explainer: { body: explanation },

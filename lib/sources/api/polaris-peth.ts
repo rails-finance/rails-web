@@ -123,6 +123,12 @@ export interface PethLedgerRow {
   event_price_source: string | null;
   valuation: PethValuation | null;
   zap: { token_in: string; token_out: string; amount_in: string; amount_out: string } | null;
+  /** The address's balance of each token just before and just after this
+   *  transaction, from its stored transfers; null unless status is "ok". */
+  balances?: Record<"peth" | "fpeth" | "vpeth", { before_raw: string; after_raw: string }> | null;
+  /** ETH in, ETH out and curve fees through this transaction; null unless
+   *  status is "ok". */
+  to_date?: { eth_in_raw: string; eth_out_raw: string; curve_fees_raw: string } | null;
 }
 
 /** How far the ledger lane has read (the server's fix round, 27 Nov 2026). */

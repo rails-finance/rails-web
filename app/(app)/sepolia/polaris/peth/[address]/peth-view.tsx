@@ -29,7 +29,6 @@ import { PolarisPethCard } from "@/components/protocol/polaris/polaris-peth-card
 import { PolarisPethPlaces } from "@/components/protocol/polaris/polaris-peth-places";
 import { PETH_NAMES, PolarisPethEventCard } from "@/components/protocol/polaris/polaris-peth-event-card";
 import { PETH, POLARIS_VENUES } from "@/lib/polaris/asset-catalog";
-import { POLARIS_BASE_PATH } from "@/lib/polaris/routes";
 import {
   pethAmountText,
   pethHeadlines,
@@ -217,7 +216,7 @@ export default function PethView({
   if (refused)
     return (
       <div className="py-8 space-y-6">
-        <DetailTopRow session="polaris" wallet={address} fallbackHref={POLARIS_BASE_PATH} tools={false} />
+        <DetailTopRow session="polaris" wallet={address} owner={{ wallet: address, pending: false }} tools={false} />
         <p className="text-sm text-rb-500" data-peth-refused={refused.code ?? refused.status}>
           {pethRefusalText(refused)}
         </p>
@@ -257,12 +256,15 @@ export default function PethView({
 
   return (
     <div className="py-8 space-y-6">
+      {/* The wallet heading under Back (H13), as the Trove page draws it: the
+          address is the heading, so the card leaves it out. */}
       <DetailTopRow
         session="polaris"
         wallet={address}
-        fallbackHref={POLARIS_BASE_PATH}
+        owner={{ wallet: address, pending: false }}
         assets={stripAssets}
         tools={false}
+        card
       />
       {!onEventPage && (
         <>
