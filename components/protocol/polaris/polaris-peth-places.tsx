@@ -302,7 +302,7 @@ export function PolarisPethPlaces({
             <Place
               id="vpeth"
               label="vpETH in the wallet"
-              note="Minted beside fpETH when pETH is split. Not valued here."
+              note="The part of pETH above the floor. Splitting one pETH gives one fpETH and one vpETH, and merging them gives the pETH back. Not valued here."
               figure={
                 p.vpeth != null ? (
                   <Figure
@@ -319,7 +319,7 @@ export function PolarisPethPlaces({
             <Place
               id="svpeth"
               label="svpETH in the wallet"
-              note="Staked vpETH, shown with the vpETH it converts to. Not valued here."
+              note="vpETH deposited in the svpETH vault, which supplies it to a Morpho Blue market. Shown with the vpETH it converts to. Not valued here."
               figure={
                 p.svpeth ? (
                   <span className="flex flex-col items-end gap-0.5">
