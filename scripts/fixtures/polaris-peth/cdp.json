@@ -1,0 +1,530 @@
+{
+  "address": "0xbdb7ffa6483b53670a298ab7f47389a6f625771f",
+  "deployment_id": "sepolia-2026-08",
+  "scanned_to_block": "12224000",
+  "head": {
+    "block": "12224512",
+    "source": "multicall at head (POLARIS_HEAD_RPC_URL)"
+  },
+  "prices": {
+    "spot_raw": "3200026976866559475",
+    "floor_raw": "2018944134040294996",
+    "block": "12224512",
+    "source": "multicall at head (POLARIS_HEAD_RPC_URL)"
+  },
+  "figures": {
+    "eth_in": {
+      "raw": "2000000000000000000",
+      "source": "ledger: curve buys, zap swaps from ETH or the reserve token, BuyFpToken",
+      "block": "12224000"
+    },
+    "eth_out": {
+      "raw": "0",
+      "source": "ledger: curve sells, zap swaps to ETH or the reserve token, splitter Redeem",
+      "block": "12224000"
+    },
+    "curve_fees_paid": {
+      "raw": "892078626494487",
+      "source": "ledger: feeAmount on the address's curve trades and its zap-routed ones",
+      "block": "12224000"
+    },
+    "peth_held": {
+      "raw": "19183776116146994788",
+      "head_raw": "19183776116146994788",
+      "stored_raw": "-1509952516388505910",
+      "block": "12224512",
+      "source": "multicall at head (POLARIS_HEAD_RPC_URL)",
+      "stored_block": "12224000"
+    }
+  },
+  "rollup": {
+    "wallet_peth": {
+      "raw": "19183776116146994788",
+      "at_spot_raw": "61388601089838775462",
+      "at_floor_raw": "38730972258437287990",
+      "block": "12224512",
+      "source": "multicall at head (POLARIS_HEAD_RPC_URL)"
+    },
+    "cdp_collateral": {
+      "raw": "225000055362668814",
+      "source": "polaris_cdp_updated: new_coll at the CDP's last touch",
+      "items": [
+        {
+          "market": "usdp",
+          "cdp_id": "194",
+          "coll_raw": "162500055362668814",
+          "as_of_block": "11631933",
+          "as_of_tx": "0x3fcbd2b35b83ce97c2bf8e2ddb03f9028366dffaebe70894f1df736d74d12ebe"
+        },
+        {
+          "market": "usdp",
+          "cdp_id": "195",
+          "coll_raw": "62500000000000000",
+          "as_of_block": "11631925",
+          "as_of_tx": "0xc48d2714b673aa3ab1ea918b64c65dc5fe218affaab60a8486ae31b46d8f034c"
+        }
+      ]
+    },
+    "sp_peth": {
+      "raw": "0",
+      "source": "polaris_sp_deposit_updated: stashed_bc_tokens at the deposit's last operation",
+      "items": []
+    },
+    "loans_fpeth": {
+      "raw": "100000000000000000",
+      "source": "polaris_loan_opened + polaris_loan_adjusted: fpETH collateral",
+      "items": [
+        {
+          "loan_id": "190",
+          "fpeth_raw": "100000000000000000",
+          "opened_block": "11631940"
+        }
+      ]
+    },
+    "wallet_fpeth": {
+      "raw": "9018248935379181829",
+      "at_floor_raw": "18207340787398934524",
+      "block": "12224512",
+      "source": "multicall at head (POLARIS_HEAD_RPC_URL)"
+    },
+    "lp": [
+      {
+        "venue": "venue_curve_tripool",
+        "address": "0x28b6f412904834dee78a4fa464f2089f5264770c",
+        "lp_balance_raw": "173305234208600233",
+        "lp_supply_raw": "6929611285381741268238",
+        "pool_peth_raw": "4311431934864293985571",
+        "peth_share_raw": "107826209937969589",
+        "block": "12224512",
+        "source": "multicall at head"
+      },
+      {
+        "venue": "venue_univ2_polar_peth",
+        "address": "0xdce2d72d07760cdb29604baee6271fcb1f3a7565",
+        "lp_balance_raw": "598867588040939980",
+        "lp_supply_raw": "316339669630984405586525",
+        "pool_peth_raw": "60624920707097438196659",
+        "peth_share_raw": "114769987846875466",
+        "block": "12224512",
+        "source": "multicall at head"
+      },
+      {
+        "venue": "venue_univ2_peth_weth",
+        "address": "0xb3348b1c358aa118b6304a91c48f3ee5a13f06a8",
+        "lp_balance_raw": "0",
+        "lp_supply_raw": "117620765739216387",
+        "pool_peth_raw": "814239444445395",
+        "peth_share_raw": "0",
+        "block": "12224512",
+        "source": "multicall at head"
+      }
+    ],
+    "wallet_vpeth": {
+      "raw": "7934208163635321052",
+      "valued": false,
+      "block": "12224512",
+      "source": "multicall at head (POLARIS_HEAD_RPC_URL)"
+    }
+  },
+  "rows": [
+    {
+      "tx_hash": "0xa467df7ec22fedf142cdc6d0971103766e079062d9446078ec8fe50c25a01f57",
+      "block_number": "12003344",
+      "block_timestamp": "1793082708",
+      "kind": "svpeth_reward",
+      "effect": "income",
+      "lines": [
+        {
+          "rule": "svpeth_reward",
+          "effect": "income",
+          "token": "peth",
+          "direction": "in",
+          "amount_raw": "47483611494090",
+          "counterparty": "0x7b118bd63bbe9023a2a509cecd48bc283d150539",
+          "counterparty_role": "svp_token",
+          "counterparty_code_size": null,
+          "log_index": 28
+        }
+      ],
+      "peth_delta_raw": "47483611494090",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": {
+        "kind": "peth_arrival",
+        "peth_raw": "47483611494090",
+        "basis": "spot_and_floor",
+        "block": "12003344",
+        "source": "polaris_oracle_at_block",
+        "price_at_block_filled": true,
+        "eth_raw": null,
+        "eth_at_spot_raw": "146214171443725",
+        "eth_at_floor_raw": "89208914599905"
+      },
+      "zap": null
+    },
+    {
+      "tx_hash": "0xe3fed079b2ce3ca42f4d95f442739513e232ece5e072f122655898e8b3371c21",
+      "block_number": "12003315",
+      "block_timestamp": "1793082360",
+      "kind": "split",
+      "effect": "change_of_place",
+      "lines": [
+        {
+          "rule": "split",
+          "effect": "change_of_place",
+          "token": "fpeth",
+          "direction": "in",
+          "amount_raw": "1000000000000000000",
+          "counterparty": "0x0000000000000000000000000000000000000000",
+          "counterparty_role": "zero",
+          "counterparty_code_size": null,
+          "log_index": 203
+        },
+        {
+          "rule": "split",
+          "effect": "change_of_place",
+          "token": "vpeth",
+          "direction": "in",
+          "amount_raw": "1000000000000000000",
+          "counterparty": "0x0000000000000000000000000000000000000000",
+          "counterparty_role": "zero",
+          "counterparty_code_size": null,
+          "log_index": 204
+        },
+        {
+          "rule": "split",
+          "effect": "change_of_place",
+          "token": "peth",
+          "direction": "out",
+          "amount_raw": "1000000000000000000",
+          "counterparty": "0x94220c1c340336527c719bcf06067ca7769ac185",
+          "counterparty_role": "fp_token_splitter",
+          "counterparty_code_size": null,
+          "log_index": 205
+        }
+      ],
+      "peth_delta_raw": "-1000000000000000000",
+      "fpeth_delta_raw": "1000000000000000000",
+      "vpeth_delta_raw": "1000000000000000000",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": null
+    },
+    {
+      "tx_hash": "0xdf9a8352742188991d5e830a656237df28e145041de337fe3a2a8a292a1e4663",
+      "block_number": "11631953",
+      "block_timestamp": "1788506088",
+      "kind": "split",
+      "effect": "change_of_place",
+      "lines": [
+        {
+          "rule": "split",
+          "effect": "change_of_place",
+          "token": "fpeth",
+          "direction": "in",
+          "amount_raw": "10000000000000000",
+          "counterparty": "0x0000000000000000000000000000000000000000",
+          "counterparty_role": "zero",
+          "counterparty_code_size": null,
+          "log_index": 4
+        },
+        {
+          "rule": "split",
+          "effect": "change_of_place",
+          "token": "vpeth",
+          "direction": "in",
+          "amount_raw": "10000000000000000",
+          "counterparty": "0x0000000000000000000000000000000000000000",
+          "counterparty_role": "zero",
+          "counterparty_code_size": null,
+          "log_index": 5
+        },
+        {
+          "rule": "split",
+          "effect": "change_of_place",
+          "token": "peth",
+          "direction": "out",
+          "amount_raw": "10000000000000000",
+          "counterparty": "0x94220c1c340336527c719bcf06067ca7769ac185",
+          "counterparty_role": "fp_token_splitter",
+          "counterparty_code_size": null,
+          "log_index": 6
+        }
+      ],
+      "peth_delta_raw": "-10000000000000000",
+      "fpeth_delta_raw": "10000000000000000",
+      "vpeth_delta_raw": "10000000000000000",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": null
+    },
+    {
+      "tx_hash": "0x55c238b509c63f1d355ec68418d9e2421356eb12e9c6c7beac0ace1adc0ca56d",
+      "block_number": "11631940",
+      "block_timestamp": "1788505920",
+      "kind": "loan_collateral",
+      "effect": "change_of_place",
+      "lines": [
+        {
+          "rule": "loan_collateral",
+          "effect": "change_of_place",
+          "token": "fpeth",
+          "direction": "out",
+          "amount_raw": "100000000000000000",
+          "counterparty": "0xcaa0757808a96f9f4ee76c04256536d6c17e6e27",
+          "counterparty_role": "reserve_loans_manager",
+          "counterparty_code_size": null,
+          "log_index": 38
+        }
+      ],
+      "peth_delta_raw": "0",
+      "fpeth_delta_raw": "-100000000000000000",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": null
+    },
+    {
+      "tx_hash": "0xe399725d16280396475000c08971d0fa610c20e595c19886686033198ff6765e",
+      "block_number": "11631936",
+      "block_timestamp": "1788505872",
+      "kind": "cdp_deposit",
+      "effect": "change_of_place",
+      "lines": [
+        {
+          "rule": "cdp_deposit",
+          "effect": "change_of_place",
+          "token": "peth",
+          "direction": "out",
+          "amount_raw": "100000000000000000",
+          "counterparty": "0xbdc1fe97e787ae7f653ffbccd74ec49814fe6aa1",
+          "counterparty_role": "usdp_cdp_manager",
+          "counterparty_code_size": null,
+          "log_index": 19
+        }
+      ],
+      "peth_delta_raw": "-100000000000000000",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": null
+    },
+    {
+      "tx_hash": "0x3fcbd2b35b83ce97c2bf8e2ddb03f9028366dffaebe70894f1df736d74d12ebe",
+      "block_number": "11631933",
+      "block_timestamp": "1788505836",
+      "kind": "cdp_deposit",
+      "effect": "change_of_place",
+      "lines": [
+        {
+          "rule": "cdp_deposit",
+          "effect": "change_of_place",
+          "token": "peth",
+          "direction": "out",
+          "amount_raw": "100000000000000000",
+          "counterparty": "0xbdc1fe97e787ae7f653ffbccd74ec49814fe6aa1",
+          "counterparty_role": "usdp_cdp_manager",
+          "counterparty_code_size": null,
+          "log_index": 10
+        }
+      ],
+      "peth_delta_raw": "-100000000000000000",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": null
+    },
+    {
+      "tx_hash": "0x5f494c92be38b930844f1a878a7689fb5bc27a24747d29fdbba08123840f4415",
+      "block_number": "11631930",
+      "block_timestamp": "1788505800",
+      "kind": "cdp_deposit",
+      "effect": "change_of_place",
+      "lines": [
+        {
+          "rule": "cdp_deposit",
+          "effect": "change_of_place",
+          "token": "peth",
+          "direction": "out",
+          "amount_raw": "100000000000000000",
+          "counterparty": "0xbdc1fe97e787ae7f653ffbccd74ec49814fe6aa1",
+          "counterparty_role": "usdp_cdp_manager",
+          "counterparty_code_size": null,
+          "log_index": 53
+        }
+      ],
+      "peth_delta_raw": "-100000000000000000",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": null
+    },
+    {
+      "tx_hash": "0xc48d2714b673aa3ab1ea918b64c65dc5fe218affaab60a8486ae31b46d8f034c",
+      "block_number": "11631925",
+      "block_timestamp": "1788505728",
+      "kind": "cdp_deposit",
+      "effect": "change_of_place",
+      "lines": [
+        {
+          "rule": "cdp_deposit",
+          "effect": "change_of_place",
+          "token": "peth",
+          "direction": "out",
+          "amount_raw": "100000000000000000",
+          "counterparty": "0xbdc1fe97e787ae7f653ffbccd74ec49814fe6aa1",
+          "counterparty_role": "usdp_cdp_manager",
+          "counterparty_code_size": null,
+          "log_index": 36
+        }
+      ],
+      "peth_delta_raw": "-100000000000000000",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": null
+    },
+    {
+      "tx_hash": "0x27b6e8f2a99520aaf8c3851921e0af0a8eb947f705578142b33ac70a6c0423a0",
+      "block_number": "11631922",
+      "block_timestamp": "1788505692",
+      "kind": "cdp_deposit",
+      "effect": "change_of_place",
+      "lines": [
+        {
+          "rule": "cdp_deposit",
+          "effect": "change_of_place",
+          "token": "peth",
+          "direction": "out",
+          "amount_raw": "100000000000000000",
+          "counterparty": "0xbdc1fe97e787ae7f653ffbccd74ec49814fe6aa1",
+          "counterparty_role": "usdp_cdp_manager",
+          "counterparty_code_size": null,
+          "log_index": 11
+        }
+      ],
+      "peth_delta_raw": "-100000000000000000",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": null
+    },
+    {
+      "tx_hash": "0x8946c2b2657a41ef96f4eebbc7da9fdf3156858c4a157c1bf7c152efc5ce8303",
+      "block_number": "11631910",
+      "block_timestamp": "1788505548",
+      "kind": "zap_in",
+      "effect": "acquisition",
+      "lines": [
+        {
+          "rule": "zap_in",
+          "effect": "acquisition",
+          "token": "vpeth",
+          "direction": "in",
+          "amount_raw": "1353516465238884144",
+          "counterparty": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8",
+          "counterparty_role": "zap_router",
+          "counterparty_code_size": null,
+          "log_index": 20
+        }
+      ],
+      "peth_delta_raw": "0",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "1353516465238884144",
+      "eth_in_raw": "1000000000000000000",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "446465587898681",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": {
+        "token_in": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+        "token_out": "0x43cc4978e11bc1e1d8cfcd8348cb7e7246c49b6e",
+        "amount_in": "1000000000000000000",
+        "amount_out": "1353516465238884144"
+      }
+    },
+    {
+      "tx_hash": "0x8a2c726a9b443538efd42d3623cafbc36f431ffd1dd0c5855ae98a0b2df511d6",
+      "block_number": "11631905",
+      "block_timestamp": "1788505440",
+      "kind": "zap_out",
+      "effect": "sale",
+      "lines": [
+        {
+          "rule": "zap_out",
+          "effect": "sale",
+          "token": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+          "direction": "out",
+          "amount_raw": "1000000000000000000",
+          "counterparty": "0xbdb7ffa6483b53670a298ab7f47389a6f625771f",
+          "counterparty_role": "zap_router",
+          "counterparty_code_size": null,
+          "log_index": null
+        }
+      ],
+      "peth_delta_raw": "0",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "1000000000000000000",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "445613038595806",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": {
+        "token_in": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+        "token_out": "0x5543ca71ed8c88daf217488b1808994e080d925b",
+        "amount_in": "1000000000000000000",
+        "amount_out": "1036212011758386063997"
+      }
+    }
+  ],
+  "code_sizes_read": {
+    "read": 1,
+    "outside_counterparties": 0,
+    "capped": false
+  }
+}

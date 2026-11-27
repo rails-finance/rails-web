@@ -131,6 +131,10 @@ export interface HolderStripProps {
    *  drawn only for a protocol the /wallet page reads (`WALLET_PROTOCOLS`):
    *  a page that leaves the protocol out would answer the link with nothing. */
   protocol?: string;
+  /** A page of the protocol's that states the wallet as one account (N7.4):
+   *  Polaris's pETH account (ui-jobs 865). A foot link beside the wallet
+   *  link, drawn whatever the wallet holds. */
+  accountLink?: { href: string; label: string };
 }
 
 /** RevealTip's bubble is sized for a number (nowrap, tabular figures); a
@@ -204,6 +208,21 @@ function HouseFigure({ leg, figure }: { leg: HolderLeg; figure: NonNullable<Hold
   );
 }
 
+/** The account page's foot link (N7.4). */
+function AccountLink({ link, gap = false }: { link: { href: string; label: string }; gap?: boolean }) {
+  return (
+    <Link
+      href={link.href}
+      prefetch={false}
+      className={`mt-2 text-sm ${gap ? "ml-4 " : ""}${FOOT_LINK}`}
+      data-holder-account-link=""
+      data-anatomy="N7.4"
+    >
+      {link.label}
+    </Link>
+  );
+}
+
 export function HolderStrip({
   countsLine,
   counts,
@@ -214,19 +233,25 @@ export function HolderStrip({
   protocol,
   positions,
   kinds,
+  accountLink,
   scoped = false,
 }: HolderStripProps & {
   /** Drawn inside a page's receipts scope (the wallet page, ui-jobs 738):
    *  its receipts open in that page's inspector. */
   scoped?: boolean;
 }) {
-  if (positions != null && positions < 2) return null;
+  if (positions != null && positions < 2)
+    return accountLink ? (
+      <div className="mb-5" data-holder-account-only="">
+        <AccountLink link={accountLink} />
+      </div>
+    ) : null;
   const Scope = scoped ? Fragment : ProvUnscoped;
   const open = counts.open + (kinds ?? []).reduce((n, k) => n + k.open, 0);
   const totals = !truncated && legs.length > 0 && (positions == null || open >= 2);
   const walletHref = walletPageHref(protocol, wallet);
   // The wallet page's sections pass no counts sentence: their cards are under it.
-  if (!countsLine && !totals && !note && !walletHref) return null;
+  if (!countsLine && !totals && !note && !walletHref && !accountLink) return null;
   return (
     // A BAND, not a card: the raised rounded surface belongs to a position, and
     // this states something about several of them. A rule under it separates it
@@ -312,6 +337,7 @@ export function HolderStrip({
             Everything this wallet holds
           </Link>
         )}
+        {accountLink && <AccountLink link={accountLink} gap={walletHref != null} />}
       </div>
     </Scope>
   );

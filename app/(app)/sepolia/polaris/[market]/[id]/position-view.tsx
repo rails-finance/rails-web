@@ -66,6 +66,7 @@ import { rateStepNotesFor, liveRateStepNote, type MarketNote } from "@/lib/share
 import { curvePriceAtBlockProv, liveCurvePriceProv, liveMedianiserProv } from "@/lib/polaris/live-provenance";
 import { usePolarisUiState } from "@/hooks/usePolarisUiState";
 import { polarisExplorer } from "@/lib/polaris/explorer";
+import { polarisOwnerMenuItems } from "@/components/protocol/polaris/polaris-owner-menu";
 
 /** What the ETH/USD row is, and why it is in the menu. */
 const ETH_USD_LABEL = "ETH/USD: the protocol's medianiser";
@@ -397,7 +398,12 @@ export default function PolarisPositionView({
         <DetailTopRow
           session="polaris"
           wallet={view?.owner ?? null}
-          owner={{ wallet: view?.owner ?? null, pending: loading, wrap: view ? polarisOwnerWrap(view) : undefined }}
+          owner={{
+            wallet: view?.owner ?? null,
+            pending: loading,
+            wrap: view ? polarisOwnerWrap(view) : undefined,
+            menuItems: polarisOwnerMenuItems(view?.owner),
+          }}
           assets={stripAssets}
           closed={view != null && view.status !== "open"}
           closing={closing}

@@ -11,6 +11,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { dolomiteBalanceAction, DOLOMITE_BALANCE_ACTION_LABELS } from "@/lib/dolomite/balance-action";
 import { isNoChangeAdjust, TROVE_DELTA_EPSILON } from "@/lib/liquity/trove-ops";
 import { polarisFilterKey } from "@/lib/polaris/row-kinds";
+import { PETH_ACTION_LEGS, PETH_EFFECT_LABELS, pethActionLegs } from "@/lib/polaris/peth-ledger";
 import {
   isLiquityEvent,
   isAaveV4Event,
@@ -59,6 +60,8 @@ export const ACTION_LEGS: Record<string, { key: string; label: string }[]> = {
     { key: "adjustPosition.borrow", label: "Borrowed" },
     { key: "adjustPosition.repay", label: "Repaid" },
   ],
+  // A Polaris pETH account's effects, each kind beneath (ui-jobs 865).
+  ...PETH_ACTION_LEGS,
 };
 
 const LEG_LABEL = new Map(Object.values(ACTION_LEGS).flatMap((legs) => legs.map((l) => [l.key, l.label] as const)));
@@ -72,6 +75,9 @@ export const actionLegParent = (key: string): string | null => LEG_PARENT.get(ke
 /** An event's legs under its umbrella type, or null where its type has none
  *  (or the event moved nothing a leg names). */
 export function getEventActionLegs(e: BaseActivityEvent): string[] | null {
+  // A pETH account row: its kind under its effect.
+  const peth = pethActionLegs(e.actionType, e.actionLabel);
+  if (peth) return peth;
   if (isLiquityEvent(e)) {
     const ctx = e.context.data;
     if (ctx.operation !== "adjustTrove" || !ctx.troveOperation || isNoChangeAdjust(ctx)) return null;
@@ -322,6 +328,9 @@ export function getEventAssetKeys(e: BaseActivityEvent): string[] {
     found.push(e.context.data.assetSymbol);
   } else if (isPwnEvent(e)) {
     found.push(e.context.data.collateralSymbol, e.context.data.creditSymbol);
+  } else if (e.actionType.startsWith("peth.")) {
+    // A pETH account row: the tokens its lines moved.
+    for (const f of e.flows) found.push(f.tokenSymbol);
   }
   const keys: string[] = [];
   for (const sym of found) if (sym && !keys.includes(sym)) keys.push(sym);
@@ -769,6 +778,7 @@ const ALCHEMIX_OP_LABELS: Record<string, string> = {
  * different roster's meaning for the same key (Moonwell's "mint" — a supply).
  */
 const PROTOCOL_OP_LABELS: Record<string, Record<string, string>> = {
+  "polaris-peth": PETH_EFFECT_LABELS,
   "liquity-v2-troves": LIQUITY_OP_LABELS,
   "aave-v4": AAVE_V4_OP_LABELS,
   "aave-v3": AAVE_V3_OP_LABELS,

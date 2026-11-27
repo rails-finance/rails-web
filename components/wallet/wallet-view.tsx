@@ -524,7 +524,7 @@ export function WalletView({
   const missing = unanswered.map((u) => u.what);
   // The reads that stop the wallet total (`total: false` stops none).
   const blocking = unanswered.filter((u) => u.total !== false).map((u) => u.what);
-  const sections = walletSections(all, { bands: !filtered, unanswered });
+  const sections = walletSections(all, { bands: !filtered, unanswered, address });
   // A vault protocol whose shares the trail counts and the read draws none
   // of (each past its chain's draw limit): its section is its name, its
   // count and its undrawn lines (ui-jobs 863). A vault share is a deposit.
