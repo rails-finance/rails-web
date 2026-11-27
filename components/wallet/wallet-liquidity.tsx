@@ -85,9 +85,10 @@ function useLiquidityView(l: WalletLiquidity) {
   );
   const ceiling = sources.some((s) => s.state === "ceiling");
   const truncated = sources.filter((s) => s.state === "ok" && s.truncated);
+  const through = sources.filter((s) => s.state === "ok" && s.foundThrough != null);
   const more = sources.filter((s) => s.state === "ok" && s.held > s.drawn + s.failed);
-  const lines = unread.length > 0 || ceiling || truncated.length > 0 || more.length > 0;
-  return { scoped, unread, ceiling, truncated, more, lines };
+  const lines = unread.length > 0 || ceiling || truncated.length > 0 || through.length > 0 || more.length > 0;
+  return { scoped, unread, ceiling, truncated, through, more, lines };
 }
 
 /** `children` once the liquidity read has settled with no position drawn and every route
@@ -99,7 +100,7 @@ export function WhenLiquidityEmpty({ read, children }: { read: Promise<WalletLiq
 
 export function LiquiditySection({ read }: { read: Promise<WalletLiquidity> }) {
   const l = use(read);
-  const { scoped, unread, ceiling, truncated, more, lines } = useLiquidityView(l);
+  const { scoped, unread, ceiling, truncated, through, more, lines } = useLiquidityView(l);
   if (scoped.rows.length === 0 && !lines) return null;
   return (
     <section
@@ -151,6 +152,12 @@ export function LiquiditySection({ read }: { read: Promise<WalletLiquidity> }) {
         {truncated.map((s) => (
           <p key={s.key} className={LINE} data-wallet-liquidity-truncated={s.key}>
             {s.what}: the wallet holds more positions than one read takes; the first are read.
+          </p>
+        ))}
+        {through.map((s) => (
+          <p key={s.key} className={LINE} data-wallet-liquidity-found-through={s.key}>
+            {s.what}: newer transfers were not read, so a position opened after block{" "}
+            {s.foundThrough!.toLocaleString("en-US")} may be missing.
           </p>
         ))}
         {more.map((s) => (
