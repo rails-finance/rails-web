@@ -122,7 +122,7 @@ export function noneDrawnLine(n: number, protocol: string, status?: "open" | "cl
  *  counts hold, then each position read at visit they do not, so the
  *  dashboard's count matches the cards it draws. `slugOf` gives a visit
  *  position's chain as the counts name it; a chain it does not know is left
- *  out. The position pages' /summary count stays stored-only. */
+ *  out. */
 export function trailWithVisited<V extends Omit<WalletCountsPosition, "chain"> & { chain: unknown }>(
   stored: WalletCountsPosition[],
   visited: V[],
