@@ -168,3 +168,18 @@ test("a summary row keeps its market and id where it states them", () => {
   assert.equal(summaryPositionCrumb({ positionId: w, noun: "Position", chainName: "Arbitrum" }, w), "Arbitrum");
   assert.equal(summaryPositionCrumb({ positionId: "31245", market: "WETH", noun: "Trove" }, w), "WETH · #31245");
 });
+
+test("a vault share reads by its share symbol (ui-jobs 862)", () => {
+  const w = "0xaa3e1a91fc83723e527062ff929a357354d10dcb";
+  const v = "0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2";
+  const row = (market) => ({
+    positionId: `${v}-${w}`,
+    ...(market ? { market } : {}),
+    noun: "Holding",
+    chainName: "Base",
+  });
+  assert.equal(summaryPositionCrumb(row("steakUSDC"), w), "steakUSDC");
+  assert.equal(summaryPositionCrumb(row(), w), "Holding");
+  // The holder card's name gives the same crumb.
+  assert.equal(positionCrumb(positionName({ market: "steakUSDC", noun: "Holding", id: w }), w), "steakUSDC");
+});

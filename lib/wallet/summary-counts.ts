@@ -23,6 +23,9 @@ export interface WalletCountsPosition {
   /** The market or branch the position sits in, as the wallet view names it
    *  ("Core", "WETH"); the positions menu's crumb names read it. */
   market?: string;
+  /** A vault share's asset symbol, for the icon before its name in the
+   *  positions menu (ui-jobs 862). */
+  asset?: string;
 }
 
 export interface WalletCountsFamily {
