@@ -76,8 +76,11 @@ export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ vault: string; holder: string }> };
 
 /** One read per request: `generateMetadata` and the page both await this, and
- *  React's cache() collapses the two into one chain read. */
-const load = cache((vault: string, holder: string | undefined) => loadYearnEthereumVault(vault, holder));
+ *  React's cache() collapses the two into one chain read. The key is lowercased,
+ *  so the metadata's typed address and the page's resolved one are one key. Under
+ *  an ENS name the metadata reads the vault without a holder, a second read. */
+const loadVault = cache((vault: string, holder: string | undefined) => loadYearnEthereumVault(vault, holder));
+const load = (vault: string, holder: string | undefined) => loadVault(vault.toLowerCase(), holder?.toLowerCase());
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
@@ -319,8 +322,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const address = vault.toLowerCase();
   if (!(await isYearnRosterVault(address))) return { title: "Yearn V3 vault" };
   // Metadata is about the VAULT and the address AS TYPED: metadata must not
-  // make a network call of its own, so no name is resolved here.
-  const data = await load(address, undefined);
+  // make a network call of its own, so no name is resolved here. A typed address
+  // is the page's own read key, so the two share one vault read.
+  const data = await load(address, ADDRESS.test(holder) ? holder : undefined);
   const name = data.vault.name ?? data.vault.censusName;
   const subject = ADDRESS.test(holder) ? shortAddress(holder.toLowerCase()) : decodeURIComponent(holder);
   return sectionPositionMetadata({

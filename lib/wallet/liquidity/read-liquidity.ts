@@ -156,7 +156,7 @@ async function readSource(
   // fields by design and are on the explorer's wallet page.
   const headRows = (answer.data as { headRows?: number }).headRows ?? LIQUIDITY_HEAD_ROWS;
   const failed = all.slice(0, headRows).filter((n) => !n.card).length;
-  const through = s.kind === "balancer" ? foundThrough(answer.data as BalPositionsRead) : null;
+  const through = s.kind === "balancer" ? foundThrough(answer.data as Partial<BalPositionsRead>) : null;
   return {
     read: {
       ...base,
