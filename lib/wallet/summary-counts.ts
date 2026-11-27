@@ -26,6 +26,9 @@ export interface WalletCountsPosition {
   /** A vault share's asset symbol, for the icon before its name in the
    *  positions menu (ui-jobs 862). */
   asset?: string;
+  /** That asset's address, from the census (rails-server's wallet route
+   *  reads it into the card as `assetAddress`). */
+  assetAddress?: string;
   /** A vault share's protocol root (morpho, aave-v3, yearn) from its census
    *  family (`vaultRootOfCensus`; ui-jobs 863). Read through `vaultRootOf`. */
   vault?: string;

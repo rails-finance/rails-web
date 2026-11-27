@@ -38,6 +38,7 @@ import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { CHAINS, chainMeta, type ChainId } from "@/lib/shared/chains";
+import { ChainProvider } from "@/lib/shared/chain-context";
 import { menuProtocolOf, protocolEntryOf, summaryCrumb } from "@/lib/wallet/position-protocol";
 import { walletProtocol, walletProtocolHref } from "@/lib/wallet/wallet-filters";
 import {
@@ -452,10 +453,20 @@ export function WalletPositionsMenu({
                         <ChainGlyph id={chainIdOf(p.chain)} className="size-3.5 shrink-0" />
                       </span>
                       {/* A vault share's asset, its symbol in the tip: steakUSDC and
-                          gtUSDCp share USDC's mark (ui-jobs 862). */}
+                          gtUSDCp share USDC's mark (ui-jobs 862). The census
+                          address finds a mark the symbol does not (mkUSD,
+                          yPRISMA), under the row's chain. */}
                       {p.asset && (
                         <span className="inline-flex shrink-0" title={p.asset} data-wallet-position-asset={p.asset}>
-                          <TokenChipIcon symbol={p.asset} size={14} filterable={false} untitled />
+                          <ChainProvider chainId={chainIdOf(p.chain)}>
+                            <TokenChipIcon
+                              symbol={p.asset}
+                              address={p.assetAddress}
+                              size={14}
+                              filterable={false}
+                              untitled
+                            />
+                          </ChainProvider>
                         </span>
                       )}
                       <span className="min-w-0 truncate">{summaryCrumb(p, address)}</span>
