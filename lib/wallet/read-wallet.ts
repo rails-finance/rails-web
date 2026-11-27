@@ -71,8 +71,9 @@ import {
 import { SP_DEPLOYMENTS } from "@/lib/liquity-v2/sp-deployment";
 import { countedRow, withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
-import type { WalletCounts } from "@/lib/wallet/summary-counts";
-import { countsOf, summaryPositions } from "@/lib/wallet/trail-counts";
+import type { WalletCounts, WalletCountsChain } from "@/lib/wallet/summary-counts";
+import { CHAINS, type ChainId } from "@/lib/shared/chains";
+import { countsOf, summaryPositions, trailWithVisited } from "@/lib/wallet/trail-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
 import { explorerName, PROTOCOLS } from "@/lib/shared/protocols";
 import { LIQUIDITY_SOURCES } from "@/lib/wallet/liquidity/sources";
@@ -655,10 +656,26 @@ async function readWalletInScope(address: string, readerIp: string | undefined, 
     ms: Date.now() - t0,
     protocol: opts.protocol,
     held,
-    trail: (await trailCounts(address, summary, t0)).positions,
+    // The stored positions, then the ones read at visit (H13.2): the
+    // dashboard counts the cards it draws; the position pages stay stored-only.
+    trail: trailWithVisited((await trailCounts(address, summary, t0)).positions, visitedAll.positions, slugOf),
     ...(failed.length || visited.failed.length ? { partial: [...failed.map((x) => x.what), ...visited.failed] } : {}),
   };
 }
+
+/** A chain id as the counts name it ("optimism"); none for a chain they do not count. */
+const COUNTED_CHAINS = new Set<string>([
+  "ethereum",
+  "base",
+  "arbitrum",
+  "optimism",
+  "arc",
+  "sepolia",
+] satisfies WalletCountsChain[]);
+const slugOf = (id: ChainId): WalletCountsChain | undefined => {
+  const slug = CHAINS[id]?.slug;
+  return slug && COUNTED_CHAINS.has(slug) ? (slug as WalletCountsChain) : undefined;
+};
 
 // 60 s per address, and one read at a time per address: a page and its route
 // asking together share the read.

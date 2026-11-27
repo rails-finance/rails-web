@@ -117,3 +117,33 @@ export function noneDrawnLine(n: number, protocol: string, status?: "open" | "cl
   const noun = `${status ? `${status} ` : ""}${n === 1 ? "holding" : "holdings"}`;
   return `Rails holds ${n.toLocaleString("en-US")} ${noun} in ${protocol} for this wallet, and draws none of ${n === 1 ? "it" : "them"} here.`;
 }
+
+/** The wallet view's trail (H13.2; ui-jobs 856): the stored positions the
+ *  counts hold, then each position read at visit they do not, so the
+ *  dashboard's count matches the cards it draws. `slugOf` gives a visit
+ *  position's chain as the counts name it; a chain it does not know is left
+ *  out. The position pages' /summary count stays stored-only. */
+export function trailWithVisited<V extends Omit<WalletCountsPosition, "chain"> & { chain: unknown }>(
+  stored: WalletCountsPosition[],
+  visited: V[],
+  slugOf: (chain: V["chain"]) => WalletCountsPosition["chain"] | undefined,
+): WalletCountsPosition[] {
+  const seen = new Set(stored.map((p) => `${p.chain}:${p.family}:${p.positionId.toLowerCase()}`));
+  const out = [...stored];
+  for (const v of visited) {
+    const chain = slugOf(v.chain);
+    if (!chain) continue;
+    const k = `${chain}:${v.family}:${v.positionId.toLowerCase()}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push({
+      chain,
+      family: v.family,
+      positionId: v.positionId,
+      status: v.status,
+      href: v.href,
+      ...(v.market ? { market: v.market } : {}),
+    });
+  }
+  return out;
+}

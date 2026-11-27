@@ -5,7 +5,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { summaryPositions, countsOf, vaultUndrawn, noneDrawnLine } = await import("../../lib/wallet/trail-counts.ts");
+const { summaryPositions, countsOf, vaultUndrawn, noneDrawnLine, trailWithVisited } = await import(
+  "../../lib/wallet/trail-counts.ts"
+);
 
 const W = "0x3df83ec9d2b62bb9bb83eba1218a202564bb67da";
 const COMET_A = "0x9c4ec768c28520b50860ea7a15bd7213a9ff58bf";
@@ -152,4 +154,33 @@ test("the line where a vault view draws none of the shares it counts", () => {
     noneDrawnLine(1, "Yearn V3", "open"),
     "Rails holds 1 open holding in Yearn V3 for this wallet, and draws none of it here.",
   );
+});
+
+test("the wallet view's trail adds the positions read at visit that the stored ones lack", () => {
+  const slugOf = (id) => ({ 1: "ethereum", 10: "optimism", 5042: "arc" })[id];
+  const stored = [row("ethereum", "aave-v3", W, "open", { market: "Core" })];
+  const visited = [
+    // Already stored: counted once, by any case of its id.
+    {
+      chain: 1,
+      family: "aave-v3",
+      positionId: W.toUpperCase().replace("0X", "0x"),
+      status: "open",
+      href: "/x",
+      market: "Core",
+    },
+    { chain: 10, family: "aave-v3", positionId: W, status: "open", href: `/optimism/aave-v3/${W}` },
+    { chain: 5042, family: "morpho", positionId: "0xabc", status: "closed", href: null, market: "USDC / WETH" },
+    // A chain the counts do not name is left out.
+    { chain: 4663, family: "aave-v3", positionId: W, status: "open", href: null },
+  ];
+  const trail = trailWithVisited(stored, visited, slugOf);
+  assert.deepEqual(
+    trail.map((p) => `${p.chain}:${p.family}:${p.status}`),
+    ["ethereum:aave-v3:open", "optimism:aave-v3:open", "arc:morpho:closed"],
+  );
+  assert.equal(trail[2].market, "USDC / WETH");
+  assert.equal("market" in trail[1], false);
+  // The stored list stands as it was: the position pages count it alone.
+  assert.equal(stored.length, 1);
 });

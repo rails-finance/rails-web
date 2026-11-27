@@ -335,9 +335,10 @@ export interface WalletRead {
   held: { slug: string; name: string; positions: number }[];
   /** Every counted position of the wallet as the heading's trail reads it
    *  (H13.4; ui-jobs 856), whatever protocol the read is narrowed to: the
-   *  /summary route's positions, by the same rule (`countsFromSummary`), so
-   *  the dashboard and the position pages count alike. The positions read
-   *  at visit are not among them. */
+   *  /summary route's positions, by the same rule (`countsFromSummary`),
+   *  then each position read at visit (`trailWithVisited`), so the
+   *  dashboard counts the cards it draws. The position pages count the
+   *  stored positions alone. */
   trail?: WalletCountsPosition[];
   /** The listing reads that did not answer, by what they read: the answer
    *  is part of the wallet, states no wallet total and is not kept. */

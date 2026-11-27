@@ -590,8 +590,8 @@ export function WalletView({
               ) : (
                 // The dashboard's line is the positions menu, the trail's
                 // first crumb, as the current page, built from this read's
-                // trail: it counts as the position pages' /summary does,
-                // the positions read at visit left out (ui-jobs 856).
+                // trail: the stored positions and the ones read at visit,
+                // so it counts the cards drawn (H13.2; ui-jobs 856).
                 trail.length > 0 && (
                   <div className="flex" data-wallet-count={trail.length}>
                     <WalletPositionsMenu wallet={address} page="wallet" search="" onDashboard positions={trail} />
