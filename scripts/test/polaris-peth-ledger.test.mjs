@@ -188,6 +188,7 @@ test("svpETH is a place with the vpETH it converts to; svpETH moves are changes 
   const bullets = pethRowBullets(row, NAMES);
   assert.equal(bullets.length, 1);
   assert.match(bullets[0], /does not read this Morpho Blue market/);
+  assert.match(bullets[0], /counts in no ETH figure or valuation\.$/);
   const e = pethTimelineEvent(row, NAMES, VENUES);
   assert.equal(e.actionType, "peth.not_decoded");
 });

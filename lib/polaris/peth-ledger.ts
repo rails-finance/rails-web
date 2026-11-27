@@ -328,7 +328,9 @@ export function pethAmountText(raw: bigint): string {
 export function pethRowBullets(r: PethLedgerRow, names: PethTokenNames): string[] {
   // A move Rails does not read: one bullet, and none of the sums.
   if (pethRowEffect(r) === "not_decoded")
-    return ["Rails does not read this Morpho Blue market yet, so this row counts in no figure on the page."];
+    return [
+      "Rails does not read this Morpho Blue market yet, so this vpETH move counts in no ETH figure or valuation.",
+    ];
   const out: string[] = [];
   if (r.kind === "lp_received")
     out.push("The pool minted this share to the address without a deposit from it in this transaction.");
