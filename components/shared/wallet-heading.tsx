@@ -29,7 +29,7 @@ import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { Facehash } from "@/components/shared/facehash";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { WalletMenu } from "@/components/shared/wallet-menu";
+import { WalletMenu, type WalletMenuItem } from "@/components/shared/wallet-menu";
 import { HolderLabelTag } from "@/components/shared/holder-label";
 import { WalletPositionsMenu } from "@/components/shared/wallet-positions-menu";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
@@ -321,6 +321,10 @@ export interface PositionOwner {
   wrap?: (pill: ReactNode) => ReactNode;
   /** Drawn after the address (Alchemix's "V2 history →"). */
   extra?: ReactNode;
+  /** The explorer's own rows in the address menu, after its own (H13.6):
+   *  Polaris's pETH account (ui-jobs 865). With them a page that passes
+   *  `href` draws the menu, and carries that link as one of these rows. */
+  menuItems?: WalletMenuItem[];
 }
 
 export function PositionWalletHeading({
@@ -350,7 +354,7 @@ export function PositionWalletHeading({
   const chainId = (session ? protocolForSession(session)?.chainId : undefined) ?? owner.chain;
   // A wallet is its address menu (ui-jobs 271); a vault or a page that links
   // the address elsewhere (PWN's other side) keeps the pill.
-  const plain = !owner.vault && !owner.href;
+  const plain = !owner.vault && (!owner.href || (owner.menuItems?.length ?? 0) > 0);
   // The detail card's name, as the trail's last crumb.
   const card = usePositionCardName();
   const cardMenu = usePositionCardMenu();
@@ -359,7 +363,13 @@ export function PositionWalletHeading({
   useRegisterPositionTrail(page === "position" && !!owner.wallet);
   const pill = owner.wallet ? (
     plain ? (
-      <WalletMenu wallet={owner.wallet} ensName={owner.ensName ?? null} bookmark={bookmark} heading />
+      <WalletMenu
+        wallet={owner.wallet}
+        ensName={owner.ensName ?? null}
+        bookmark={bookmark}
+        heading
+        items={owner.menuItems}
+      />
     ) : (
       <WalletPill
         wallet={owner.wallet}

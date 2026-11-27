@@ -14,6 +14,17 @@ export const POLARIS_MARKETS_PATH = `${POLARIS_BASE_PATH}/markets`;
 export const POLARIS_SP_PATH = `${POLARIS_BASE_PATH}/stability-pool`;
 export const POLARIS_LOANS_PATH = `${POLARIS_BASE_PATH}/reserve-loans`;
 
+/** One address's pETH account (ui-jobs 865): `/peth/<address>`, a static
+ *  segment beside the two sub-pages, so it outranks the `[market]` slot. */
+export const POLARIS_PETH_PATH = `${POLARIS_BASE_PATH}/peth`;
+
+/** The account page of an address (lower-cased) or an ENS name, which the
+ *  page resolves and redirects. */
+export function polarisPethAccountHref(address: string): string {
+  const a = address.trim();
+  return `${POLARIS_PETH_PATH}/${/^0x[0-9a-fA-F]{40}$/.test(a) ? a.toLowerCase() : encodeURIComponent(a)}`;
+}
+
 export function polarisDepositHref(market: PolarisMarket, tokenId: string): string {
   return `${POLARIS_SP_PATH}/${market}/${tokenId}`;
 }

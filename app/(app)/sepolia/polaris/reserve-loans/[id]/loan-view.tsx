@@ -41,6 +41,7 @@ import {
 import { fetchPolarisLoanChain, type PolarisLoanChain } from "@/lib/api/fetch-polaris-sp-loans-chain";
 import { FPETH } from "@/lib/polaris/asset-catalog";
 import { POLARIS_LOANS_PATH } from "@/lib/polaris/routes";
+import { polarisOwnerMenuItems } from "@/components/protocol/polaris/polaris-owner-menu";
 import { atFloor, big, loanLifetime, max0, units } from "@/lib/polaris/sp-loan-math";
 import { loanFlows } from "@/lib/polaris/sp-loan-flow-timelines";
 import { loanTimelineEvent } from "@/lib/polaris/sp-loan-timeline-events";
@@ -181,6 +182,16 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
               wallet: holder,
               pending: !chainSettled,
               href: holder ? `${POLARIS_LOANS_PATH}?q=${holder}` : undefined,
+              menuItems: polarisOwnerMenuItems(
+                holder,
+                holder
+                  ? {
+                      href: `${POLARIS_LOANS_PATH}?q=${holder}`,
+                      title: "Reserve loans",
+                      subtitle: "The loans this wallet holds",
+                    }
+                  : undefined,
+              ),
               wrap: chain?.owner
                 ? (pill) => (
                     <Prov info={loanLiveProv("owner")} value={chain.owner ?? undefined}>

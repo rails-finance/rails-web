@@ -32,6 +32,8 @@
 // read with dollars (`storedSubtotal`);
 // a section mixing stored and head figures states none (rule 743).
 
+import { polarisPethAccountHref } from "@/lib/polaris/routes";
+import { isPolarisProtocolAddress } from "@/lib/polaris/asset-catalog";
 import type { HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { liquityV2HolderStrip } from "@/lib/liquity-v2/holder-strip";
@@ -502,6 +504,8 @@ export function walletSections(
     bands: boolean;
     /** Listing reads that did not answer: each one's protocol slug and what it reads. */
     unanswered?: { family: string; what: string }[];
+    /** The wallet, for a section's link to an account page of its own. */
+    address?: string;
   },
 ): WalletSection[] {
   const bySlug = new Map<string, WalletPosition[]>();
@@ -609,6 +613,9 @@ export function walletSections(
       band = { ...band, note: `No ${missing} total: ${named}.` };
     }
     if (!opts.bands) band = { ...band, positions: 0 };
+    // Polaris's section links the wallet's pETH account (N7.4, ui-jobs 865).
+    if (slug === "polaris" && opts.address && !isPolarisProtocolAddress(opts.address))
+      band = { ...band, accountLink: { href: polarisPethAccountHref(opts.address), label: "pETH account" } };
     sections.push({
       slug,
       name,

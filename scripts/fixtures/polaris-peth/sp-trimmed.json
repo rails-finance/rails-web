@@ -1,0 +1,237 @@
+{
+  "address": "0x22f23610da519045488393a205e9236a6bca3507",
+  "deployment_id": "sepolia-2026-08",
+  "scanned_to_block": "12224000",
+  "head": {
+    "block": "12224513",
+    "source": "multicall at head (POLARIS_HEAD_RPC_URL)"
+  },
+  "prices": {
+    "spot_raw": "3200026976866559475",
+    "floor_raw": "2018944134040294996",
+    "block": "12224513",
+    "source": "multicall at head (POLARIS_HEAD_RPC_URL)"
+  },
+  "figures": {
+    "eth_in": {
+      "raw": "3532004107918613274671",
+      "source": "ledger: curve buys, zap swaps from ETH or the reserve token, BuyFpToken",
+      "block": "12224000"
+    },
+    "eth_out": {
+      "raw": "0",
+      "source": "ledger: curve sells, zap swaps to ETH or the reserve token, splitter Redeem",
+      "block": "12224000"
+    },
+    "curve_fees_paid": {
+      "raw": "15111429469420721802",
+      "source": "ledger: feeAmount on the address's curve trades and its zap-routed ones",
+      "block": "12224000"
+    },
+    "peth_held": {
+      "raw": "0",
+      "head_raw": "0",
+      "stored_raw": "0",
+      "block": "12224513",
+      "source": "multicall at head (POLARIS_HEAD_RPC_URL)",
+      "stored_block": "12224000"
+    }
+  },
+  "rollup": {
+    "wallet_peth": {
+      "raw": "0",
+      "at_spot_raw": "0",
+      "at_floor_raw": "0",
+      "block": "12224513",
+      "source": "multicall at head (POLARIS_HEAD_RPC_URL)"
+    },
+    "cdp_collateral": {
+      "raw": "0",
+      "source": "polaris_cdp_updated: new_coll at the CDP's last touch",
+      "items": []
+    },
+    "sp_peth": {
+      "raw": "0",
+      "source": "polaris_sp_deposit_updated: stashed_bc_tokens at the deposit's last operation",
+      "items": [
+        {
+          "market": "usdp",
+          "token_id": "3",
+          "peth_raw": "0",
+          "deposit_raw": "54872589825126389686319",
+          "as_of_block": "12004995",
+          "as_of_tx": "0xf72e3c7fe37a05e90236b2682d14556dbc59cb8cfb250dc2aacaa5e9a19cbea7"
+        }
+      ]
+    },
+    "loans_fpeth": {
+      "raw": "0",
+      "source": "polaris_loan_opened + polaris_loan_adjusted: fpETH collateral",
+      "items": []
+    },
+    "wallet_fpeth": {
+      "raw": "0",
+      "at_floor_raw": "0",
+      "block": "12224513",
+      "source": "multicall at head (POLARIS_HEAD_RPC_URL)"
+    },
+    "lp": [
+      {
+        "venue": "venue_curve_tripool",
+        "address": "0x28b6f412904834dee78a4fa464f2089f5264770c",
+        "lp_balance_raw": "0",
+        "lp_supply_raw": "6929611285381741268238",
+        "pool_peth_raw": "4311431934864293985571",
+        "peth_share_raw": "0",
+        "block": "12224513",
+        "source": "multicall at head"
+      },
+      {
+        "venue": "venue_univ2_polar_peth",
+        "address": "0xdce2d72d07760cdb29604baee6271fcb1f3a7565",
+        "lp_balance_raw": "0",
+        "lp_supply_raw": "316339669630984405586525",
+        "pool_peth_raw": "60624920707097438196659",
+        "peth_share_raw": "0",
+        "block": "12224513",
+        "source": "multicall at head"
+      },
+      {
+        "venue": "venue_univ2_peth_weth",
+        "address": "0xb3348b1c358aa118b6304a91c48f3ee5a13f06a8",
+        "lp_balance_raw": "0",
+        "lp_supply_raw": "117620765739216387",
+        "pool_peth_raw": "814239444445395",
+        "peth_share_raw": "0",
+        "block": "12224513",
+        "source": "multicall at head"
+      }
+    ],
+    "wallet_vpeth": {
+      "raw": "0",
+      "valued": false,
+      "block": "12224513",
+      "source": "multicall at head (POLARIS_HEAD_RPC_URL)"
+    }
+  },
+  "rows": [
+    {
+      "tx_hash": "0x506aeab68dfde4d9b5261c81d13a5c1c9385a9248eb7ec43c7f8d3b7067b84ec",
+      "block_number": "12001557",
+      "block_timestamp": "1793060868",
+      "kind": "psm_mint",
+      "effect": "sale",
+      "lines": [
+        {
+          "rule": "psm_mint",
+          "effect": "sale",
+          "token": "peth",
+          "direction": "out",
+          "amount_raw": "170274898101366389",
+          "counterparty": "0xbdc1fe97e787ae7f653ffbccd74ec49814fe6aa1",
+          "counterparty_role": "usdp_cdp_manager",
+          "counterparty_code_size": null,
+          "log_index": 344
+        }
+      ],
+      "peth_delta_raw": "-170274898101366389",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": {
+        "kind": "psm_mint",
+        "peth_raw": "170274898101366389",
+        "market": "usdp",
+        "stables_raw": "1218502055081717797326",
+        "basis": "psm_log_and_eth_in_usdp",
+        "block": "12001557",
+        "source": "polaris_oracle_at_block",
+        "price_at_block_filled": true,
+        "eth_raw": "524258476233733424",
+        "eth_at_spot_raw": "524258476233733424",
+        "eth_at_floor_raw": "319614568691070056"
+      },
+      "zap": null
+    },
+    {
+      "tx_hash": "0xdfee0fecb12500070c49fb7e20ba5a1ea0180649e4ae8f116043ae2500c054b9",
+      "block_number": "12001556",
+      "block_timestamp": "1793060856",
+      "kind": "curve_buy",
+      "effect": "acquisition",
+      "lines": [
+        {
+          "rule": "curve_buy",
+          "effect": "acquisition",
+          "token": "peth",
+          "direction": "in",
+          "amount_raw": "170274898101366389",
+          "counterparty": "0x0000000000000000000000000000000000000000",
+          "counterparty_role": "zero",
+          "counterparty_code_size": null,
+          "log_index": 386
+        }
+      ],
+      "peth_delta_raw": "170274898101366389",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "524873516622526050",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "199774794778368",
+      "event_price_raw": "3078894405283800583",
+      "event_price_source": "BcTokensBought: reserveIn / (bcTokenOut + feeAmount)",
+      "valuation": null,
+      "zap": null
+    },
+    {
+      "tx_hash": "0xaf660f07f001832ea4de188270f7f595988a81da0ef306aa8bba754bc8549757",
+      "block_number": "11590944",
+      "block_timestamp": "1787995620",
+      "kind": "sp_gain",
+      "effect": "income",
+      "lines": [
+        {
+          "rule": "sp_gain",
+          "effect": "income",
+          "token": "peth",
+          "direction": "in",
+          "amount_raw": "32281317153274860",
+          "counterparty": "0xb61eb4712b285d9621af4ccba74a93c8d88502e5",
+          "counterparty_role": "usdp_stability_pool",
+          "counterparty_code_size": null,
+          "log_index": 148
+        }
+      ],
+      "peth_delta_raw": "32281317153274860",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": {
+        "kind": "peth_arrival",
+        "peth_raw": "32281317153274860",
+        "basis": "spot_and_floor",
+        "block": "11590944",
+        "source": "polaris_oracle_at_block",
+        "price_at_block_filled": true,
+        "eth_raw": null,
+        "eth_at_spot_raw": "64664140320203424",
+        "eth_at_floor_raw": "42060185701475278"
+      },
+      "zap": null
+    }
+  ],
+  "code_sizes_read": {
+    "read": 1,
+    "outside_counterparties": 0,
+    "capped": false
+  },
+  "note": "trimmed to one row per kind; figures cover every row"
+}

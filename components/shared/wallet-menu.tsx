@@ -10,7 +10,7 @@
 // chevron.
 
 import { CANVAS_HOVER, CANVAS_HOVER_ON } from "@/components/nav/chrome-hover";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Bookmark, Check, ChevronDown, Copy, Wallet } from "lucide-react";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
@@ -26,12 +26,22 @@ import { OVERLAY_HEADING, WALLET_HEADING_NAME } from "@/lib/shared/ui-grammar";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
+/** An explorer's row in the menu (H13.6): a page for this wallet. */
+export interface WalletMenuItem {
+  key: string;
+  icon: ReactNode;
+  title: string;
+  subtitle: string;
+  href: string;
+}
+
 export function WalletMenu({
   wallet,
   ensName,
   bookmark = true,
   heading = false,
   view = true,
+  items,
 }: {
   wallet: string;
   ensName: string | null;
@@ -42,6 +52,8 @@ export function WalletMenu({
   heading?: boolean;
   /** The Wallet dashboard row; false on the wallet view. */
   view?: boolean;
+  /** The explorer's rows, after the dashboard (H13.6). */
+  items?: WalletMenuItem[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -122,6 +134,21 @@ export function WalletMenu({
           }}
         />
       )}
+      {items?.map((it) => (
+        <span key={it.key} className="contents" data-wallet-menu-item={it.key} data-anatomy="H13.6">
+          <ToolsMenuItem
+            icon={it.icon}
+            title={it.title}
+            subtitle={it.subtitle}
+            internal
+            onClick={() => {
+              close();
+              startNavigationProgress(it.href);
+              router.push(it.href);
+            }}
+          />
+        </span>
+      ))}
     </>
   );
 

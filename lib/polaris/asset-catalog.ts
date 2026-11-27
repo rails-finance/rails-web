@@ -74,6 +74,61 @@ export const POLARIS_WETH: PolarisTokenMeta = {
   decimals: 18,
 };
 
+/** vpETH — minted 1:1 with fpETH when the splitter splits pETH. The pETH
+ *  account page states a balance of it and values none (ui-jobs 865). */
+export const VPETH: PolarisTokenMeta = {
+  symbol: "vpETH",
+  address: "0x43cc4978e11bc1e1d8cfcd8348cb7e7246c49b6e",
+  decimals: 18,
+};
+
+/** svpETH — staked vpETH, the fee router's third recipient. */
+export const SVPETH: PolarisTokenMeta = {
+  symbol: "svpETH",
+  address: "0x7b118bd63bbe9023a2a509cecd48bc283d150539",
+  decimals: 18,
+};
+
+/** The zap router (`MultiSwap`): a zap trade names its user only in that log. */
+export const POLARIS_ZAP_ROUTER = "0xd09416d328dfaa07a422a1df233d1d968b80fbf8";
+
+/** The three venues whose LP shares the pETH account page reads at the head,
+ *  keyed as the server's `polaris_deployments` columns name them. */
+export type PolarisVenueKey = "venue_curve_tripool" | "venue_univ2_polar_peth" | "venue_univ2_peth_weth";
+
+export interface PolarisVenue {
+  key: PolarisVenueKey;
+  /** The venue's name in prose. */
+  label: string;
+  /** The pool, which is its LP token on all three. */
+  address: string;
+}
+
+export const POLARIS_VENUES: Record<PolarisVenueKey, PolarisVenue> = {
+  venue_curve_tripool: {
+    key: "venue_curve_tripool",
+    label: "Curve pETH/fpETH/vpETH pool",
+    address: "0x28b6f412904834dee78a4fa464f2089f5264770c",
+  },
+  venue_univ2_polar_peth: {
+    key: "venue_univ2_polar_peth",
+    label: "Uniswap V2 pETH/POLAR pair",
+    address: "0xdce2d72d07760cdb29604baee6271fcb1f3a7565",
+  },
+  venue_univ2_peth_weth: {
+    key: "venue_univ2_peth_weth",
+    label: "Uniswap V2 pETH/WETH pair",
+    address: "0xb3348b1c358aa118b6304a91c48f3ee5a13f06a8",
+  },
+};
+
+/** POLAR — the share system's token, which a POLAR conversion pays out. */
+export const POLAR: PolarisTokenMeta = {
+  symbol: "POLAR",
+  address: "0x5543ca71ed8c88daf217488b1808994e080d925b",
+  decimals: 18,
+};
+
 /** The deployment these addresses belong to: the `polaris_deployments` id the
  *  deposit and loan proxies pass as `deployment`, so the pages keep naming it
  *  once a redeploy adds a second row. */
@@ -161,3 +216,38 @@ export function normalizeCdpId(raw: string | null | undefined): string | null {
   const s = (raw ?? "").trim();
   return /^(0|[1-9][0-9]*)$/.test(s) ? s : null;
 }
+
+/** Every token this deployment names, by lower-cased address: the pETH
+ *  account page names a zap line's token through it. */
+export const POLARIS_TOKENS_BY_ADDRESS: Record<string, PolarisTokenMeta> = Object.fromEntries(
+  [
+    PETH,
+    FPETH,
+    VPETH,
+    SVPETH,
+    POLARIS_WETH,
+    POLAR,
+    ...POLARIS_MARKETS.flatMap((m) => [
+      POLARIS_MARKET_CONFIG[m].stable,
+      { ...POLARIS_MARKET_CONFIG[m].vault, decimals: 18 as const },
+    ]),
+  ].map((t) => [t.address.toLowerCase(), t]),
+);
+
+/** Every contract this deployment names, lower-cased: the protocol's
+ *  addresses, which hold pETH for the protocol and have no account page. */
+export const POLARIS_PROTOCOL_ADDRESSES: ReadonlySet<string> = new Set(
+  [
+    ...Object.values(POLARIS_CORE),
+    ...POLARIS_MARKETS.flatMap((m) => {
+      const c = POLARIS_MARKET_CONFIG[m];
+      return [c.cdpManager, c.stabilityPool, c.cdpNft, c.priceFeed, c.psm, c.vault.address, c.stable.address];
+    }),
+    ...Object.keys(POLARIS_TOKENS_BY_ADDRESS),
+    ...Object.values(POLARIS_VENUES).map((v) => v.address),
+    POLARIS_ZAP_ROUTER,
+  ].map((a) => a.toLowerCase()),
+);
+
+/** Whether an address (any case) is one of the deployment's contracts. */
+export const isPolarisProtocolAddress = (a: string): boolean => POLARIS_PROTOCOL_ADDRESSES.has(a.toLowerCase());

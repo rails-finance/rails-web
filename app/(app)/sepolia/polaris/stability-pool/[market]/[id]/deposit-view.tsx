@@ -42,6 +42,7 @@ import { PolarisDepositSinceTouchRow } from "@/components/protocol/polaris/polar
 import { fetchPolarisDepositChain, type PolarisDepositChain } from "@/lib/api/fetch-polaris-sp-loans-chain";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { POLARIS_SP_PATH } from "@/lib/polaris/routes";
+import { polarisOwnerMenuItems } from "@/components/protocol/polaris/polaris-owner-menu";
 import { big, depositLifetime, depositNow, depositNowFromChain, units } from "@/lib/polaris/sp-loan-math";
 import { depositFlows, depositFlowsFromDays } from "@/lib/polaris/sp-loan-flow-timelines";
 import { DEPOSIT_FIRST_READ, depositTimelineEvent, WHOLE_LIFE_READ } from "@/lib/polaris/sp-loan-timeline-events";
@@ -269,6 +270,16 @@ export default function DepositView({
                 wallet: holder,
                 pending: !chainSettled,
                 href: holder ? `${POLARIS_SP_PATH}?q=${holder}` : undefined,
+                menuItems: polarisOwnerMenuItems(
+                  holder,
+                  holder
+                    ? {
+                        href: `${POLARIS_SP_PATH}?q=${holder}`,
+                        title: "Stability Pool deposits",
+                        subtitle: "The deposits this wallet holds",
+                      }
+                    : undefined,
+                ),
                 wrap: chain?.owner
                   ? (pill) => (
                       <Prov info={spLiveProv("owner", market)} value={chain.owner ?? undefined}>

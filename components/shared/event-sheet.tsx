@@ -136,7 +136,12 @@ export interface SheetStat {
 }
 
 export interface SheetPanel {
-  panel: "risk" | "limits";
+  /** Risk and Limits, or a family's own panel ("to-date": a running total
+   *  of the account's, the Polaris pETH account's ETH in and out), which
+   *  names itself with `name` and `tip`. */
+  panel: "risk" | "limits" | "to-date";
+  name?: string;
+  tip?: string;
   rows: SheetStat[];
   /** The protocol's parameters, muted, with the breakdown on. */
   breakdown?: SheetStat[];
@@ -516,7 +521,7 @@ function StatRows({ rows, muted, name }: { rows: SheetStat[]; muted?: boolean; n
 }
 
 function StatPanel({ p, breakdown }: { p: SheetPanel; breakdown: boolean }) {
-  const name = p.panel === "risk" ? WORDS.risk : WORDS.limits;
+  const name = p.name ?? (p.panel === "risk" ? WORDS.risk : WORDS.limits);
   return (
     <section
       className="min-w-0 rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3 text-sm"
@@ -524,7 +529,7 @@ function StatPanel({ p, breakdown }: { p: SheetPanel; breakdown: boolean }) {
       aria-label={name}
     >
       <h3 className="mb-1 text-sm font-semibold text-rb-500">
-        <HeadingTip text={name} tip={p.panel === "risk" ? WORDS.tipRisk : WORDS.tipLimits} />
+        <HeadingTip text={name} tip={p.tip ?? (p.panel === "risk" ? WORDS.tipRisk : WORDS.tipLimits)} />
       </h3>
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3">
         <StatRows rows={p.rows} name={name} />

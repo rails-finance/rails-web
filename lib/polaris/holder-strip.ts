@@ -48,6 +48,7 @@ import {
   POLARIS_MARKET_CONFIG,
   POLARIS_MARKETS,
   POLARIS_WETH,
+  isPolarisProtocolAddress,
   type PolarisMarket,
 } from "@/lib/polaris/asset-catalog";
 import { holderUsdReceipt, type UsdLeg } from "@/lib/shared/holder-usd-receipt";
@@ -58,6 +59,7 @@ import type { Provenance } from "@/components/shared/provenance";
 import type { PolarisDepositRow, PolarisLoanRow } from "@/lib/sources/api/polaris-sp-loans";
 import { kindsLine, type KindCount } from "@/lib/liquity/holder-deposits";
 import { big, units } from "./sp-loan-math";
+import { polarisPethAccountHref } from "./routes";
 
 const BOARD_VIA = "GET /api/chain/polaris/markets";
 const TESTNET = "A Sepolia testnet figure: a test dollar.";
@@ -229,6 +231,13 @@ export function polarisHolderStrip(
   others: PolarisOtherKinds = {},
 ): HolderStripProps {
   const other = otherKinds(others);
+  // The wallet's pETH account (N7.4, ui-jobs 865): named by the search, an
+  // address or an ENS name, which the page resolves.
+  // A protocol contract has no account page.
+  const accountLink =
+    wallet && !isPolarisProtocolAddress(wallet)
+      ? { accountLink: { href: polarisPethAccountHref(wallet), label: "pETH account" } }
+      : {};
   const kinds = other.counts.length ? { kinds: other.counts } : {};
   // A CDP the wallet passed on is not its holding: left out of the counts,
   // the sums and the count it holds. Whether the page is the whole answer is
@@ -257,6 +266,7 @@ export function polarisHolderStrip(
       protocol: "polaris",
       // The other kinds are whole pages of their own: still counted.
       ...kinds,
+      ...accountLink,
       note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} positions; this wallet holds ${plural(held, "position", "positions")}.`,
     };
   }
@@ -445,5 +455,6 @@ export function polarisHolderStrip(
     wallet,
     protocol: "polaris",
     ...kinds,
+    ...accountLink,
   };
 }
