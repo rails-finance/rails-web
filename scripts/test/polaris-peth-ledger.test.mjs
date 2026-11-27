@@ -118,7 +118,7 @@ test("a PSM mint's ETH value is a valuation, never ETH out", () => {
   assert.ok(r);
   assert.equal(r.eth_out_raw, "0");
   const bullets = pethRowBullets(r, NAMES);
-  assert.ok(bullets.some((b) => /valuation left out of ETH out/.test(b)));
+  assert.ok(bullets.some((b) => /which ETH out does not count/.test(b)));
   assert.ok(!bullets.some((b) => /counted in ETH out/.test(b)));
 });
 

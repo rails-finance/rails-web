@@ -14,7 +14,7 @@ const WORDS = {
   address: "Address",
   effect: "Effect",
   timeline_link: "See the whole history in the timeline.",
-  description: (day: string) => `One transaction of this address's pETH on Polaris, on ${day}.`,
+  description: (day: string) => `One of this address's pETH transactions on Polaris, on ${day}.`,
 };
 
 const EFFECT_WORD = Object.fromEntries(PETH_EFFECTS.map((e) => [e.key, e.label]));

@@ -275,7 +275,7 @@ export default function DepositView({
                   holder
                     ? {
                         href: `${POLARIS_SP_PATH}?q=${holder}`,
-                        title: "Stability-pool deposits",
+                        title: "Stability Pool deposits",
                         subtitle: "The deposits this wallet holds",
                       }
                     : undefined,

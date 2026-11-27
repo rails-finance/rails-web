@@ -5,7 +5,7 @@
 // event-card shell as the redeemer row draws it
 // (components/protocol/liquity/redeemer-event-card.tsx). T1 the kind with the
 // tokens it moved on the spine, T2 the effect, the ETH figures, the curve fee,
-// the trade's own price, any valuation at its block and the transaction, T3
+// the trade's price, any valuation at its block and the transaction, T3
 // the row in words (T10·polaris). A valuation is labelled as one and is never
 // added into ETH out.
 
@@ -152,7 +152,7 @@ export function PolarisPethEventCard({
       ? [
           amountCell(
             "valued-eth",
-            v.kind === "psm_mint" ? "Valued at its block" : "Valued at the floor then",
+            v.kind === "psm_mint" ? "Valued then" : "Valued at the floor then",
             big(v.eth_raw),
             "ETH",
             POLARIS_WETH.address,
@@ -253,7 +253,7 @@ export function PolarisPethEventCard({
     },
     caption: label,
     cells,
-    ledgers: { none: "A pETH account row holds no balance: it states what one transaction moved for this address." },
+    ledgers: { none: "A pETH account row holds no balance." },
     explainer: {
       body:
         bullets.length > 0 ? (

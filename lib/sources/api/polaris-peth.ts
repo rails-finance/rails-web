@@ -113,7 +113,7 @@ export interface PethLedgerRow {
   eth_in_raw: string;
   eth_out_raw: string;
   curve_fee_raw: string;
-  /** ETH per pETH, 1e18, from the row's own event (trade rows only). */
+  /** ETH per pETH, 1e18, from the row's event (trade rows only). */
   event_price_raw: string | null;
   event_price_source: string | null;
   valuation: PethValuation | null;

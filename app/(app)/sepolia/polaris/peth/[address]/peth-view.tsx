@@ -59,7 +59,7 @@ export function pethRefusalText(r: PethRefusal): string {
   if (/heavy/.test(said))
     return "This address has too many transactions to replay on one page, so Rails does not draw its pETH account.";
   if (/protocol|contract/.test(said))
-    return "This address is one of Polaris's own contracts. Its pETH belongs to the protocol, so it has no account page.";
+    return "This address is a Polaris contract. Its pETH belongs to the protocol, so it has no account page.";
   return r.reason ? `The index refused this address: ${r.reason}` : "The index refused this address.";
 }
 
@@ -89,16 +89,17 @@ function PethExplanation({
       </>,
     );
   if (ledgerGap == null) {
-    if (f.ethIn != null) items.push(<>This address paid {strong(eth(f.ethIn)!)} in ETH and WETH for pETH and fpETH.</>);
-    if (f.ethOut != null) items.push(<>{strong(eth(f.ethOut)!)} in ETH and WETH reached this address.</>);
+    if (f.ethIn != null)
+      items.push(<>This address paid {strong(eth(f.ethIn)!)}, in ETH or WETH, for pETH and fpETH.</>);
+    if (f.ethOut != null) items.push(<>This address received {strong(eth(f.ethOut)!)}, in ETH or WETH.</>);
     if (f.curveFees != null)
-      items.push(<>The bonding curve took {strong(`${pethAmountText(f.curveFees)} pETH`)} in fees on its trades.</>);
-    items.push(
-      <>A PSM mint and a POLAR conversion are valued on their own rows at their time, and are left out of ETH out.</>,
-    );
-    items.push(
-      <>pETH received by plain transfer came with no ETH, so it counts in pETH held and in neither ETH figure.</>,
-    );
+      items.push(
+        <>
+          The bonding curve took {strong(`${pethAmountText(f.curveFees)} pETH`)} in fees on this address&rsquo;s trades.
+        </>,
+      );
+    items.push(<>PSM mints and POLAR conversions carry a valuation on their rows, which ETH out does not count.</>);
+    items.push(<>pETH received by plain transfer counts in pETH held and in neither ETH figure.</>);
   } else if (ledgerGap === "too_heavy") {
     items.push(
       <>
@@ -111,13 +112,8 @@ function PethExplanation({
     );
   }
   if (ledgerGap == null && unchecked)
-    items.push(
-      <>
-        The history is read to a stored point, and whether it reaches this address&rsquo;s latest transactions was not
-        checked.
-      </>,
-    );
-  if (!headRead) items.push(<>The figures read at the chain now did not answer, so they are not stated.</>);
+    items.push(<>The history may stop short of this address&rsquo;s latest transactions.</>);
+  if (!headRead) items.push(<>The chain did not answer on this read, so the current figures are not stated.</>);
   return (
     <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
       {items.map((it, i) => (

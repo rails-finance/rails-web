@@ -44,17 +44,17 @@ type LedgerSum = "ethIn" | "ethOut" | "curveFees";
 const LEDGER_SUM: Record<LedgerSum, { summary: string; formula: string }> = {
   ethIn: {
     summary:
-      "ETH in — the ETH and WETH this address paid for pETH and fpETH: reserveIn on its curve buys, amountIn on zap trades from ETH or WETH, and the WETH paid on BuyFpToken. A zap's amountIn counts the dust the router refunds, so a zap trade can overstate it by that dust.",
+      "ETH in — the ETH and WETH this address paid for pETH and fpETH: on its curve buys, on zap trades from ETH or WETH, and on fpETH bought from the splitter. A zap trade's amount in counts the dust the router refunds, so it can overstate by that dust.",
     formula: "Σ reserveIn (BcTokensBought) + Σ amountIn (MultiSwap, ETH or WETH in) + Σ BuyFpToken WETH",
   },
   ethOut: {
     summary:
-      "ETH out — the ETH and WETH that reached this address: reserveOut on its curve sales, amountOut on zap trades to ETH or WETH, and the WETH paid on an fpETH Redeem. A PSM mint and a POLAR conversion are left out: each is valued on its row.",
+      "ETH out — the ETH and WETH that reached this address: on its curve sales, on zap trades to ETH or WETH, and on fpETH redeemed at the floor. PSM mints and POLAR conversions carry a valuation on their rows, which this does not count.",
     formula: "Σ reserveOut (BcTokensSold) + Σ amountOut (MultiSwap, ETH or WETH out) + Σ Redeem WETH",
   },
   curveFees: {
     summary:
-      "Curve fees paid — feeAmount on this address's curve trades, and on the zap router's curve trades in the transactions whose MultiSwap names this address. The fee is in pETH.",
+      "Curve fees paid — the fee the bonding curve took on this address's trades, and on the zap router's trades made for this address, in pETH.",
     formula: "Σ feeAmount (BcTokensBought, BcTokensSold)",
   },
 };
@@ -62,7 +62,7 @@ const LEDGER_SUM: Record<LedgerSum, { summary: string; formula: string }> = {
 export function pethLedgerSumProv(what: LedgerSum, scannedTo: string | null, unchecked = false): Provenance {
   const s = LEDGER_SUM[what];
   const note = unchecked
-    ? ` The stored ledger reaches${scannedTo ? ` block ${scannedTo}` : " a stored block"}; the head was not read, so how far behind it that is was not checked.`
+    ? ` The stored ledger reaches${scannedTo ? ` block ${scannedTo}` : " a stored block"}. The chain did not answer on this read, so how far that is from the latest block was not checked.`
     : "";
   return {
     kind: "chain-derived",
@@ -81,27 +81,27 @@ type HeadRead = "pethHeld" | "spot" | "floor" | "fpethHeld" | "vpethHeld";
 const HEAD: Record<HeadRead, { method: string; summary: string; contract: Provenance["contract"] }> = {
   pethHeld: {
     method: "balanceOf(address)",
-    summary: "pETH held — the pETH token's balanceOf(address) at the head block.",
+    summary: "pETH held — this address's pETH balance at the head block.",
     contract: curve,
   },
   spot: {
     method: "currentPrice()",
-    summary: "Spot — the bonding curve's currentPrice() at the head block: pETH's price in ETH.",
+    summary: "Spot — pETH's price in ETH at the bonding curve, at the head block.",
     contract: curve,
   },
   floor: {
     method: "floorPrice()",
-    summary: "Floor — the bonding curve's floorPrice() at the head block: the price in ETH the protocol only raises.",
+    summary: "Floor — the floor price in ETH, which the protocol only raises, at the head block.",
     contract: curve,
   },
   fpethHeld: {
     method: "balanceOf(address)",
-    summary: "fpETH in the wallet — the fpETH token's balanceOf(address) at the head block.",
+    summary: "fpETH in the wallet — this address's fpETH balance at the head block.",
     contract: splitter,
   },
   vpethHeld: {
     method: "balanceOf(address)",
-    summary: "vpETH in the wallet — the vpETH token's balanceOf(address) at the head block. It is not valued.",
+    summary: "vpETH in the wallet — this address's vpETH balance at the head block. It is not valued.",
     contract: vpeth,
   },
 };
@@ -114,6 +114,7 @@ export function pethHeadProv(what: HeadRead, block: string | null): Provenance {
     verify: ask(h.method),
     summary: h.summary,
     contract: h.contract,
+    formula: h.method,
     via: `${VIA} · ${h.method} @ head`,
     source: blockOf(block),
   };
@@ -129,8 +130,8 @@ export function pethValuedProv(what: "pethSpot" | "pethFloor" | "fpethFloor", bl
     verify: ask(`balanceOf(address) and ${at}`),
     summary:
       what === "pethSpot"
-        ? "pETH held at spot — the balance at the head block times the bonding curve's currentPrice(), in ETH."
-        : `${token} held at the floor — the balance at the head block times the bonding curve's floorPrice(), in ETH.`,
+        ? "pETH held at spot — the balance times the bonding curve's price, both at the head block, in ETH."
+        : `${token} held at the floor — the balance times the floor price, both at the head block, in ETH.`,
     contract: curve,
     formula: `balanceOf(address) × ${at} ÷ 10¹⁸`,
     via: `${VIA} · Multicall3 @ head`,
@@ -144,7 +145,8 @@ export function pethCdpPlaceProv(market: "usdp" | "goldp", cdpId: string, block:
     kind: "chain",
     pclass: "emitted",
     verify: { kind: "recompute", text: "To check: open the transaction and read CDPUpdated's newColl." },
-    summary: `CDP ${m.stable.symbol} #${cdpId}'s collateral — newColl on its last CDPUpdated, in pETH. Reward pETH and PSM shares built up since land at its next touch.`,
+    summary: `${m.stable.symbol} CDP #${cdpId}'s collateral — the collateral its last touch recorded, in pETH. Reward pETH and PSM shares built up since land at its next touch.`,
+    formula: "newColl (the CDP's last CDPUpdated)",
     contract: { name: `Polaris ${m.stable.symbol} CdpManager`, address: m.cdpManager },
     via: `${VIA} · polaris_cdp_updated`,
     source: { block, txHash: tx },
@@ -157,7 +159,8 @@ export function pethSpPlaceProv(market: "usdp" | "goldp", tokenId: string, block
     kind: "chain",
     pclass: "emitted",
     verify: { kind: "recompute", text: "To check: open the transaction and read DepositUpdated's stashed pETH." },
-    summary: `Deposit #${tokenId}'s pETH — the pETH gains the deposit held unclaimed at its last operation. pETH paid in since is left out.`,
+    summary: `${m.stable.symbol} deposit #${tokenId}'s pETH — the pETH gains it held unclaimed at its last touch. pETH paid in since is not counted.`,
+    formula: "stashed pETH (the deposit's last DepositUpdated)",
     contract: { name: `Polaris ${m.stable.symbol} StabilityPool`, address: m.stabilityPool },
     via: `${VIA} · polaris_sp_deposit_updated`,
     source: { block, txHash: tx },
@@ -183,7 +186,7 @@ export function pethLpProv(venue: PolarisVenueKey, block: string | null): Proven
     kind: "chain-derived",
     pclass: "state",
     verify: ask(`balanceOf(address), totalSupply() and ${reserve}`),
-    summary: `pETH in the ${v.label} — this address's share of the pool's pETH: its LP balance over the LP supply, times the pETH the pool holds, at the head block. LP staked in another contract is not seen.`,
+    summary: `pETH in the ${v.label} — this address's share of the pool's pETH: its LP balance over the LP supply, times the pETH the pool holds, at the head block. LP staked in another contract is not counted.`,
     contract: { name: v.label, address: v.address },
     formula: `balanceOf(address) × ${reserve} ÷ totalSupply()`,
     via: `${VIA} · Multicall3 @ head`,
@@ -209,14 +212,14 @@ export function pethLineProv(row: PethLedgerRow, line: PethLedgerLine, symbol: s
 export function pethRowEthProv(row: PethLedgerRow, what: "ethIn" | "ethOut" | "fee"): Provenance {
   const zap =
     row.zap != null && what !== "fee"
-      ? " A zap's amountIn includes the dust the router refunds, so this can read slightly high."
+      ? " A zap trade's amount in counts the dust the router refunds, so this can read slightly high."
       : "";
   const summary =
     what === "ethIn"
       ? `ETH in on this row — the ETH or WETH this address paid in this transaction.${zap}`
       : what === "ethOut"
         ? `ETH out on this row — the ETH or WETH that reached this address in this transaction.${zap}`
-        : "Curve fee on this row — feeAmount on the curve trade, in pETH.";
+        : "Curve fee on this row — the fee the bonding curve took on the trade, in pETH.";
   return {
     kind: "chain",
     pclass: "emitted",
@@ -231,7 +234,7 @@ export function pethRowEthProv(row: PethLedgerRow, what: "ethIn" | "ethOut" | "f
   };
 }
 
-/** The row's own price: its trade's reserve over its pETH. */
+/** The row's price: its trade's reserve over its pETH. */
 export function pethRowPriceProv(row: PethLedgerRow): Provenance {
   return {
     kind: "chain-derived",
@@ -245,24 +248,51 @@ export function pethRowPriceProv(row: PethLedgerRow): Provenance {
   };
 }
 
-/** A row's valuation at its block. */
+/** A row's valuation at its block, from the price the server reads there
+ *  (rails-server routes/polaris-peth.ts, valueAtBlock): a USDp mint at the
+ *  USDp feed's ETH price in USDp, a GOLDp mint at XAU/USD over ETH/USD, the
+ *  rest at the curve's spot or floor. */
 export function pethRowValuationProv(row: PethLedgerRow, leg: "eth" | "spot" | "floor"): Provenance {
   const v = row.valuation;
+  const at = leg === "spot" ? "spot" : "floor";
+  const curveAsk = ask(leg === "spot" ? "the bonding curve's currentPrice()" : "the bonding curve's floorPrice()");
+  if (v?.kind === "psm_mint" && leg === "eth") {
+    const usdp = v.market !== "goldp";
+    const m = POLARIS_MARKET_CONFIG[usdp ? "usdp" : "goldp"];
+    return {
+      kind: "chain-derived",
+      pclass: "oracle",
+      verify: ask(
+        usdp
+          ? "the USDp price feed's previewReservePriceInDebt()"
+          : "the XAU/USD and ETH/USD medianisers' previewExternalPrice()",
+      ),
+      summary: usdp
+        ? "The USDp this PSM mint paid, in ETH at the USDp market's ETH price at its block. A valuation, which ETH out does not count."
+        : "The GOLDp this PSM mint paid, in ETH at the gold and ETH prices the protocol's medianisers state at its block. A valuation, which ETH out does not count.",
+      contract: usdp
+        ? { name: "Polaris USDp PriceFeed", address: m.priceFeed }
+        : { name: "Polaris XAU/USD Medianiser", address: POLARIS_CORE.xauUsdMedianiser },
+      formula: usdp
+        ? "USDp paid ÷ previewReservePriceInDebt() (ETH in USDp)"
+        : "GOLDp paid × XAU/USD ÷ ETH/USD (previewExternalPrice())",
+      via: `${VIA} · polaris_oracle_at_block`,
+      source: { block: row.block_number, txHash: row.tx_hash },
+    };
+  }
   const what =
     v?.kind === "psm_mint"
-      ? leg === "eth"
-        ? "The stablecoin this PSM mint paid, in ETH at the market's price feed at its block. A valuation, left out of ETH out."
-        : `The pETH this PSM mint gave up, at the curve's ${leg === "spot" ? "spot" : "floor"} at its block.`
+      ? `The pETH this PSM mint gave up, at the curve's ${at} at its block.`
       : v?.kind === "polar_conversion"
-        ? "The pETH this conversion burned for POLAR, at the curve's floor at its block. A valuation, left out of ETH out."
-        : `The pETH that arrived with no ETH paid, at the curve's ${leg === "spot" ? "spot" : "floor"} at its block. A valuation.`;
+        ? "The pETH this conversion burned for POLAR, at the curve's floor at its block. A valuation, which ETH out does not count."
+        : `The pETH that arrived with no ETH paid, at the curve's ${at} at its block. A valuation.`;
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    verify: ask(leg === "spot" ? "currentPrice()" : "floorPrice()"),
+    verify: curveAsk,
     summary: what,
     contract: curve,
-    formula: v?.basis,
+    formula: `pETH × ${leg === "spot" ? "currentPrice()" : "floorPrice()"} ÷ 10¹⁸`,
     via: `${VIA} · polaris_oracle_at_block`,
     source: { block: row.block_number, txHash: row.tx_hash },
   };

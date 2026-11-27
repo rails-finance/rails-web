@@ -1,7 +1,7 @@
 "use client";
 
 // Where a Polaris address's pETH sits (C24·polaris; ui-jobs 865): one figure
-// for each place, in its own unit, each linking to the page that place already
+// for each place, in its unit, each linking to the page that place already
 // has, which keeps its card. Beside the card's lozenge in the Lifetime flows
 // slot (P2.1), in the position card's frame. The places are in different units
 // (pETH, fpETH, vpETH), so the box states no total.
@@ -164,8 +164,8 @@ export function PolarisPethPlaces({
             />
             <Place
               id="sp"
-              label="Stability-pool deposits"
-              note="pETH gains unclaimed at each deposit's last operation. Gains paid in since are not included."
+              label="Stability Pool deposits"
+              note="pETH gains unclaimed at each deposit's last touch. Gains paid in since are not included."
               figure={
                 p.sp ? (
                   <Figure
@@ -176,7 +176,7 @@ export function PolarisPethPlaces({
                       kind: "chain-derived",
                       pclass: "emitted",
                       summary:
-                        "Stability-pool pETH — the sum of the pETH gains each deposit this address holds left unclaimed at its last operation. pETH paid in since is left out.",
+                        "Stability Pool pETH — the sum of the pETH gains each deposit this address holds left unclaimed at its last touch. pETH paid in since is not counted.",
                       formula: "Σ stashed pETH (last DepositUpdated of each deposit held)",
                       via: "GET /api/polaris/peth/<address> · polaris_sp_deposit_updated",
                     }}
@@ -261,7 +261,7 @@ export function PolarisPethPlaces({
             <Place
               id="lp"
               label="Pool shares"
-              note="This address's share of the pETH in three pools, read now. LP tokens staked in another contract are not seen."
+              note="This address's share of the pETH in three pools. LP tokens staked in another contract are not counted."
               figure={
                 lpTotal != null ? (
                   <Figure

@@ -34,7 +34,7 @@ const W = POLARIS_WETH;
 export const PETH_UNREAD = {
   ledger: "History still being read",
   heavy: "Too many transactions to replay",
-  head: "Not read at the head",
+  head: "The chain did not answer",
 } as const;
 
 function PethMenuRows({ address }: { address: string }) {

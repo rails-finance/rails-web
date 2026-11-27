@@ -55,7 +55,7 @@ export const PETH_EFFECTS: { key: PethEffect; label: string }[] = [
   { key: "income", label: "Earned" },
   { key: "change_of_place", label: "Moved between places" },
   { key: "exit", label: "Left the address" },
-  { key: "fee", label: "Fees" },
+  { key: "fee", label: "Paid in fees" },
 ];
 
 /** Each kind the server's classifier names (api/src/services/
@@ -71,7 +71,7 @@ export const PETH_KINDS: Record<string, { effect: PethEffect; label: string }> =
   psm_redeem: { effect: "acquisition", label: "PSM redeem" },
   cdp_deposit: { effect: "change_of_place", label: "Into a CDP" },
   cdp_withdraw: { effect: "change_of_place", label: "Out of a CDP" },
-  sp_gain: { effect: "income", label: "Stability-pool gain" },
+  sp_gain: { effect: "income", label: "Stability Pool gain" },
   svpeth_reward: { effect: "income", label: "svpETH reward" },
   surplus_claim: { effect: "change_of_place", label: "Surplus claimed" },
   split: { effect: "change_of_place", label: "Split" },
@@ -83,8 +83,8 @@ export const PETH_KINDS: Record<string, { effect: PethEffect; label: string }> =
   lp_remove: { effect: "change_of_place", label: "Liquidity removed" },
   venue_swap_in: { effect: "acquisition", label: "Bought on a pool" },
   venue_swap_out: { effect: "sale", label: "Sold on a pool" },
-  zap_in: { effect: "acquisition", label: "Zap buy" },
-  zap_out: { effect: "sale", label: "Zap sale" },
+  zap_in: { effect: "acquisition", label: "Bought through the zap" },
+  zap_out: { effect: "sale", label: "Sold through the zap" },
   wallet_receive: { effect: "acquisition", label: "Received from a wallet" },
   wallet_send: { effect: "exit", label: "Sent to a wallet" },
   contract_receive: { effect: "acquisition", label: "Received from a contract" },
@@ -294,7 +294,7 @@ export function pethPlaces(d: PolarisPethResponse): PethPlaces {
 /** The row's key on the page: its transaction (one row per transaction). */
 export const pethRowId = (r: Pick<PethLedgerRow, "tx_hash">): string => r.tx_hash.toLowerCase();
 
-/** The row's lines in the address's own tokens, with an amount. */
+/** The row's lines in the address's tokens, with an amount. */
 export const pethRowLines = (r: PethLedgerRow): PethLedgerLine[] => r.lines.filter((l) => big(l.amount_raw) > ZERO);
 
 /** A raw amount in words for prose: four significant digits below one. */
@@ -324,18 +324,18 @@ export function pethRowBullets(r: PethLedgerRow, names: PethTokenNames): string[
     if (raw < ZERO) out.push(`${pethAmountText(raw)} ${sym} left this address.`);
   }
   if (ethIn > ZERO) out.push(`This address paid ${pethAmountText(ethIn)} ETH, counted in ETH in.`);
-  if (ethOut > ZERO) out.push(`${pethAmountText(ethOut)} ETH reached this address, counted in ETH out.`);
+  if (ethOut > ZERO) out.push(`This address received ${pethAmountText(ethOut)} ETH, counted in ETH out.`);
   if (fee > ZERO) out.push(`The curve charged ${pethAmountText(fee)} ${P} as its fee.`);
   const v = r.valuation;
   if (v) {
-    if (!v.price_at_block_filled) out.push("Its value at its block is not read yet.");
+    if (!v.price_at_block_filled) out.push("This row's valuation is not read yet.");
     else if (v.kind === "psm_mint" && v.eth_raw != null)
       out.push(
-        `The stablecoin it minted was worth ${pethAmountText(big(v.eth_raw))} ETH then, a valuation left out of ETH out.`,
+        `The stablecoin minted was worth ${pethAmountText(big(v.eth_raw))} ETH then, which ETH out does not count.`,
       );
     else if (v.kind === "polar_conversion" && v.eth_raw != null)
       out.push(
-        `The ${P} it gave up was worth ${pethAmountText(big(v.eth_raw))} ETH at the floor then, a valuation left out of ETH out.`,
+        `The ${P} given up was worth ${pethAmountText(big(v.eth_raw))} ETH at the floor then, which ETH out does not count.`,
       );
     else if (v.kind === "peth_arrival" && v.eth_at_spot_raw != null && v.eth_at_floor_raw != null)
       out.push(
