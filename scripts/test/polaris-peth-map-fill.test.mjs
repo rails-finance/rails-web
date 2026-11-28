@@ -51,6 +51,18 @@ const CTX = {
     venue_univ2_polar_peth: "Uniswap V2 pETH/POLAR pair",
   },
   timelineHref: (id) => `/sepolia/polaris/peth/x?map=${encodeURIComponent(id)}`,
+  // Stand-ins for lib/polaris/peth-provenance.ts: each names its helper.
+  receipts: {
+    held: (what, block) => ({ kind: "chain", summary: `held ${what}`, source: { block } }),
+    cdpTotal: (stored, block) => ({ kind: "chain-derived", summary: "cdpTotal", source: { block } }),
+    cdp: (market, id, block) => ({ kind: "chain", summary: `cdp ${market} ${id}`, source: { block } }),
+    spTotal: (stored, block) => ({ kind: "chain-derived", summary: "spTotal", source: { block } }),
+    sp: (market, id, block) => ({ kind: "chain", summary: `sp ${market} ${id}`, source: { block } }),
+    loanTotal: () => ({ kind: "chain-derived", summary: "loanTotal" }),
+    loan: (id) => ({ kind: "chain-derived", summary: `loan ${id}` }),
+    lpTotal: (block) => ({ kind: "chain-derived", summary: "lpTotal", source: { block } }),
+    lp: (venue, block) => ({ kind: "chain-derived", summary: `lp ${venue}`, source: { block } }),
+  },
 };
 
 /** An edge's amounts as { symbol: raw }. */
@@ -342,13 +354,24 @@ test("every summed figure carries its receipt: the rows and the block", () => {
   const f = buildPethMapFill(fx("map-c513"), CTX);
   const e = f.edges[pmEdge(PM.zap, MAP_HOLDER)];
   assert.equal(e.receipt.rows, 4);
-  assert.equal(e.receipt.asOf.block, "12229120");
-  assert.match(e.receipt.summary, /^Zap router → This address — /);
+  assert.equal(e.receipt.pclass, "indexed");
+  assert.deepEqual(e.receipt.source, { block: "12229120" });
+  assert.equal(
+    e.receipt.summary,
+    "Zap router → This address — the amounts this address moved along this arrow, summed over 4 transactions.",
+  );
+  assert.equal(e.receipt.formula, "Σ amount over this arrow's transactions");
   const pools = f.nodes[PM.pools].lines;
-  assert.equal(pools[0].receipt.rows, 2);
-  assert.equal(pools[1].receipt.asOf.block, "12229142");
+  assert.match(pools[0].receipt.summary, /^Pools, in — the amounts this address put into it, summed over 2 /);
+  // A box's "now" takes the places section's receipt.
+  assert.deepEqual(pools[1].receipt, { kind: "chain-derived", summary: "lpTotal", source: { block: "12229142" } });
+  assert.deepEqual(
+    f.nodes[MAP_HOLDER].lines[0].amounts.map((a) => a.receipt.summary),
+    ["held peth", "held fpeth", "held vpeth", "held svpeth"],
+  );
+  assert.equal(f.nodes[PM.svpeth].lines.find((l) => l.text === "Converts to").receipt.summary, "held svpethVpeth");
   for (const n of Object.values(f.nodes))
-    for (const l of n.lines) if (l.amounts.length > 0) assert.ok(l.receipt, JSON.stringify(l));
+    for (const l of n.lines) for (const a of l.amounts) assert.ok(a.receipt ?? l.receipt, JSON.stringify(l));
 });
 
 test("a box counts each row once; past the first read, several places count visits", () => {
@@ -365,4 +388,33 @@ test("a box counts each row once; past the first read, several places count visi
   const partial = buildPethMapFill(two, CTX);
   assert.ok(partial.nodes[PM.pools].lines.some((l) => l.text === "2 visits across its 2 pools"));
   assert.ok(partial.nodes[PM.zap].lines.some((l) => l.text === "7 transactions in all"));
+});
+
+test("the CDP, deposit and loan boxes take the places section's receipts", () => {
+  const f = buildPethMapFill(fx("map-38d7"), CTX);
+  const cdp = f.nodes[PM.cdp].lines;
+  assert.deepEqual(cdp[1].receipt, { kind: "chain-derived", summary: "cdpTotal", source: { block: "11514797" } });
+  assert.deepEqual(
+    cdp.filter((l) => l.text?.includes("CDP #")).map((l) => l.receipt.summary),
+    ["cdp goldp 22", "cdp usdp 36"],
+  );
+  const loan = f.nodes[PM.loan].lines;
+  assert.equal(loan.find((l) => l.label === "now").receipt.summary, "loanTotal");
+  assert.equal(loan.find((l) => l.text === "Reserve loan #28").receipt.summary, "loan 28");
+  const d = fx("map-38d7");
+  d.rollup.sp_peth = {
+    raw: "3",
+    source: "x",
+    items: [
+      { market: "usdp", token_id: "3", peth_raw: "1", deposit_raw: "0", as_of_block: "10", as_of_tx: "0xa" },
+      { market: "goldp", token_id: "4", peth_raw: "2", deposit_raw: "0", as_of_block: "12", as_of_tx: "0xb" },
+    ],
+  };
+  const sp = buildPethMapFill(d, CTX).nodes[PM.sp].lines;
+  // The total stands at the latest deposit's block.
+  assert.deepEqual(sp[0].receipt, { kind: "chain-derived", summary: "spTotal", source: { block: "12" } });
+  assert.deepEqual(
+    sp.slice(1).map((l) => l.receipt.summary),
+    ["sp usdp 3", "sp goldp 4"],
+  );
 });

@@ -15,6 +15,27 @@ import {
 } from "@/lib/polaris/asset-catalog";
 import { polarisPethAccountHref } from "@/lib/polaris/routes";
 import type { PethMapContext } from "@/lib/polaris/peth-map-fill";
+import {
+  pethCdpPlaceProv,
+  pethCdpTotalProv,
+  pethHeadProv,
+  pethLoanPlaceProv,
+  pethLoanTotalProv,
+  pethLpProv,
+  pethLpTotalProv,
+  pethSpPlaceProv,
+  pethSpTotalProv,
+} from "@/lib/polaris/peth-provenance";
+import type { PolarisVenueKey } from "@/lib/polaris/asset-catalog";
+
+/** The head read behind each balance the address's box states. */
+const HELD = {
+  peth: "pethHeld",
+  fpeth: "fpethHeld",
+  vpeth: "vpethHeld",
+  svpeth: "svpethHeld",
+  svpethVpeth: "svpethVpeth",
+} as const;
 
 export function pethMapContext(address: string): PethMapContext {
   const stables = POLARIS_MARKETS.map((m) => POLARIS_MARKET_CONFIG[m].stable);
@@ -33,6 +54,19 @@ export function pethMapContext(address: string): PethMapContext {
       venue_univ2_polar_peth: "pETH/POLAR pair",
       venue_univ2_peth_weth: "pETH/WETH pair",
     } satisfies Record<keyof typeof POLARIS_VENUES, string>,
+    // The places section's receipts (C24·polaris), so a figure both sections
+    // show reads the same in each.
+    receipts: {
+      held: (what, block) => pethHeadProv(HELD[what], block),
+      cdpTotal: pethCdpTotalProv,
+      cdp: pethCdpPlaceProv,
+      spTotal: pethSpTotalProv,
+      sp: pethSpPlaceProv,
+      loanTotal: pethLoanTotalProv,
+      loan: pethLoanPlaceProv,
+      lpTotal: pethLpTotalProv,
+      lp: (venue, block) => pethLpProv(venue as PolarisVenueKey, block),
+    },
     timelineHref: (edgeId) =>
       `${polarisPethAccountHref(address)}?${MAP_EDGE_PARAM}=${encodeURIComponent(edgeId)}#peth-timeline`,
   };

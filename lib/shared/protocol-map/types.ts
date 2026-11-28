@@ -9,7 +9,9 @@
 // no fill is drawn dashed, and so is a node no filled edge touches.
 //
 // "in" and "now" are valuations side by side. The fill has no field for a
-// gain. Pure, and imports nothing: scripts/test loads it directly.
+// gain. Pure, and imports only types: scripts/test loads it directly.
+
+import type { Provenance } from "../../../components/shared/provenance";
 
 /** The shared node every map draws: the address the page is about. */
 export const MAP_HOLDER = "holder";
@@ -54,26 +56,17 @@ export interface MapLayout {
 /** An amount of one asset. `address` is the icon's key. */
 export interface MapAmount {
   asset: string;
+  /** This amount's receipt, where it differs from its line's. */
+  receipt?: MapReceipt;
   address?: string;
   raw: string;
   decimals: number;
 }
 
-/** Where a figure on the map comes from: the component renders it as the
- *  figure's provenance receipt (components/shared/provenance.tsx). */
-export interface MapReceipt {
-  /** "<name clause> — <sentence>", the receipt grammar's one prose field. */
-  summary: string;
-  /** "chain" for a figure read as stated; "chain-derived" for a sum. */
-  kind: "chain" | "chain-derived";
-  /** The read the figure came through. */
-  via: string;
-  formula?: string;
-  /** The rows a sum covers. */
-  rows?: number;
-  /** The block the figure stands at. */
-  asOf: { block: string | null; tx?: string };
-}
+/** A figure's provenance receipt, as the shared Prov renders it, with the
+ *  rows a sum covers. The protocol's builder writes it; for a figure another
+ *  section of the page also shows, it uses that section's receipt. */
+export type MapReceipt = Provenance & { rows?: number };
 
 export interface MapLine {
   label: "in" | "now" | "note";

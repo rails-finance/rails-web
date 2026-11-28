@@ -40,17 +40,10 @@ interface Box {
 
 type Pt = [number, number];
 
-/** A map receipt as the shared provenance receipt: a sum of ledger rows is
- *  indexed, a figure recorded at a transaction emitted, a head read state. */
+/** A map receipt is a provenance receipt; `rows` is the map's own. */
 function receiptProv(r: MapReceipt): Provenance {
-  return {
-    kind: r.kind,
-    pclass: r.rows != null ? "indexed" : r.asOf.tx ? "emitted" : "state",
-    summary: r.summary,
-    via: r.via,
-    ...(r.formula ? { formula: r.formula } : {}),
-    source: { ...(r.asOf.block ? { block: r.asOf.block } : {}), ...(r.asOf.tx ? { txHash: r.asOf.tx } : {}) },
-  };
+  const { rows: _rows, ...info } = r;
+  return info;
 }
 
 /** One amount: the compact figure, then its asset's icon. With a receipt the
@@ -60,8 +53,8 @@ function Amount({ a, receipt, echo }: { a: MapAmount; receipt?: MapReceipt; echo
   const figure = formatCompact(mapUnits(a));
   return (
     <span className="inline-flex items-center gap-1 tabular-nums" title={`${exact} ${a.asset}`}>
-      {receipt ? (
-        <Prov info={receiptProv(receipt)} value={exact} symbol={a.asset} echo={echo}>
+      {(a.receipt ?? receipt) ? (
+        <Prov info={receiptProv((a.receipt ?? receipt)!)} value={exact} symbol={a.asset} echo={echo}>
           {figure}
         </Prov>
       ) : (

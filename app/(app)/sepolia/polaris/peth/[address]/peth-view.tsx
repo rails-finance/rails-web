@@ -499,19 +499,17 @@ export default function PethView({
             const r = rowById.get(event.id);
             if (!r) return null;
             const card = <PolarisPethEventCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} />;
-            if (onEventPage || !fill) return card;
+            if (onEventPage || !fill || fill.edgesUnknown) return card;
             // A click on a row selects it on the map (ui-jobs 873), and a
             // selection on the map marks its rows here. A click on a link or
-            // a button inside the card is the card's own.
+            // a button inside the card belongs to the card. "Show on the map"
+            // is the row's keyboard control.
             const lit = hot?.any === true && hot.rows.has(event.id);
+            const chosen = selection?.type === "row" && selection.id === event.id;
             const select = () => setSelection({ type: "row", id: event.id });
             return (
               <div
-                role="button"
-                tabIndex={0}
-                aria-pressed={lit}
-                aria-label={`Show ${pethKindLabel(r.kind)} on the Polaris map`}
-                className={`rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${lit ? "ring-2 ring-[var(--focus-ring)]" : ""}`}
+                className={`rounded-xl ${lit ? "ring-2 ring-[var(--focus-ring)]" : ""}`}
                 data-map-row={event.id}
                 data-map-lit={lit ? "" : undefined}
                 data-anatomy="L12·polaris"
@@ -519,13 +517,19 @@ export default function PethView({
                   if ((e.target as HTMLElement).closest("a, button")) return;
                   select();
                 }}
-                onKeyDown={(e) => {
-                  if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
-                  e.preventDefault();
-                  select();
-                }}
               >
                 {card}
+                <div className="flex justify-end px-3 pb-1">
+                  <button
+                    type="button"
+                    className={`${INLINE_LINK} cursor-pointer rounded text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]`}
+                    aria-pressed={chosen}
+                    aria-label={`Show ${pethKindLabel(r.kind)} on the Polaris map`}
+                    onClick={() => setSelection(chosen ? null : { type: "row", id: event.id })}
+                  >
+                    Show on the map
+                  </button>
+                </div>
               </div>
             );
           }}

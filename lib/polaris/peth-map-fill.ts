@@ -11,15 +11,17 @@
 // none (`pethPlacesServed` false), a ledger still being read and one too
 // heavy to list all set `edgesUnknown`: no arrows, and no box marked unused.
 //
-// Every summed figure carries a receipt (MapReceipt): the rows it covers and
-// the block it stands at.
+// Every figure carries a receipt (MapReceipt). An arrow and a box's "in" sum
+// rows; a box's "now" is the same figure as the places section's and takes
+// that section's receipt, from lib/polaris/peth-provenance.ts through the
+// context (`receipts`).
 //
 // THE ETH ARROWS carry the row's ETH in and ETH out, the figures the card
 // states: they count only zaps and trades into or out of pETH or fpETH. A row
 // with several places gives its ETH to the curve, else the splitter, else the
-// zap, else its first place. A zap
-// to or from vpETH, USDp, GOLDp or POLAR draws its tokens and no ETH. Morpho
-// Blue moves show their vpETH and are not decoded. The fee router's rewards
+// zap, else its first place. A zap to or from vpETH, USDp, GOLDp or POLAR
+// draws its tokens and no ETH. Morpho Blue moves show their vpETH and are not
+// decoded. The fee router's rewards
 // back to the address are not read yet (ui-jobs 871), and the box says so.
 
 import type { PethLedgerLine, PethLedgerRow, PethPlace, PolarisPethResponse } from "../sources/api/polaris-peth";
@@ -56,6 +58,23 @@ export interface PethMapContext {
   venueLabel: Record<string, string>;
   /** The address's timeline filtered to one edge. */
   timelineHref: (edgeId: string) => string;
+  /** The places section's receipts, for the figures both sections show. */
+  receipts: PethMapReceipts;
+}
+
+/** The places section's receipt for each figure the map's boxes repeat
+ *  (lib/polaris/peth-provenance.ts). `stored`: the chain did not answer and
+ *  the figure is the stored index's. */
+export interface PethMapReceipts {
+  held: (what: "peth" | "fpeth" | "vpeth" | "svpeth" | "svpethVpeth", block: string | null) => MapReceipt;
+  cdpTotal: (stored: boolean, block: string | null) => MapReceipt;
+  cdp: (market: "usdp" | "goldp", id: string, block: string, tx: string) => MapReceipt;
+  spTotal: (stored: boolean, block: string | null) => MapReceipt;
+  sp: (market: "usdp" | "goldp", id: string, block: string, tx: string) => MapReceipt;
+  loanTotal: (stored: boolean, block: string | null) => MapReceipt;
+  loan: (id: string) => MapReceipt;
+  lpTotal: (block: string | null) => MapReceipt;
+  lp: (venue: string, block: string | null) => MapReceipt;
 }
 
 const NATIVE_ETH: PethMapToken = { symbol: "ETH" };
@@ -269,12 +288,13 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
   const total = ok ? (d.total_rows ?? rows.length) : 0;
   const full = rows.length >= total;
   const sumReceipt = (name: string, n: number, what: string): MapReceipt => ({
-    summary: `${name} — the sum of ${plural(n, "transaction")} of this address's pETH ledger ${what}, through the last block the ledger read.`,
+    summary: `${name} — the amounts ${what}, summed over ${plural(n, "transaction")}.`,
     kind: "chain-derived",
+    pclass: "indexed",
     via: `${VIA} · rows`,
-    formula: "Σ the rows' line amounts",
+    formula: "Σ amount over this arrow's transactions",
     rows: n,
-    asOf: { block: ledgerBlock },
+    ...(ledgerBlock ? { source: { block: ledgerBlock } } : {}),
   });
   const edges: MapFill["edges"] = {};
   for (const e of POLARIS_MAP_LAYOUT.edges) {
@@ -285,7 +305,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
       amounts: full ? s.s.amounts() : [],
       rowCount: s.rows,
       timelineHref: ctx.timelineHref(e.id),
-      receipt: sumReceipt(name, s.rows, "that moved along this arrow"),
+      receipt: sumReceipt(name, s.rows, "this address moved along this arrow"),
     };
   }
 
@@ -329,52 +349,42 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
       ? {
           label: "in",
           amounts: e.amounts,
-          receipt: sumReceipt(`${TITLE.get(node)}, in`, e.rowCount, "that moved into it from this address"),
+          receipt: sumReceipt(`${TITLE.get(node)}, in`, e.rowCount, "this address put into it"),
         }
       : null;
   };
-  const headReceipt = (name: string, source: string | null | undefined, block: string | null): MapReceipt => ({
-    summary: `${name} — read at the head block through the route's one Multicall3.`,
-    kind: "chain",
-    via: `${VIA} · ${source ?? "head read"}`,
-    asOf: { block },
-  });
-  const storedReceipt = (name: string, source: string, block: string | null, tx?: string): MapReceipt => ({
-    summary: `${name} — as the index recorded it at its last touch.`,
-    kind: "chain",
-    via: `${VIA} · ${source}`,
-    asOf: { block, ...(tx ? { tx } : {}) },
-  });
+  const rc = ctx.receipts;
+  const stored = d.ledger != null && d.ledger.complete === null;
+  const latest = (blocks: string[]): string | null =>
+    blocks.reduce<string | null>((b, x) => (b == null || BigInt(x) > BigInt(b) ? x : b), null);
   const r = d.rollup;
 
-  // The address: what it holds now.
-  const held = new Sums();
-  held.add(ctx.peth, big(r.wallet_peth.raw));
-  held.add(ctx.fpeth, big(r.wallet_fpeth.raw));
-  held.add(ctx.vpeth, big(r.wallet_vpeth.raw));
-  held.add(ctx.svpeth, big(r.wallet_svpeth?.raw));
+  // The address: what it holds now, each token with its balance's receipt.
+  const heldAmounts = (
+    [
+      [ctx.peth, r.wallet_peth.raw, "peth", r.wallet_peth.block],
+      [ctx.fpeth, r.wallet_fpeth.raw, "fpeth", r.wallet_fpeth.block],
+      [ctx.vpeth, r.wallet_vpeth.raw, "vpeth", r.wallet_vpeth.block],
+      [ctx.svpeth, r.wallet_svpeth?.raw, "svpeth", r.wallet_svpeth?.block],
+    ] as const
+  )
+    .filter(([, raw]) => big(raw) > ZERO)
+    .map(([t, raw, what, block]) => ({ ...amount(t, big(raw)), receipt: rc.held(what, block ?? headBlock) }));
   put(MAP_HOLDER, [
     r.wallet_peth.raw == null
       ? { label: "note", amounts: [], text: "Holdings not read" }
-      : {
-          label: "now",
-          amounts: held.amounts(),
-          receipt: headReceipt("This address's balances", r.wallet_peth.source, r.wallet_peth.block ?? headBlock),
-        },
+      : { label: "now", amounts: heldAmounts },
   ]);
 
   const cdps = r.cdp_collateral.items ?? [];
-  const cdpBlock = cdps.reduce<string | null>(
-    (b, c) => (b == null || BigInt(c.as_of_block) > BigInt(b) ? c.as_of_block : b),
-    null,
-  );
+  const cdpBlock = latest(cdps.map((c) => c.as_of_block));
   put(PM.cdp, [
     inLine(PM.cdp),
     cdps.length > 0 && r.cdp_collateral.raw != null
       ? {
           label: "now",
           amounts: [amount(ctx.peth, big(r.cdp_collateral.raw))],
-          receipt: storedReceipt("CDP collateral", r.cdp_collateral.source, cdpBlock),
+          receipt: rc.cdpTotal(stored, cdpBlock),
         }
       : null,
     ...cdps.map((c) => {
@@ -383,7 +393,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
         label: "note" as const,
         text,
         amounts: [amount(ctx.peth, big(c.coll_raw))],
-        receipt: storedReceipt(`${text}'s collateral`, r.cdp_collateral.source, c.as_of_block, c.as_of_tx),
+        receipt: rc.cdp(c.market, c.cdp_id, c.as_of_block, c.as_of_tx),
       };
     }),
     cdps.length > 0 ? { label: "note", amounts: [], text: "At each CDP's last touch" } : null,
@@ -396,7 +406,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
       ? {
           label: "now",
           amounts: [amount(ctx.peth, big(r.sp_peth.raw))],
-          receipt: storedReceipt("Stability Pool pETH", r.sp_peth.source, sps[0]?.as_of_block ?? null),
+          receipt: rc.spTotal(stored, latest(sps.map((x) => x.as_of_block))),
         }
       : null,
     ...sps.map((s) => {
@@ -405,7 +415,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
         label: "note" as const,
         text,
         amounts: [amount(ctx.peth, big(s.peth_raw))],
-        receipt: storedReceipt(`${text}'s pETH`, r.sp_peth.source, s.as_of_block, s.as_of_tx),
+        receipt: rc.sp(s.market, s.token_id, s.as_of_block, s.as_of_tx),
       };
     }),
   ]);
@@ -417,7 +427,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
       ? {
           label: "now",
           amounts: [amount(ctx.fpeth, big(r.loans_fpeth.raw))],
-          receipt: storedReceipt("Reserve-loan collateral", r.loans_fpeth.source, ledgerBlock),
+          receipt: rc.loanTotal(stored, null),
         }
       : null,
     ...loans.map((l) => {
@@ -426,7 +436,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
         label: "note" as const,
         text,
         amounts: [amount(ctx.fpeth, big(l.fpeth_raw))],
-        receipt: storedReceipt(`${text}'s collateral`, r.loans_fpeth.source, ledgerBlock),
+        receipt: rc.loan(l.loan_id),
       };
     }),
   ]);
@@ -439,7 +449,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
       ? {
           label: "now",
           amounts: [amount(ctx.peth, share)],
-          receipt: headReceipt("pETH in pools", lps[0].source, lps[0].block ?? headBlock),
+          receipt: rc.lpTotal(lps[0].block ?? headBlock),
         }
       : null,
     ...(lps.length > 1
@@ -449,7 +459,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
             label: "note" as const,
             text,
             amounts: [amount(ctx.peth, big(x.peth_share_raw))],
-            receipt: headReceipt(`pETH in the ${text}`, x.source, x.block ?? headBlock),
+            receipt: rc.lp(x.venue, x.block ?? headBlock),
           };
         })
       : []),
@@ -462,7 +472,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
       ? {
           label: "now",
           amounts: [amount(ctx.svpeth, big(sv.raw))],
-          receipt: headReceipt("svpETH held", sv.source, sv.block ?? headBlock),
+          receipt: rc.held("svpeth", sv.block ?? headBlock),
         }
       : null,
     sv?.vpeth_raw != null && big(sv.vpeth_raw) > ZERO
@@ -470,7 +480,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
           label: "note",
           text: "Converts to",
           amounts: [amount(ctx.vpeth, big(sv.vpeth_raw))],
-          receipt: headReceipt("svpETH in vpETH", sv.source, sv.block ?? headBlock),
+          receipt: rc.held("svpethVpeth", sv.block ?? headBlock),
         }
       : null,
   ]);
