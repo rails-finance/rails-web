@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { startNavigationProgress } from "@/components/nav/navigation-progress";
+import { startNavigationProgress, startNavigationProgressOnClick } from "@/components/nav/navigation-progress";
 import { holderLabelHref } from "@/lib/ipor-fusion/label-href";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
@@ -61,7 +61,13 @@ export function HolderLabelTag({
         Open the vault page
       </button>
     ) : (
-      <Link href={href} prefetch={false} className={`mt-1.5 block font-semibold ${INLINE_LINK}`}>
+      <Link
+        href={href}
+        prefetch={false}
+        className={`mt-1.5 block font-semibold ${INLINE_LINK}`}
+        // RevealTip stops the click in its bubble, before the window listener.
+        onClick={(e) => startNavigationProgressOnClick(e, href)}
+      >
         Open the vault page
       </Link>
     )

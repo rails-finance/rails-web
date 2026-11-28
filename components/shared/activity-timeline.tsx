@@ -12,9 +12,12 @@
 // shim can be replaced with the verbatim 1200-line file.
 
 import Link from "next/link";
-import { createContext, useContext, useState, useRef } from "react";
+import { createContext, useContext, useId, useState, useRef } from "react";
 import { fmtSpine } from "@/lib/shared/spine-format";
-import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
+import { INLINE_LINK, INPLACE_TEXT } from "@/lib/shared/ui-grammar";
+import { spineAmountPress } from "@/lib/shared/spine-amount-press";
+import { RevealTip } from "@/components/shared/reveal-tip";
+import { startNavigationProgressOnClick } from "@/components/nav/navigation-progress";
 export { fmtSpine };
 
 // ── Timeline scale ─────────────────────────────────────────────────────
@@ -85,7 +88,8 @@ export function SpineVal({
   value?: string | number;
   side: "left" | "right";
   /** The amount opens this page: the figure keeps its look at rest and
-   *  takes the link cue (underline, the focus ring) on hover and focus. */
+   *  takes the link cue (underline, the focus ring) on hover and focus; on a
+   *  screen without hover it rests on a dotted hairline underline. */
   link?: SpineAmountLink;
   /** A symbol printed after the figure, smaller and muted. */
   unit?: string;
@@ -126,28 +130,119 @@ export function SpineVal({
     // Below 640px the spine node passes taps through to the row's phone
     // toggle (spine-column.tsx); a tap on the link opens the link.
     " pointer-events-auto" +
+    // The resting cue without hover (anatomy L3.2).
+    " [@media(hover:none)]:underline [@media(hover:none)]:decoration-dotted [@media(hover:none)]:decoration-1" +
+    " [@media(hover:none)]:decoration-[var(--edge-row-line)]" +
     mark;
+  return (
+    <span className={sideClass}>
+      <SpineAmountLinkView link={link} cls={cls} side={side} name={`${txt}${unit ? ` ${unit}` : ""}`}>
+        {body}
+      </SpineAmountLinkView>
+    </span>
+  );
+}
+
+/** The linked amount in the house tooltip (RevealTip, held open here): a
+ *  touch or a pen opens the link's words with the link in them first, and a
+ *  second press follows it; a mouse click follows at once, and with no pointer
+ *  event `(hover: none)` decides (lib/shared/spine-amount-press.ts). */
+function SpineAmountLinkView({
+  link,
+  cls,
+  side,
+  name,
+  children,
+}: {
+  link: SpineAmountLink;
+  cls: string;
+  side: "left" | "right";
+  name: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  // Once a press has opened the tooltip the link says whether it is open;
+  // before that, and with a mouse or a keyboard, it is a plain link.
+  const [discloses, setDiscloses] = useState(false);
+  const tipId = useId();
+  // The pointer that pressed the link, read at its click; none for a
+  // keyboard or a screen reader's activation.
+  const pointer = useRef<string | undefined>(undefined);
   const common = {
     title: link.tip,
+    "aria-expanded": discloses ? open : undefined,
+    "aria-describedby": open ? tipId : undefined,
+    // The spine node stands above the rows around it while this is set.
+    "data-tip-open": open ? "" : undefined,
+    onPointerDown: (e: React.PointerEvent) => {
+      pointer.current = e.pointerType;
+    },
+    // A touch that turns into a scroll leaves no pointer behind.
+    onPointerCancel: () => {
+      pointer.current = undefined;
+    },
     // The arrows are visual: the name reads the words alone.
-    "aria-label": `${txt}${unit ? ` ${unit}` : ""}: ${link.tip.replace(/\s*[→↗]\s*$/u, "")}`,
-    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+    "aria-label": `${name}: ${link.tip.replace(/\s*[→↗]\s*$/u, "")}`,
+    onClick: (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const pressedBy = pointer.current;
+      pointer.current = undefined;
+      const press = spineAmountPress(open, {
+        on: "amount",
+        pointer: pressedBy,
+        hoverless: pressedBy === undefined && window.matchMedia("(hover: none)").matches,
+        keyboard: e.detail === 0,
+      });
+      if (!press.follow) e.preventDefault();
+      else if (!link.external) startNavigationProgressOnClick(e, link.href);
+      if (press.open) setDiscloses(true);
+      setOpen(press.open);
+    },
     // "marked" while the border is drawn, "plain" while Display has it off.
     "data-spine-amount-link": link.marked ? "marked" : "plain",
     "data-anatomy": link.marked ? "L3.3" : "L3.2",
   };
+  const tipLink = {
+    className: `font-semibold ${INLINE_LINK}`,
+    // The press belongs to the link.
+    onClick: (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!link.external) startNavigationProgressOnClick(e, link.href);
+    },
+  };
+  const outside = { on: "outside", hoverless: false, keyboard: false } as const;
   return (
-    <span className={sideClass}>
+    <RevealTip
+      tip={
+        link.external ? (
+          <a href={link.href} target="_blank" rel="noopener" {...tipLink}>
+            {link.tip}
+          </a>
+        ) : (
+          <Link href={link.href} prefetch={false} {...tipLink}>
+            {link.tip}
+          </Link>
+        )
+      }
+      interactive
+      wrap
+      align={side === "left" ? "end" : "start"}
+      open={open}
+      bubbleId={tipId}
+      onOpenChange={(o) => {
+        if (!o) setOpen(spineAmountPress(open, outside).open);
+      }}
+    >
       {link.external ? (
         <a href={link.href} target="_blank" rel="noopener" className={cls} {...common}>
-          {body}
+          {children}
         </a>
       ) : (
         <Link href={link.href} prefetch={false} className={cls} {...common}>
-          {body}
+          {children}
         </Link>
       )}
-    </span>
+    </RevealTip>
   );
 }
 

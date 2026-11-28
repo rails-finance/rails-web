@@ -43,6 +43,9 @@ export function RevealTip({
   align = "start",
   wrap,
   interactive = false,
+  open: openProp,
+  onOpenChange,
+  bubbleId,
 }: {
   tip: ReactNode;
   children: ReactNode;
@@ -61,8 +64,20 @@ export function RevealTip({
    *  takes pointer events, a click inside it is the control's, and focus
    *  moving into it keeps it open. */
   interactive?: boolean;
+  /** Held by the caller, which opens it (the spine's linked amount on a first
+   *  tap); a press elsewhere and Escape still close it, through `onOpenChange`. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** The bubble's id, for a caller that points `aria-describedby` at it. */
+  bubbleId?: string;
 }) {
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = openProp ?? ownOpen;
+  const setOpen = (next: boolean | ((o: boolean) => boolean)) => {
+    const v = typeof next === "function" ? next(open) : next;
+    if (onOpenChange) onOpenChange(v);
+    else setOwnOpen(v);
+  };
   const quiet = useContext(QuietTipsContext);
   const ref = useRef<HTMLSpanElement>(null);
   const bubbleRef = useRef<HTMLSpanElement>(null);
@@ -154,8 +169,15 @@ export function RevealTip({
           : undefined
       }
       onClick={(e) => {
-        // A click on the bubble's own control is the control's.
-        if (interactive && bubbleRef.current?.contains(e.target as Node)) return;
+        // A click in the bubble stops there. On its padding or arrow it also
+        // follows no link around the tip (a listing card's row); a control in
+        // the bubble that navigates starts the progress bar.
+        if (interactive && bubbleRef.current?.contains(e.target as Node)) {
+          const control = (e.target as Element).closest("a[href],button");
+          if (!control || !bubbleRef.current.contains(control)) e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
         // Inside a value the inspector can pick, the click traces it.
         if (tipYieldsToTrace(ref.current, provInspector.getArmed())) return;
         e.preventDefault();
@@ -182,6 +204,7 @@ export function RevealTip({
            the displayed value. */
         <span
           ref={bubbleRef}
+          id={bubbleId}
           role="tooltip"
           data-prov-hidden=""
           className={`${interactive ? "pointer-events-auto" : "pointer-events-none"} absolute ${below ? "top-full mt-2.5" : "bottom-full mb-2.5"} ${align === "end" ? "right-0" : "left-0"} z-[var(--z-dropdown)] ${wrap ? "w-max max-w-[min(20rem,calc(100vw-1.5rem))] whitespace-normal break-words" : "whitespace-nowrap"} rounded-2xl border p-3 text-xs font-medium tabular-nums text-foreground shadow-lg`}
