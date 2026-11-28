@@ -155,7 +155,7 @@ export function TokenChipIcon({
   // chain, so a Base page drawing "USDC" by symbol alone still finds it. The
   // overrides are Ethereum addresses by construction.
   // Polaris's fpETH, vpETH and svpETH have no artwork: each draws pETH's
-  // mark, ringed from 20px (PolarisMark at the foot of this file).
+  // mark in its ring at every size (PolarisMark at the foot of this file).
   const ringed = polarisRingedToken(callerAddress, iconOverride ?? symbol, chainId);
   const rawLookup = ringed?.base.symbol ?? iconOverride ?? symbol;
   const address = ringed?.base.address ?? callerAddress;
@@ -190,7 +190,7 @@ export function TokenChipIcon({
   const isPt = /^PT-/i.test(rawLookup);
   // A Pendle PT (isPendlePt: "PT-<asset>-<DMMMYYYY>") from 20px wears
   // Pendle's PT ring (PtMark below); the mark shrinks to sit inside it.
-  const ring = size >= 20 && (isPendlePt(rawLookup) || !!ringed);
+  const ring = !!ringed || (size >= 20 && isPendlePt(rawLookup));
   const markSize = ring ? kindRingInner(size) : size;
   // Resolve as though the caller had asked for the underlying — symbol AND
   // address, so the local-PNG tiers get their chance too. The PT's own address
@@ -255,7 +255,7 @@ export function TokenChipIcon({
     );
   if (ringed)
     return (
-      <PolarisMark size={size} ringed={ringed} ring={ring}>
+      <PolarisMark size={size} ringed={ringed}>
         {chip}
       </PolarisMark>
     );
@@ -326,34 +326,31 @@ function PtMark({
   );
 }
 
-/** A Polaris split token's icon: pETH's mark, inside the token's kind ring
- *  from 20px and bare below it, with a tooltip naming the token at every
- *  size, since the mark alone would read as pETH. */
+/** A Polaris split token's icon: pETH's mark inside the token's kind ring,
+ *  1px wide below 20px, with a tooltip naming the token at every size, since
+ *  the mark alone would read as pETH. Below 20px the icon may narrow under
+ *  `sm`, as a bare chip's img does, so a tight row at 390px stays inside the
+ *  viewport; the ring keeps its circle. */
 function PolarisMark({
   size,
   ringed,
-  ring,
   children,
 }: {
   size: number;
   ringed: PolarisRingedToken;
-  ring: boolean;
   children: React.ReactNode;
 }) {
+  const fluid = size < 20;
   return (
     <span
-      className="relative inline-flex shrink-0"
+      className={`relative inline-flex ${fluid ? "min-w-0 shrink items-center sm:shrink-0" : "shrink-0"}`}
       style={{ width: size, height: size }}
       title={ringed.tip}
       data-polaris-icon={ringed.ring}
     >
-      {ring ? (
-        <KindRing ring={ringed.ring} size={size}>
-          {children}
-        </KindRing>
-      ) : (
-        children
-      )}
+      <KindRing ring={ringed.ring} size={size} fluid={fluid}>
+        {children}
+      </KindRing>
     </span>
   );
 }

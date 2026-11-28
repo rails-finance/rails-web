@@ -1,6 +1,6 @@
-// Polaris's split tokens, which have no artwork of their own: each draws
-// pETH's mark, in its kind ring from 20px (components/shared/token-kind-ring.tsx;
-// ui-jobs 871), and the tip names the token. The token chip resolves them here
+// Polaris's split tokens, which have no artwork: each draws pETH's mark in its
+// kind ring at every size (components/shared/token-kind-ring.tsx; ui-jobs 871),
+// and the tip names the token. The token chip resolves them here
 // by the catalog's address, or by symbol on the Polaris chain where a caller
 // passes no address.
 

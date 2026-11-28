@@ -2,7 +2,10 @@
 // captured from origin/preview before ui-jobs 871 added the Polaris kinds
 // (scripts/fixtures/kind-rings/expected.json): the market token icon at each
 // size either side of the 20px rule, a Pendle PT through the shared token
-// chip, and a spine row wearing each ring.
+// chip, and a spine row wearing each ring. OTHER_CHIPS are the token chip's
+// unringed cases, captured from the same base (scripts/fixtures/kind-rings/
+// chips.json): a plain chip, and a PT outside Pendle's naming, which keeps the
+// neutral "PT" stamp.
 const SUSDE = { symbol: "sUSDe", address: "0x9d39a5de30e57443bff2a8307a4256c8797a3497" };
 
 export const PENDLE_ICONS = Object.fromEntries(
@@ -33,3 +36,10 @@ export const SPINES = {
     tokens: [{ symbol: "YT-sUSDE-27MAR2025", iconSymbol: "sUSDe", direction: "left", value: 300, ring: "yt" }],
   },
 };
+
+export const OTHER_CHIPS = Object.fromEntries(
+  [14, 16, 20, 28].flatMap((size) => [
+    [`plain-chip-${size}`, { symbol: "sUSDe", address: SUSDE.address, size, filterable: false }],
+    [`pt-stamp-chip-${size}`, { symbol: "PT-sUSDe", size, filterable: false }],
+  ]),
+);
