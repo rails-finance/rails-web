@@ -105,6 +105,7 @@ import {
   getEventActionLegs,
   getEventAssetKeys,
   getEventCounterpartyKeys,
+  getEventPlaceKeys,
   getEventVersionKeys,
   actionLabel,
   DEMOTED_ACTIONS,
@@ -217,7 +218,7 @@ export interface TimelineEventsState {
   /** The keys each axis hides, as stored (the URL, a stored view, the
    *  toggles): a key no option offers can stand here, and a write that
    *  clears the axis reads this to clear it too. */
-  hiddenKeys: { action: string[]; asset: string[]; counterparty: string[]; version: string[] };
+  hiddenKeys: { action: string[]; asset: string[]; counterparty: string[]; version: string[]; place: string[] };
   /** Action-type buckets for the FilterDropdown (demoted sorted to bottom). */
   eventOptions: FilterOption[];
   /** Keys currently shown (FilterDropdown `selected` for multi mode). */
@@ -253,6 +254,18 @@ export interface TimelineEventsState {
   visibleVersionKeys: Set<string>;
   toggleHiddenVersion: (key: string) => void;
   resetHiddenVersions: () => void;
+
+  /** Place buckets for the FilterDropdown: where each row's tokens went or
+   *  came from (a CDP, a loan, a deposit, a pool), first seen first. Empty on
+   *  every timeline whose events carry no place (see getEventPlaceKeys), and
+   *  the toolbar renders no control then. */
+  placeOptions: FilterOption[];
+  visiblePlaceKeys: Set<string>;
+  toggleHiddenPlace: (key: string) => void;
+  resetHiddenPlaces: () => void;
+  /** Show the rows of the places in `keys` and hide every other place, as one
+   *  live view: what a place's "N events" link applies on the page. */
+  showOnlyPlaces: (keys: string[]) => void;
 
   dateRange: [number, number] | null;
   setDateRange: (next: [number, number] | null) => void;
@@ -317,6 +330,8 @@ export interface TimelineAxesView {
   hiddenAssets: Set<string>;
   hiddenCounterparties: Set<string>;
   hiddenVersions: Set<string>;
+  /** Absent where the page offers no place axis. */
+  hiddenPlaces?: Set<string>;
   /** Absent where the page offers no Size. */
   size?: { dims: readonly TimelineSizeDim[]; ranges: SizeRanges };
 }
@@ -332,6 +347,7 @@ export function eventPassesAxes(e: BaseActivityEvent, v: TimelineAxesView): bool
     some(getEventAssetKeys(e), v.hiddenAssets) &&
     some(getEventCounterpartyKeys(e), v.hiddenCounterparties) &&
     some(getEventVersionKeys(e), v.hiddenVersions) &&
+    (!v.hiddenPlaces || some(getEventPlaceKeys(e), v.hiddenPlaces)) &&
     (!v.size || sizePasses(e, v.size.dims, v.size.ranges))
   );
 }
@@ -347,6 +363,9 @@ interface PersistedState {
   /** Absent in entries written before the version axis existed: read as
    *  none hidden. */
   hiddenVersions?: string[];
+  /** Absent in entries written before the place axis existed: read as none
+   *  hidden. */
+  hiddenPlaces?: string[];
 }
 
 /** The view as the URL carries it — the hook's own state, minus display. */
@@ -355,6 +374,7 @@ interface ViewParams {
   hiddenAssets: string[];
   hiddenCounterparties: string[];
   hiddenVersions: string[];
+  hiddenPlaces: string[];
   dateRange: [number, number] | null;
   sizeRanges: SizeRanges;
 }
@@ -398,6 +418,7 @@ function writeViewParams(
   list("hideAssets", view.hiddenAssets);
   list("hideAddresses", view.hiddenCounterparties);
   list("hideVersions", view.hiddenVersions);
+  list("hidePlaces", view.hiddenPlaces);
   writeSizeParams(sp, sizeSides, view.sizeRanges);
   if (datesBy === "chart") return;
   if (view.dateRange) {
@@ -426,6 +447,8 @@ function readViewParams(sp: URLSearchParams, sizeSides: readonly SizeSide[]): Pa
   if (hideAddresses) view.hiddenCounterparties = hideAddresses;
   const hideVersions = splitList(sp.get("hideVersions"));
   if (hideVersions) view.hiddenVersions = hideVersions;
+  const hidePlaces = splitList(sp.get("hidePlaces"));
+  if (hidePlaces) view.hiddenPlaces = hidePlaces;
   const from = parseUtcDay(sp.get("from"));
   const to = parseUtcDay(sp.get("to"));
   if (from !== null && to !== null && from <= to) view.dateRange = [from, to + SECONDS_PER_DAY - 1];
@@ -491,6 +514,7 @@ export function useTimelineEvents(
   const [hiddenAssets, setHiddenAssets] = useState<string[]>([]);
   const [hiddenCounterparties, setHiddenCounterparties] = useState<string[]>([]);
   const [hiddenVersions, setHiddenVersions] = useState<string[]>([]);
+  const [hiddenPlaces, setHiddenPlaces] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<[number, number] | null>(null);
   const [sizeRanges, setSizeRanges] = useState<SizeRanges>(NO_SIZE);
   const sizeDims = useMemo(() => size ?? [], [size]);
@@ -551,6 +575,7 @@ export function useTimelineEvents(
     setHiddenAssets([]);
     setHiddenCounterparties([]);
     setHiddenVersions([]);
+    setHiddenPlaces([]);
     setDateRange(null);
     setSizeRanges(NO_SIZE);
     if (!storageKey) {
@@ -565,6 +590,7 @@ export function useTimelineEvents(
         setHiddenAssets(Array.isArray(parsed.hiddenAssets) ? parsed.hiddenAssets : []);
         setHiddenCounterparties(Array.isArray(parsed.hiddenCounterparties) ? parsed.hiddenCounterparties : []);
         setHiddenVersions(Array.isArray(parsed.hiddenVersions) ? parsed.hiddenVersions : []);
+        setHiddenPlaces(Array.isArray(parsed.hiddenPlaces) ? parsed.hiddenPlaces : []);
       }
     } catch {
       /* corrupt entry — fall back to defaults */
@@ -575,6 +601,7 @@ export function useTimelineEvents(
         if (view.hiddenAssets) setHiddenAssets(view.hiddenAssets);
         if (view.hiddenCounterparties) setHiddenCounterparties(view.hiddenCounterparties);
         if (view.hiddenVersions) setHiddenVersions(view.hiddenVersions);
+        if (view.hiddenPlaces) setHiddenPlaces(view.hiddenPlaces);
         pendingRange.current = null;
         if (view.dateRange) {
           if (datesByRef.current === "pill") setDateRange(view.dateRange);
@@ -602,12 +629,12 @@ export function useTimelineEvents(
     try {
       localStorage.setItem(
         `rails-ui-${storageKey}`,
-        JSON.stringify({ hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions }),
+        JSON.stringify({ hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, hiddenPlaces }),
       );
     } catch {
       /* storage full / unavailable — non-fatal */
     }
-  }, [storageKey, hydrated, hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions]);
+  }, [storageKey, hydrated, hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, hiddenPlaces]);
 
   // Mirror the view into the URL after the visitor's first live toggle. Only ever a
   // non-default value is written, matching the listing driver's
@@ -623,6 +650,7 @@ export function useTimelineEvents(
           hiddenAssets,
           hiddenCounterparties,
           hiddenVersions,
+          hiddenPlaces,
           dateRange,
           sizeRanges,
         },
@@ -641,6 +669,7 @@ export function useTimelineEvents(
     hiddenAssets,
     hiddenCounterparties,
     hiddenVersions,
+    hiddenPlaces,
     dateRange,
     sizeRanges,
     datesBy,
@@ -659,6 +688,7 @@ export function useTimelineEvents(
         hiddenAssets,
         hiddenCounterparties,
         hiddenVersions,
+        hiddenPlaces,
         dateRange,
         sizeRanges,
       },
@@ -666,7 +696,17 @@ export function useTimelineEvents(
       sizeSides,
     );
     return url.toString();
-  }, [hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, sizeRanges, datesBy, sizeSides]);
+  }, [
+    hiddenActions,
+    hiddenAssets,
+    hiddenCounterparties,
+    hiddenVersions,
+    hiddenPlaces,
+    dateRange,
+    sizeRanges,
+    datesBy,
+    sizeSides,
+  ]);
 
   // The ⋮ link row reads the view through the registry while this page is up.
   useEffect(() => {
@@ -678,6 +718,7 @@ export function useTimelineEvents(
   const hiddenAssetSet = useMemo(() => new Set(hiddenAssets), [hiddenAssets]);
   const hiddenCounterpartySet = useMemo(() => new Set(hiddenCounterparties), [hiddenCounterparties]);
   const hiddenVersionSet = useMemo(() => new Set(hiddenVersions), [hiddenVersions]);
+  const hiddenPlaceSet = useMemo(() => new Set(hiddenPlaces), [hiddenPlaces]);
 
   // Oldest first; events of one block or one transaction in the order they
   // happened (lib/shared/event-order.ts), else as the family passed them.
@@ -783,9 +824,10 @@ export function useTimelineEvents(
         hiddenAssets: hiddenAssetSet,
         hiddenCounterparties: hiddenCounterpartySet,
         hiddenVersions: hiddenVersionSet,
+        hiddenPlaces: hiddenPlaceSet,
         size: sizeView,
       }),
-    [actionHiddenSet, hiddenAssetSet, hiddenCounterpartySet, hiddenVersionSet, sizeView],
+    [actionHiddenSet, hiddenAssetSet, hiddenCounterpartySet, hiddenVersionSet, hiddenPlaceSet, sizeView],
   );
   const visibleEvents = useMemo(() => sortedEvents.filter(passesAxes), [sortedEvents, passesAxes]);
 
@@ -1008,6 +1050,25 @@ export function useTimelineEvents(
       .map(([key, count]) => ({ key, label: key, count }));
   }, [sortedEvents]);
 
+  // First seen first: the order the rows reached each place. Labels come
+  // off the events.
+  const placeOptions = useMemo<FilterOption[]>(() => {
+    const counts = new Map<string, { label: string; count: number }>();
+    for (const e of sortedEvents) {
+      for (const key of getEventPlaceKeys(e)) {
+        const hit = counts.get(key);
+        if (hit) hit.count++;
+        else counts.set(key, { label: e.places?.find((p) => p.key === key)?.label ?? key, count: 1 });
+      }
+    }
+    return [...counts.entries()].map(([key, { label, count }]) => ({ key, label, count }));
+  }, [sortedEvents]);
+
+  const visiblePlaceKeys = useMemo(
+    () => new Set(placeOptions.map((o) => o.key).filter((k) => !hiddenPlaceSet.has(k))),
+    [placeOptions, hiddenPlaceSet],
+  );
+
   const visibleVersionKeys = useMemo(
     () => new Set(versionOptions.map((o) => o.key).filter((k) => !hiddenVersionSet.has(k))),
     [versionOptions, hiddenVersionSet],
@@ -1068,6 +1129,27 @@ export function useTimelineEvents(
     });
   }, []);
 
+  const toggleHiddenPlace = useCallback((key: string) => {
+    interactedRef.current = true;
+    setHiddenPlaces((prev) => {
+      const set = new Set(prev);
+      if (set.has(key)) set.delete(key);
+      else set.add(key);
+      return [...set];
+    });
+  }, []);
+  const resetHiddenPlaces = useCallback(() => {
+    interactedRef.current = true;
+    setHiddenPlaces([]);
+  }, []);
+  const showOnlyPlaces = useCallback(
+    (keys: string[]) => {
+      interactedRef.current = true;
+      setHiddenPlaces(placeOptions.map((o) => o.key).filter((k) => !keys.includes(k)));
+    },
+    [placeOptions],
+  );
+
   const resetHiddenActions = useCallback(() => {
     interactedRef.current = true;
     setHiddenActions([]);
@@ -1099,23 +1181,34 @@ export function useTimelineEvents(
       const assetKeys = getEventAssetKeys(event);
       const counterpartyKeys = getEventCounterpartyKeys(event);
       const versionKeys = getEventVersionKeys(event);
+      const placeKeys = getEventPlaceKeys(event);
       const needsAction = actionHidden(event, actionHiddenSet);
       const needsAssets = assetKeys.some((k) => hiddenAssets.includes(k));
       const needsCounterparties = counterpartyKeys.some((k) => hiddenCounterparties.includes(k));
       const needsVersions = versionKeys.some((k) => hiddenVersions.includes(k));
+      const needsPlaces = placeKeys.some((k) => hiddenPlaces.includes(k));
       const needsDateClear = dateRange !== null;
       const needsSizeClear = sizeView != null && !sizePasses(event, sizeView.dims, sizeView.ranges);
-      if (!needsAction && !needsAssets && !needsCounterparties && !needsVersions && !needsDateClear && !needsSizeClear)
+      if (
+        !needsAction &&
+        !needsAssets &&
+        !needsCounterparties &&
+        !needsVersions &&
+        !needsPlaces &&
+        !needsDateClear &&
+        !needsSizeClear
+      )
         return;
       suppressNextPersistRef.current = true;
       if (needsAction) setHiddenActions((prev) => prev.filter((k) => !actionKeys.includes(k)));
       if (needsAssets) setHiddenAssets((prev) => prev.filter((k) => !assetKeys.includes(k)));
       if (needsCounterparties) setHiddenCounterparties((prev) => prev.filter((k) => !counterpartyKeys.includes(k)));
       if (needsVersions) setHiddenVersions((prev) => prev.filter((k) => !versionKeys.includes(k)));
+      if (needsPlaces) setHiddenPlaces((prev) => prev.filter((k) => !placeKeys.includes(k)));
       if (needsDateClear) setDateRange(null);
       if (needsSizeClear) setSizeRanges(NO_SIZE);
     },
-    [actionHiddenSet, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, sizeView],
+    [actionHiddenSet, hiddenAssets, hiddenCounterparties, hiddenVersions, hiddenPlaces, dateRange, sizeView],
   );
   // The one setter handed out raw: selecting a range in the heatmap is a live
   // toggle like any other, so it opens the address-bar mirror too.
@@ -1138,6 +1231,7 @@ export function useTimelineEvents(
     hiddenAssetSet.size > 0 ||
     hiddenCounterpartySet.size > 0 ||
     hiddenVersionSet.size > 0 ||
+    hiddenPlaceSet.size > 0 ||
     dateRange !== null ||
     sizeView != null;
 
@@ -1167,6 +1261,11 @@ export function useTimelineEvents(
     visibleVersionKeys,
     toggleHiddenVersion,
     resetHiddenVersions,
+    placeOptions,
+    visiblePlaceKeys,
+    toggleHiddenPlace,
+    resetHiddenPlaces,
+    showOnlyPlaces,
     dateRange,
     setDateRange: setDateRangeLive,
     sizeDims,
@@ -1195,6 +1294,7 @@ export function useTimelineEvents(
       asset: hiddenAssets,
       counterparty: hiddenCounterparties,
       version: hiddenVersions,
+      place: hiddenPlaces,
     },
     draftView,
     filteredCountIsFloor: false,

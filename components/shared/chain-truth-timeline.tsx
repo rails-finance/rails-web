@@ -2416,7 +2416,8 @@ function ChainTruthTimelineBody({
                                   tl.visibleActionKeys.size === tl.eventOptions.length &&
                                   tl.visibleAssetKeys.size === tl.assetOptions.length &&
                                   tl.visibleCounterpartyKeys.size === tl.counterpartyOptions.length &&
-                                  tl.visibleVersionKeys.size === tl.versionOptions.length
+                                  tl.visibleVersionKeys.size === tl.versionOptions.length &&
+                                  tl.visiblePlaceKeys.size === tl.placeOptions.length
                                 }
                                 // A served folder has no run around it to scope its
                                 // spine terminus to, so its place in the displayed list

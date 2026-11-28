@@ -4,7 +4,7 @@
 // listings' filter-bar style (ui-jobs 735): the heading line (the tenure, with
 // Sync to chart, the 30-day projection's switch and Display at its right), then
 // the pill row (ui-jobs 801): the Filters button, one N1.10 pill per axis that
-// is set (Type, Asset, Version, Address; timeline-filter-bar.tsx), the Date
+// is set (Type, Asset, Version, Address, Place; timeline-filter-bar.tsx), the Date
 // where the page has a date axis, a round calendar button at rest and a pill
 // once set (`tl.datesAxis`; a timeline the Lifetime flows chart ties to has
 // none, `timelineDates` in lib/shared/timeline-dates.ts, and draws the

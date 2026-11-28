@@ -6,9 +6,11 @@
 // (components/protocol/liquity/redeemer-event-card.tsx). T1 the kind with the
 // tokens it moved on the spine, T2 the effect, the ETH figures, the curve fee,
 // the trade's price, any valuation at its block and the transaction, T3
-// the row in words (T10·polaris). A valuation is labelled as one and is never
-// added into ETH out.
+// the row in words (T10·polaris), closed by the link to the place its tokens
+// went to or came from (T10.1·polaris; ui-jobs 872). A valuation is labelled
+// as one and is never added into ETH out.
 
+import Link from "next/link";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineTokenRow } from "@/components/shared/spine-column";
@@ -30,6 +32,7 @@ import {
   pethAmountText,
   pethKindLabel,
   pethLineToken,
+  pethPlaceWords,
   pethRowBullets,
   pethRowEffect,
   pethRowId,
@@ -39,6 +42,8 @@ import {
   type PethTokenNames,
 } from "@/lib/polaris/peth-ledger";
 import { pethLineProv, pethRowEthProv, pethRowPriceProv, pethRowValuationProv } from "@/lib/polaris/peth-provenance";
+import { PETH_PLACE_NAMES, pethPlaceHref } from "@/lib/polaris/peth-place-links";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import type { PethLedgerRow } from "@/lib/sources/api/polaris-peth";
 import { polarisPethSheet } from "./polaris-peth-sheet";
 
@@ -74,6 +79,28 @@ function amountCell(
       iconAddress: address,
     },
   };
+}
+
+/** The row's place line: its words and a link to the place's page (→), or
+ *  to the contract on the block explorer (↗). Null where the row has none. */
+function PlaceLine({ row }: { row: PethLedgerRow }) {
+  const p = row.place;
+  const to = p ? pethPlaceHref(p) : null;
+  if (!p || !to) return null;
+  const words = pethPlaceWords(row, p, PETH_PLACE_NAMES);
+  return (
+    <p className="mt-2 text-sm leading-relaxed" data-anatomy="T10.1·polaris" data-peth-row-place={p.kind}>
+      {to.external ? (
+        <a href={to.href} target="_blank" rel="noopener" className={INLINE_LINK}>
+          {words} ↗
+        </a>
+      ) : (
+        <Link href={to.href} prefetch={false} className={INLINE_LINK}>
+          {words} →
+        </Link>
+      )}
+    </p>
+  );
 }
 
 export function PolarisPethEventCard({
@@ -265,18 +292,22 @@ export function PolarisPethEventCard({
     sheet: polarisPethSheet(row),
     ledgers: { none: "Each balance is its side's total." },
     explainer: {
-      body:
-        bullets.length > 0 ? (
-          <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed" data-anatomy="T10·polaris">
-            {bullets.map((b) => (
-              <li key={b}>{b}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm leading-relaxed" data-anatomy="T10·polaris">
-            This transaction moved no pETH for this address.
-          </p>
-        ),
+      body: (
+        <>
+          {bullets.length > 0 ? (
+            <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed" data-anatomy="T10·polaris">
+              {bullets.map((b) => (
+                <li key={b}>{b}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm leading-relaxed" data-anatomy="T10·polaris">
+              This transaction moved no pETH for this address.
+            </p>
+          )}
+          <PlaceLine row={row} />
+        </>
+      ),
     },
     learnMore: null,
   };

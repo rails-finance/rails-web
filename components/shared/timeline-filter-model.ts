@@ -18,9 +18,9 @@ import type { TimelineAxesView, TimelineEventsState } from "@/hooks/useTimelineE
 import { sizeDimensions } from "@/lib/shared/size-dimensions";
 import type { SizeSide, TimelineSizeDim } from "@/lib/shared/timeline-size";
 
-export type Axis = "type" | "asset" | "version" | "address";
+export type Axis = "type" | "asset" | "version" | "address" | "place";
 /** Each pill's code beside N1.10 (app-anatomy L1), by its first dimension. */
-const HIDE_AXIS_ANATOMY = { type: "L1.3", asset: "L1.4", version: "L1.5", address: "L1.6" };
+const HIDE_AXIS_ANATOMY = { type: "L1.3", asset: "L1.4", version: "L1.5", address: "L1.6", place: "L1.14" };
 const SIZE_PILL_ANATOMY = "L1.13";
 export const AXIS_ANATOMY: Record<string, string> = {
   ...HIDE_AXIS_ANATOMY,
@@ -117,6 +117,15 @@ function axesOf(tl: TimelineEventsState, assetIcon?: (symbol: string) => ReactNo
       toggle: tl.toggleHiddenCounterparty,
       reset: tl.resetHiddenCounterparties,
     },
+    {
+      axis: "place",
+      hiddenRaw: tl.hiddenKeys.place,
+      name: "Place",
+      options: tl.placeOptions,
+      visible: tl.visiblePlaceKeys,
+      toggle: tl.toggleHiddenPlace,
+      reset: tl.resetHiddenPlaces,
+    },
   ];
   return all.filter((a) => a.options.length > 1 || (a.options.length === 1 && !a.visible.has(a.options[0].key)));
 }
@@ -201,6 +210,7 @@ export function timelineFilterModel(
     asset: [],
     version: [],
     address: [],
+    place: [],
     debt: tl.sizeRanges.debt ?? [],
     coll: tl.sizeRanges.coll ?? [],
     deposit: tl.sizeRanges.deposit ?? [],
@@ -233,7 +243,7 @@ export function timelineFilterModel(
   return { dimensions: dims, filters, onChange };
 }
 
-/** A draft as the hook's four hidden sets: an offered axis hides what its
+/** A draft as the hook's hidden sets: an offered axis hides what its
  *  selection leaves out (nothing while it is []), an axis with no pill keeps
  *  what it hides now. */
 export function draftAxesView(tl: TimelineEventsState, draft: TimelineFilters): TimelineAxesView {
@@ -249,6 +259,7 @@ export function draftAxesView(tl: TimelineEventsState, draft: TimelineFilters): 
     hiddenAssets: hidden("asset", tl.assetOptions, tl.visibleAssetKeys),
     hiddenVersions: hidden("version", tl.versionOptions, tl.visibleVersionKeys),
     hiddenCounterparties: hidden("address", tl.counterpartyOptions, tl.visibleCounterpartyKeys),
+    hiddenPlaces: hidden("place", tl.placeOptions, tl.visiblePlaceKeys),
     ...(tl.sizeDims.length > 0
       ? {
           size: {

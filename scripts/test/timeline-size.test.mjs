@@ -168,7 +168,7 @@ test("a served folder stands under Size and its members are read", () => {
 function modelState(sizeRanges = {}) {
   const log = [];
   const tl = {
-    hiddenKeys: { action: [], asset: [], counterparty: [], version: [] },
+    hiddenKeys: { action: [], asset: [], counterparty: [], version: [], place: [] },
     eventOptions: [
       { key: "openTrove", label: "Open" },
       { key: "redeemCollateral", label: "Redemption" },
@@ -182,6 +182,8 @@ function modelState(sizeRanges = {}) {
     visibleVersionKeys: new Set(),
     counterpartyOptions: [],
     visibleCounterpartyKeys: new Set(),
+    placeOptions: [],
+    visiblePlaceKeys: new Set(),
     sizeDims: dims,
     sizeRanges,
     setSizeRange: (side, values) => log.push([side, values]),

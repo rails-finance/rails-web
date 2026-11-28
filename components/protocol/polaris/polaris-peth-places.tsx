@@ -4,7 +4,9 @@
 // for each place, in its unit, each linking to the page that place already
 // has, which keeps its card. Beside the card's lozenge in the Lifetime flows
 // slot (P2.1), in the position card's frame. The places are in different units
-// (pETH, fpETH, vpETH), so the box states no total.
+// (pETH, fpETH, vpETH), so the box states no total. Each CDP, deposit, loan,
+// pool and the svpETH vault carries "N events →" (C24.1·polaris; ui-jobs
+// 872), which narrows the timeline to that place's rows on the Place axis.
 
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -24,6 +26,7 @@ import {
 } from "@/lib/polaris/asset-catalog";
 import { polarisDepositHref, polarisLoanHref, polarisPositionHref } from "@/lib/polaris/routes";
 import { exactUnits, ZERO, type PethPlaces } from "@/lib/polaris/peth-ledger";
+import type { PethPlace } from "@/lib/sources/api/polaris-peth";
 import {
   pethCdpPlaceProv,
   pethHeadProv,
@@ -55,12 +58,15 @@ function Place({
   note,
   figure,
   items,
+  after,
 }: {
   id: string;
   label: string;
   note?: string;
   figure: ReactNode;
   items?: ReactNode[];
+  /** A line under the note: the place's "N events" link. */
+  after?: ReactNode;
 }) {
   return (
     <li className="py-2.5 first:pt-0 last:pb-0" data-peth-place={id}>
@@ -68,6 +74,7 @@ function Place({
         <div className="min-w-0">
           <div className="text-sm font-medium text-foreground">{label}</div>
           {note && <div className="text-xs text-rb-500">{note}</div>}
+          {after}
         </div>
         <div className="text-sm">{figure}</div>
       </div>
@@ -86,12 +93,50 @@ function Place({
 
 const unread = (why: string) => <span className="text-xs text-rb-500">{why}</span>;
 
+/** What a place's "N events" link needs: the place's row count, the link
+ *  that opens the timeline narrowed to it, and the in-page apply. */
+export type PethPlaceEvents = (match: (p: PethPlace) => boolean) => {
+  rows: number;
+  href: string;
+  show: () => void;
+} | null;
+
+function EventsLink({ events, match }: { events?: PethPlaceEvents; match: (p: PethPlace) => boolean }) {
+  const e = events?.(match);
+  if (!e) return null;
+  return (
+    <a
+      href={e.href}
+      className={`${INLINE_LINK} text-xs`}
+      data-anatomy="C24.1·polaris"
+      data-peth-place-events={e.rows}
+      onClick={(ev) => {
+        if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return;
+        ev.preventDefault();
+        e.show();
+      }}
+    >
+      {e.rows.toLocaleString("en-US")} {e.rows === 1 ? "event" : "events"} →
+    </a>
+  );
+}
+
+const linkRow = (link: ReactNode, events: ReactNode) => (
+  <span className="flex flex-wrap items-baseline gap-x-2">
+    {link}
+    {events}
+  </span>
+);
+
 export function PolarisPethPlaces({
   places: p,
   headRead,
   headBlock,
   storedAsOf,
+  events,
 }: {
+  /** The "N events" links' reader; absent, no place carries one. */
+  events?: PethPlaceEvents;
   places: PethPlaces;
   headRead: boolean;
   headBlock: string | null;
@@ -169,9 +214,15 @@ export function PolarisPethPlaces({
               }
               items={p.cdp?.items.map((c) => (
                 <>
-                  <Link href={polarisPositionHref(c.market, c.id)} prefetch={false} className={INLINE_LINK}>
-                    {POLARIS_MARKET_CONFIG[c.market].stable.symbol} CDP #{c.id}
-                  </Link>
+                  {linkRow(
+                    <Link href={polarisPositionHref(c.market, c.id)} prefetch={false} className={INLINE_LINK}>
+                      {POLARIS_MARKET_CONFIG[c.market].stable.symbol} CDP #{c.id}
+                    </Link>,
+                    <EventsLink
+                      events={events}
+                      match={(p) => p.kind === "cdp" && p.market === c.market && p.id === c.id}
+                    />,
+                  )}
                   <Figure
                     raw={c.raw}
                     symbol={PETH.symbol}
@@ -207,9 +258,15 @@ export function PolarisPethPlaces({
               }
               items={p.sp?.items.map((s) => (
                 <>
-                  <Link href={polarisDepositHref(s.market, s.id)} prefetch={false} className={INLINE_LINK}>
-                    {POLARIS_MARKET_CONFIG[s.market].stable.symbol} deposit #{s.id}
-                  </Link>
+                  {linkRow(
+                    <Link href={polarisDepositHref(s.market, s.id)} prefetch={false} className={INLINE_LINK}>
+                      {POLARIS_MARKET_CONFIG[s.market].stable.symbol} deposit #{s.id}
+                    </Link>,
+                    <EventsLink
+                      events={events}
+                      match={(p) => p.kind === "sp_deposit" && p.market === s.market && p.id === s.id}
+                    />,
+                  )}
                   <Figure
                     raw={s.raw}
                     symbol={PETH.symbol}
@@ -245,9 +302,12 @@ export function PolarisPethPlaces({
               }
               items={p.loans?.items.map((l) => (
                 <>
-                  <Link href={polarisLoanHref(l.id)} prefetch={false} className={INLINE_LINK}>
-                    Reserve loan #{l.id}
-                  </Link>
+                  {linkRow(
+                    <Link href={polarisLoanHref(l.id)} prefetch={false} className={INLINE_LINK}>
+                      Reserve loan #{l.id}
+                    </Link>,
+                    <EventsLink events={events} match={(p) => p.kind === "loan" && p.id === l.id} />,
+                  )}
                   <Figure raw={l.raw} symbol={FPETH.symbol} address={FPETH.address} info={pethLoanPlaceProv(l.id)} />
                 </>
               ))}
@@ -305,7 +365,10 @@ export function PolarisPethPlaces({
               }
               items={lpHeld.map((x) => (
                 <>
-                  <span>{POLARIS_VENUES[x.venue as PolarisVenueKey]?.label ?? x.address}</span>
+                  {linkRow(
+                    <span>{POLARIS_VENUES[x.venue as PolarisVenueKey]?.label ?? x.address}</span>,
+                    <EventsLink events={events} match={(p) => p.kind === "venue" && p.market === x.venue} />,
+                  )}
                   {x.share != null ? (
                     <Figure
                       raw={x.share}
@@ -340,6 +403,7 @@ export function PolarisPethPlaces({
               id="svpeth"
               label="svpETH in the wallet"
               note="vpETH deposited in the svpETH vault, which supplies it to a Morpho Blue market. Shown with the vpETH it converts to. Not valued here."
+              after={<EventsLink events={events} match={(p) => p.kind === "svpeth"} />}
               figure={
                 p.svpeth ? (
                   <span className="flex flex-col items-end gap-0.5">

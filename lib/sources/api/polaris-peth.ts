@@ -134,6 +134,22 @@ export interface PethLedgerRow {
   /** ETH in, ETH out and curve fees through this transaction; null unless
    *  status is "ok". */
   to_date?: { eth_in_raw: string; eth_out_raw: string; curve_fees_raw: string } | null;
+  /** Where the row's tokens went or came from: its primary line's place, or
+   *  null; absent on a server before ui-jobs 872. */
+  place?: PethPlace | null;
+  /** Every place the row's lines touch, in line order, once each. */
+  places?: PethPlace[];
+}
+
+/** A row's place (api services/polaris-peth-ledger.ts, placesOf): a CDP, a
+ *  reserve loan or a Stability Pool deposit by its id (and market), or a
+ *  contract of the deployment by its address (a venue with its deployment
+ *  column in `market`). */
+export interface PethPlace {
+  kind: "cdp" | "loan" | "sp_deposit" | "venue" | "svpeth" | "splitter" | "curve" | "morpho" | "zap";
+  id?: string;
+  market?: string;
+  address?: string;
 }
 
 /** How far the ledger lane has read (the server's fix round, 27 Nov 2026). */
@@ -187,6 +203,10 @@ export interface PolarisPethResponse {
   limit: number;
   offset: number;
   rows: PethLedgerRow[] | null;
+  /** The ledger's rows per place, over every row, a row counted under each
+   *  of its places; null unless status is "ok", absent on a server before
+   *  ui-jobs 872. */
+  place_counts?: { place: PethPlace; rows: number }[] | null;
   code_sizes_read?: {
     read: number;
     cap?: number;

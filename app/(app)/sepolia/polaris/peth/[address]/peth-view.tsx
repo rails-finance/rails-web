@@ -10,6 +10,11 @@
 // page draws one row on the shared event page (P4): the timeline alone, in its
 // pinned mode.
 //
+// Each row's Explanation links the place its tokens went to or came from, and
+// each place in the box links its rows: "N events" narrows the timeline to
+// that place on the Place axis (`?hidePlaces=`, every other place hidden), on
+// the page without a reload (ui-jobs 872).
+//
 // The answer can lack either half. While the ledger lane reads the history,
 // the ledger's figures and rows are absent and the head reads stand; with no
 // chain read the head figures are absent and the stored ledger stands. Each
@@ -26,7 +31,7 @@ import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { PETH_HEAVY, PETH_UNREAD, PolarisPethCard } from "@/components/protocol/polaris/polaris-peth-card";
-import { PolarisPethPlaces } from "@/components/protocol/polaris/polaris-peth-places";
+import { PolarisPethPlaces, type PethPlaceEvents } from "@/components/protocol/polaris/polaris-peth-places";
 import { PETH_NAMES, PolarisPethEventCard } from "@/components/protocol/polaris/polaris-peth-event-card";
 import { PETH, POLARIS_VENUES } from "@/lib/polaris/asset-catalog";
 import {
@@ -36,6 +41,7 @@ import {
   pethLedgerGap,
   pethLedgerUnchecked,
   pethScannedTo,
+  pethPlaceKey,
   pethPlaces,
   pethRowId,
   pethTimelineEvent,
@@ -43,6 +49,8 @@ import {
   type PethHeadlines,
 } from "@/lib/polaris/peth-ledger";
 import { pethHeadProv } from "@/lib/polaris/peth-provenance";
+import { PETH_PLACE_NAMES } from "@/lib/polaris/peth-place-links";
+import { polarisPethAccountHref } from "@/lib/polaris/routes";
 import { polarisPethEventPage } from "@/lib/polaris/peth-explorer";
 import { pethStoredAsOf } from "@/lib/polaris/peth-as-of";
 import { isPethRefusal, PETH_FIRST_READ, PETH_OLDER_READ, type PethRefusal } from "@/lib/polaris/peth-page-data-shared";
@@ -190,7 +198,10 @@ export default function PethView({
       .reverse();
   }, [rows, older]);
   const rowById = useMemo(() => new Map(listed.map((r) => [pethRowId(r), r])), [listed]);
-  const events = useMemo(() => listed.map((r) => pethTimelineEvent(r, PETH_NAMES, POLARIS_VENUES)), [listed]);
+  const events = useMemo(
+    () => listed.map((r) => pethTimelineEvent(r, PETH_NAMES, POLARIS_VENUES, PETH_PLACE_NAMES)),
+    [listed],
+  );
   const total = data?.total_rows ?? listed.length;
   const olderCount = Math.max(0, total - listed.length);
 
@@ -210,6 +221,30 @@ export default function PethView({
       state: null,
     });
   }, [olderCount, total, listed.length, tl.sortedEvents]);
+
+  // A place's "N events": its rows over the whole ledger, and the timeline
+  // narrowed to it by hiding every other place the rows file under.
+  const placeCounts = data?.place_counts;
+  const placeOptions = tl.placeOptions;
+  const showOnlyPlaces = tl.showOnlyPlaces;
+  const placeEvents = useMemo<PethPlaceEvents>(
+    () => (match) => {
+      const hit = placeCounts?.find((c) => match(c.place));
+      if (!hit || hit.rows === 0) return null;
+      const key = pethPlaceKey(hit.place);
+      const hide = placeOptions.map((o) => o.key).filter((k) => k !== key);
+      const q = new URLSearchParams(hide.length > 0 ? { hidePlaces: hide.join(",") } : {}).toString();
+      return {
+        rows: hit.rows,
+        href: `${polarisPethAccountHref(address)}${q ? `?${q}` : ""}#peth-timeline`,
+        show: () => {
+          showOnlyPlaces([key]);
+          document.getElementById("peth-timeline")?.scrollIntoView({ block: "start" });
+        },
+      };
+    },
+    [placeCounts, placeOptions, showOnlyPlaces, address],
+  );
 
   const figures = useMemo(() => (data ? pethHeadlines(data) : null), [data]);
   const places = useMemo(() => (data ? pethPlaces(data) : null), [data]);
@@ -291,32 +326,35 @@ export default function PethView({
             headRead={headRead}
             headBlock={headBlock}
             storedAsOf={pethStoredAsOf(data)}
+            events={placeEvents}
           />
         </>
       )}
-      <ChainTruthTimeline
-        persistKeyPrefix="polaris-peth"
-        closed={false}
-        tl={tl}
-        boundary={boundary}
-        loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
-        displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-        emptyLabel={
-          ledgerGap === "too_heavy"
-            ? PETH_HEAVY
-            : ledgerGap === "reading"
-              ? "The history of this address is still being read"
-              : "No pETH, fpETH or vpETH transactions recorded for this address"
-        }
-        toolbarLeading={
-          <TimelineActivityHeader events={events} closed={false} firstAt={firstAt} tenurePending={firstAt == null} />
-        }
-        eventPage={(slot) => polarisPethEventPage({ ...slot, address, row: rowById.get(slot.event.id) })}
-        renderCard={(event, meta) => {
-          const r = rowById.get(event.id);
-          return r ? <PolarisPethEventCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} /> : null;
-        }}
-      />
+      <div id="peth-timeline" className="scroll-mt-4">
+        <ChainTruthTimeline
+          persistKeyPrefix="polaris-peth"
+          closed={false}
+          tl={tl}
+          boundary={boundary}
+          loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
+          displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+          emptyLabel={
+            ledgerGap === "too_heavy"
+              ? PETH_HEAVY
+              : ledgerGap === "reading"
+                ? "The history of this address is still being read"
+                : "No pETH, fpETH or vpETH transactions recorded for this address"
+          }
+          toolbarLeading={
+            <TimelineActivityHeader events={events} closed={false} firstAt={firstAt} tenurePending={firstAt == null} />
+          }
+          eventPage={(slot) => polarisPethEventPage({ ...slot, address, row: rowById.get(slot.event.id) })}
+          renderCard={(event, meta) => {
+            const r = rowById.get(event.id);
+            return r ? <PolarisPethEventCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} /> : null;
+          }}
+        />
+      </div>
       <ProvInspectorLayer />
     </div>
   );

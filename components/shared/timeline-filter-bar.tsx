@@ -1,7 +1,7 @@
 "use client";
 
 // The timeline's filters on the listings' pills (N1.10, ui-jobs 735, 801): one
-// pill per axis that is set (Type, Asset, Version, Address), each with its
+// pill per axis that is set (Type, Asset, Version, Address, Place), each with its
 // editor, and the Filters button with its sheet, over the model in
 // timeline-filter-model.ts. The toolbar draws the Date.
 
