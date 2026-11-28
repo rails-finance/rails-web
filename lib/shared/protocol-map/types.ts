@@ -149,6 +149,33 @@ export function hotSets(layout: MapLayout, fill: MapFill, sel: MapSelection): Ma
   return out;
 }
 
+/** The fill with rows the page read later: each names its edges, and the
+ *  row count and each edge's count are recounted over every row. Amounts are
+ *  summed on the server, and only over a ledger read in full, so a page with
+ *  rows left to read has none. Should an edge carry amounts when rows are
+ *  added, they are dropped: an edge never shows a count beside amounts summed
+ *  over fewer rows. An edge only the added rows use stays unfilled. */
+export function mergeFillRows(fill: MapFill, more: { id: string; edgeIds: string[] }[]): MapFill {
+  if (fill.edgesUnknown) return fill;
+  const seen = new Set(fill.rows.map((r) => r.id));
+  const added = more.filter((r) => !seen.has(r.id) && seen.add(r.id));
+  if (added.length === 0) return fill;
+  const rows = [...fill.rows, ...added];
+  const edges: MapFill["edges"] = {};
+  for (const [id, e] of Object.entries(fill.edges))
+    edges[id] = { ...e, amounts: [], rowCount: rows.filter((r) => r.edgeIds.includes(id)).length };
+  return { ...fill, rows, edges, counted: { ...fill.counted, rows: rows.length } };
+}
+
+/** The legend's words for a dashed arrow: over every row, unused; over the
+ *  newest rows only, unused among them. */
+export function mapUnusedWords(fill: MapFill): string {
+  const { rows, total } = fill.counted;
+  return rows < total
+    ? `Not used in the newest ${rows.toLocaleString("en-US")} ${rows === 1 ? "transaction" : "transactions"}`
+    : "Not used by this address";
+}
+
 /** An amount as an exact decimal string. */
 export function mapExact(a: MapAmount): string {
   const v = BigInt(a.raw);

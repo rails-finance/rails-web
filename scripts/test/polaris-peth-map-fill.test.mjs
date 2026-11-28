@@ -27,7 +27,9 @@ register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
 const { buildPethMapFill, pethMapPlaces, pethMapRowEdges } = await import("../../lib/polaris/peth-map-fill.ts");
 const { POLARIS_MAP_LAYOUT, PM, pmEdge } = await import("../../lib/polaris/peth-map-layout.ts");
-const { hotSets, MAP_HOLDER, mapExact, usedNodes } = await import("../../lib/shared/protocol-map/types.ts");
+const { hotSets, MAP_HOLDER, mapExact, mapUnusedWords, mergeFillRows, usedNodes } = await import(
+  "../../lib/shared/protocol-map/types.ts"
+);
 
 const fx = (name) =>
   JSON.parse(readFileSync(new URL(`../fixtures/polaris-peth/${name}.json`, import.meta.url), "utf8"));
@@ -299,8 +301,8 @@ test("places not served: no arrows, no untouched boxes, the boxes' now kept", ()
     const f = buildPethMapFill(d, CTX);
     assert.equal(f.edgesUnknown, true, name);
     assert.deepEqual(f.edges, {}, name);
-    assert.ok(f.rows.every((r) => r.edgeIds.length === 0));
-    assert.equal(f.rows.length, d.rows.length);
+    // No row's arrows go to the browser while the arrows are unknown.
+    assert.deepEqual(f.rows, []);
     assert.ok(f.nodes[MAP_HOLDER].lines[0].label === "now");
     // Every box reads as known-unknown: none is marked untouched.
     assert.equal(usedNodes(POLARIS_MAP_LAYOUT, f).size, POLARIS_MAP_LAYOUT.nodes.length);
@@ -386,7 +388,7 @@ test("a box counts each row once; past the first read, several places count visi
   assert.equal(buildPethMapFill(two, CTX).nodes[PM.pools].rowCount, 2);
   two.total_rows = 900;
   const partial = buildPethMapFill(two, CTX);
-  assert.ok(partial.nodes[PM.pools].lines.some((l) => l.text === "2 visits across its 2 pools"));
+  assert.ok(partial.nodes[PM.pools].lines.some((l) => l.text === "2 transactions across 2 pools"));
   assert.ok(partial.nodes[PM.zap].lines.some((l) => l.text === "7 transactions in all"));
 });
 
@@ -417,4 +419,59 @@ test("the CDP, deposit and loan boxes take the places section's receipts", () =>
     sp.slice(1).map((l) => l.receipt.summary),
     ["sp usdp 3", "sp goldp 4"],
   );
+});
+
+test("past the first read, a dashed arrow reads as unused in the newest rows", () => {
+  const d = fx("map-c513");
+  assert.equal(mapUnusedWords(buildPethMapFill(d, CTX)), "Not used by this address");
+  d.total_rows = 600;
+  const f = buildPethMapFill(d, CTX);
+  assert.equal(mapUnusedWords(f), "Not used in the newest 11 transactions");
+  // No arrow is drawn from place_counts: only the rows read fill an arrow.
+  for (const id of Object.keys(f.edges))
+    assert.ok(
+      f.rows.some((r) => r.edgeIds.includes(id)),
+      id,
+    );
+});
+
+test("older rows merged in recount the rows and each arrow's count", () => {
+  const d = fx("map-38d7");
+  d.total_rows = 7;
+  const f = buildPethMapFill(d, CTX);
+  assert.deepEqual(f.counted, { rows: 5, total: 7 });
+  const cdpIn = pmEdge(MAP_HOLDER, PM.cdp);
+  assert.equal(f.edges[cdpIn].rowCount, 2);
+  const m = mergeFillRows(f, [
+    { id: "0x" + "a".repeat(64), edgeIds: [cdpIn] },
+    { id: "0x" + "b".repeat(64), edgeIds: [] },
+    { id: f.rows[0].id, edgeIds: [cdpIn] },
+  ]);
+  assert.deepEqual(m.counted, { rows: 7, total: 7 });
+  assert.equal(m.edges[cdpIn].rowCount, 3);
+  assert.equal(m.edges[pmEdge(PM.eth, PM.zap)].rowCount, 2);
+  assert.equal(m.rows.length, 7);
+  // An arrow only the added rows use stays unfilled.
+  assert.equal(
+    mergeFillRows(f, [{ id: "0xc", edgeIds: [pmEdge(MAP_HOLDER, PM.sp)] }]).edges[pmEdge(MAP_HOLDER, PM.sp)],
+    undefined,
+  );
+});
+
+test("amounts exist only over a ledger read in full, and a merge never keeps them beside a larger count", () => {
+  // Read in full: amounts, and nothing older to load.
+  const full = buildPethMapFill(fx("map-38d7"), CTX);
+  assert.equal(full.counted.rows, full.counted.total);
+  assert.ok(Object.values(full.edges).some((e) => e.amounts.length > 0));
+  // Rows left to read: no amounts.
+  const d = fx("map-38d7");
+  d.total_rows = 9;
+  const partial = buildPethMapFill(d, CTX);
+  assert.ok(Object.values(partial.edges).every((e) => e.amounts.length === 0));
+  // Should amounts meet added rows, the merge drops them.
+  const m = mergeFillRows(full, [{ id: "0x" + "d".repeat(64), edgeIds: [pmEdge(MAP_HOLDER, PM.cdp)] }]);
+  assert.ok(Object.values(m.edges).every((e) => e.amounts.length === 0));
+  assert.equal(m.edges[pmEdge(MAP_HOLDER, PM.cdp)].rowCount, 3);
+  // A merge that adds nothing changes nothing.
+  assert.equal(mergeFillRows(full, []), full);
 });

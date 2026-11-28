@@ -29,6 +29,7 @@ import {
   type MapLine,
   type MapReceipt,
   type MapSelection,
+  mapUnusedWords,
 } from "@/lib/shared/protocol-map/types";
 
 interface Box {
@@ -40,7 +41,7 @@ interface Box {
 
 type Pt = [number, number];
 
-/** A map receipt is a provenance receipt; `rows` is the map's own. */
+/** A map receipt is a provenance receipt plus `rows`, which only the map reads. */
 function receiptProv(r: MapReceipt): Provenance {
   const { rows: _rows, ...info } = r;
   return info;
@@ -338,11 +339,23 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
                   : isUsed
                     ? "border border-blue-500/40 dark:border-blue-400/40"
                     : "border border-dashed border-rb-300 dark:border-rb-500";
+              const titleCls = `text-sm ${isUsed ? "font-semibold text-foreground" : "font-medium text-rb-500"}`;
               const body = (
                 <>
-                  <span className={`text-sm ${isUsed ? "font-semibold text-foreground" : "font-medium text-rb-500"}`}>
-                    {n.title}
-                  </span>
+                  {clickable ? (
+                    // The box's control is its title, so the receipts inside
+                    // the box are not nested in a button.
+                    <button
+                      type="button"
+                      className={`${titleCls} cursor-pointer self-start rounded text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]`}
+                      aria-pressed={isHot}
+                      onClick={() => toggle({ type: "node", id: n.id })}
+                    >
+                      {n.title}
+                    </button>
+                  ) : (
+                    <span className={titleCls}>{n.title}</span>
+                  )}
                   {holder && holderNote && <span className="text-xs text-rb-500">{holderNote}</span>}
                   {n.blurb && <span className="text-xs leading-snug text-rb-500">{n.blurb}</span>}
                   {lines.length > 0 && (
@@ -359,21 +372,24 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
               } ${hot.any && !isHot && isUsed ? "opacity-50" : ""}`;
               const style = { gridColumn: `${n.col} / span ${n.span}`, gridRow: String(n.row) };
               return clickable ? (
-                <button
+                // A press anywhere on the box selects it too, except on a
+                // receipt, a link or the title's button.
+                <div
                   key={n.id}
-                  type="button"
                   ref={(el) => {
                     boxRefs.current[n.id] = el;
                   }}
                   className={`${cls} cursor-pointer hover:bg-[var(--surface-hover)]`}
                   style={style}
-                  aria-pressed={isHot}
                   data-map-node={n.id}
                   data-anatomy="O2"
-                  onClick={() => toggle({ type: "node", id: n.id })}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest("a, button, [data-prov-inspect], .prov-locate-box")) return;
+                    toggle({ type: "node", id: n.id });
+                  }}
                 >
                   {body}
-                </button>
+                </div>
               ) : (
                 <div
                   key={n.id}
@@ -410,19 +426,23 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
                     type="button"
                     className="cursor-pointer text-foreground"
                     aria-pressed={isHot}
-                    aria-label={`${title(x.edge.from)} to ${title(x.edge.to)}`}
                     onClick={() => toggle({ type: "edge", id: x.edge.id })}
                   >
+                    <span className="sr-only">
+                      {title(x.edge.from)} → {title(x.edge.to)}:{" "}
+                    </span>
                     {f.amounts.length > 0 ? (
                       <Amounts amounts={f.amounts} receipt={f.receipt} />
                     ) : (
-                      plural(f.rowCount, "transaction")
+                      // A count of index rows, which carries no receipt.
+                      <span data-prov-exempt="">{plural(f.rowCount, "transaction")}</span>
                     )}
                   </button>
                   <a
                     href={f.timelineHref}
                     className={`${INLINE_LINK} tabular-nums`}
                     title={`The timeline filtered to ${plural(f.rowCount, "transaction")} on this arrow`}
+                    aria-label={`Show the ${plural(f.rowCount, "transaction")} on this arrow in the timeline`}
                     onClick={(ev) => {
                       if (!onFilter || ev.metaKey || ev.ctrlKey || ev.shiftKey) return;
                       ev.preventDefault();
@@ -447,9 +467,9 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
               className="inline-block w-6 border-t border-dashed border-rb-300 dark:border-rb-500"
               aria-hidden="true"
             />
-            Not used by this address
+            {mapUnusedWords(fill)}
           </span>
-          <span>Each arrow&rsquo;s number links to the timeline filtered to its transactions.</span>
+          <span>Each arrow&rsquo;s ↓ link opens the timeline filtered to its transactions.</span>
         </div>
       )}
       {sentence && (

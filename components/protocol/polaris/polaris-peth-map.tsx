@@ -50,8 +50,8 @@ export function PolarisPethMap({
           </h2>
         </div>
         <p className="mt-1 text-sm leading-relaxed text-rb-500">
-          The map below draws Polaris with this address&rsquo;s activity on it: where its tokens came from above it, and
-          the mechanisms it used below.{" "}
+          The map below draws Polaris with this address&rsquo;s activity on it: sources above this address, the
+          mechanisms it used below.{" "}
           {boxesOnly
             ? "Each box gives what sits there now, in its token."
             : "Each arrow sums what moved along it. Each box gives what went in and what sits there now, each in its token. Click a box, an arrow or a timeline row to trace it."}

@@ -38,7 +38,13 @@ import { PolarisPethMap } from "@/components/protocol/polaris/polaris-peth-map";
 import { buildPethMapFill, pethMapRowEdges } from "@/lib/polaris/peth-map-fill";
 import { pethMapContext } from "@/lib/polaris/peth-map-context";
 import { POLARIS_MAP_LAYOUT } from "@/lib/polaris/peth-map-layout";
-import { hotSets, MAP_EDGE_PARAM, type MapFill, type MapSelection } from "@/lib/shared/protocol-map/types";
+import {
+  hotSets,
+  MAP_EDGE_PARAM,
+  mergeFillRows,
+  type MapFill,
+  type MapSelection,
+} from "@/lib/shared/protocol-map/types";
 import { PETH, POLARIS_VENUES } from "@/lib/polaris/asset-catalog";
 import {
   pethAmountText,
@@ -266,23 +272,26 @@ export default function PethView({
   const fill = useMemo(() => {
     // Rows read later name their edges by the same rule: none while the
     // server sends no places.
+    // mergeFillRows recounts the rows and each arrow's count over them.
     if (!baseFill || older.length === 0 || baseFill.edgesUnknown) return baseFill;
-    const seen = new Set(baseFill.rows.map((r) => r.id));
-    const more = older
-      .filter((r) => !seen.has(pethRowId(r)))
-      .map((r) => ({ id: pethRowId(r), edgeIds: pethMapRowEdges(r, mapCtx) }));
-    return { ...baseFill, rows: [...baseFill.rows, ...more] };
+    return mergeFillRows(
+      baseFill,
+      older.map((r) => ({ id: pethRowId(r), edgeIds: pethMapRowEdges(r, mapCtx) })),
+    );
   }, [baseFill, older, mapCtx]);
   const [selection, setSelection] = useState<MapSelection>(null);
   const [filterEdge, setFilterEdge] = useState<string | null>(null);
+  // `?map=<arrow>` applies once, and only for an arrow this address used.
+  const mapParamRead = useRef(false);
   useEffect(() => {
-    if (onEventPage) return;
+    if (onEventPage || !baseFill || mapParamRead.current) return;
+    mapParamRead.current = true;
     const id = new URLSearchParams(window.location.search).get(MAP_EDGE_PARAM);
-    if (id && POLARIS_MAP_LAYOUT.edges.some((e) => e.id === id)) {
+    if (id && baseFill.edges[id]) {
       setFilterEdge(id);
       setSelection({ type: "edge", id });
     }
-  }, [onEventPage]);
+  }, [onEventPage, baseFill]);
   const applyFilter = (edgeId: string | null) => {
     setFilterEdge(edgeId);
     if (edgeId) setSelection({ type: "edge", id: edgeId });
@@ -321,6 +330,10 @@ export default function PethView({
     protocolKey: "polaris-peth",
     olderCount,
     hideIds,
+    onClearHideIds: () => {
+      applyFilter(null);
+      setSelection(null);
+    },
   });
   const boundary = useMemo(() => {
     const oldest = tl.sortedEvents[0];
@@ -524,10 +537,9 @@ export default function PethView({
                     type="button"
                     className={`${INLINE_LINK} cursor-pointer rounded text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]`}
                     aria-pressed={chosen}
-                    aria-label={`Show ${pethKindLabel(r.kind)} on the Polaris map`}
                     onClick={() => setSelection(chosen ? null : { type: "row", id: event.id })}
                   >
-                    Show on the map
+                    Show on the map<span className="sr-only">: {pethKindLabel(r.kind)}</span>
                   </button>
                 </div>
               </div>

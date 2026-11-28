@@ -45,8 +45,9 @@ export default async function PolarisPethPage({ params }: Props) {
   const { address: raw } = await params;
   const address = await pethAddressOf(raw);
   const initial = await loadPolarisPeth(address);
-  // The map's fill is summed here, so the browser receives a few dozen
-  // figures for it (ui-jobs 873).
+  // The map's fill is summed here (ui-jobs 873): the browser receives each
+  // arrow's and box's figures with their receipts and, where the arrows are
+  // known, the arrows each row used.
   const mapFill = initial && !isPethRefusal(initial) ? buildPethMapFill(initial, pethMapContext(address)) : null;
   const handAdded = (await loadPethDevCache(address))?.handAddedPlaces ?? null;
   return (

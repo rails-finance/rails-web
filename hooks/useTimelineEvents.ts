@@ -268,6 +268,9 @@ export interface TimelineEventsState {
    *  "N events" link applies, its hide set taken from the whole history
    *  (rows past the loaded ones included), not from the options. */
   hidePlacesExactly: (keys: string[]) => void;
+  /** The page's hide-by-id filter (`hideIds`), for the toolbar's Clear all:
+   *  null where the page hides nothing by id. */
+  clearHideIds: (() => void) | null;
 
   dateRange: [number, number] | null;
   setDateRange: (next: [number, number] | null) => void;
@@ -471,7 +474,10 @@ export function useTimelineEvents(
     eventsServed,
     size,
     hideIds,
+    onClearHideIds,
   }: {
+    /** Clears `hideIds`, from the toolbar's Clear all and Reset. */
+    onClearHideIds?: () => void;
     /** Events the page hides by id after numbering (a Polaris pETH account's
      *  map filter, ui-jobs 873): numbers, counts and the cut stay the whole
      *  list's, as on the Place axis. Omitted, nothing is hidden by id. */
@@ -1277,6 +1283,7 @@ export function useTimelineEvents(
     toggleHiddenPlace,
     resetHiddenPlaces,
     hidePlacesExactly,
+    clearHideIds: (hideIds?.size ?? 0) > 0 && onClearHideIds ? onClearHideIds : null,
     dateRange,
     setDateRange: setDateRangeLive,
     sizeDims,

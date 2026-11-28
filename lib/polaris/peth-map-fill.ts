@@ -238,8 +238,8 @@ export function pethMapRowEdges(row: PethLedgerRow, ctx: PethMapContext): string
 export const pethPlacesServed = (d: Pick<PolarisPethResponse, "place_counts" | "rows">): boolean =>
   d.place_counts !== undefined || (d.rows ?? []).some((r) => "place" in r || "places" in r);
 
-/** Each mechanism box with several places of one kind, in words for a count
- *  that may visit two of them in one row. */
+/** Each mechanism box that holds several places of one kind, by the word
+ *  its count names them with. */
 const PLACES_WORD: Record<string, string> = {
   [PM.cdp]: "CDPs",
   [PM.sp]: "deposits",
@@ -280,7 +280,8 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
       );
       for (const b of boxes) boxRows.set(b, (boxRows.get(b) ?? 0) + 1);
     }
-    fillRows.push({ id: r.tx_hash.toLowerCase(), edgeIds: [...used] });
+    // Each row's arrows go to the browser only where the arrows are known.
+    if (known) fillRows.push({ id: r.tx_hash.toLowerCase(), edgeIds: [...used] });
   }
 
   // With more rows than the page read, an arrow states the rows read on it
@@ -311,7 +312,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
 
   // Each box's count over the whole ledger where the page did not read every
   // row: place_counts counts a row once per place, so a box with several
-  // places states visits.
+  // places states its count across them.
   const placeTally = new Map<string, { rows: number; places: number }>();
   for (const c of (ok ? d.place_counts : null) ?? []) {
     const node = PM_NODE_OF_PLACE[c.place.kind];
@@ -329,7 +330,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
     if (!t) return {};
     const text =
       t.places > 1 && PLACES_WORD[id]
-        ? `${plural(t.rows, "visit")} across its ${t.places.toLocaleString("en-US")} ${PLACES_WORD[id]}`
+        ? `${plural(t.rows, "transaction")} across ${t.places.toLocaleString("en-US")} ${PLACES_WORD[id]}`
         : `${plural(t.rows, "transaction")} in all`;
     return { rowCount: t.rows, line: { label: "note", amounts: [], text } };
   };
