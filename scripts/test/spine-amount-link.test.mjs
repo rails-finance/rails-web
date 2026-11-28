@@ -43,7 +43,7 @@ test("an amountLink wraps the amount alone, and the rest of the spine is unchang
   assert.match(whole, /data-spine-amount-link="marked"/);
   assert.match(whole, /data-anatomy="L3.3"/);
   assert.match(whole, /aria-label="4.2K: Went to reserve loan #28"/, "the name reads the words without the arrow");
-  assert.match(whole, /pointer-events-auto/, "the link takes its own tap");
+  assert.match(whole, /pointer-events-auto/, "a tap on the link opens the link");
   assert.match(
     html,
     /data-spine-node=""[^>]*class="relative z-10 max-sm:z-30 max-sm:pointer-events-none/,
@@ -58,4 +58,22 @@ test("an amountLink wraps the amount alone, and the rest of the spine is unchang
     )
     .replace(" max-sm:z-30 max-sm:pointer-events-none", "");
   assert.equal(plain, expected.liquityAdjust);
+});
+
+// Below 640px a node with a linked amount stands at max-sm:z-30 in the row's
+// stacking context, and a wide node's ground reaches the number column at the
+// row's left edge: the number and a group's range stand above it.
+test("below 640px the number column and the group range stand above a linked node", () => {
+  const read = (f) => readFileSync(path.join(REPO, f), "utf8");
+  const node = Number(
+    /data-spine-node[\s\S]*?max-sm:z-(\d+) max-sm:pointer-events-none/.exec(
+      read("components/shared/spine-column.tsx"),
+    )[1],
+  );
+  const num = Number(/spine-num absolute z-20 max-sm:z-(\d+)/.exec(read("components/shared/event-card.tsx"))?.[1]);
+  assert.ok(num > node, `.spine-num max-sm:z-${num} is above the node's max-sm:z-${node}`);
+  const css = read("app/globals.css");
+  const phone = css.slice(css.indexOf("@media (max-width: 639.98px)", css.indexOf(".spine-row {")));
+  const range = Number(/\.group-range \{\s*z-index: (\d+);/.exec(phone)?.[1]);
+  assert.ok(range > node, `.group-range z-index ${range} is above the node's ${node} below 640px`);
 });

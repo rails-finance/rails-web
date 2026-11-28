@@ -369,7 +369,10 @@ export default function PethView({
         <ChainTruthTimeline
           persistKeyPrefix="polaris-peth"
           pinnedRead={
-            pinnedTx && !pinnedLoaded && !pinned && /^0x[0-9a-f]{64}$/.test(pinnedTx)
+            pinnedTx &&
+            !pinnedLoaded &&
+            (pinned == null || pethRowId(pinned) !== pinnedTx) &&
+            /^0x[0-9a-f]{64}$/.test(pinnedTx)
               ? pinnedRead === "failed"
                 ? "failed"
                 : pinnedRead === "done"

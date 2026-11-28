@@ -1067,10 +1067,13 @@ function EventCardView(props: EventCardProps) {
             </div>
             {/* The number column, at the row's far left, level with the
                 first node: the event's number, or the boundary's count. After
-                the card in the DOM, so the keyboard reaches the header first. */}
+                the card in the DOM, so the keyboard reaches the header first.
+                Below 640px it stands above a node with a linked amount
+                (spine-column.tsx, max-sm:z-30), whose ground can reach the
+                row's left edge when its flanks are wide. */}
             {!pageMode && (
               <div
-                className={`spine-num absolute z-20 w-11 justify-center ${inTimeline ? "flex" : "hidden sm:flex"}`}
+                className={`spine-num absolute z-20 max-sm:z-40 w-11 justify-center ${inTimeline ? "flex" : "hidden sm:flex"}`}
                 data-number-column=""
               >
                 {numberSlot ?? numberNode}
