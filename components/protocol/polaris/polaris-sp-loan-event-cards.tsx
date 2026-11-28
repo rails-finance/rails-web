@@ -23,6 +23,7 @@ import type { PolarisDepositEventRow, PolarisLoanEventRow } from "@/lib/sources/
 import type { Provenance } from "@/components/shared/provenance";
 import type { EventGas } from "@/components/shared/event-price-row";
 import { polarisDepositSheet, polarisLoanSheet } from "./polaris-sp-loan-sheet";
+import { usePethAccountPath, walletOwner } from "./polaris-peth-path";
 
 const ZERO = BigInt(0);
 const short = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
@@ -118,6 +119,10 @@ export function PolarisDepositEventCard({
   const change = big(row.top_up_or_withdrawal);
   const bcClaimed = big(row.bc_gain_claimed);
   const gainClaimed = big(row.stable_gain_claimed);
+  // The pETH gain paid to the holder's wallet links the holder's pETH account
+  // (ui-jobs 872); the stablecoin's moves are not pETH, and a deposit the
+  // vault holds pays the vault.
+  const pethPath = usePethAccountPath(vaultHeld ? null : walletOwner(holder, row.tx_from), row.tx_hash, false);
 
   const tokens: SpineTokenRow[] = [];
   if (change !== ZERO)
@@ -137,6 +142,7 @@ export function PolarisDepositEventCard({
       popover: true,
       value: units(bcClaimed),
       verb: "claimed",
+      ...(pethPath ? { amountLink: pethPath } : {}),
     });
   if (gainClaimed > ZERO)
     tokens.push({
@@ -247,6 +253,9 @@ export function PolarisLoanEventCard({
   const coord = (summary: string) => touchProv(summary, row.tx_hash, row.block_number, "loans");
   const c = big(row.coll_change);
   const d = big(row.debt_change);
+  // The fpETH collateral's move with the borrower's wallet links the
+  // borrower's pETH account (ui-jobs 872).
+  const pethPath = usePethAccountPath(walletOwner(row.borrower, row.tx_from), row.tx_hash, c > ZERO);
   const tokens: SpineTokenRow[] = [];
   if (c !== ZERO)
     tokens.push({
@@ -256,6 +265,7 @@ export function PolarisLoanEventCard({
       popover: true,
       value: units(c > ZERO ? c : -c),
       verb: c > ZERO ? "deposited" : "returned",
+      ...(pethPath ? { amountLink: pethPath } : {}),
     });
   if (d !== ZERO)
     tokens.push({

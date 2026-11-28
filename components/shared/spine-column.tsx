@@ -38,7 +38,7 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { DelegateRatePillShell, GavelGlyph, RatePillShell, UserGlyph } from "@/components/shared/rate-pill";
 import { ArrowFromDot } from "@/components/shared/timeline-spine";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { useTimelineScale, SpineVal, fmtSpine } from "@/components/shared/activity-timeline";
+import { useTimelineScale, SpineVal, fmtSpine, type SpineAmountLink } from "@/components/shared/activity-timeline";
 import { spokenAmount, useSpineRow } from "@/components/shared/mobile-spine";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
@@ -196,6 +196,11 @@ export interface SpineTokenRow {
    *  withdrawn"). Unset reads by direction: "to the wallet", "into the
    *  position". */
   verb?: string;
+  /** The flanking amount opens a page (the place a pETH account row's
+   *  tokens went; the pETH account behind a Polaris position's collateral
+   *  move): href, tooltip, and `marked` for the hairline border. Unset draws
+   *  the plain amount, as every other family does. */
+  amountLink?: SpineAmountLink;
 }
 
 /** One leg of a position swap, stacked on the swap node's right flank: the
@@ -1348,6 +1353,7 @@ export function SpineColumn({
               unitClass={row.ring && RING_UNIT_CLASS[row.ring]}
               full={row.fullValue}
               text={row.display}
+              link={row.direction === "left" ? row.amountLink : undefined}
             />
             {row.direction === "left" ? <ArrowFromDot direction="left" size={scale.arrowSize} /> : <span />}
           </>
@@ -1387,6 +1393,7 @@ export function SpineColumn({
               unitClass={row.ring && RING_UNIT_CLASS[row.ring]}
               full={row.fullValue}
               text={row.display}
+              link={row.direction === "right" ? row.amountLink : undefined}
             />
           </>
         }

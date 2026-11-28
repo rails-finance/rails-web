@@ -59,7 +59,11 @@ import { PETH, POLARIS_MARKET_CONFIG, POLARIS_TESTNET_CLOSED, type PolarisMarket
 import { formatDate } from "@/lib/date";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
-import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
+import {
+  TimelineActivityHeader,
+  CHAIN_TRUTH_DISPLAY_ITEMS,
+  PROTOCOL_PATHS_ITEM,
+} from "@/components/shared/timeline-toolbar";
 import { polarisExports } from "@/components/protocol/polaris/polaris-export-menu";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { rateStepNotesFor, liveRateStepNote, type MarketNote } from "@/lib/shared/market-note";
@@ -102,6 +106,9 @@ interface PolarisPositionViewProps {
    *  surfaces stay PENDING until it lands. An EMPTY array is a real answer. */
   initialEvents: BaseActivityEvent[] | null;
 }
+
+/** The preset and "Protocol paths" (ui-jobs 872). */
+const POLARIS_POSITION_DISPLAY_ITEMS = [...CHAIN_TRUTH_DISPLAY_ITEMS, PROTOCOL_PATHS_ITEM];
 
 export default function PolarisPositionView({
   market,
@@ -512,7 +519,7 @@ export default function PolarisPositionView({
                     lastHolder: view.status !== "open" && polarisChangedHands,
                   })
                 }
-                displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+                displayItems={POLARIS_POSITION_DISPLAY_ITEMS}
                 toolbarLeading={<TimelineActivityHeader events={polarisEvents} closed={view.status !== "open"} />}
                 renderCard={(event, meta) =>
                   isPolarisEvent(event) ? (

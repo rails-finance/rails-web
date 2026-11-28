@@ -27,7 +27,11 @@ import {
   useFlowFocusValue,
   FlowsStoreContext,
 } from "@/components/shared/flow-focus-context";
-import { CHAIN_TRUTH_DISPLAY_ITEMS, TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
+import {
+  CHAIN_TRUTH_DISPLAY_ITEMS,
+  PROTOCOL_PATHS_ITEM,
+  TimelineActivityHeader,
+} from "@/components/shared/timeline-toolbar";
 import { Prov } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -57,6 +61,9 @@ import {
   type PolarisDepositEventRow,
   type PolarisDepositTimelineResponse,
 } from "@/lib/sources/api/polaris-sp-loans";
+
+/** The preset and "Protocol paths" (ui-jobs 872). */
+const POLARIS_POSITION_DISPLAY_ITEMS = [...CHAIN_TRUTH_DISPLAY_ITEMS, PROTOCOL_PATHS_ITEM];
 
 export default function DepositView({
   market,
@@ -336,7 +343,7 @@ export default function DepositView({
                 closed={!open}
                 tl={tl}
                 boundary={boundary}
-                displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+                displayItems={POLARIS_POSITION_DISPLAY_ITEMS}
                 emptyLabel="No operations recorded for this deposit"
                 toolbarLeading={
                   <TimelineActivityHeader

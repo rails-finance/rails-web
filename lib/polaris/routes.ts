@@ -25,6 +25,11 @@ export function polarisPethAccountHref(address: string): string {
   return `${POLARIS_PETH_PATH}/${/^0x[0-9a-fA-F]{40}$/.test(a) ? a.toLowerCase() : encodeURIComponent(a)}`;
 }
 
+/** One transaction of an address's pETH account, on its event page. */
+export function polarisPethEventHref(address: string, txHash: string): string {
+  return `${polarisPethAccountHref(address)}/event/${txHash.toLowerCase()}`;
+}
+
 export function polarisDepositHref(market: PolarisMarket, tokenId: string): string {
   return `${POLARIS_SP_PATH}/${market}/${tokenId}`;
 }

@@ -39,6 +39,7 @@ import { LearnMore } from "@/components/shared/learn-more-modal";
 import { PolarisLedgerProvider } from "./polaris-ledger";
 import { POLARIS_LIQ_CONSTANTS } from "./polaris-liquidation-forensics";
 import { POLARIS_WORDS } from "@/lib/polaris/event-templates";
+import { usePethAccountPath, walletOwner } from "./polaris-peth-path";
 
 export interface PolarisEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "polaris"; data: PolarisContext } };
@@ -68,6 +69,9 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent, ho
   const dColl = num(ctx.collChange);
   const dDebt = num(ctx.debtChange);
   const isTouch = ctx.eventType === "open" || ctx.eventType === "adjust" || ctx.eventType === "close";
+  // The collateral's move with the holder's wallet links the holder's pETH
+  // account (ui-jobs 872); a liquidation moves nothing of the wallet's.
+  const pethPath = usePethAccountPath(walletOwner(holder, ctx.txFrom), event.txHash, dColl > 0);
 
   // Each leg keyed by what it is; "right" moves into the protocol.
   type Leg = { kind: "coll" | "debt" | "escrow"; row: SpineTokenRow };
@@ -83,6 +87,7 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent, ho
         value: Math.abs(dColl),
         // The header's rule: in full, pETH to four decimals; the icon names the token.
         display: formatPeth(Math.abs(dColl)),
+        ...(pethPath ? { amountLink: pethPath } : {}),
       },
     });
   if (isTouch && dDebt !== 0)

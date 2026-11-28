@@ -299,6 +299,11 @@ export const FIGURES_FIRST_ITEM: TimelineDisplayItem = { key: "figuresFirst", la
  *  whenever the page passes `runs`. */
 export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [TX_HASH_ITEM, FIGURES_FIRST_ITEM];
 
+/** "Protocol paths" (ui-jobs 872): the hairline border on a Polaris
+ *  position's amounts that moved pETH or fpETH with the owner's wallet. The
+ *  CDP, deposit and reserve-loan pages add it after the preset. */
+export const PROTOCOL_PATHS_ITEM: TimelineDisplayItem = { key: "showProtocolPaths", label: "Protocol paths" };
+
 /** The shared display "eye" menu — one FilterDropdown over a chosen subset of
  *  the timeline-display flags. Replaces the per-protocol TimelineDisplayToggle
  *  copies; callers pass only the flags that have a render path on their cards. */
