@@ -35,12 +35,15 @@ import { PETH_HEAVY, PETH_UNREAD, PolarisPethCard } from "@/components/protocol/
 import { PolarisPethPlaces, type PethPlaceEvents } from "@/components/protocol/polaris/polaris-peth-places";
 import { PETH_NAMES, PolarisPethEventCard } from "@/components/protocol/polaris/polaris-peth-event-card";
 import { PolarisPethMap } from "@/components/protocol/polaris/polaris-peth-map";
-import { buildPethMapFill, pethMapNewEdge, pethMapRowEdges } from "@/lib/polaris/peth-map-fill";
+import { buildPethMapFill, pethMapNewEdge, pethMapRowEdges, pethRowAt } from "@/lib/polaris/peth-map-fill";
 import { pethMapContext } from "@/lib/polaris/peth-map-context";
 import { POLARIS_MAP_LAYOUT } from "@/lib/polaris/peth-map-layout";
 import {
   hotSets,
   MAP_EDGE_PARAM,
+  mapEdgesFromParam,
+  mapEdgesIn,
+  mapLandingClearsFilter,
   mergeFillRows,
   type MapFill,
   type MapSelection,
@@ -142,18 +145,25 @@ function PethExplanation({
   );
 }
 
-/** The timeline's notice while it is filtered to one arrow of the map. */
-function MapFilterNotice({ edgeId, count, onClear }: { edgeId: string; count: number; onClear: () => void }) {
-  const e = POLARIS_MAP_LAYOUT.edges.find((x) => x.id === edgeId);
+/** The timeline's notice while it is filtered to arrows of the map: one by
+ *  name, several by their count. */
+function MapFilterNotice({ edgeIds, count, onClear }: { edgeIds: string[]; count: number; onClear: () => void }) {
+  const e = POLARIS_MAP_LAYOUT.edges.find((x) => x.id === edgeIds[0]);
   const name = (id: string | undefined) => POLARIS_MAP_LAYOUT.nodes.find((n) => n.id === id)?.title ?? id;
   return (
-    <p className="text-sm text-rb-500" data-map-filter={edgeId} data-anatomy="L13·polaris">
-      The timeline shows the {count.toLocaleString("en-US")} {count === 1 ? "transaction" : "transactions"} on the
-      map&rsquo;s{" "}
-      <span className="font-semibold text-foreground">
-        {name(e?.from)} → {name(e?.to)}
-      </span>{" "}
-      arrow.{" "}
+    <p className="text-sm text-rb-500" data-map-filter={edgeIds.join(",")} data-anatomy="L13·polaris">
+      The timeline shows the {count.toLocaleString("en-US")} {count === 1 ? "transaction" : "transactions"} on{" "}
+      {edgeIds.length > 1 ? (
+        <>{edgeIds.length.toLocaleString("en-US")} of the map&rsquo;s arrows. </>
+      ) : (
+        <>
+          the map&rsquo;s{" "}
+          <span className="font-semibold text-foreground">
+            {name(e?.from)} → {name(e?.to)}
+          </span>{" "}
+          arrow.{" "}
+        </>
+      )}
       <button type="button" className={`${INLINE_LINK} cursor-pointer`} onClick={onClear}>
         Clear filter
       </button>
@@ -280,37 +290,51 @@ export default function PethView({
     if (!baseFill || older.length === 0 || baseFill.edgesUnknown) return baseFill;
     return mergeFillRows(
       baseFill,
-      older.map((r) => ({ id: pethRowId(r), edgeIds: pethMapRowEdges(r, mapCtx) })),
+      older.map((r) => ({ id: pethRowId(r), edgeIds: pethMapRowEdges(r, mapCtx), at: pethRowAt(r) })),
       pethMapNewEdge(mapCtx, data?.ledger?.scanned_to_block ?? null),
     );
   }, [baseFill, older, mapCtx, data]);
   const [selection, setSelection] = useState<MapSelection>(null);
-  const [filterEdge, setFilterEdge] = useState<string | null>(null);
-  // `?map=<arrow>` applies once, and only for an arrow this address used.
+  // The arrows the timeline is filtered to: one from the map, several from
+  // the explanation's "more steps" line.
+  const [filterEdges, setFilterEdges] = useState<string[]>([]);
+  // `?map=<arrow>[,<arrow>…]` applies once, and only for arrows this address used.
   const mapParamRead = useRef(false);
   useEffect(() => {
     if (onEventPage || !baseFill || mapParamRead.current) return;
     mapParamRead.current = true;
-    const id = new URLSearchParams(window.location.search).get(MAP_EDGE_PARAM);
-    if (id && baseFill.edges[id]) {
-      setFilterEdge(id);
-      setSelection({ type: "edge", id });
+    const ids = mapEdgesFromParam(new URLSearchParams(window.location.search).get(MAP_EDGE_PARAM), baseFill);
+    if (ids.length > 0) {
+      setFilterEdges(ids);
+      if (ids.length === 1) setSelection({ type: "edge", id: ids[0] });
     }
   }, [onEventPage, baseFill]);
-  const applyFilter = (edgeId: string | null) => {
-    setFilterEdge(edgeId);
-    if (edgeId) setSelection({ type: "edge", id: edgeId });
+  // The explanation's times land on their event in place, as `?at=` does on
+  // load; a map filter that hides the event is cleared first.
+  const [landAt, setLandAt] = useState<{ id: string; seq: number } | null>(null);
+  const landOn = (id: string) => {
+    if (mapLandingClearsFilter(id, hideIds)) {
+      applyFilter(null);
+      setSelection(null);
+    }
+    setLandAt((l) => ({ id, seq: (l?.seq ?? 0) + 1 }));
+  };
+  const applyFilter = (edgeIds: string[] | null) => {
+    const ids = edgeIds ?? [];
+    setFilterEdges(ids);
+    if (ids.length === 1) setSelection({ type: "edge", id: ids[0] });
     const url = new URL(window.location.href);
-    if (edgeId) url.searchParams.set(MAP_EDGE_PARAM, edgeId);
+    if (ids.length > 0) url.searchParams.set(MAP_EDGE_PARAM, ids.join(","));
     else url.searchParams.delete(MAP_EDGE_PARAM);
     window.history.replaceState(window.history.state, "", url);
-    if (edgeId) document.getElementById("peth-timeline")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (ids.length > 0)
+      document.getElementById("peth-timeline")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
   const hot = useMemo(() => (fill ? hotSets(POLARIS_MAP_LAYOUT, fill, selection) : null), [fill, selection]);
   const edgeRows = useMemo(() => {
-    if (!fill || !filterEdge || fill.edgesUnknown || onEventPage) return null;
-    return new Set(fill.rows.filter((r) => r.edgeIds.includes(filterEdge)).map((r) => r.id));
-  }, [fill, filterEdge, onEventPage]);
+    if (!fill || filterEdges.length === 0 || fill.edgesUnknown || onEventPage) return null;
+    return new Set(fill.rows.filter((r) => r.edgeIds.some((id) => filterEdges.includes(id))).map((r) => r.id));
+  }, [fill, filterEdges, onEventPage]);
   const rowLabel = (id: string) => {
     const r = rowById.get(id);
     return r ? pethKindLabel(r.kind) : null;
@@ -473,7 +497,10 @@ export default function PethView({
               ledgerGap={ledgerGap}
               selection={selection}
               onSelect={setSelection}
-              onFilter={applyFilter}
+              onFilter={(edgeId) => applyFilter([edgeId])}
+              onAt={landOn}
+              // Any edge the page's fill has, older rows' included.
+              onEdges={(ids) => applyFilter(mapEdgesIn(ids, fill))}
               rowLabel={rowLabel}
               handAddedPlaces={handAddedPlaces}
             />
@@ -488,9 +515,10 @@ export default function PethView({
           tl={tl}
           boundary={boundary}
           loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
+          landAt={landAt}
           notice={
-            filterEdge && edgeRows ? (
-              <MapFilterNotice edgeId={filterEdge} count={shownCount} onClear={() => applyFilter(null)} />
+            filterEdges.length > 0 && edgeRows ? (
+              <MapFilterNotice edgeIds={filterEdges} count={shownCount} onClear={() => applyFilter(null)} />
             ) : undefined
           }
           displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}

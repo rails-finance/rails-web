@@ -11,19 +11,26 @@
 // Clicking a box, a receipt or a timeline row selects it: the page holds the
 // selection and passes it back, and `hotSets` says what it lights.
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { CardTabStrip, INFO_PATH } from "@/components/shared/info-disclosure";
+import { EXPLAIN_GROUP_RULE, ExplainBullet, ExplainHeading } from "@/components/shared/explain-groups";
 import {
   hotSets,
   MAP_HOLDER,
   mapExact,
+  mapPlainClick,
+  mapSeries,
   mapUnits,
   usedNodes,
   type MapAmount,
   type MapEdge,
+  type MapExplanation,
+  type MapTextPart,
+  type MapWhenEnd,
   type MapFill,
   type MapLayout,
   type MapLine,
@@ -195,9 +202,239 @@ export interface ProtocolMapProps {
   holderNote?: ReactNode;
   /** The words of a selected timeline row, for the selection's sentence. */
   rowLabel?: (rowId: string) => string | null;
+  /** The explanation drawer under the legend: the protocol's words, or none. */
+  explanation?: MapExplanation | null;
+  /** A bullet's "?" (the protocol's modal), by the key the bullet names. */
+  learnMore?: (key: string) => ReactNode;
+  /** The app-anatomy code of the protocol's words in the drawer ("O8·polaris"). */
+  explanationAnatomy?: string;
+  /** A drawer time's click, handled in place: land on that event on the
+   *  page's timeline. Unset, the link's href loads. */
+  onExplanationAt?: (eventId: string) => void;
+  /** A drawer link to several edges, handled in place: filter the page's
+   *  timeline to them. Unset, the link's href loads. */
+  onExplanationEdges?: (edgeIds: string[]) => void;
 }
 
-export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holderNote, rowLabel }: ProtocolMapProps) {
+/** The page's in-place handlers for the drawer's links; each link keeps its
+ *  href for a new tab or a page without script. */
+interface DrawerLinks {
+  /** Land on one event on the page's timeline. */
+  onAt?: (eventId: string) => void;
+  /** Filter the page's timeline to these edges. */
+  onEdges?: (edgeIds: string[]) => void;
+}
+
+/** A plain click that the page handles in place. */
+const inPlace = (ev: React.MouseEvent, run: (() => void) | null) => {
+  if (!run || !mapPlainClick(ev)) return;
+  ev.preventDefault();
+  run();
+};
+
+/** One part of a drawer bullet: a figure bold with its receipt, a time or a
+ *  link to the timeline. */
+function Part({ p, links }: { p: MapTextPart; links: DrawerLinks }) {
+  if (typeof p === "string") return <>{p}</>;
+  if ("list" in p) return <>{mapSeries(p.list)}</>;
+  if ("figure" in p) {
+    const a = p.figure;
+    const exact = mapExact(a);
+    const figure = formatCompact(mapUnits(a));
+    return (
+      <strong className="font-semibold text-foreground tabular-nums" title={`${exact} ${a.asset}`}>
+        {p.receipt ? (
+          <Prov info={receiptProv(p.receipt)} value={exact} symbol={a.asset} echo>
+            {figure}
+          </Prov>
+        ) : (
+          figure
+        )}{" "}
+        {a.asset}
+      </strong>
+    );
+  }
+  if ("link" in p) {
+    const edges = p.edges;
+    return (
+      <a
+        href={p.href}
+        className={INLINE_LINK}
+        onClick={(ev) => inPlace(ev, edges && links.onEdges ? () => links.onEdges!(edges) : null)}
+      >
+        {p.link}
+      </a>
+    );
+  }
+  const { from, to, cap } = p.when;
+  // An event read after the page's first read opens on its own page; the
+  // rest land on the timeline.
+  const at = (x: MapWhenEnd) => {
+    const where = x.later ? "on its event page" : "on the timeline";
+    return (
+      <a
+        href={x.href}
+        className={`${INLINE_LINK} tabular-nums`}
+        title={x.later ? "Opens this event's page" : "Opens this event on the timeline"}
+        onClick={(ev) => inPlace(ev, !x.later && links.onAt ? () => links.onAt!(x.id) : null)}
+      >
+        {x.text}
+        <span className="sr-only"> {where}</span>
+      </a>
+    );
+  };
+  return to ? (
+    <>
+      {cap ? "From" : "from"} {at(from)} to {at(to)}
+    </>
+  ) : (
+    <>
+      {cap ? "At" : "at"} {at(from)}
+    </>
+  );
+}
+
+/** O8: the map's explanation, under the legend. The (i), the words and the
+ *  chevron are one toggle, muted at rest and foreground on hover, focus and
+ *  while open, as the event card's T3 row; the pane has a hairline above and
+ *  no fill or box. Closed by default; open, the protocol's tabs in the opened
+ *  card's tab strip, the first tab open. */
+function MapExplanationDrawer({
+  explanation,
+  learnMore,
+  anatomy,
+  links,
+}: {
+  explanation: MapExplanation;
+  learnMore?: (key: string) => ReactNode;
+  anatomy?: string;
+  links: DrawerLinks;
+}) {
+  const [open, setOpen] = useState(false);
+  // The tabs as the opened timeline card draws Explanation and Figures
+  // (CardTabStrip); the first opens.
+  const [openTab, setOpenTab] = useState<string | null>(null);
+  const tab = explanation.tabs.find((t) => t.key === openTab) ?? explanation.tabs[0];
+  const domId = `map-explanation-${useId().replace(/:/g, "")}`;
+  const tone = open
+    ? "text-foreground"
+    : "text-rb-500 group-hover/mapx:text-foreground group-focus-visible/mapx:text-foreground";
+  return (
+    <div
+      className="border-t border-[var(--explain-rule,var(--color-rb-300))] pt-2 dark:border-[var(--explain-rule,var(--color-rb-700))]"
+      data-map-explanation-drawer=""
+      data-anatomy="O8"
+    >
+      <button
+        type="button"
+        className="group/mapx inline-flex cursor-pointer items-center gap-1.5 rounded-md py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+        aria-expanded={open}
+        aria-controls={`${domId}-pane`}
+        aria-label={open ? "Hide map explanation" : "Show map explanation"}
+        data-map-explanation-toggle=""
+        onClick={() => setOpen((o) => !o)}
+      >
+        <svg
+          className={`h-5 w-5 shrink-0 transition-colors duration-200 ${tone}`}
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
+        </svg>
+        <span id={`${domId}-name`} className={`text-sm transition-colors duration-200 ${tone}`}>
+          Map explanation
+        </span>
+        <svg
+          className={`h-3 w-3 transition-[color,transform] duration-200 ${tone} ${open ? "rotate-180" : ""}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {open && tab && (
+        <div
+          id={`${domId}-pane`}
+          className="pt-2"
+          data-map-explanation=""
+          data-anatomy={anatomy}
+          data-card-tab-open={tab.key}
+        >
+          {explanation.tabs.length > 1 && (
+            // CardTabStrip takes no name; the group around it is named
+            // "Map explanation" from the toggle's words.
+            <div role="group" aria-labelledby={`${domId}-name`}>
+              <CardTabStrip
+                idBase={domId}
+                tabs={explanation.tabs.map((t) => ({ key: t.key, label: t.label }))}
+                openTab={tab.key}
+                onOpenTabChange={setOpenTab}
+              />
+            </div>
+          )}
+          <div
+            id={`${domId}-panel`}
+            role={explanation.tabs.length > 1 ? "tabpanel" : undefined}
+            aria-labelledby={explanation.tabs.length > 1 ? `${domId}-tab-${tab.key}` : undefined}
+            className="pb-1 pt-3 text-sm"
+          >
+            {tab.groups.map((g) => (
+              <section
+                key={g.id}
+                className={g.heading ? `mt-3 first:mt-0 ${EXPLAIN_GROUP_RULE}` : "mt-1 first:mt-0"}
+                data-map-explanation-group={g.id}
+              >
+                {g.heading && <ExplainHeading>{g.heading}</ExplainHeading>}
+                {g.lead && (
+                  <p className="mt-1 text-sm leading-snug text-rb-500">
+                    {g.lead.map((p, i) => (
+                      <Part key={i} p={p} links={links} />
+                    ))}
+                  </p>
+                )}
+                {g.bullets.length > 0 && (
+                  <ul className="mt-1 space-y-1 text-sm leading-snug text-rb-500">
+                    {g.bullets.map((b, i) => (
+                      <ExplainBullet key={i}>
+                        {b.parts.map((p, j) => (
+                          <Part key={j} p={p} links={links} />
+                        ))}
+                        {b.learnMore && learnMore && (
+                          <span className="ml-1.5 inline-flex align-middle">{learnMore(b.learnMore)}</span>
+                        )}
+                      </ExplainBullet>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ProtocolMap({
+  layout,
+  fill,
+  selection,
+  onSelect,
+  onFilter,
+  holderNote,
+  rowLabel,
+  explanation,
+  learnMore,
+  explanationAnatomy,
+  onExplanationAt,
+  onExplanationEdges,
+}: ProtocolMapProps) {
   const frame = useRef<HTMLDivElement>(null);
   const boxRefs = useRef<Record<string, HTMLElement | null>>({});
   const [geo, setGeo] = useState<{ w: number; h: number; boxes: Record<string, Box> } | null>(null);
@@ -492,6 +729,15 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
             </button>
           </span>
         </div>
+      )}
+      {/* The selection line stays next to the map; the drawer follows. */}
+      {explanation && explanation.tabs.length > 0 && (
+        <MapExplanationDrawer
+          explanation={explanation}
+          learnMore={learnMore}
+          anatomy={explanationAnatomy}
+          links={{ onAt: onExplanationAt, onEdges: onExplanationEdges }}
+        />
       )}
     </div>
   );

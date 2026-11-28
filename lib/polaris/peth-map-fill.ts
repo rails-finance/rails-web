@@ -14,7 +14,8 @@
 // Every figure carries a receipt (MapReceipt). An arrow and a box's "in" sum
 // rows; a box's "now" is the same figure as the places section's and takes
 // that section's receipt, from lib/polaris/peth-provenance.ts through the
-// context (`receipts`).
+// context (`receipts`). Each arrow also names its earliest and latest row
+// (`first`, `last`), over the rows read.
 //
 // THE ETH ARROWS carry the row's ETH in and ETH out, the figures the card
 // states: they count only zaps and trades into or out of pETH or fpETH. A row
@@ -26,8 +27,8 @@
 
 import type { PethLedgerLine, PethLedgerRow, PethPlace, PolarisPethResponse } from "../sources/api/polaris-peth";
 import type { MapAmount, MapFill, MapLine, MapReceipt } from "../shared/protocol-map/types";
-import { MAP_HOLDER } from "../shared/protocol-map/types";
-import { PM, PM_NODE_OF_PLACE, POLARIS_MAP_LAYOUT, pmEdge } from "./peth-map-layout";
+import { MAP_HOLDER, spanWith } from "../shared/protocol-map/types";
+import { PM, PM_NODE_OF_PLACE, POLARIS_LOAN_ONE, POLARIS_MAP_LAYOUT, pmEdge } from "./peth-map-layout";
 
 const ZERO = BigInt(0);
 const big = (raw: string | null | undefined): bigint => {
@@ -276,6 +277,16 @@ export function pethMapNewEdge(
   };
 }
 
+/** A row's block time in unix seconds: the route sends seconds as a string;
+ *  an ISO time is read too. */
+export function pethRowAt(r: Pick<PethLedgerRow, "block_timestamp">): number | null {
+  const t = r.block_timestamp;
+  if (t == null || t === "") return null;
+  if (/^\d+$/.test(t)) return Number(t);
+  const ms = Date.parse(t);
+  return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+}
+
 const plural = (n: number, one: string) => `${n.toLocaleString("en-US")} ${n === 1 ? one : `${one}s`}`;
 
 export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): MapFill {
@@ -310,7 +321,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
       for (const b of boxes) boxRows.set(b, (boxRows.get(b) ?? 0) + 1);
     }
     // Each row's arrows go to the browser only where the arrows are known.
-    if (known) fillRows.push({ id: r.tx_hash.toLowerCase(), edgeIds: [...used] });
+    if (known) fillRows.push({ id: r.tx_hash.toLowerCase(), edgeIds: [...used], at: pethRowAt(r) });
   }
 
   // With more rows than the page read, an arrow states the rows read on it
@@ -318,16 +329,22 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
   const total = ok ? (d.total_rows ?? rows.length) : 0;
   const full = rows.length >= total;
   const sumReceipt = (name: string, n: number, what: string) => arrowReceipt(name, n, what, ledgerBlock);
+  // Each edge's earliest and latest row, over the rows read.
+  const spans = new Map<string, Pick<MapFill["edges"][string], "first" | "last">>();
+  for (const fr of fillRows) for (const id of fr.edgeIds) spans.set(id, spanWith(spans.get(id) ?? {}, fr));
   const edges: MapFill["edges"] = {};
   for (const e of POLARIS_MAP_LAYOUT.edges) {
     const s = sums.get(e.id);
     if (!s) continue;
     const name = `${TITLE.get(e.from)} → ${TITLE.get(e.to)}`;
+    const span = spans.get(e.id);
     edges[e.id] = {
       amounts: full ? s.s.amounts() : [],
       rowCount: s.rows,
       timelineHref: ctx.timelineHref(e.id),
       receipt: sumReceipt(name, s.rows, "this address moved along this arrow"),
+      ...(span?.first ? { first: span.first } : {}),
+      ...(span?.last ? { last: span.last } : {}),
     };
   }
 
@@ -453,7 +470,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
         }
       : null,
     ...loans.map((l) => {
-      const text = `Reserve loan #${l.loan_id}`;
+      const text = `${POLARIS_LOAN_ONE} #${l.loan_id}`;
       return {
         label: "note" as const,
         text,

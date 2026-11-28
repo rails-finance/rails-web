@@ -77,12 +77,47 @@ export interface MapLine {
   receipt?: MapReceipt;
 }
 
+/** One end of an edge's span: a row's block time (unix seconds) and the id
+ *  of the timeline event the row is. */
+export interface MapEdgeEnd {
+  at: number;
+  id: string;
+  /** The row was read after the page's first read (`mergeFillRows`). */
+  later?: true;
+}
+
 export interface MapEdgeFill {
   amounts: MapAmount[];
   rowCount: number;
   timelineHref: string;
   /** The amounts' receipt. */
   receipt: MapReceipt;
+  /** The earliest and latest of the rows summed on this edge, over the rows
+   *  the fill read (all of them, or the newest `counted.rows`). Absent where
+   *  no row carries a time. */
+  first?: MapEdgeEnd;
+  last?: MapEdgeEnd;
+}
+
+/** A row the fill summed: the edges it used and its block time. */
+export interface MapFillRow {
+  id: string;
+  edgeIds: string[];
+  at?: number | null;
+  /** Read after the page's first read (`mergeFillRows` sets it). */
+  later?: true;
+}
+
+/** Widens an edge's first and last to take in one row. Ties keep the end
+ *  already set, so rows read newest first give the earliest row of a time as
+ *  `first` only if it comes later in the list. */
+export function spanWith(e: Pick<MapEdgeFill, "first" | "last">, row: MapFillRow): Pick<MapEdgeFill, "first" | "last"> {
+  if (row.at == null) return { first: e.first, last: e.last };
+  const end: MapEdgeEnd = { at: row.at, id: row.id, ...(row.later ? { later: true as const } : {}) };
+  return {
+    first: !e.first || row.at <= e.first.at ? end : e.first,
+    last: !e.last || row.at > e.last.at ? end : e.last,
+  };
 }
 
 export interface MapFill {
@@ -92,7 +127,7 @@ export interface MapFill {
   nodes: Record<string, { lines: MapLine[]; rowCount?: number }>;
   edges: Record<string, MapEdgeFill>;
   /** The rows the fill summed, each naming its edges. */
-  rows: { id: string; edgeIds: string[] }[];
+  rows: MapFillRow[];
   /** How many rows the fill summed, of how many the address has. */
   counted: { rows: number; total: number };
   /** The server does not say which edges the rows used: the map draws no
@@ -158,12 +193,12 @@ export function hotSets(layout: MapLayout, fill: MapFill, sel: MapSelection): Ma
  *  an edge never shows a count beside amounts summed over fewer rows. */
 export function mergeFillRows(
   fill: MapFill,
-  more: { id: string; edgeIds: string[] }[],
+  more: MapFillRow[],
   newEdge: (edgeId: string, rowCount: number) => Pick<MapEdgeFill, "timelineHref" | "receipt">,
 ): MapFill {
   if (fill.edgesUnknown) return fill;
   const seen = new Set(fill.rows.map((r) => r.id));
-  const added = more.filter((r) => !seen.has(r.id) && seen.add(r.id));
+  const added = more.filter((r) => !seen.has(r.id) && seen.add(r.id)).map((r): MapFillRow => ({ ...r, later: true }));
   if (added.length === 0) return fill;
   const rows = [...fill.rows, ...added];
   const counts = new Map<string, number>();
@@ -174,6 +209,15 @@ export function mergeFillRows(
     edges[id] = e ? { ...e, amounts: [], rowCount: n } : { amounts: [], rowCount: n, ...newEdge(id, n) };
   }
   for (const [id, e] of Object.entries(fill.edges)) if (!edges[id]) edges[id] = { ...e, amounts: [], rowCount: 0 };
+  // The added rows widen each edge's first and last.
+  for (const r of added)
+    for (const id of r.edgeIds) {
+      const e = edges[id];
+      if (!e) continue;
+      const span = spanWith(e, r);
+      if (span.first) e.first = span.first;
+      if (span.last) e.last = span.last;
+    }
   return { ...fill, rows, edges, counted: { ...fill.counted, rows: rows.length } };
 }
 
@@ -199,5 +243,113 @@ export function mapExact(a: MapAmount): string {
 /** An amount as a number of tokens. */
 export const mapUnits = (a: MapAmount): number => Number(mapExact(a));
 
-/** The query param that filters an address's timeline to one edge. */
+/** The query param that filters an address's timeline to one edge, or to
+ *  several, comma-separated. */
 export const MAP_EDGE_PARAM = "map";
+
+/** The edges a `?map=` value names that the fill has, in its order, once each. */
+export function mapEdgesFromParam(raw: string | null, fill: MapFill): string[] {
+  return raw ? mapEdgesIn(raw.split(","), fill) : [];
+}
+
+/** The ids the fill has an edge for, once each, in their order: a filter's
+ *  arrows, checked against the fill as it stands (older rows' edges included
+ *  once merged). */
+export function mapEdgesIn(ids: string[], fill: MapFill): string[] {
+  const xs = ids.map((x) => x.trim());
+  return xs.filter((id, i) => id !== "" && fill.edges[id] != null && xs.indexOf(id) === i);
+}
+
+/** Whether landing on an event must first clear the edge filter: the filter
+ *  hides it. */
+export const mapLandingClearsFilter = (eventId: string, hidden: ReadonlySet<string> | null): boolean =>
+  hidden?.has(eventId) === true;
+
+/** A plain primary click, which a page may handle in place; a modifier or
+ *  another button keeps the link's behaviour (a new tab, a download). */
+export const mapPlainClick = (ev: {
+  button: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}): boolean => ev.button === 0 && !ev.metaKey && !ev.ctrlKey && !ev.shiftKey && !ev.altKey;
+
+// ── The explanation drawer (ui-jobs 873.5) ─────────────────────────────────
+// Under the legend, the map's plain-language account of the address: tabs of
+// grouped bullets the protocol builds from its fill (Polaris:
+// lib/polaris/peth-map-explanation.ts) and the shared map draws. A bullet is
+// text and parts: each figure is a fill amount drawn bold with its receipt,
+// each time a link to its event on the timeline.
+
+/** One end of a time: its words, its event and where it links. `later`: the
+ *  row was read after the page's first read, and the link opens the event's
+ *  page, not the timeline. */
+export interface MapWhenEnd {
+  text: string;
+  id: string;
+  href: string;
+  later?: true;
+}
+
+/** A time in the account, as the drawer prints it: "at T", or "from T1 to
+ *  T2". Each end's text is set by the builder (the first time in the drawer
+ *  carries its date, a later one on the same day the time alone), and links
+ *  to its event on the timeline. Counts as one word and one figure. */
+export interface MapWhen {
+  from: MapWhenEnd;
+  to?: MapWhenEnd;
+  /** Starts the bullet: "At", "From". */
+  cap?: boolean;
+}
+
+export type MapTextPart =
+  | string
+  /** A series: "a", "a and b", "a, b and c". Its commas list, and join no clause. */
+  | { list: string[] }
+  /** A fill amount, bold, with the receipt the map shows it with. */
+  | { figure: MapAmount; receipt?: MapReceipt }
+  | { when: MapWhen }
+  /** A link; `edges` where it opens the timeline filtered to those edges. */
+  | { link: string; href: string; edges?: string[] };
+
+export interface MapBullet {
+  parts: MapTextPart[];
+  /** The protocol's key for a "?" modal, drawn after the bullet. */
+  learnMore?: string;
+}
+
+export interface MapExplanationGroup {
+  /** A stable name for the group (`data-map-explanation-group`). */
+  id: string;
+  heading?: string;
+  /** A sentence before the bullets. */
+  lead?: MapTextPart[];
+  bullets: MapBullet[];
+}
+
+/** One tab of the drawer: its label and its groups. The first tab opens. */
+export interface MapExplanationTab {
+  key: string;
+  label: string;
+  groups: MapExplanationGroup[];
+}
+
+export interface MapExplanation {
+  tabs: MapExplanationTab[];
+}
+
+/** A part as plain text, a figure by `figure`. */
+export function mapPartText(p: MapTextPart, figure: (a: MapAmount) => string): string {
+  if (typeof p === "string") return p;
+  if ("list" in p) return mapSeries(p.list);
+  if ("figure" in p) return `${figure(p.figure)} ${p.figure.asset}`;
+  if ("link" in p) return p.link;
+  const { from, to, cap } = p.when;
+  return to ? `${cap ? "From" : "from"} ${from.text} to ${to.text}` : `${cap ? "At" : "at"} ${from.text}`;
+}
+
+/** "a", "a and b", "a, b and c". */
+export function mapSeries(xs: string[]): string {
+  return xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+}

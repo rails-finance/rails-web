@@ -28,8 +28,8 @@ register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 const { buildPethMapFill, pethMapNewEdge, pethMapPlaces, pethMapRowEdges } = await import(
   "../../lib/polaris/peth-map-fill.ts"
 );
-const { POLARIS_MAP_LAYOUT, PM, pmEdge } = await import("../../lib/polaris/peth-map-layout.ts");
-const { hotSets, MAP_HOLDER, mapExact, mapUnusedWords, mergeFillRows, usedNodes } = await import(
+const { POLARIS_MAP_LAYOUT, POLARIS_POOL_NAME, PM, pmEdge } = await import("../../lib/polaris/peth-map-layout.ts");
+const { hotSets, MAP_HOLDER, mapEdgesFromParam, mapExact, mapUnusedWords, mergeFillRows, usedNodes } = await import(
   "../../lib/shared/protocol-map/types.ts"
 );
 
@@ -404,7 +404,7 @@ test("the CDP, deposit and loan boxes take the places section's receipts", () =>
   );
   const loan = f.nodes[PM.loan].lines;
   assert.equal(loan.find((l) => l.label === "now").receipt.summary, "loanTotal");
-  assert.equal(loan.find((l) => l.text === "Reserve loan #28").receipt.summary, "loan 28");
+  assert.equal(loan.find((l) => l.text === "Floor Loan #28").receipt.summary, "loan 28");
   const d = fx("map-38d7");
   d.rollup.sp_peth = {
     raw: "3",
@@ -487,7 +487,7 @@ test("older rows can make an unused arrow used: merged to the whole ledger", () 
   assert.deepEqual(m.edges[spIn].amounts, []);
   assert.equal(m.edges[spIn].rowCount, 1);
   assert.equal(m.edges[spIn].timelineHref, CTX.timelineHref(spIn));
-  assert.match(m.edges[spIn].receipt.summary, /^This address → Stability Pools — /);
+  assert.ok(m.edges[spIn].receipt.summary.startsWith(`This address → ${POLARIS_POOL_NAME} — `));
   assert.ok(usedNodes(POLARIS_MAP_LAYOUT, m).has(PM.sp));
   assert.equal(mapUnusedWords(m), "Not used by this address");
   assert.equal(m.nodes[PM.sp].rowCount, 1);
@@ -515,4 +515,73 @@ test("amounts exist only over a ledger read in full, and a merge never keeps the
   assert.equal(m.edges[pmEdge(MAP_HOLDER, PM.cdp)].rowCount, 3);
   // A merge that adds nothing changes nothing.
   assert.equal(mergeFillRows(full, [], pethMapNewEdge(CTX, null)), full);
+});
+
+// Each arrow's first and last row (ui-jobs 873.5): the block time and the
+// timeline event id of its earliest and latest row, over the rows read.
+const at = (iso) => Date.parse(iso) / 1000;
+const SPANS = {
+  "map-38d7": {
+    "polaris:eth->polaris:zap": ["11:26:48", "0xaae5b20f", "11:28:00", "0x8e21f0c5"],
+    "polaris:zap->polaris:curve": ["11:26:48", "0xaae5b20f", "11:28:00", "0x8e21f0c5"],
+    "polaris:curve->polaris:fee": ["11:26:48", "0xaae5b20f", "11:28:00", "0x8e21f0c5"],
+    "polaris:zap->holder": ["11:26:48", "0xaae5b20f", "11:28:00", "0x8e21f0c5"],
+    "holder->polaris:cdp": ["11:28:48", "0x5f8c5387", "11:29:36", "0xf1a90105"],
+    "holder->polaris:loan": ["11:30:12", "0x259e83f4", "11:30:12", "0x259e83f4"],
+  },
+  "map-c513": {
+    "polaris:eth->polaris:zap": ["04:09:00", "0x37b5fcbb", "04:18:48", "0x9184b990"],
+    "polaris:zap->polaris:other": ["04:14:00", "0x17aebbe6", "04:18:00", "0x102d7d5f"],
+    "polaris:zap->polaris:curve": ["04:09:00", "0x37b5fcbb", "04:18:48", "0x9184b990"],
+    "polaris:curve->polaris:fee": ["04:09:00", "0x37b5fcbb", "04:18:48", "0x9184b990"],
+    "holder->polaris:zap": ["04:34:48", "0xeb31cded", "04:34:48", "0xeb31cded"],
+    "polaris:zap->holder": ["04:09:00", "0x37b5fcbb", "04:34:48", "0xeb31cded"],
+    "polaris:outside->holder": ["04:10:48", "0xc96f2196", "04:10:48", "0xc96f2196"],
+    "holder->polaris:pools": ["04:30:00", "0x71964bc7", "04:33:36", "0x497a897d"],
+    "holder->polaris:svpeth": ["04:21:48", "0xa4b9e976", "04:21:48", "0xa4b9e976"],
+  },
+};
+for (const [name, want] of Object.entries(SPANS))
+  test(`each arrow's first and last row on ${name}`, () => {
+    const f = buildPethMapFill(fx(name), CTX);
+    assert.deepEqual(Object.keys(f.edges).sort(), Object.keys(want).sort());
+    for (const [id, [t1, id1, t2, id2]] of Object.entries(want)) {
+      const e = f.edges[id];
+      assert.equal(e.first.at, at(`2026-08-18T${t1}Z`), `${id} first`);
+      assert.equal(e.last.at, at(`2026-08-18T${t2}Z`), `${id} last`);
+      assert.ok(e.first.id.startsWith(id1) && e.last.id.startsWith(id2), id);
+      // The ids are the timeline's: each is a row the fill summed on this arrow.
+      for (const end of [e.first, e.last]) assert.ok(f.rows.some((r) => r.id === end.id && r.edgeIds.includes(id)));
+    }
+  });
+
+test("a partial read takes first and last over the rows read, and older rows widen them", () => {
+  const d = fx("map-38d7");
+  const oldest = d.rows[d.rows.length - 1];
+  d.rows = d.rows.slice(0, -1);
+  d.total_rows = 5;
+  const f = buildPethMapFill(d, CTX);
+  const ethZap = pmEdge(PM.eth, PM.zap);
+  assert.equal(f.counted.rows, 4);
+  assert.equal(f.edges[ethZap].first.id, f.edges[ethZap].last.id);
+  assert.equal(f.edges[ethZap].first.at, at("2026-08-18T11:28:00Z"));
+  const m = mergeFillRows(
+    f,
+    [{ id: oldest.tx_hash.toLowerCase(), edgeIds: pethMapRowEdges(oldest, CTX), at: Number(oldest.block_timestamp) }],
+    pethMapNewEdge(CTX, null),
+  );
+  assert.equal(m.edges[ethZap].first.at, at("2026-08-18T11:26:48Z"));
+  assert.equal(m.edges[ethZap].first.id, oldest.tx_hash.toLowerCase());
+  assert.equal(m.edges[ethZap].last.at, at("2026-08-18T11:28:00Z"));
+  // The fill's own copy is left as it was.
+  assert.equal(f.edges[ethZap].first.at, at("2026-08-18T11:28:00Z"));
+});
+
+test("?map= takes several arrows and drops the ones the fill has not", () => {
+  const f = buildPethMapFill(fx("map-38d7"), CTX);
+  const a = pmEdge(PM.eth, PM.zap);
+  const b = pmEdge(MAP_HOLDER, PM.cdp);
+  assert.deepEqual(mapEdgesFromParam(`${a},nope,${b},${a}`, f), [a, b]);
+  assert.deepEqual(mapEdgesFromParam(pmEdge(MAP_HOLDER, PM.sp), f), []);
+  assert.deepEqual(mapEdgesFromParam(null, f), []);
 });
