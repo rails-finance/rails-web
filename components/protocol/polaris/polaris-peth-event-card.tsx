@@ -82,12 +82,16 @@ function amountCell(
 }
 
 /** The row's primary place as a link: its page (→) or the contract on the
- *  block explorer (↗), with the T3 line's text. Null where the row has none. */
-function pethPlaceLinkOf(row: PethLedgerRow): { href: string; tip: string; external: boolean } | null {
+ *  block explorer (↗), with the T3 line's text, or with `direction` the words
+ *  for one line's amount. Null where the row has none. */
+function pethPlaceLinkOf(
+  row: PethLedgerRow,
+  direction?: "in" | "out",
+): { href: string; tip: string; external: boolean } | null {
   const p = row.place;
   const to = p ? pethPlaceHref(p) : null;
   if (!p || !to) return null;
-  return { ...to, tip: `${pethPlaceWords(row, p, PETH_PLACE_NAMES)} ${to.external ? "↗" : "→"}` };
+  return { ...to, tip: `${pethPlaceWords(row, p, PETH_PLACE_NAMES, direction)} ${to.external ? "↗" : "→"}` };
 }
 
 /** The row's place line in T3. Null where the row has none. */
@@ -136,23 +140,28 @@ export function PolarisPethEventCard({
     const prev = byToken.get(k);
     byToken.set(k, { ...t, raw: (prev?.raw ?? ZERO) + big(l.amount_raw), dir: l.direction });
   }
-  // The amounts of the row's primary lines open its place, with the T3
-  // line's words as the tooltip (ui-jobs 872).
-  const placeLink = pethPlaceLinkOf(row);
+  // The amounts of the row's primary lines open its place where it has a
+  // Rails page, with the T3 line's words for each amount's direction as the
+  // tooltip (ui-jobs 872, 878). The spine links no page outside Rails: a place
+  // on the block explorer leaves its amounts plain.
   const primary = new Set(
     lines
       .filter((l) => l.rule === row.kind)
       .map((l) => `${pethLineToken(l.token, PETH_NAMES, POLARIS_VENUES).address}:${l.direction}`),
   );
-  const tokens: SpineTokenRow[] = [...byToken.entries()].map(([k, t]) => ({
-    symbol: t.symbol,
-    address: t.address,
-    direction: t.dir === "in" ? "left" : "right",
-    popover: true,
-    value: units(t.raw),
-    display: pethAmountText(t.raw),
-    ...(placeLink && primary.has(k) ? { amountLink: placeLink } : {}),
-  }));
+  const tokens: SpineTokenRow[] = [...byToken.entries()].map(([k, t]) => {
+    const place = primary.has(k) ? pethPlaceLinkOf(row, t.dir) : null;
+    const amountLink = place && !place.external ? place : null;
+    return {
+      symbol: t.symbol,
+      address: t.address,
+      direction: t.dir === "in" ? "left" : "right",
+      popover: true,
+      value: units(t.raw),
+      display: pethAmountText(t.raw),
+      ...(amountLink ? { amountLink } : {}),
+    };
+  });
 
   const lineCells: EventCellSpec[] = lines.map((l, i) => {
     const t = pethLineToken(l.token, PETH_NAMES, POLARIS_VENUES);

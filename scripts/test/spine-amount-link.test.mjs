@@ -35,6 +35,10 @@ for (const name of ["liquityAdjust", "aaveWithdraw", "touch"]) {
   });
 }
 
+test("an amountLink outside Rails draws the spine as before the prop: the spine links Rails pages only", () => {
+  assert.equal(rendered.linkedExternal, expected.liquityAdjust);
+});
+
 test("an amountLink wraps the amount alone, and the rest of the spine is unchanged", () => {
   const html = rendered.linked;
   const anchors = [...html.matchAll(/<a\b[^>]*>(.*?)<\/a>/g)];
@@ -42,7 +46,7 @@ test("an amountLink wraps the amount alone, and the rest of the spine is unchang
   const [whole, inner] = anchors[0];
   assert.equal(inner, "4.2K", "the link holds the figure and nothing else");
   assert.match(whole, /href="\/sepolia\/polaris\/reserve-loans\/28"/);
-  assert.match(whole, /title="Went to reserve loan #28 →"/);
+  assert.doesNotMatch(whole, /\btitle=/, "the house tooltip names the destination, and no native title doubles it");
   assert.match(whole, /data-spine-amount-link="marked"/);
   assert.match(whole, /data-anatomy="L3.3"/);
   assert.match(whole, /aria-label="4.2K: Went to reserve loan #28"/, "the name reads the words without the arrow");
@@ -98,7 +102,7 @@ test("an amountLink wraps the amount alone, and the rest of the spine is unchang
 test("below 640px the number column and the group range stand above a linked node", () => {
   const read = (f) => readFileSync(path.join(REPO, f), "utf8");
   const node = Number(
-    /rows\.some\(\(r\) => r\.amountLink\) \? " max-sm:z-(\d+) max-sm:pointer-events-none /.exec(
+    /rows\.some\(\(r\) => r\.amountLink && !r\.amountLink\.external\) \? " max-sm:z-(\d+) max-sm:pointer-events-none /.exec(
       read("components/shared/spine-column.tsx"),
     )?.[1],
   );
@@ -126,15 +130,15 @@ test("a click in an interactive RevealTip's bubble stops there, and on its paddi
   );
 });
 test("the links that stop their click start the progress bar", () => {
-  const spine = src("components/shared/activity-timeline.tsx");
+  const value = src("components/shared/linked-value.tsx");
   assert.match(
-    spine,
-    /else if \(!link\.external\) startNavigationProgressOnClick\(e, link\.href\);/,
-    "the spine amount, when its press follows",
+    value,
+    /else if \(!external\) startNavigationProgressOnClick\(e, href\);/,
+    "the linked value (the spine amount), when its press follows",
   );
   assert.match(
-    spine,
-    /onClick: \(e: React\.MouseEvent\) => \{\s*e\.stopPropagation\(\);\s*if \(!link\.external\) startNavigationProgressOnClick\(e, link\.href\);/,
+    value,
+    /onClick: \(e: React\.MouseEvent\) => \{\s*e\.stopPropagation\(\);\s*if \(!external\) startNavigationProgressOnClick\(e, href\);/,
     "the link in its tooltip",
   );
   assert.match(
@@ -150,12 +154,12 @@ test("the links that stop their click start the progress bar", () => {
 });
 test("a touch that turns into a scroll leaves no pointer behind", () => {
   assert.match(
-    src("components/shared/activity-timeline.tsx"),
+    src("components/shared/linked-value.tsx"),
     /onPointerCancel: \(\) => \{\s*pointer\.current = undefined;/,
   );
 });
 test("the link says whether its tooltip is open only once a press has opened it", () => {
-  const spine = src("components/shared/activity-timeline.tsx");
+  const spine = src("components/shared/linked-value.tsx");
   assert.match(spine, /"aria-expanded": discloses \? open : undefined,/);
   assert.match(spine, /if \(press\.open\) setDiscloses\(true\);/);
   assert.match(spine, /"data-tip-open": open \? "" : undefined,/);
