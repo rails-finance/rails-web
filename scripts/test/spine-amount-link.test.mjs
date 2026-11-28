@@ -12,6 +12,8 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { spineAmountPress } from "../../lib/shared/spine-amount-press.ts";
 
+const OPEN_Z = " has-[[data-spine-amount-link][aria-expanded=true]]:z-50!";
+
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const rendered = JSON.parse(
   execFileSync(
@@ -66,10 +68,16 @@ test("an amountLink wraps the amount alone, and the rest of the spine is unchang
     "the link stands in the house tooltip (RevealTip)",
   );
   assert.doesNotMatch(html, /role="tooltip"/, "the tooltip is closed at rest");
+  assert.match(whole, /aria-expanded="false"/, "the link says its tooltip is closed");
+  assert.doesNotMatch(whole, /aria-describedby/, "a closed tooltip describes nothing");
   assert.match(
     html,
     /data-spine-node=""[^>]*class="relative z-10 max-sm:z-30 max-sm:pointer-events-none/,
     "its node stands above the phone toggle and passes other taps through",
+  );
+  assert.ok(
+    html.includes(`max-sm:pointer-events-none${OPEN_Z}`),
+    "while the amount's tooltip is open its node stands above the other rows, the number column and a group's range",
   );
   // Put the plain figure back where the link stands: the spine is the
   // unlinked one, so nothing beside the amount moved.
@@ -78,7 +86,7 @@ test("an amountLink wraps the amount alone, and the rest of the spine is unchang
       /<span class="(justify-self-(?:end|start) p[rl]-5)"><span data-reveal-tip=""[^>]*><a\b[^>]*>(.*?)<\/a><\/span><\/span>/,
       (_, side, txt) => `<span class="text-base font-semibold whitespace-nowrap ${side}">${txt}</span>`,
     )
-    .replace(" max-sm:z-30 max-sm:pointer-events-none", "");
+    .replace(` max-sm:z-30 max-sm:pointer-events-none${OPEN_Z}`, "");
   assert.equal(plain, expected.liquityAdjust);
 });
 
@@ -89,7 +97,7 @@ test("an amountLink wraps the amount alone, and the rest of the spine is unchang
 test("below 640px the number column and the group range stand above a linked node", () => {
   const read = (f) => readFileSync(path.join(REPO, f), "utf8");
   const node = Number(
-    /rows\.some\(\(r\) => r\.amountLink\) \? " max-sm:z-(\d+) max-sm:pointer-events-none"/.exec(
+    /rows\.some\(\(r\) => r\.amountLink\) \? " max-sm:z-(\d+) max-sm:pointer-events-none /.exec(
       read("components/shared/spine-column.tsx"),
     )?.[1],
   );
@@ -103,35 +111,61 @@ test("below 640px the number column and the group range stand above a linked nod
   const range = Number(/\.group-range \{\s*z-index: (\d+);/.exec(phone)?.[1]);
   assert.ok(range > node, `.group-range z-index ${range} is above the node's ${node} below 640px`);
   assert.match(css, /\.group-range \{[^}]*pointer-events: none;/, ".group-range passes taps through");
+  const open = Number(/aria-expanded=true\]\]:z-(\d+)!/.exec(read("components/shared/spine-column.tsx"))?.[1]);
+  assert.ok(open > num && open > range, `an open tooltip's node, z-${open}, is above .spine-num and .group-range`);
 });
 
-// A press on the linked amount (lib/shared/spine-amount-press.ts): on a screen
-// without hover the first tap opens the tooltip and the second follows the
-// link; a mouse click and a keyboard Enter follow at once.
-const touch = { hoverless: true, keyboard: false };
-test("on a screen without hover the first tap on the amount opens its tooltip and does not follow the link", () => {
-  assert.deepEqual(spineAmountPress(false, { on: "amount", ...touch }), { open: true, follow: false });
+// RevealTip in interactive mode: a click anywhere in the bubble (its padding,
+// its arrow) stops at the bubble, so it never reaches the card row behind it.
+// Read from the source: the repo has no DOM to dispatch a click in.
+test("a click in an interactive RevealTip's bubble stops there", () => {
+  const src = readFileSync(path.join(REPO, "components/shared/reveal-tip.tsx"), "utf8");
+  assert.match(
+    src,
+    /if \(interactive && bubbleRef\.current\?\.contains\(e\.target as Node\)\) \{\s*e\.stopPropagation\(\);\s*return;\s*\}/,
+  );
 });
-test("on a screen without hover a second tap on the amount follows the link", () => {
-  const first = spineAmountPress(false, { on: "amount", ...touch });
-  assert.deepEqual(spineAmountPress(first.open, { on: "amount", ...touch }), { open: true, follow: true });
+
+// A press on the linked amount (lib/shared/spine-amount-press.ts): a touch or
+// a pen opens the tooltip first and a second press follows the link; a mouse
+// click and a keyboard Enter follow at once; with no pointer event seen, a
+// screen without hover opens the tooltip first.
+const tap = { pointer: "touch", hoverless: false, keyboard: false };
+test("a first tap on the amount opens its tooltip and does not follow the link", () => {
+  assert.deepEqual(spineAmountPress(false, { on: "amount", ...tap }), { open: true, follow: false });
+  assert.deepEqual(spineAmountPress(false, { on: "amount", ...tap, pointer: "pen" }), { open: true, follow: false });
+});
+test("a second tap on the amount follows the link", () => {
+  const first = spineAmountPress(false, { on: "amount", ...tap });
+  assert.deepEqual(spineAmountPress(first.open, { on: "amount", ...tap }), { open: true, follow: true });
 });
 test("the link in the open tooltip follows it", () => {
-  assert.equal(spineAmountPress(true, { on: "tip", ...touch }).follow, true);
+  assert.equal(spineAmountPress(true, { on: "tip", ...tap }).follow, true);
 });
 test("a tap elsewhere closes the tooltip and follows nothing", () => {
-  assert.deepEqual(spineAmountPress(true, { on: "outside", ...touch }), { open: false, follow: false });
+  assert.deepEqual(spineAmountPress(true, { on: "outside", ...tap }), { open: false, follow: false });
 });
-test("with hover a click on the amount follows the link and opens no tooltip", () => {
+test("a mouse click on the amount follows the link and opens no tooltip, on any screen", () => {
+  for (const hoverless of [true, false])
+    assert.deepEqual(spineAmountPress(false, { on: "amount", pointer: "mouse", hoverless, keyboard: false }), {
+      open: false,
+      follow: true,
+    });
+});
+test("Enter on the amount follows the link, whatever pointer came before", () => {
+  for (const pointer of [undefined, "touch", "mouse"])
+    assert.deepEqual(spineAmountPress(false, { on: "amount", pointer, hoverless: true, keyboard: true }), {
+      open: false,
+      follow: true,
+    });
+});
+test("with no pointer event (a screen reader's activation) the screen decides", () => {
+  assert.deepEqual(spineAmountPress(false, { on: "amount", hoverless: true, keyboard: false }), {
+    open: true,
+    follow: false,
+  });
   assert.deepEqual(spineAmountPress(false, { on: "amount", hoverless: false, keyboard: false }), {
     open: false,
     follow: true,
   });
-});
-test("Enter on the amount follows the link, with or without hover", () => {
-  for (const hoverless of [true, false])
-    assert.deepEqual(spineAmountPress(false, { on: "amount", hoverless, keyboard: true }), {
-      open: false,
-      follow: true,
-    });
 });

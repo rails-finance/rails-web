@@ -45,6 +45,7 @@ export function RevealTip({
   interactive = false,
   open: openProp,
   onOpenChange,
+  bubbleId,
 }: {
   tip: ReactNode;
   children: ReactNode;
@@ -67,6 +68,8 @@ export function RevealTip({
    *  tap); a press elsewhere and Escape still close it, through `onOpenChange`. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** The bubble's id, for a caller that points `aria-describedby` at it. */
+  bubbleId?: string;
 }) {
   const [ownOpen, setOwnOpen] = useState(false);
   const open = openProp ?? ownOpen;
@@ -166,8 +169,12 @@ export function RevealTip({
           : undefined
       }
       onClick={(e) => {
-        // A click on the bubble's own control is the control's.
-        if (interactive && bubbleRef.current?.contains(e.target as Node)) return;
+        // A click in the bubble is the bubble's: its control's, and on its
+        // padding or arrow nobody's, never the row's behind it.
+        if (interactive && bubbleRef.current?.contains(e.target as Node)) {
+          e.stopPropagation();
+          return;
+        }
         // Inside a value the inspector can pick, the click traces it.
         if (tipYieldsToTrace(ref.current, provInspector.getArmed())) return;
         e.preventDefault();
@@ -194,6 +201,7 @@ export function RevealTip({
            the displayed value. */
         <span
           ref={bubbleRef}
+          id={bubbleId}
           role="tooltip"
           data-prov-hidden=""
           className={`${interactive ? "pointer-events-auto" : "pointer-events-none"} absolute ${below ? "top-full mt-2.5" : "bottom-full mb-2.5"} ${align === "end" ? "right-0" : "left-0"} z-[var(--z-dropdown)] ${wrap ? "w-max max-w-[min(20rem,calc(100vw-1.5rem))] whitespace-normal break-words" : "whitespace-nowrap"} rounded-2xl border p-3 text-xs font-medium tabular-nums text-foreground shadow-lg`}

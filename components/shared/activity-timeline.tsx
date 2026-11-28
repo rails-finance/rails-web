@@ -12,7 +12,7 @@
 // shim can be replaced with the verbatim 1200-line file.
 
 import Link from "next/link";
-import { createContext, useContext, useState, useRef } from "react";
+import { createContext, useContext, useId, useState, useRef } from "react";
 import { fmtSpine } from "@/lib/shared/spine-format";
 import { INLINE_LINK, INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 import { spineAmountPress } from "@/lib/shared/spine-amount-press";
@@ -129,8 +129,7 @@ export function SpineVal({
     // Below 640px the spine node passes taps through to the row's phone
     // toggle (spine-column.tsx); a tap on the link opens the link.
     " pointer-events-auto" +
-    // A screen without hover never shows the hover cue: there the link rests
-    // on a dotted hairline underline (anatomy L3.2).
+    // The resting cue without hover (anatomy L3.2).
     " [@media(hover:none)]:underline [@media(hover:none)]:decoration-dotted [@media(hover:none)]:decoration-1" +
     " [@media(hover:none)]:decoration-[var(--edge-row-line)]" +
     mark;
@@ -160,15 +159,27 @@ function SpineAmountLinkView({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const tipId = useId();
+  // The pointer that pressed the link, read at its click; none for a
+  // keyboard or a screen reader's activation.
+  const pointer = useRef<string | undefined>(undefined);
   const common = {
     title: link.tip,
+    "aria-expanded": open,
+    "aria-describedby": open ? tipId : undefined,
+    onPointerDown: (e: React.PointerEvent) => {
+      pointer.current = e.pointerType;
+    },
     // The arrows are visual: the name reads the words alone.
     "aria-label": `${name}: ${link.tip.replace(/\s*[→↗]\s*$/u, "")}`,
     onClick: (e: React.MouseEvent) => {
       e.stopPropagation();
+      const pressedBy = pointer.current;
+      pointer.current = undefined;
       const press = spineAmountPress(open, {
         on: "amount",
-        hoverless: window.matchMedia("(hover: none)").matches,
+        pointer: pressedBy,
+        hoverless: pressedBy === undefined && window.matchMedia("(hover: none)").matches,
         keyboard: e.detail === 0,
       });
       if (!press.follow) e.preventDefault();
@@ -180,10 +191,10 @@ function SpineAmountLinkView({
   };
   const tipLink = {
     className: `font-semibold ${INLINE_LINK}`,
-    // The press is the link's, not the card row's.
+    // The press belongs to the link.
     onClick: (e: React.MouseEvent) => e.stopPropagation(),
   };
-  const outside = { on: "outside", hoverless: true, keyboard: false } as const;
+  const outside = { on: "outside", hoverless: false, keyboard: false } as const;
   return (
     <RevealTip
       tip={
@@ -201,6 +212,7 @@ function SpineAmountLinkView({
       wrap
       align={side === "left" ? "end" : "start"}
       open={open}
+      bubbleId={tipId}
       onOpenChange={(o) => {
         if (!o) setOpen(spineAmountPress(open, outside).open);
       }}
