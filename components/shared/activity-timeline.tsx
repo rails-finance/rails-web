@@ -123,8 +123,8 @@ export function SpineVal({
   const cls =
     "text-base font-semibold whitespace-nowrap underline-offset-2 hover:underline focus-visible:underline " +
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] rounded-sm" +
-    // The spine node passes taps through to the row's phone toggle below
-    // 640px (spine-column.tsx); the link takes its own.
+    // Below 640px the spine node passes taps through to the row's phone
+    // toggle (spine-column.tsx); a tap on the link opens the link.
     " pointer-events-auto" +
     mark;
   const common = {

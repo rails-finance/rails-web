@@ -45,10 +45,12 @@ import {
   pethPlaceName,
   pethPlaceView,
   pethPlaces,
+  pethPinnedRead,
   pethRowId,
   pethTimelineEvent,
   units,
   type PethHeadlines,
+  type PethPinnedFetch,
 } from "@/lib/polaris/peth-ledger";
 import { pethHeadProv } from "@/lib/polaris/peth-provenance";
 import { PETH_PLACE_NAMES } from "@/lib/polaris/peth-place-links";
@@ -192,21 +194,23 @@ export default function PethView({
   // first read, or an address too heavy to list): read alone by `tx`. While
   // it runs the timeline draws a skeleton; a failed read says so; a read
   // with no row leaves the not-found notice.
-  const [pinned, setPinned] = useState<PethLedgerRow | null>(null);
-  const [pinnedRead, setPinnedRead] = useState<"idle" | "loading" | "done" | "failed">("idle");
+  // The read is kept with its tx: a read for the last pinned event answers
+  // nothing for the next, so its notice never draws for one render.
+  const [pinnedFetch, setPinnedFetch] = useState<PethPinnedFetch | null>(null);
   const pinnedTx = pinnedId ? decodeURIComponent(pinnedId).toLowerCase() : null;
+  const pinned = pinnedFetch && pinnedFetch.tx === pinnedTx ? pinnedFetch.row : null;
   const pinnedLoaded = pinnedTx == null || [...(data?.rows ?? []), ...older].some((r) => pethRowId(r) === pinnedTx);
   useEffect(() => {
     if (!data || pinnedLoaded || !pinnedTx || !/^0x[0-9a-f]{64}$/.test(pinnedTx)) return;
     let cancelled = false;
-    setPinnedRead("loading");
-    readPolarisPeth(address, { tx: pinnedTx })
+    const tx = pinnedTx;
+    setPinnedFetch({ tx, row: null, read: "loading" });
+    readPolarisPeth(address, { tx })
       .then((d) => {
         if (cancelled) return;
-        setPinned(d.rows?.[0] ?? null);
-        setPinnedRead("done");
+        setPinnedFetch({ tx, row: d.rows?.[0] ?? null, read: "done" });
       })
-      .catch(() => !cancelled && setPinnedRead("failed"));
+      .catch(() => !cancelled && setPinnedFetch({ tx, row: null, read: "failed" }));
     return () => {
       cancelled = true;
     };
@@ -368,15 +372,7 @@ export default function PethView({
       <div id="peth-timeline" className="scroll-mt-4">
         <ChainTruthTimeline
           persistKeyPrefix="polaris-peth"
-          pinnedRead={
-            pinnedTx && !pinnedLoaded && !pinned && /^0x[0-9a-f]{64}$/.test(pinnedTx)
-              ? pinnedRead === "failed"
-                ? "failed"
-                : pinnedRead === "done"
-                  ? undefined
-                  : "loading"
-              : undefined
-          }
+          pinnedRead={pethPinnedRead(pinnedFetch, pinnedTx, pinnedLoaded)}
           closed={false}
           tl={tl}
           boundary={boundary}

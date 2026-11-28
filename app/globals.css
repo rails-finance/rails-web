@@ -667,6 +667,11 @@ body {
     .group-range {
       left: 0;
     }
+    /* Above a node with a linked amount (spine-column.tsx, max-sm:z-30),
+       as `.spine-num` is (event-card.tsx, max-sm:z-40). */
+    .group-range {
+      z-index: 40;
+    }
   }
   @media (min-width: 640px) {
     .spine-row {

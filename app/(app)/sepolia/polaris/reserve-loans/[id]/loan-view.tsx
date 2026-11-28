@@ -60,7 +60,7 @@ import {
 
 const NO_FOCUS: never[] = [];
 
-/** The preset and "pETH account links" (ui-jobs 872). */
+/** The preset and "Mark pETH account links" (ui-jobs 872). */
 const POLARIS_POSITION_DISPLAY_ITEMS = [...CHAIN_TRUTH_DISPLAY_ITEMS, PETH_ACCOUNT_LINKS_ITEM];
 
 export default function LoanView({ loanId, initial }: { loanId: string; initial: PolarisLoanTimelineResponse | null }) {

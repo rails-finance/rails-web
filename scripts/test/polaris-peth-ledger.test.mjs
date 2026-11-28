@@ -24,6 +24,7 @@ import {
   pethPlaces,
   pethRowBullets,
   pethTimelineEvent,
+  pethPinnedRead,
 } from "../../lib/polaris/peth-ledger.ts";
 
 const fx = (name) =>
@@ -345,4 +346,23 @@ test("a zap from vpETH or a stablecoin to ETH is in no ETH figure; a zap from pE
     pethRowBullets({ ...base, eth_out_raw: "2000000000000000000", zap: zap(NAMES.peth.address) }, named),
     ["This address received 2 ETH, counted in ETH out."],
   );
+});
+
+// The event page's read of a pinned row by tx (peth-view.tsx): a read kept for
+// one tx answers nothing for the next, so a new pin draws the skeleton, never
+// the last pin's notice.
+test("pethPinnedRead: a read answers only for the tx it was for", () => {
+  const a = "0x" + "a".repeat(64);
+  const b = "0x" + "b".repeat(64);
+  assert.equal(pethPinnedRead(null, a, false), "loading", "a pin not yet read draws the skeleton");
+  assert.equal(pethPinnedRead({ tx: a, row: null, read: "loading" }, a, false), "loading");
+  assert.equal(pethPinnedRead({ tx: a, row: null, read: "failed" }, a, false), "failed");
+  assert.equal(pethPinnedRead({ tx: a, row: null, read: "done" }, a, false), undefined, "no row: the not-found notice");
+  assert.equal(pethPinnedRead({ tx: a, row: { tx_hash: a }, read: "done" }, a, false), undefined);
+  assert.equal(pethPinnedRead({ tx: a, row: null, read: "failed" }, b, false), "loading", "the last pin's failure");
+  assert.equal(pethPinnedRead({ tx: a, row: null, read: "done" }, b, false), "loading", "the last pin's not-found");
+  assert.equal(pethPinnedRead({ tx: a, row: { tx_hash: a }, read: "done" }, b, false), "loading", "the last pin's row");
+  assert.equal(pethPinnedRead(null, b, true), undefined, "a row the page holds");
+  assert.equal(pethPinnedRead(null, "nope", false), undefined, "an id that is not a tx");
+  assert.equal(pethPinnedRead(null, null, false), undefined);
 });

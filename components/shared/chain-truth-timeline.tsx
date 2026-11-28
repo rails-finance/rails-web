@@ -233,13 +233,7 @@ function keepCentred(el: HTMLElement, reduced: boolean): void {
 }
 const USER_SCROLL_EVENTS = ["wheel", "touchstart", "keydown"] as const;
 
-/** The one message for "an event id this page can't find among what it has
- *  fetched" — pinned mode's id-not-served case and a `?at=` landing's
- *  not-found case draw it identically (see §2 of the Phase 3 share brief).
- *  Not a 404: the window a windowed family served, an id from another
- *  position, or a typo are all the same reader-facing fact — "not among
- *  what's here" — so the wording never guesses which. */
-/** A pinned event the page's own read of it did not return. */
+/** A pinned event that the page's read could not return. */
 function EventReadFailedNotice() {
   return (
     <div className={`${NOTICE_TEXT} border-b border-rb-200 pb-3 dark:border-rb-800`} data-pinned-read-failed="">
@@ -250,6 +244,12 @@ function EventReadFailedNotice() {
   );
 }
 
+/** The one message for "an event id this page can't find among what it has
+ *  fetched" — pinned mode's id-not-served case and a `?at=` landing's
+ *  not-found case draw it identically (see §2 of the Phase 3 share brief).
+ *  Not a 404: the window a windowed family served, an id from another
+ *  position, or a typo are all the same reader-facing fact — "not among
+ *  what's here" — so the wording never guesses which. */
 export function EventNotFoundNotice({ id, chainId }: { id: string; chainId: ChainId }) {
   const hashMatch = TX_HASH_IN_ID.exec(id);
   return (
@@ -1120,8 +1120,8 @@ function ChainTruthTimelineBody({
     : pinnedMember && pinnedFolder?.folder
       ? pinnedFolder.folder.ordinalFirst + pinnedMemberIdx
       : 0;
-  // The page's own read of a pinned event it had not loaded (`pinnedRead`):
-  // the skeleton while it runs, its notice where it failed.
+  // The page reads a pinned event it had not loaded (`pinnedRead`): the
+  // skeleton shows while the read runs, the notice where it failed.
   const pinnedPending = (askFolderForPin && pinnedFolderId === undefined) || pinnedRead === "loading";
 
   // Settle the displayed list into rows (`settleRunRows`, rails-ops decision
