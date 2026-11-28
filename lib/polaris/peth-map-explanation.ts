@@ -46,7 +46,7 @@ import { PM, POLARIS_LOAN_NAME, POLARIS_MAP_LAYOUT, POLARIS_POOL_NAME, pmEdge } 
 
 /** What the drawer links to, from the page. */
 export interface PethMapExplainContext {
-  /** One event: on the address's timeline, or on its own page where its row
+  /** One event: on the address's timeline, or on its page where its row
    *  was read after the first read (`later`). */
   eventHref: (eventId: string, later: boolean) => string;
   /** The address's timeline filtered to these arrows. */

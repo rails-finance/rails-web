@@ -162,6 +162,7 @@ import { cutUnloadedWords, type TimelineLoadOlder } from "@/lib/shared/timeline-
 import { useChainId } from "@/lib/shared/chain-context";
 import { chainMeta, explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { decodeEventId } from "@/lib/shared/page-metadata";
+import { cancelTimer, restartTimer, type TimerClock } from "@/lib/shared/restart-timer";
 import {
   eventsWithin,
   monthEndTs,
@@ -205,6 +206,12 @@ function clickToOpenIfClosed(id: string): void {
   const toggle = wrapper.querySelector('[data-spine-toggle], [role="button"]');
   if (toggle instanceof HTMLElement) toggle.click();
 }
+
+/** The window's timers, for `restartTimer`. */
+const TIMER_CLOCK: TimerClock<ReturnType<typeof setTimeout>> = {
+  set: (run, ms) => setTimeout(run, ms),
+  clear: (t) => clearTimeout(t),
+};
 
 /** After a `?at=` landing's first scroll, re-centre the target each time the
  *  document's height changes for the next `KEEP_CENTRED_MS` — the content
@@ -1002,6 +1009,10 @@ function ChainTruthTimelineBody({
   // A ring that fades in ~2s on the event a `?at=` landing scrolled to;
   // `prefers-reduced-motion` skips it entirely (see the landing effect).
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  // The highlight's 2 s clear: a new landing's highlight restarts it, so an
+  // earlier landing's clear never cuts a later one short.
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => cancelTimer(highlightTimer, TIMER_CLOCK), []);
   // The one event a `?at=` landing is still working to reveal/open/scroll to
   // — set once the id is found among `tl.sortedEvents` (revealEvent already
   // applied), cleared once the DOM row exists and has been acted on. Distinct
@@ -1040,11 +1051,18 @@ function ChainTruthTimelineBody({
   const [landedFolderId, setLandedFolderId] = useState<string | null>(null);
 
   // The same landing, asked for in place by the page (`landAt`): each new one
-  // starts from a clean landing state. Without `landAt` this never runs.
+  // starts from a clean landing state, a stalled earlier landing's target
+  // included. Without `landAt` this never runs.
   const landSeq = landAt?.seq;
   const landId = landAt?.id;
+  // The landing a folder lookup was asked for: a lookup that answers after a
+  // newer `landAt` is dropped. Without `landAt` it stays unset.
+  const landSeqRef = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (pinnedId || landSeq == null || !landId) return;
+    landSeqRef.current = landSeq;
+    setPendingLandingId(null);
+    setLandingRunMember(null);
     setLandingNotFoundId(null);
     setLandingTries(0);
     setLandedFolderId(null);
@@ -1074,8 +1092,10 @@ function ChainTruthTimelineBody({
     }
     if (folders.enabled) {
       const wanted = landingWantedId;
+      const seq = landSeqRef.current;
       setLandingWantedId(null);
       void folders.resolveEventKey(wanted).then((id) => {
+        if (landSeqRef.current !== seq) return;
         // A refusal is a stated fact and the notice says the same thing it
         // says for any id this page has not served — the route distinguishes
         // "already its own row", "below the window" and "no such folder", and
@@ -1372,7 +1392,7 @@ function ChainTruthTimelineBody({
     keepCentred(el, reduced);
     if (!reduced) {
       setHighlightId(pendingLandingId);
-      setTimeout(() => setHighlightId(null), 2000);
+      restartTimer(highlightTimer, () => setHighlightId(null), 2000, TIMER_CLOCK);
     }
     setPendingLandingId(null);
     // `at` is read-only and dropped once applied — see useTimelineEvents.ts's
