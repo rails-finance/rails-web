@@ -12,8 +12,11 @@
 // (the zap buy), and the bonding curve's fee after it, which carries no time
 // of its own. Each dated bullet states one time or span and one amount. Past
 // the bullets Now leaves, the middle steps give way to a line linking the
-// timeline filtered to their arrows. NOW: each box's "now", two to a bullet,
-// then the address's balances. PARTS: each part this address used, in the
+// timeline filtered to their arrows. NOW: what each mechanism holds now, two
+// figures to a bullet; the address's own balances are the map's, not here
+// (Miles, 28 Nov 2026), and with none in a mechanism there is no Now. With
+// the arrows unknown and nothing in a mechanism, the map's note says why and
+// the Explanation tab is not drawn. PARTS: each part this address used, in the
 // documented term, and the dashed boxes.
 //
 // Every figure is a fill amount with the receipt the map shows it with. The
@@ -170,23 +173,6 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
       const [a, b] = [clauses[i], clauses[i + 1]];
       const first = [upperFirst(String(a[0])), ...a.slice(1)];
       bullets.push({ parts: b ? [...first, ", and ", ...b, "."] : [...first, "."] });
-    }
-    const held = lines(MAP_HOLDER);
-    const heldNow = held.find((l) => l.label === "now");
-    if (heldNow && heldNow.amounts.length > 0) {
-      for (let i = 0; i < heldNow.amounts.length; i += 2) {
-        const [a, b] = heldNow.amounts.slice(i, i + 2);
-        bullets.push({
-          parts: [
-            i === 0 ? "It now holds " : "It also holds ",
-            fig(a, heldNow.receipt),
-            ...(b ? [" and ", fig(b, heldNow.receipt)] : []),
-            ".",
-          ],
-        });
-      }
-    } else if (held.some((l) => l.label === "note")) {
-      bullets.push({ parts: ["What it holds now is not read yet."] });
     }
     for (let i = 0; i < bullets.length; i += 4)
       nowGroups.push({
