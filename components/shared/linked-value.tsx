@@ -20,9 +20,8 @@
 // (lib/shared/spine-amount-press.ts `valuePress`). A tap elsewhere or Escape
 // closes it. While the receipts inspector is armed, a press on a value inside
 // a receipt pins the receipt. A Rails link given `onFollow` jumps in place:
-// each press that would follow runs it and closes the tooltip, with no page
-// load and no progress bar, and the href stays for a new tab
-// (`followsInPlace`). Tested by scripts/test/linked-value.test.mjs.
+// each press that would follow runs it, starts no progress bar and closes the
+// tooltip, and the href stays for a new tab (`followsInPlace`). Tested by scripts/test/linked-value.test.mjs.
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
@@ -162,8 +161,7 @@ function LinkedValueLink(props: LinkedValueProps) {
     hoverClose.current = setTimeout(() => setOpen(false), HOVER_CLOSE_MS);
   };
   useEffect(() => keepHover, []);
-  // The caller's jump, for a press that follows: no page loads, so no
-  // progress bar starts.
+  // The caller's jump, for a press that follows.
   const jump = (e: React.MouseEvent, follow: FollowHandler) => {
     e.preventDefault();
     follow(e);
