@@ -5,13 +5,15 @@
 // carry everything about the protocol; this file names none. Sources sit above
 // the address's box, mechanisms below it. Each filled edge is an arrow with its
 // receipt (the summed amounts, each with its asset's icon) and a link to the
-// timeline filtered to it. An edge or box with no fill is drawn dashed, so the
-// map also shows the parts of the protocol the address never used.
+// timeline filtered to it. By default the map draws only the boxes and arrows
+// the address used, without gaps (`mapCompactGrid`); its "Show unused routes"
+// switch, kept in the URL as `?routes=all`, draws the whole layout, an edge or
+// box with no fill dashed (ui-jobs 882).
 //
 // Clicking a box, a receipt or a timeline row selects it: the page holds the
 // selection and passes it back, and `hotSets` says what it lights.
 
-import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
@@ -21,8 +23,13 @@ import { EXPLAIN_GROUP_RULE, ExplainBullet, ExplainHeading } from "@/components/
 import {
   hotSets,
   MAP_HOLDER,
+  mapCompactGrid,
   mapExact,
+  mapFullGrid,
+  mapJoined,
   mapPlainClick,
+  mapRoutesFromSearch,
+  mapRoutesHref,
   mapSeries,
   mapUnits,
   usedNodes,
@@ -35,6 +42,7 @@ import {
   type MapLayout,
   type MapLine,
   type MapReceipt,
+  type MapRoutes,
   type MapSelection,
   mapUnusedWords,
 } from "@/lib/shared/protocol-map/types";
@@ -104,6 +112,9 @@ const bezier = (p: [Pt, Pt, Pt, Pt], t: number): Pt => {
   const k = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
   return [0, 1].map((i) => k.reduce((s, c, j) => s + c * p[j][i], 0)) as Pt;
 };
+
+/** The full layout's least width, which the frame scrolls below. */
+const MAP_MIN_WIDTH = 1040;
 
 interface DrawnEdge {
   edge: MapEdge;
@@ -267,7 +278,7 @@ function Part({ p, links }: { p: MapTextPart; links: DrawerLinks }) {
     );
   }
   const { from, to, cap } = p.when;
-  // An event read after the page's first read opens on its own page; the
+  // An event read after the page's first read opens on its page; the
   // rest land on the timeline.
   const at = (x: MapWhenEnd) => {
     const where = x.later ? "on its event page" : "on the timeline";
@@ -438,6 +449,15 @@ export function ProtocolMap({
   const frame = useRef<HTMLDivElement>(null);
   const boxRefs = useRef<Record<string, HTMLElement | null>>({});
   const [geo, setGeo] = useState<{ w: number; h: number; boxes: Record<string, Box> } | null>(null);
+  // Used routes only, or the whole layout (`?routes=all`), read on load.
+  const [routes, setRoutes] = useState<MapRoutes>("used");
+  useEffect(() => {
+    setRoutes(mapRoutesFromSearch(window.location.search));
+  }, []);
+  const showRoutes = (next: MapRoutes) => {
+    setRoutes(next);
+    window.history.replaceState(window.history.state, "", mapRoutesHref(window.location.href, next));
+  };
 
   const measure = useCallback(() => {
     const f = frame.current;
@@ -459,16 +479,23 @@ export function ProtocolMap({
     const ro = new ResizeObserver(() => measure());
     ro.observe(f);
     return () => ro.disconnect();
-  }, [measure, fill]);
+  }, [measure, fill, routes]);
 
   const used = useMemo(() => usedNodes(layout, fill), [layout, fill]);
   const hot = useMemo(() => hotSets(layout, fill, selection), [layout, fill, selection]);
-  // With the edges unknown, the map draws its boxes alone.
+  // With the edges unknown, the map draws every box and no arrow, and has no
+  // switch.
   const unknown = fill.edgesUnknown === true;
-  const edges = useMemo(
-    () => (geo && !unknown ? drawEdges(layout, fill, geo.boxes, geo.w) : []),
-    [layout, fill, geo, unknown],
+  const all = unknown || routes === "all";
+  const grid = useMemo(
+    () => (all ? mapFullGrid(layout) : mapCompactGrid(layout, used, mapJoined(layout, fill))),
+    [all, layout, used, fill],
   );
+  const edges = useMemo(() => {
+    if (!geo || unknown) return [];
+    const drawn = drawEdges(layout, fill, geo.boxes, geo.w);
+    return all ? drawn : drawn.filter((x) => x.used);
+  }, [layout, fill, geo, unknown, all]);
   const title = (id: string) => layout.nodes.find((n) => n.id === id)?.title ?? id;
   const toggle = (s: NonNullable<MapSelection>) =>
     onSelect(selection && selection.type === s.type && selection.id === s.id ? null : s);
@@ -518,12 +545,10 @@ export function ProtocolMap({
     );
   }
 
-  const rows = Math.max(...layout.nodes.map((n) => n.row));
-
   return (
-    <div className="space-y-3" data-protocol-map={layout.id} data-anatomy="O1">
+    <div className="space-y-3" data-protocol-map={layout.id} data-map-routes={all ? "all" : "used"} data-anatomy="O1">
       <div className="overflow-x-auto">
-        <div ref={frame} className="relative min-w-[1040px] py-1">
+        <div ref={frame} className="relative py-1" style={{ minWidth: Math.round(MAP_MIN_WIDTH * grid.scale) }}>
           <svg
             className="pointer-events-none absolute inset-0 overflow-visible"
             width={geo?.w ?? 0}
@@ -561,11 +586,13 @@ export function ProtocolMap({
           <div
             className="relative grid items-start gap-x-4 gap-y-20"
             style={{
-              gridTemplateColumns: `repeat(${layout.columns}, minmax(0, 1fr))`,
-              gridTemplateRows: `repeat(${rows}, auto)`,
+              gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${grid.rows}, auto)`,
             }}
           >
             {layout.nodes.map((n) => {
+              const cell = grid.cells[n.id];
+              if (!cell) return null;
               const isUsed = used.has(n.id);
               const clickable = isUsed && !unknown;
               const isHot = hot.nodes.has(n.id);
@@ -609,7 +636,7 @@ export function ProtocolMap({
               const cls = `flex min-w-0 flex-col gap-0.5 rounded-xl bg-[var(--card-background)] px-3 py-2.5 text-left ${frameCls} ${
                 isHot ? "ring-2 ring-[var(--focus-ring)]" : ""
               } ${hot.any && !isHot && isUsed ? "opacity-50" : ""}`;
-              const style = { gridColumn: `${n.col} / span ${n.span}`, gridRow: String(n.row) };
+              const style = { gridColumn: `${cell.col} / span ${cell.span}`, gridRow: String(cell.row) };
               return clickable ? (
                 // A press anywhere on the box selects it too, except on a
                 // receipt, a link or the title's button.
@@ -701,14 +728,41 @@ export function ProtocolMap({
             <span className="inline-block w-6 border-t-2 border-blue-500/70" aria-hidden="true" />
             Used by this address
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span
-              className="inline-block w-6 border-t border-dashed border-rb-300 dark:border-rb-500"
-              aria-hidden="true"
-            />
-            {mapUnusedWords(fill)}
-          </span>
+          {all && (
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className="inline-block w-6 border-t border-dashed border-rb-300 dark:border-rb-500"
+                aria-hidden="true"
+              />
+              {mapUnusedWords(fill)}
+            </span>
+          )}
           <span>Each arrow&rsquo;s ↓ link opens the timeline filtered to its transactions.</span>
+          {/* O9: the routes switch, at the legend's right end; below sm on a
+              line of its own. */}
+          <span className="h-0 basis-full sm:hidden" aria-hidden="true" />
+          <button
+            type="button"
+            className="group/routes inline-flex cursor-pointer items-center gap-1.5 rounded-md py-0.5 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:ml-auto"
+            aria-pressed={all}
+            onClick={() => showRoutes(all ? "used" : "all")}
+            data-map-routes-toggle=""
+            data-anatomy="O9"
+          >
+            <span
+              className={`relative inline-flex h-3.5 w-6 shrink-0 items-center rounded-full ${
+                all ? "bg-blue-500/70 dark:bg-blue-400/70" : "bg-rb-300 dark:bg-rb-600"
+              }`}
+              aria-hidden="true"
+            >
+              <span
+                className={`absolute h-2.5 w-2.5 rounded-full bg-white shadow-sm ${
+                  all ? "translate-x-[11px]" : "translate-x-0.5"
+                }`}
+              />
+            </span>
+            Show unused routes
+          </button>
         </div>
       )}
       {sentence && (

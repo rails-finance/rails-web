@@ -5,8 +5,9 @@
 //
 // Ids are namespaced by protocol ("polaris:cdp"); the address's box is the one
 // shared node, `holder`. An edge may join nodes of two protocols, so an edge
-// names its `protocol`. The layout lists every possible edge; an edge with
-// no fill is drawn dashed, and so is a node no filled edge touches.
+// names its `protocol`. The layout lists every possible edge. The map draws
+// only the used nodes and filled edges, or with `?routes=all` every one, an
+// edge with no fill and a node the address did not use (`usedNodes`) dashed.
 //
 // "in" and "now" are valuations side by side. The fill has no field for a
 // gain. Pure, and imports only types: scripts/test loads it directly.
@@ -144,17 +145,132 @@ export interface MapHot {
   rows: Set<string>;
 }
 
-/** The nodes a filled edge touches, the holder always among them. */
+/** The nodes this address used: the holder, every node a filled edge
+ *  touches, and every node with a "now" line or a row count of its own.
+ *  With the edges unknown, every node. */
 export function usedNodes(layout: MapLayout, fill: MapFill): Set<string> {
   const out = new Set<string>([MAP_HOLDER]);
   if (fill.edgesUnknown) for (const n of layout.nodes) out.add(n.id);
-  for (const [id, n] of Object.entries(fill.nodes)) if ((n.rowCount ?? 0) > 0) out.add(id);
+  for (const [id, n] of Object.entries(fill.nodes))
+    if ((n.rowCount ?? 0) > 0 || n.lines.some((l) => l.label === "now")) out.add(id);
   for (const e of layout.edges)
     if (fill.edges[e.id]) {
       out.add(e.from);
       out.add(e.to);
     }
   return out;
+}
+
+// ── Used routes only (ui-jobs 882) ─────────────────────────────────────────
+// By default the map draws only the nodes this address used (`usedNodes`)
+// and its filled edges, laid out without gaps; `?routes=all` draws the whole
+// layout, the unused parts muted.
+
+/** Where a node sits on the drawn grid: 1-based column, span and row. */
+export interface MapCell {
+  col: number;
+  span: number;
+  row: number;
+}
+
+/** The grid the map draws: its width in columns, its rows, each drawn node's
+ *  cell, and the layout's columns that one grid column stands for. */
+export interface MapGrid {
+  columns: number;
+  rows: number;
+  cells: Record<string, MapCell>;
+  /** The layout's columns per grid column, for the frame's least width. */
+  scale: number;
+}
+
+/** The whole layout, as it is written. */
+export function mapFullGrid(layout: MapLayout): MapGrid {
+  const cells: Record<string, MapCell> = {};
+  for (const n of layout.nodes) cells[n.id] = { col: n.col, span: n.span, row: n.row };
+  return { columns: layout.columns, rows: Math.max(...layout.nodes.map((n) => n.row)), cells, scale: 1 };
+}
+
+/** The layout with only the `shown` nodes. Each row keeps its shown nodes in
+ *  layout order, left to right; a row with none is dropped. Every row is
+ *  measured in the same unit, a layout column, so a node's span carries over
+ *  as its relative width: the grid is as wide as its widest row, and each row
+ *  sits centred in it. In the holder's row the nodes left of the holder sit
+ *  left of it and the rest right, with the holder at the centre. Two
+ *  neighbours that `joined` names (an arrow between them in the row) keep one
+ *  unit between them, room for the arrow and its receipt. The grid has two
+ *  columns per unit, so a centred row starts on a whole column. */
+export function mapCompactGrid(
+  layout: MapLayout,
+  shown: ReadonlySet<string>,
+  joined: (a: string, b: string) => boolean = () => false,
+): MapGrid {
+  const byRow = new Map<number, MapNode[]>();
+  for (const n of layout.nodes) {
+    if (!shown.has(n.id)) continue;
+    const xs = byRow.get(n.row) ?? [];
+    xs.push(n);
+    byRow.set(n.row, xs);
+  }
+  const rows = [...byRow.keys()].sort((a, b) => a - b).map((r) => byRow.get(r)!.sort((a, b) => a.col - b.col));
+  // The unit kept before each node of a row: one after a joined neighbour.
+  const gapBefore = (xs: MapNode[], i: number) => (i > 0 && joined(xs[i - 1].id, xs[i].id) ? 1 : 0);
+  // The width of nodes `from` to `to` (exclusive) of a row, their gaps between them.
+  const width = (xs: MapNode[], from: number, to: number) => {
+    let w = 0;
+    for (let i = from; i < to; i++) w += xs[i].span + (i > from ? gapBefore(xs, i) : 0);
+    return w;
+  };
+  // Each row's width in units, and where its first node starts.
+  const placed = rows.map((xs) => {
+    const h = xs.findIndex((n) => n.id === MAP_HOLDER);
+    if (h === -1) return { xs, w: width(xs, 0, xs.length), lead: 0 };
+    const left = h > 0 ? width(xs, 0, h) + gapBefore(xs, h) : 0;
+    const right = h < xs.length - 1 ? width(xs, h + 1, xs.length) + gapBefore(xs, h + 1) : 0;
+    const side = Math.max(left, right);
+    return { xs, w: 2 * side + xs[h].span, lead: side - left };
+  });
+  const units = Math.max(1, ...placed.map((p) => p.w));
+  const cells: Record<string, MapCell> = {};
+  placed.forEach(({ xs, w, lead }, i) => {
+    // In half units: (units - w) / 2 + lead, doubled.
+    let at = units - w + 2 * lead + 1;
+    for (const [j, n] of xs.entries()) {
+      at += 2 * gapBefore(xs, j);
+      cells[n.id] = { col: at, span: 2 * n.span, row: i + 1 };
+      at += 2 * n.span;
+    }
+  });
+  return { columns: 2 * units, rows: rows.length, cells, scale: units / layout.columns };
+}
+
+/** Whether a filled edge joins two nodes, either way. */
+export function mapJoined(layout: MapLayout, fill: MapFill): (a: string, b: string) => boolean {
+  const pairs = new Set<string>();
+  for (const e of layout.edges)
+    if (fill.edges[e.id]) {
+      pairs.add(`${e.from}|${e.to}`);
+      pairs.add(`${e.to}|${e.from}`);
+    }
+  return (a, b) => pairs.has(`${a}|${b}`);
+}
+
+/** The query param that draws the whole layout: `?routes=all`. */
+export const MAP_ROUTES_PARAM = "routes";
+
+export type MapRoutes = "used" | "all";
+
+/** The routes a page's query asks for: "all" for `routes=all`, else "used". */
+export function mapRoutesFromSearch(search: string): MapRoutes {
+  return new URLSearchParams(search).get(MAP_ROUTES_PARAM) === "all" ? "all" : "used";
+}
+
+/** The url with the routes set: `routes=all`, or no param for "used". The
+ *  other params and the hash are kept. */
+export function mapRoutesHref(href: string, routes: MapRoutes): string {
+  const url = new URL(href);
+  if (routes === "all") url.searchParams.set(MAP_ROUTES_PARAM, "all");
+  else url.searchParams.delete(MAP_ROUTES_PARAM);
+  return url.href;
 }
 
 /** What a selection lights: an edge lights its two nodes and its rows; a node
