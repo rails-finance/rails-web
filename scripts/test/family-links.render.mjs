@@ -18,6 +18,9 @@ import { CowTradeCard } from "@/components/protocol/cow/cow-trade-card";
 import { PlaceLine } from "@/components/protocol/polaris/polaris-peth-event-card";
 import { OtherAccount } from "@/lib/dolomite/explainer-clauses";
 import { OtherAccountLink } from "@/components/protocol/dolomite/dolomite-event-detail";
+import { llamalendEventSlots } from "@/lib/llamalend/explainer-clauses";
+import { pwnEventSlots } from "@/lib/pwn/explainer-clauses";
+import { eventClauses } from "@/lib/shared/explainer-prose";
 import { ADDR, OWNER, TX, TROVE } from "./family-links.cases.mjs";
 
 const html = (el) => renderToStaticMarkup(el);
@@ -240,6 +243,53 @@ out.dolomiteOtherUnnumbered = html(h(OtherAccount, { ctx: { counterparty: ADDR, 
 out.dolomiteAccountLink = html(h(OtherAccountLink, { other: { owner: ADDR, number: "0" }, sameWallet: false }));
 out.dolomiteAccountLinkSameWallet = html(
   h(OtherAccountLink, { other: { owner: OWNER, number: "1" }, sameWallet: true }),
+);
+
+// ── LlamaLend and PWN: a liquidator, and a collateral's return ──────────────
+// Each clause's markup, joined; the families' slots carry the sentences.
+const clauses = (slots) =>
+  html(
+    h(
+      "div",
+      null,
+      ...eventClauses(slots)
+        .filter(Boolean)
+        .map((c, i) => h("p", { key: i }, c.node)),
+    ),
+  );
+out.llamalendLiquidator = clauses(
+  llamalendEventSlots(
+    {
+      eventType: "liquidation",
+      role: "borrower",
+      liquidator: ADDR,
+      collateralSymbol: "WETH",
+      borrowedSymbol: "crvUSD",
+      collateralDelta: "-1.5",
+      debtDelta: "-3000",
+    },
+    { txHash: TX, blockNumber: 21000000, controller: ADDR, user: OWNER },
+  ),
+);
+const pwnCreated = {
+  eventType: "created",
+  lender: ADDR,
+  borrower: OWNER,
+  creditSymbol: "USDC",
+  dueKind: "duration",
+  dueValue: "2592000",
+  collateralReturn: {
+    from: ADDR,
+    to: OWNER,
+    txHash: TX,
+    blockNumber: 20900000,
+    timestamp: 1729000000,
+    priorLoanId: "41",
+  },
+};
+const pwnSelf = { timestamp: 1730000000, context: { data: pwnCreated } };
+out.pwnReturnTx = clauses(
+  pwnEventSlots(pwnCreated, { txHash: TX, blockNumber: 21000000, loanId: "42" }, [pwnSelf], pwnSelf),
 );
 
 process.stdout.write(JSON.stringify(out, null, 1));

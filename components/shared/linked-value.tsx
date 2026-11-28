@@ -4,8 +4,8 @@
 // address, an amount, an id or a name), with a tooltip naming where it goes
 // (anatomy L14, ui-jobs 878). A Rails link's tooltip is one line, the page's
 // name as the link ("Trove 123 →"). An explorer link's is the context line
-// ("Went to the Curve pETH/fpETH/vpETH pool"), then the link "View on
-// Etherscan ↗"; the chain, the kind and the value build the href and name the
+// where it adds to the value's words ("Router 0x8888…f946"), then the link
+// "View on Etherscan ↗"; the chain, the kind and the value build the href and name the
 // explorer, both from lib/shared/chains.ts; on a chain that file does not
 // name the value renders plain, with no link or tooltip. The timeline
 // spine links Rails pages only. The value keeps its look at rest and takes

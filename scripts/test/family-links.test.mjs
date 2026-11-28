@@ -17,7 +17,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { ADDR, OWNER, TROVE } from "./family-links.cases.mjs";
+import { ADDR, OWNER, TROVE, TX } from "./family-links.cases.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const after = JSON.parse(
@@ -159,11 +159,36 @@ test("CoW: a trade that was an Aave swap names the swap's page and keeps its hoo
   assert.match(a, /href="\/ethereum\/aave-v3\/[^"]*\/event\//);
 });
 
-test("Polaris: a place outside Rails states the place, then Etherscan", () => {
-  const vault = linked(after.placeSvpeth, "Went to the svpETH vault, View on Etherscan");
-  external(vault, "https://sepolia.etherscan.io/address/0x7b118bd63bbe9023a2a509cecd48bc283d150539");
-  linked(after.placeVenue, "Went to the Curve pETH/fpETH/vpETH pool, View on Etherscan");
-  assert.match(after.placeSvpeth, /data-anatomy="T10\.1·polaris" data-peth-row-place="svpeth"/);
+test("Polaris: a place outside Rails names Etherscan; the line's words are the value", () => {
+  for (const [name, words, kind] of [
+    ["placeSvpeth", "Went to the svpETH vault", "svpeth"],
+    ["placeVenue", "Went to the Curve pETH/fpETH/vpETH pool", "venue"],
+  ]) {
+    const a = linked(after[name], `${words}: View on Etherscan`);
+    assert.match(
+      a,
+      /^<a href="https:\/\/sepolia\.etherscan\.io\/address\/0x[0-9a-f]{40}" target="_blank" rel="noopener"/,
+    );
+    assert.ok(a.endsWith(">") && after[name].includes(`${a}${words} ↗</a>`), "the line keeps its words and ↗");
+    assert.match(after[name], new RegExp(`data-anatomy="T10\\.1·polaris" data-peth-row-place="${kind}"`));
+  }
+  external(
+    linked(after.placeSvpeth, "Went to the svpETH vault: View on Etherscan"),
+    "https://sepolia.etherscan.io/address/0x7b118bd63bbe9023a2a509cecd48bc283d150539",
+  );
+});
+
+test("LlamaLend: the liquidator is LinkedAddress to the explorer", () => {
+  external(
+    linked(after.llamalendLiquidator, `Address ${short(ADDR)}, View on Etherscan`),
+    `https://etherscan.io/address/${ADDR}`,
+  );
+});
+
+test("PWN: the collateral's return transaction is LinkedTx, its shared short form", () => {
+  const a = linked(after.pwnReturnTx, "Transaction 0x5c50…2060, View on Etherscan");
+  external(a, `https://etherscan.io/tx/${TX}#eventlog`);
+  assert.ok(after.pwnReturnTx.includes(`${a}0x5c504e…2060</a>`));
 });
 
 test("Dolomite: another wallet's address is LinkedAddress; its account names the account's page", () => {

@@ -96,9 +96,8 @@ function pethPlaceLinkOf(
 }
 
 /** The row's place line in T3. Null where the row has none. A place outside
- *  Rails is a LinkedValue (anatomy L14) whose tooltip is the line's words,
- *  then "View on Etherscan ↗"; a Rails page's line names the page and takes
- *  none. */
+ *  Rails is a LinkedValue (anatomy L14) whose tooltip is "View on Etherscan
+ *  ↗"; a Rails page's line names the page and takes none. */
 export function PlaceLine({ row }: { row: PethLedgerRow }) {
   const to = pethPlaceLinkOf(row);
   if (!to) return null;
@@ -108,7 +107,6 @@ export function PlaceLine({ row }: { row: PethLedgerRow }) {
       {to.external && address ? (
         <LinkedValue
           explorer={{ chainId: SEPOLIA_CHAIN_ID, kind: "address", value: address }}
-          context={to.words}
           label={to.words}
           className={INLINE_LINK}
         >
