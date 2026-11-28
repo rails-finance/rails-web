@@ -17,7 +17,13 @@
 // its block: each is labelled a valuation and never added into ETH out (Miles,
 // 27 Nov 2026; the equity-at-the-feed ruling, TO-DO-polaris-scoping §10).
 
-import type { PethEffect, PethLedgerLine, PethLedgerRow, PolarisPethResponse } from "../sources/api/polaris-peth";
+import type {
+  PethEffect,
+  PethLedgerLine,
+  PethLedgerRow,
+  PethPlace,
+  PolarisPethResponse,
+} from "../sources/api/polaris-peth";
 import type { BaseActivityEvent } from "../shared/types/event-shape";
 
 export const ZERO = BigInt(0);
@@ -391,6 +397,96 @@ export function pethRowBullets(r: PethLedgerRow, names: PethTokenNames): string[
   return out;
 }
 
+// ── Where a row's tokens went ─────────────────────────────────────────────
+
+/** The names a place is given: each market's stablecoin and each venue's
+ *  label, from the deployment's catalog. */
+export interface PethPlaceNames {
+  stable: Record<string, string>;
+  venues: Record<string, { label: string }>;
+}
+
+/** The Place filter's key of a row with no place. */
+export const PETH_NO_PLACE = "none";
+
+/** A place as one key, the server's placeKey: kind, market, then the id or
+ *  the address. */
+export const pethPlaceKey = (p: PethPlace): string => [p.kind, p.market ?? "", p.id ?? p.address ?? ""].join(":");
+
+/** What a place's "N events" applies: the Place keys to hide (every other
+ *  place of the whole ledger, from the route's place_counts, and the rows
+ *  with none), and whether the place has rows past those loaded, which the
+ *  page reads first. Null where the place has no rows. */
+export function pethPlaceView(
+  counts: { place: PethPlace; rows: number }[],
+  key: string,
+  loaded: number,
+): { hide: string[]; rows: number; needsOlder: boolean } | null {
+  const hit = counts.find((c) => pethPlaceKey(c.place) === key);
+  if (!hit || hit.rows === 0) return null;
+  const hide = [...counts.map((c) => pethPlaceKey(c.place)).filter((k) => k !== key), PETH_NO_PLACE];
+  return { hide, rows: hit.rows, needsOlder: loaded < hit.rows };
+}
+
+/** The place's name in a sentence ("USDp CDP #12", "the bonding curve"). */
+export function pethPlaceName(p: PethPlace, names: PethPlaceNames): string {
+  const stable = (m: string | undefined) => (m ? (names.stable[m] ?? m) : "");
+  switch (p.kind) {
+    case "cdp":
+      return `${stable(p.market)} CDP #${p.id}`;
+    case "loan":
+      return `reserve loan #${p.id}`;
+    case "sp_deposit":
+      return `${stable(p.market)} deposit #${p.id}`;
+    case "venue":
+      return `the ${(p.market && names.venues[p.market]?.label) || "pool"}`;
+    case "svpeth":
+      return "the svpETH vault";
+    case "splitter":
+      return "the splitter";
+    case "curve":
+      return "the bonding curve";
+    case "morpho":
+      return "Morpho Blue";
+    case "zap":
+      return "the zap router";
+  }
+}
+
+// A token symbol keeps its case ("svpETH vault").
+const upperFirst = (t: string) => (/^[a-z]+[A-Z]/.test(t) ? t : t.charAt(0).toUpperCase() + t.slice(1));
+
+/** The place as the Place filter's option: its name without the article. */
+export const pethPlaceOption = (p: PethPlace, names: PethPlaceNames): string =>
+  upperFirst(pethPlaceName(p, names).replace(/^the /, ""));
+
+/** Which way the row's tokens moved with its place, from the row's lines of
+ *  its kind: "to" when any of them left the address, else "from"; a
+ *  liquidated CDP's collateral was "seized" from it. A pool share's line
+ *  (the LP token, which moves the other way) is read only where no other
+ *  line of the kind stands. */
+export function pethPlaceDirection(r: Pick<PethLedgerRow, "kind" | "lines">): "to" | "from" | "seized" {
+  if (r.kind === "liquidated") return "seized";
+  const own = r.lines.filter((l) => l.rule === r.kind);
+  const tokens = own.filter((l) => !l.token.startsWith("lp_"));
+  const read = tokens.length > 0 ? tokens : own;
+  return read.some((l) => l.direction === "out") ? "to" : "from";
+}
+
+/** The row's place line in T3, without its arrow: "Went to USDp CDP #12". */
+export function pethPlaceWords(r: Pick<PethLedgerRow, "kind" | "lines">, p: PethPlace, names: PethPlaceNames): string {
+  const verb = { to: "Went to", from: "Came from", seized: "Seized from" }[pethPlaceDirection(r)];
+  return `${verb} ${pethPlaceName(p, names)}`;
+}
+
+/** The places a row files under on the Place axis: each of its places, or
+ *  "Other" where it has none. */
+function pethRowPlaces(r: PethLedgerRow, names: PethPlaceNames): { key: string; label: string }[] {
+  const places = r.places ?? (r.place ? [r.place] : []);
+  if (places.length === 0) return [{ key: PETH_NO_PLACE, label: "Other" }];
+  return places.map((p) => ({ key: pethPlaceKey(p), label: pethPlaceOption(p, names) }));
+}
+
 /** A row as the shared timeline's event: its effect is the Type filter's
  *  umbrella, its kind the label (and the leg beneath), its lines the flows
  *  the Asset filter reads. */
@@ -398,8 +494,12 @@ export function pethTimelineEvent(
   r: PethLedgerRow,
   names: PethTokenNames,
   venues: Record<string, { address: string }>,
+  placeNames?: PethPlaceNames,
 ): BaseActivityEvent {
   return {
+    // The Place axis: every row files under each place its lines touch, or
+    // under "Other".
+    ...(placeNames ? { places: pethRowPlaces(r, placeNames) } : {}),
     id: pethRowId(r),
     txHash: r.tx_hash,
     blockNumber: Number(r.block_number),

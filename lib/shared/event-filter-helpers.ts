@@ -381,6 +381,19 @@ export function getEventCounterpartyKeys(e: BaseActivityEvent): string[] {
   return keys;
 }
 
+/**
+ * The place an event's tokens went to or came from: the timeline's Place
+ * axis, beside the type, asset and address axes. A Polaris pETH account row
+ * names each CDP, reserve loan, deposit, pool or contract its lines touch (the
+ * route's `places`), and a row with none files under `none`, so a link that
+ * shows one place's rows hides the rest. An event with two passes while
+ * either is shown. An EMPTY list means the event offers no place and is never
+ * hidden by the axis.
+ */
+export function getEventPlaceKeys(e: BaseActivityEvent): string[] {
+  return e.places?.map((p) => p.key) ?? [];
+}
+
 // ─────────────────────────── settled verb rule ───────────────────────────
 // One vocabulary across every table below, so the filter menu reads as one
 // system instead of per-protocol dialects:

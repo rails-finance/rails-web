@@ -23,7 +23,11 @@ import {
   useFlowFocusValue,
   FlowsStoreContext,
 } from "@/components/shared/flow-focus-context";
-import { CHAIN_TRUTH_DISPLAY_ITEMS, TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
+import {
+  CHAIN_TRUTH_DISPLAY_ITEMS,
+  PETH_ACCOUNT_LINKS_ITEM,
+  TimelineActivityHeader,
+} from "@/components/shared/timeline-toolbar";
 import { Prov } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -55,6 +59,9 @@ import {
 } from "@/lib/sources/api/polaris-sp-loans";
 
 const NO_FOCUS: never[] = [];
+
+/** The preset and "pETH account links" (ui-jobs 872). */
+const POLARIS_POSITION_DISPLAY_ITEMS = [...CHAIN_TRUTH_DISPLAY_ITEMS, PETH_ACCOUNT_LINKS_ITEM];
 
 export default function LoanView({ loanId, initial }: { loanId: string; initial: PolarisLoanTimelineResponse | null }) {
   const [data, setData] = useState(initial);
@@ -243,7 +250,7 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
             persistKeyPrefix="polaris-loan"
             closed={!open}
             tl={tl}
-            displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+            displayItems={POLARIS_POSITION_DISPLAY_ITEMS}
             emptyLabel="No operations recorded for this loan"
             toolbarLeading={<TimelineActivityHeader events={events} closed={!open} />}
             liveWindow={

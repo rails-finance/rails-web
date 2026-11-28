@@ -239,6 +239,17 @@ const USER_SCROLL_EVENTS = ["wheel", "touchstart", "keydown"] as const;
  *  Not a 404: the window a windowed family served, an id from another
  *  position, or a typo are all the same reader-facing fact — "not among
  *  what's here" — so the wording never guesses which. */
+/** A pinned event the page's own read of it did not return. */
+function EventReadFailedNotice() {
+  return (
+    <div className={`${NOTICE_TEXT} border-b border-rb-200 pb-3 dark:border-rb-800`} data-pinned-read-failed="">
+      <p>
+        <span className="text-foreground">This event could not be read.</span> Reload to try again.
+      </p>
+    </div>
+  );
+}
+
 export function EventNotFoundNotice({ id, chainId }: { id: string; chainId: ChainId }) {
   const hashMatch = TX_HASH_IN_ID.exec(id);
   return (
@@ -534,6 +545,10 @@ export interface ChainTruthTimelineProps {
    *  with the shared side column, from the family's contract
    *  (`lib/<family>/explorer.ts`). Unset, the route draws the pinned card. */
   eventPage?: (slot: EventPageSlot) => EventPageContract;
+  /** The page reads a pinned event it had not loaded (a pETH account row past
+   *  the first read): "loading" draws the skeleton, "failed" a notice to
+   *  reload; unset, a pinned event the list lacks is not found. */
+  pinnedRead?: "loading" | "failed";
   /** A row's event page where it lives on another position's page (the
    *  Liquity V2 redeemer page's rows are Troves' events). Unset, it is this
    *  page's `/event/<id>`. */
@@ -783,6 +798,7 @@ function ChainTruthTimelineBody({
   csvExportCeiling,
   persistKeyPrefix,
   eventPage,
+  pinnedRead,
   eventHref,
   closed,
   segments,
@@ -1104,7 +1120,9 @@ function ChainTruthTimelineBody({
     : pinnedMember && pinnedFolder?.folder
       ? pinnedFolder.folder.ordinalFirst + pinnedMemberIdx
       : 0;
-  const pinnedPending = askFolderForPin && pinnedFolderId === undefined;
+  // The page's own read of a pinned event it had not loaded (`pinnedRead`):
+  // the skeleton while it runs, its notice where it failed.
+  const pinnedPending = (askFolderForPin && pinnedFolderId === undefined) || pinnedRead === "loading";
 
   // Settle the displayed list into rows (`settleRunRows`, rails-ops decision
   // 0039): runs are found on the list before the date range and the cut, and
@@ -2092,6 +2110,8 @@ function ChainTruthTimelineBody({
       if (!pinnedEvent)
         return pinnedPending ? (
           <SkeletonBlock height={PINNED_SKELETON_HEIGHT} />
+        ) : pinnedRead === "failed" ? (
+          <EventReadFailedNotice />
         ) : (
           <EventNotFoundNotice id={pinnedId} chainId={chainId} />
         );
@@ -2156,6 +2176,8 @@ function ChainTruthTimelineBody({
           </EventDateContext.Provider>
         ) : pinnedPending ? (
           <SkeletonBlock height={PINNED_SKELETON_HEIGHT} />
+        ) : pinnedRead === "failed" ? (
+          <EventReadFailedNotice />
         ) : (
           <EventNotFoundNotice id={pinnedId} chainId={chainId} />
         )}
@@ -2416,7 +2438,8 @@ function ChainTruthTimelineBody({
                                   tl.visibleActionKeys.size === tl.eventOptions.length &&
                                   tl.visibleAssetKeys.size === tl.assetOptions.length &&
                                   tl.visibleCounterpartyKeys.size === tl.counterpartyOptions.length &&
-                                  tl.visibleVersionKeys.size === tl.versionOptions.length
+                                  tl.visibleVersionKeys.size === tl.versionOptions.length &&
+                                  tl.visiblePlaceKeys.size === tl.placeOptions.length
                                 }
                                 // A served folder has no run around it to scope its
                                 // spine terminus to, so its place in the displayed list

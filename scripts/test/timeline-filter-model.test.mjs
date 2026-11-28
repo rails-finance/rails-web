@@ -30,7 +30,7 @@ const { groupDimensions, pillFor } = await import("../../components/shared/filte
 
 /** A stand-in for useTimelineEvents' state: the type and asset axes over
  *  `hidden`, and a log of the writes the model makes. */
-function state({ types, assets = [], hidden = [], stale = [], sizeDims = [], sizeRanges = {} }) {
+function state({ types, assets = [], places = [], hidden = [], stale = [], sizeDims = [], sizeRanges = {} }) {
   const log = [];
   const opts = (keys) => keys.map((k) => ({ key: k, label: k[0].toUpperCase() + k.slice(1) }));
   const visible = (keys) => new Set(keys.filter((k) => !hidden.includes(k)));
@@ -42,6 +42,7 @@ function state({ types, assets = [], hidden = [], stale = [], sizeDims = [], siz
         asset: hidden.filter((k) => assets.includes(k)),
         counterparty: [],
         version: [],
+        place: hidden.filter((k) => places.includes(k)),
       },
       eventOptions: opts(types),
       visibleActionKeys: visible(types),
@@ -59,6 +60,10 @@ function state({ types, assets = [], hidden = [], stale = [], sizeDims = [], siz
       visibleCounterpartyKeys: new Set(),
       toggleHiddenCounterparty: () => {},
       resetHiddenCounterparties: () => {},
+      placeOptions: opts(places),
+      visiblePlaceKeys: visible(places),
+      toggleHiddenPlace: (k) => log.push(["hide", k]),
+      resetHiddenPlaces: () => log.push(["reset", "place"]),
       sizeDims,
       sizeRanges,
       setSizeRange: (side, values) => log.push(["size", side, values]),
@@ -127,4 +132,20 @@ test("Clear all clears a hidden key no option offers", () => {
   assert.equal(typePill(m).state, "unset");
   clearTimelineFilters(m);
   assert.deepEqual(log, [["reset", "type"]]);
+});
+
+test("the Place axis is a pill when a link hides places, and its × shows every place again", () => {
+  const { tl, log } = state({
+    types: ["a", "b"],
+    places: ["cdp:usdp:12", "loan::4", "none"],
+    hidden: ["loan::4", "none"],
+  });
+  const m = timelineFilterModel(tl);
+  assert.deepEqual(m.filters.place, ["cdp:usdp:12"]);
+  const place = groupDimensions(m.dimensions, m.filters).find((g) => g.dims[0].id === "place");
+  const pill = pillFor(place, m.filters);
+  assert.equal(pill.state, "set");
+  assert.equal(pill.label, "Place");
+  m.onChange({ ...m.filters, place: [] });
+  assert.deepEqual(log, [["reset", "place"]]);
 });
