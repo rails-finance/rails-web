@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { valuePress, spineAmountPress } from "../../lib/shared/spine-amount-press.ts";
+import { valuePress, spineAmountPress, followsInPlace } from "../../lib/shared/spine-amount-press.ts";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const r = JSON.parse(
@@ -161,4 +161,75 @@ test("872's spineAmountPress is valuePress, and a value press reads as an amount
           const p = { pointer, hoverless, keyboard };
           assert.deepEqual(valuePress(open, { on: "value", ...p }), spineAmountPress(open, { on: "amount", ...p }));
         }
+});
+
+// LinkedValue's `onFollow` (ui-jobs 878): a Rails link that jumps in place.
+const RAILS_AT_EE3AE3931 =
+  '<span data-reveal-tip="" class="relative inline-flex cursor-pointer items-center "><a class="underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] rounded-sm [@media(hover:none)]:underline [@media(hover:none)]:decoration-dotted [@media(hover:none)]:decoration-1 [@media(hover:none)]:decoration-[var(--edge-row-line)] font-mono text-xs" aria-label="#123: Trove 123" data-anatomy="L14" data-trove-link="123" href="/ethereum/liquity-v2/trove/123">#123</a></span>';
+
+test("a Rails link without onFollow renders as it did before onFollow came", () => {
+  assert.equal(r.rails.html, RAILS_AT_EE3AE3931);
+});
+
+test("onFollow leaves the markup as it is, the href kept for a new tab", () => {
+  assert.equal(r.railsFollow.html, r.rails.html);
+});
+
+const plain = { button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false };
+const jumps = (open, p, keys = plain) => followsInPlace(valuePress(open, { on: "value", ...p }), keys);
+
+test("with onFollow, a touch or a pen opens the tooltip first and the second press jumps", () => {
+  for (const pointer of ["touch", "pen"]) {
+    const first = { pointer, hoverless: true, keyboard: false };
+    assert.equal(jumps(false, first), false, `${pointer}: the first press does not call onFollow`);
+    assert.deepEqual(valuePress(false, { on: "value", ...first }), { open: true, follow: false });
+    assert.equal(jumps(true, first), true, `${pointer}: the second press calls onFollow`);
+  }
+});
+
+test("with onFollow, a mouse click, Enter and the tooltip's link jump", () => {
+  assert.equal(jumps(false, { pointer: "mouse", hoverless: false, keyboard: false }), true, "a mouse click");
+  assert.equal(jumps(true, { pointer: "mouse", hoverless: false, keyboard: false }), true, "a click while hovering");
+  for (const hoverless of [true, false])
+    assert.equal(jumps(false, { hoverless, keyboard: true }), true, `Enter, hoverless ${hoverless}`);
+  for (const open of [true, false])
+    assert.equal(
+      followsInPlace(valuePress(open, { on: "tip", hoverless: false, keyboard: false }), plain),
+      true,
+      "the tooltip's link",
+    );
+});
+
+test("with onFollow, a cmd, ctrl, shift, alt or middle click goes to the browser", () => {
+  const mouse = { pointer: "mouse", hoverless: false, keyboard: false };
+  for (const keys of [
+    { ...plain, metaKey: true },
+    { ...plain, ctrlKey: true },
+    { ...plain, shiftKey: true },
+    { ...plain, altKey: true },
+    { ...plain, button: 1 },
+  ]) {
+    assert.equal(jumps(false, mouse, keys), false, JSON.stringify(keys));
+    assert.equal(followsInPlace({ follow: true }, keys), false, `the tooltip's link: ${JSON.stringify(keys)}`);
+  }
+  assert.equal(jumps(true, { pointer: "touch", hoverless: true, keyboard: false }, { ...plain, metaKey: true }), false);
+});
+
+test("onFollow's presses prevent the navigation, close the tooltip and start no progress bar", () => {
+  const src = readFileSync(path.join(REPO, "components/shared/linked-value.tsx"), "utf8");
+  const jump =
+    /const jump = \(e: React\.MouseEvent, follow: FollowHandler\) => \{([\s\S]*?)\n  \};/.exec(src)?.[1] ?? "";
+  assert.match(jump, /e\.preventDefault\(\);\s*follow\(e\);\s*setOpen\(false\);/);
+  assert.doesNotMatch(jump, /startNavigationProgress/);
+  assert.match(
+    src,
+    /if \(onFollow && followsInPlace\(press, e\)\) \{\s*jump\(e, onFollow\);\s*return;\s*\}\s*if \(!press\.follow\) e\.preventDefault\(\);/,
+    "the value: the jump comes before the progress bar and returns",
+  );
+  const tip = /if \(onFollow\) \{([\s\S]*?)\n  \}/.exec(src)?.[1] ?? "";
+  assert.match(
+    tip,
+    /tipLink\.onClick = \(e: React\.MouseEvent\) => \{\s*e\.stopPropagation\(\);\s*if \(followsInPlace\(\{ follow: true \}, e\)\) jump\(e, onFollow\);\s*\};/,
+  );
+  assert.doesNotMatch(tip, /startNavigationProgress/, "the tooltip's link");
 });

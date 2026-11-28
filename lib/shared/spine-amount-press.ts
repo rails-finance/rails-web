@@ -25,6 +25,17 @@ export function valuePress(open: boolean, p: ValuePress): { open: boolean; follo
   return tapFirst ? { open: true, follow: false } : { open, follow: true };
 }
 
+/** The click's button and modifier keys. */
+export type ClickKeys = { button: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean };
+
+/** Whether a press on a value whose caller jumps in place (LinkedValue
+ *  `onFollow`) runs the jump: the press follows, and the browser would open it
+ *  in this tab. A cmd, ctrl, shift or alt click, or another button, goes to
+ *  the browser, which opens the href in a new tab or window. */
+export function followsInPlace(press: { follow: boolean }, e: ClickKeys): boolean {
+  return press.follow && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+}
+
 /** 872's name for the rule, kept for its callers. */
 export function spineAmountPress(open: boolean, p: ValuePress): { open: boolean; follow: boolean } {
   return valuePress(open, p);
