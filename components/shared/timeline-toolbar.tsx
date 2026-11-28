@@ -637,10 +637,13 @@ export function TimelineToolbar({
     monthReach?.onReset?.();
   };
   const axesSet = model.dimensions.filter((d) => d.get(model.filters).length > 0).length;
-  const setCount = axesSet + (filterActive ? 1 : 0);
+  // A page's hide-by-id filter (a Polaris map arrow, ui-jobs 873) counts as
+  // one set filter, and Clear all clears it.
+  const setCount = axesSet + (filterActive ? 1 : 0) + (tl.clearHideIds ? 1 : 0);
   const clearAll = () => {
     clearTimelineFilters(model);
     if (filterActive) clearDate();
+    tl.clearHideIds?.();
   };
   // data-prov-exempt: the count line is an index row count ("180 events",
   // "12 of 340 events"), the "event numbers" class, not a chain-state figure.

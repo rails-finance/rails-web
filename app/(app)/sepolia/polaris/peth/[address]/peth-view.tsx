@@ -23,6 +23,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { CHAIN_TRUTH_DISPLAY_ITEMS, TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
@@ -33,11 +34,23 @@ import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { PETH_HEAVY, PETH_UNREAD, PolarisPethCard } from "@/components/protocol/polaris/polaris-peth-card";
 import { PolarisPethPlaces, type PethPlaceEvents } from "@/components/protocol/polaris/polaris-peth-places";
 import { PETH_NAMES, PolarisPethEventCard } from "@/components/protocol/polaris/polaris-peth-event-card";
+import { PolarisPethMap } from "@/components/protocol/polaris/polaris-peth-map";
+import { buildPethMapFill, pethMapNewEdge, pethMapRowEdges } from "@/lib/polaris/peth-map-fill";
+import { pethMapContext } from "@/lib/polaris/peth-map-context";
+import { POLARIS_MAP_LAYOUT } from "@/lib/polaris/peth-map-layout";
+import {
+  hotSets,
+  MAP_EDGE_PARAM,
+  mergeFillRows,
+  type MapFill,
+  type MapSelection,
+} from "@/lib/shared/protocol-map/types";
 import { PETH, POLARIS_VENUES } from "@/lib/polaris/asset-catalog";
 import {
   pethAmountText,
   pethHeadlines,
   pethHeadRead,
+  pethKindLabel,
   pethLedgerGap,
   pethLedgerUnchecked,
   pethScannedTo,
@@ -129,12 +142,37 @@ function PethExplanation({
   );
 }
 
+/** The timeline's notice while it is filtered to one arrow of the map. */
+function MapFilterNotice({ edgeId, count, onClear }: { edgeId: string; count: number; onClear: () => void }) {
+  const e = POLARIS_MAP_LAYOUT.edges.find((x) => x.id === edgeId);
+  const name = (id: string | undefined) => POLARIS_MAP_LAYOUT.nodes.find((n) => n.id === id)?.title ?? id;
+  return (
+    <p className="text-sm text-rb-500" data-map-filter={edgeId} data-anatomy="L13·polaris">
+      The timeline shows the {count.toLocaleString("en-US")} {count === 1 ? "transaction" : "transactions"} on the
+      map&rsquo;s{" "}
+      <span className="font-semibold text-foreground">
+        {name(e?.from)} → {name(e?.to)}
+      </span>{" "}
+      arrow.{" "}
+      <button type="button" className={`${INLINE_LINK} cursor-pointer`} onClick={onClear}>
+        Clear filter
+      </button>
+    </p>
+  );
+}
+
 export default function PethView({
   address,
   initial,
+  mapFill,
+  handAddedPlaces,
 }: {
   address: string;
   initial: PolarisPethResponse | PethRefusal | null;
+  /** The map's fill, summed on the server (ui-jobs 873). */
+  mapFill?: MapFill | null;
+  /** DEV ONLY: rows whose places were added by hand. */
+  handAddedPlaces?: string[] | null;
 }) {
   const [data, setData] = useState<PolarisPethResponse | null>(isPethRefusal(initial) ? null : initial);
   const [refused, setRefused] = useState<PethRefusal | null>(isPethRefusal(initial) ? initial : null);
@@ -229,10 +267,66 @@ export default function PethView({
       .reverse();
   }, [rows, older, pinned]);
   const rowById = useMemo(() => new Map(listed.map((r) => [pethRowId(r), r])), [listed]);
+
+  // The map (ui-jobs 873): the server's fill, or the same builder over the
+  // client's read where the server read did not answer. Rows read past the
+  // first name their edges through the same function, so the map lights them.
+  const mapCtx = useMemo(() => pethMapContext(address), [address]);
+  const baseFill = useMemo(() => mapFill ?? (data ? buildPethMapFill(data, mapCtx) : null), [mapFill, data, mapCtx]);
+  const fill = useMemo(() => {
+    // Rows read later name their edges by the same rule: none while the
+    // server sends no places.
+    // mergeFillRows recounts the rows and each arrow's count over them.
+    if (!baseFill || older.length === 0 || baseFill.edgesUnknown) return baseFill;
+    return mergeFillRows(
+      baseFill,
+      older.map((r) => ({ id: pethRowId(r), edgeIds: pethMapRowEdges(r, mapCtx) })),
+      pethMapNewEdge(mapCtx, data?.ledger?.scanned_to_block ?? null),
+    );
+  }, [baseFill, older, mapCtx, data]);
+  const [selection, setSelection] = useState<MapSelection>(null);
+  const [filterEdge, setFilterEdge] = useState<string | null>(null);
+  // `?map=<arrow>` applies once, and only for an arrow this address used.
+  const mapParamRead = useRef(false);
+  useEffect(() => {
+    if (onEventPage || !baseFill || mapParamRead.current) return;
+    mapParamRead.current = true;
+    const id = new URLSearchParams(window.location.search).get(MAP_EDGE_PARAM);
+    if (id && baseFill.edges[id]) {
+      setFilterEdge(id);
+      setSelection({ type: "edge", id });
+    }
+  }, [onEventPage, baseFill]);
+  const applyFilter = (edgeId: string | null) => {
+    setFilterEdge(edgeId);
+    if (edgeId) setSelection({ type: "edge", id: edgeId });
+    const url = new URL(window.location.href);
+    if (edgeId) url.searchParams.set(MAP_EDGE_PARAM, edgeId);
+    else url.searchParams.delete(MAP_EDGE_PARAM);
+    window.history.replaceState(window.history.state, "", url);
+    if (edgeId) document.getElementById("peth-timeline")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const hot = useMemo(() => (fill ? hotSets(POLARIS_MAP_LAYOUT, fill, selection) : null), [fill, selection]);
+  const edgeRows = useMemo(() => {
+    if (!fill || !filterEdge || fill.edgesUnknown || onEventPage) return null;
+    return new Set(fill.rows.filter((r) => r.edgeIds.includes(filterEdge)).map((r) => r.id));
+  }, [fill, filterEdge, onEventPage]);
+  const rowLabel = (id: string) => {
+    const r = rowById.get(id);
+    return r ? pethKindLabel(r.kind) : null;
+  };
+
   const events = useMemo(
     () => listed.map((r) => pethTimelineEvent(r, PETH_NAMES, POLARIS_VENUES, PETH_PLACE_NAMES)),
     [listed],
   );
+  // Filtered to an arrow, the timeline hides the other rows after numbering,
+  // as the Place axis does: numbers, the count and the cut stay the list's.
+  const hideIds = useMemo(
+    () => (edgeRows ? new Set(listed.map(pethRowId).filter((id) => !edgeRows.has(id))) : null),
+    [listed, edgeRows],
+  );
+  const shownCount = edgeRows ? listed.length - (hideIds?.size ?? 0) : listed.length;
   const total = data?.total_rows ?? listed.length;
   const olderCount = Math.max(0, total - listed.length);
 
@@ -240,6 +334,11 @@ export default function PethView({
     storageKey: `polaris-peth-${address}`,
     protocolKey: "polaris-peth",
     olderCount,
+    hideIds,
+    onClearHideIds: () => {
+      applyFilter(null);
+      setSelection(null);
+    },
   });
   const boundary = useMemo(() => {
     const oldest = tl.sortedEvents[0];
@@ -367,6 +466,18 @@ export default function PethView({
             storedAsOf={pethStoredAsOf(data)}
             events={placeEvents}
           />
+          {fill && (
+            <PolarisPethMap
+              address={address}
+              fill={fill}
+              ledgerGap={ledgerGap}
+              selection={selection}
+              onSelect={setSelection}
+              onFilter={applyFilter}
+              rowLabel={rowLabel}
+              handAddedPlaces={handAddedPlaces}
+            />
+          )}
         </>
       )}
       <div id="peth-timeline" className="scroll-mt-4">
@@ -377,6 +488,11 @@ export default function PethView({
           tl={tl}
           boundary={boundary}
           loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
+          notice={
+            filterEdge && edgeRows ? (
+              <MapFilterNotice edgeId={filterEdge} count={shownCount} onClear={() => applyFilter(null)} />
+            ) : undefined
+          }
           displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
           emptyLabel={
             ledgerGap === "too_heavy"
@@ -391,7 +507,40 @@ export default function PethView({
           eventPage={(slot) => polarisPethEventPage({ ...slot, address, row: rowById.get(slot.event.id) })}
           renderCard={(event, meta) => {
             const r = rowById.get(event.id);
-            return r ? <PolarisPethEventCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} /> : null;
+            if (!r) return null;
+            const card = <PolarisPethEventCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} />;
+            if (onEventPage || !fill || fill.edgesUnknown) return card;
+            // A click on a row selects it on the map (ui-jobs 873), and a
+            // selection on the map marks its rows here. A click on a link or
+            // a button inside the card belongs to the card. "Show on the map"
+            // is the row's keyboard control.
+            const lit = hot?.any === true && hot.rows.has(event.id);
+            const chosen = selection?.type === "row" && selection.id === event.id;
+            const select = () => setSelection({ type: "row", id: event.id });
+            return (
+              <div
+                className={`rounded-xl ${lit ? "ring-2 ring-[var(--focus-ring)]" : ""}`}
+                data-map-row={event.id}
+                data-map-lit={lit ? "" : undefined}
+                data-anatomy="L12·polaris"
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest("a, button")) return;
+                  select();
+                }}
+              >
+                {card}
+                <div className="flex justify-end px-3 pb-1">
+                  <button
+                    type="button"
+                    className={`${INLINE_LINK} cursor-pointer rounded text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]`}
+                    aria-pressed={chosen}
+                    onClick={() => setSelection(chosen ? null : { type: "row", id: event.id })}
+                  >
+                    Show on the map<span className="sr-only">: {pethKindLabel(r.kind)}</span>
+                  </button>
+                </div>
+              </div>
+            );
           }}
         />
       </div>

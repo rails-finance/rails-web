@@ -268,6 +268,10 @@ export interface TimelineEventsState {
    *  "N events" link applies, its hide set taken from the whole history
    *  (rows past the loaded ones included), not from the options. */
   hidePlacesExactly: (keys: string[]) => void;
+  /** The page's hide-by-id filter (`hideIds`), for the toolbar's Clear all:
+   *  set while the page passes `hideIds` (even one that hides nothing), null
+   *  where it passes none. */
+  clearHideIds: (() => void) | null;
 
   dateRange: [number, number] | null;
   setDateRange: (next: [number, number] | null) => void;
@@ -470,7 +474,15 @@ export function useTimelineEvents(
     servedRows,
     eventsServed,
     size,
+    hideIds,
+    onClearHideIds,
   }: {
+    /** Clears `hideIds`, from the toolbar's Clear all and Reset. */
+    onClearHideIds?: () => void;
+    /** Events the page hides by id after numbering (a Polaris pETH account's
+     *  map filter, ui-jobs 873): numbers, counts and the cut stay the whole
+     *  list's, as on the Place axis. Omitted, nothing is hidden by id. */
+    hideIds?: ReadonlySet<string> | null;
     /** The Size ranges this history offers (ui-jobs 752): Liquity V2's Trove
      *  and Stability Pool deposit. Omitted, the page has no Size. */
     size?: readonly TimelineSizeDim[];
@@ -821,6 +833,7 @@ export function useTimelineEvents(
   );
   const passesAxes = useCallback(
     (e: BaseActivityEvent) =>
+      !hideIds?.has(e.id) &&
       eventPassesAxes(e, {
         hiddenActions: actionHiddenSet,
         hiddenAssets: hiddenAssetSet,
@@ -829,7 +842,7 @@ export function useTimelineEvents(
         hiddenPlaces: hiddenPlaceSet,
         size: sizeView,
       }),
-    [actionHiddenSet, hiddenAssetSet, hiddenCounterpartySet, hiddenVersionSet, hiddenPlaceSet, sizeView],
+    [actionHiddenSet, hiddenAssetSet, hiddenCounterpartySet, hiddenVersionSet, hiddenPlaceSet, sizeView, hideIds],
   );
   const visibleEvents = useMemo(() => sortedEvents.filter(passesAxes), [sortedEvents, passesAxes]);
 
@@ -857,7 +870,9 @@ export function useTimelineEvents(
     (draft: TimelineAxesView) => {
       const view = { ...draft, hiddenActions: settleActionHidden(draft.hiddenActions, offeredLegs) };
       const passes = (e: BaseActivityEvent) =>
-        eventPassesAxes(e, view) && (!dateRange || (e.timestamp >= dateRange[0] && e.timestamp <= dateRange[1]));
+        !hideIds?.has(e.id) &&
+        eventPassesAxes(e, view) &&
+        (!dateRange || (e.timestamp >= dateRange[0] && e.timestamp <= dateRange[1]));
       let loose = 0;
       for (const e of sortedEvents) if (passes(e)) loose++;
       const axes: FolderFilterAxes = {
@@ -872,7 +887,7 @@ export function useTimelineEvents(
       );
       return { loose, folders, passes };
     },
-    [sortedEvents, servedRows, dateRange, offeredLegs],
+    [sortedEvents, servedRows, dateRange, offeredLegs, hideIds],
   );
 
   const dateFilteredEvents = useMemo(() => {
@@ -1233,6 +1248,8 @@ export function useTimelineEvents(
     // A stale ?hidePlaces= on a timeline with no Place axis has no pill to
     // clear it, so it does not count.
     (placeOptions.length > 0 && hiddenPlaceSet.size > 0) ||
+    // Rows the page hides by id (a map filter); absent on every other page.
+    (hideIds?.size ?? 0) > 0 ||
     dateRange !== null ||
     sizeView != null;
 
@@ -1267,6 +1284,7 @@ export function useTimelineEvents(
     toggleHiddenPlace,
     resetHiddenPlaces,
     hidePlacesExactly,
+    clearHideIds: hideIds != null && onClearHideIds ? onClearHideIds : null,
     dateRange,
     setDateRange: setDateRangeLive,
     sizeDims,
