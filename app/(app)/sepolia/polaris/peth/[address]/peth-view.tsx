@@ -139,7 +139,7 @@ function MapFilterNotice({ edgeId, count, onClear }: { edgeId: string; count: nu
   const e = POLARIS_MAP_LAYOUT.edges.find((x) => x.id === edgeId);
   const name = (id: string | undefined) => POLARIS_MAP_LAYOUT.nodes.find((n) => n.id === id)?.title ?? id;
   return (
-    <p className="text-sm text-rb-500" data-map-filter={edgeId}>
+    <p className="text-sm text-rb-500" data-map-filter={edgeId} data-anatomy="L13·polaris">
       The timeline shows the {count.toLocaleString("en-US")} {count === 1 ? "transaction" : "transactions"} on the
       map&rsquo;s{" "}
       <span className="font-semibold text-foreground">
@@ -276,12 +276,13 @@ export default function PethView({
   const [selection, setSelection] = useState<MapSelection>(null);
   const [filterEdge, setFilterEdge] = useState<string | null>(null);
   useEffect(() => {
+    if (onEventPage) return;
     const id = new URLSearchParams(window.location.search).get(MAP_EDGE_PARAM);
     if (id && POLARIS_MAP_LAYOUT.edges.some((e) => e.id === id)) {
       setFilterEdge(id);
       setSelection({ type: "edge", id });
     }
-  }, []);
+  }, [onEventPage]);
   const applyFilter = (edgeId: string | null) => {
     setFilterEdge(edgeId);
     if (edgeId) setSelection({ type: "edge", id: edgeId });
@@ -293,30 +294,33 @@ export default function PethView({
   };
   const hot = useMemo(() => (fill ? hotSets(POLARIS_MAP_LAYOUT, fill, selection) : null), [fill, selection]);
   const edgeRows = useMemo(() => {
-    if (!fill || !filterEdge || fill.edgesUnknown) return null;
+    if (!fill || !filterEdge || fill.edgesUnknown || onEventPage) return null;
     return new Set(fill.rows.filter((r) => r.edgeIds.includes(filterEdge)).map((r) => r.id));
-  }, [fill, filterEdge]);
+  }, [fill, filterEdge, onEventPage]);
   const rowLabel = (id: string) => {
     const r = rowById.get(id);
     return r ? pethKindLabel(r.kind) : null;
   };
 
-  const shown = useMemo(
-    () => (edgeRows ? listed.filter((r) => edgeRows.has(pethRowId(r))) : listed),
+  const events = useMemo(
+    () => listed.map((r) => pethTimelineEvent(r, PETH_NAMES, POLARIS_VENUES, PETH_PLACE_NAMES)),
+    [listed],
+  );
+  // Filtered to an arrow, the timeline hides the other rows after numbering,
+  // as the Place axis does: numbers, the count and the cut stay the list's.
+  const hideIds = useMemo(
+    () => (edgeRows ? new Set(listed.map(pethRowId).filter((id) => !edgeRows.has(id))) : null),
     [listed, edgeRows],
   );
-  const events = useMemo(
-    () => shown.map((r) => pethTimelineEvent(r, PETH_NAMES, POLARIS_VENUES, PETH_PLACE_NAMES)),
-    [shown],
-  );
+  const shownCount = edgeRows ? listed.length - (hideIds?.size ?? 0) : listed.length;
   const total = data?.total_rows ?? listed.length;
-  // Filtered to an edge, the list is the rows read so far on it.
-  const olderCount = edgeRows ? 0 : Math.max(0, total - listed.length);
+  const olderCount = Math.max(0, total - listed.length);
 
   const tl = useTimelineEvents(events, {
     storageKey: `polaris-peth-${address}`,
     protocolKey: "polaris-peth",
     olderCount,
+    hideIds,
   });
   const boundary = useMemo(() => {
     const oldest = tl.sortedEvents[0];
@@ -476,7 +480,7 @@ export default function PethView({
           loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
           notice={
             filterEdge && edgeRows ? (
-              <MapFilterNotice edgeId={filterEdge} count={shown.length} onClear={() => applyFilter(null)} />
+              <MapFilterNotice edgeId={filterEdge} count={shownCount} onClear={() => applyFilter(null)} />
             ) : undefined
           }
           displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
@@ -494,17 +498,34 @@ export default function PethView({
           renderCard={(event, meta) => {
             const r = rowById.get(event.id);
             if (!r) return null;
+            const card = <PolarisPethEventCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} />;
+            if (onEventPage || !fill) return card;
             // A click on a row selects it on the map (ui-jobs 873), and a
-            // selection on the map marks its rows here.
+            // selection on the map marks its rows here. A click on a link or
+            // a button inside the card is the card's own.
             const lit = hot?.any === true && hot.rows.has(event.id);
+            const select = () => setSelection({ type: "row", id: event.id });
             return (
               <div
-                className={lit ? "rounded-xl ring-2 ring-[var(--focus-ring)]" : undefined}
+                role="button"
+                tabIndex={0}
+                aria-pressed={lit}
+                aria-label={`Show ${pethKindLabel(r.kind)} on the Polaris map`}
+                className={`rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${lit ? "ring-2 ring-[var(--focus-ring)]" : ""}`}
                 data-map-row={event.id}
                 data-map-lit={lit ? "" : undefined}
-                onClick={() => setSelection({ type: "row", id: event.id })}
+                data-anatomy="L12·polaris"
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest("a, button")) return;
+                  select();
+                }}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+                  e.preventDefault();
+                  select();
+                }}
               >
-                <PolarisPethEventCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} />
+                {card}
               </div>
             );
           }}

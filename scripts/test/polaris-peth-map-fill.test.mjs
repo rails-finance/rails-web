@@ -99,10 +99,13 @@ test("CDPs and a loan: the zaps, the curve fees, the CDP and loan arrows, and th
   assert.ok(!usedNodes(POLARIS_MAP_LAYOUT, f).has(PM.svpeth));
 
   const cdp = f.nodes[PM.cdp].lines;
-  assert.deepEqual(cdp[0], {
-    label: "in",
-    amounts: [{ asset: "pETH", address: CTX.peth.address, raw: "11000000000000000000", decimals: 18 }],
-  });
+  assert.deepEqual(
+    { label: cdp[0].label, amounts: cdp[0].amounts },
+    {
+      label: "in",
+      amounts: [{ asset: "pETH", address: CTX.peth.address, raw: "11000000000000000000", decimals: 18 }],
+    },
+  );
   assert.equal(cdp[1].label, "now");
   assert.equal(cdp[1].amounts[0].raw, "10925000000000000000");
   assert.deepEqual(
@@ -190,15 +193,20 @@ test("past the first read, arrows count rows and carry no amount; boxes give the
   assert.ok(f.nodes[PM.zap].lines.some((l) => l.text === "7,000 transactions in all"));
 });
 
-test("a ledger still being read draws no arrows and keeps the boxes' now", () => {
-  const d = fx("map-38d7");
-  d.status = "incomplete";
-  d.rows = null;
-  const f = buildPethMapFill(d, CTX);
-  assert.deepEqual(f.edges, {});
-  assert.deepEqual(f.counted, { rows: 0, total: 0 });
-  assert.equal(f.nodes[PM.cdp].lines[0].label, "now");
-});
+for (const status of ["incomplete", "too_heavy"]) {
+  test(`a ledger ${status}: no arrows, no box marked unused, the boxes' now kept`, () => {
+    const d = fx("map-38d7");
+    d.status = status;
+    d.rows = null;
+    d.place_counts = null;
+    const f = buildPethMapFill(d, CTX);
+    assert.equal(f.edgesUnknown, true);
+    assert.deepEqual(f.edges, {});
+    assert.deepEqual(f.counted, { rows: 0, total: 0 });
+    assert.equal(f.nodes[PM.cdp].lines[0].label, "now");
+    assert.equal(usedNodes(POLARIS_MAP_LAYOUT, f).size, POLARIS_MAP_LAYOUT.nodes.length);
+  });
+}
 
 test("the adapter splits a row's `places` among its lines", () => {
   const d = fx("map-c513");
@@ -295,4 +303,66 @@ test("a served row with place null is still a transfer", () => {
   const f = buildPethMapFill(d, CTX);
   assert.equal(f.edgesUnknown, undefined);
   assert.deepEqual(sums(f, PM.outside, MAP_HOLDER), { pETH: "20753615371910740758" });
+});
+
+test("a row with several places gives its ETH to the curve, else the splitter", () => {
+  const d = fx("map-38d7");
+  const cdpRow = d.rows.find((r) => r.kind === "cdp_deposit");
+  const curve = { kind: "curve", address: "0x07ea2ff889e6228cded329a09f66e370f12c705e" };
+  const venue = { kind: "venue", market: "venue_curve_tripool", address: "0x28b6f412904834dee78a4fa464f2089f5264770c" };
+  const splitter = { kind: "splitter", address: "0x94220c1c340336527c719bcf06067ca7769ac185" };
+  const row = (places, n) => ({
+    ...cdpRow,
+    tx_hash: "0x" + String(n).repeat(64),
+    eth_in_raw: "7",
+    curve_fee_raw: "2",
+    place: places[0],
+    places,
+  });
+  d.rows = [row([cdpRow.place, curve], 1), row([venue, curve], 2), row([venue, splitter], 3)];
+  d.total_rows = 3;
+  const f = buildPethMapFill(d, CTX);
+  assert.deepEqual(sums(f, MAP_HOLDER, PM.curve), { WETH: "14" });
+  assert.deepEqual(sums(f, MAP_HOLDER, PM.splitter), { WETH: "7" });
+  // The fee sits on a curve row only.
+  assert.deepEqual(sums(f, PM.curve, PM.fee), { pETH: "4" });
+  assert.equal(sums(f, MAP_HOLDER, PM.cdp).WETH, undefined);
+  assert.equal(sums(f, MAP_HOLDER, PM.pools).WETH, undefined);
+});
+
+test("native ETH into a zap carries the ETH icon by symbol", () => {
+  const d = fx("map-38d7");
+  for (const r of d.rows) if (r.zap) r.zap.token_in = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+  const f = buildPethMapFill(d, CTX);
+  const a = f.edges[pmEdge(PM.eth, PM.zap)].amounts;
+  assert.deepEqual(a, [{ asset: "ETH", raw: "30000000000000000000", decimals: 18 }]);
+});
+
+test("every summed figure carries its receipt: the rows and the block", () => {
+  const f = buildPethMapFill(fx("map-c513"), CTX);
+  const e = f.edges[pmEdge(PM.zap, MAP_HOLDER)];
+  assert.equal(e.receipt.rows, 4);
+  assert.equal(e.receipt.asOf.block, "12229120");
+  assert.match(e.receipt.summary, /^Zap router → This address — /);
+  const pools = f.nodes[PM.pools].lines;
+  assert.equal(pools[0].receipt.rows, 2);
+  assert.equal(pools[1].receipt.asOf.block, "12229142");
+  for (const n of Object.values(f.nodes))
+    for (const l of n.lines) if (l.amounts.length > 0) assert.ok(l.receipt, JSON.stringify(l));
+});
+
+test("a box counts each row once; past the first read, several places count visits", () => {
+  const d = fx("map-c513");
+  const f = buildPethMapFill(d, CTX);
+  assert.equal(f.nodes[PM.pools].rowCount, 2);
+  assert.equal(f.nodes[PM.zap].rowCount, 7);
+  const two = fx("map-c513");
+  const lp = two.rows.find((r) => r.kind === "lp_add");
+  const other = two.rows.filter((r) => r.kind === "lp_add")[1];
+  lp.places = [...lp.places, ...other.places];
+  assert.equal(buildPethMapFill(two, CTX).nodes[PM.pools].rowCount, 2);
+  two.total_rows = 900;
+  const partial = buildPethMapFill(two, CTX);
+  assert.ok(partial.nodes[PM.pools].lines.some((l) => l.text === "2 visits across its 2 pools"));
+  assert.ok(partial.nodes[PM.zap].lines.some((l) => l.text === "7 transactions in all"));
 });

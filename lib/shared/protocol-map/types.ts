@@ -59,17 +59,37 @@ export interface MapAmount {
   decimals: number;
 }
 
+/** Where a figure on the map comes from: the component renders it as the
+ *  figure's provenance receipt (components/shared/provenance.tsx). */
+export interface MapReceipt {
+  /** "<name clause> — <sentence>", the receipt grammar's one prose field. */
+  summary: string;
+  /** "chain" for a figure read as stated; "chain-derived" for a sum. */
+  kind: "chain" | "chain-derived";
+  /** The read the figure came through. */
+  via: string;
+  formula?: string;
+  /** The rows a sum covers. */
+  rows?: number;
+  /** The block the figure stands at. */
+  asOf: { block: string | null; tx?: string };
+}
+
 export interface MapLine {
   label: "in" | "now" | "note";
   amounts: MapAmount[];
   /** Words before the amounts (a note's sentence, an item's name). */
   text?: string;
+  /** The amounts' receipt. */
+  receipt?: MapReceipt;
 }
 
 export interface MapEdgeFill {
   amounts: MapAmount[];
   rowCount: number;
   timelineHref: string;
+  /** The amounts' receipt. */
+  receipt: MapReceipt;
 }
 
 export interface MapFill {

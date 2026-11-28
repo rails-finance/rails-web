@@ -13,6 +13,7 @@
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import {
@@ -26,6 +27,7 @@ import {
   type MapFill,
   type MapLayout,
   type MapLine,
+  type MapReceipt,
   type MapSelection,
 } from "@/lib/shared/protocol-map/types";
 
@@ -38,21 +40,43 @@ interface Box {
 
 type Pt = [number, number];
 
-/** One amount: the compact figure, then its asset's icon. */
-function Amount({ a }: { a: MapAmount }) {
+/** A map receipt as the shared provenance receipt: a sum of ledger rows is
+ *  indexed, a figure recorded at a transaction emitted, a head read state. */
+function receiptProv(r: MapReceipt): Provenance {
+  return {
+    kind: r.kind,
+    pclass: r.rows != null ? "indexed" : r.asOf.tx ? "emitted" : "state",
+    summary: r.summary,
+    via: r.via,
+    ...(r.formula ? { formula: r.formula } : {}),
+    source: { ...(r.asOf.block ? { block: r.asOf.block } : {}), ...(r.asOf.tx ? { txHash: r.asOf.tx } : {}) },
+  };
+}
+
+/** One amount: the compact figure, then its asset's icon. With a receipt the
+ *  figure carries it; `echo` marks a repeat of a figure shown elsewhere. */
+function Amount({ a, receipt, echo }: { a: MapAmount; receipt?: MapReceipt; echo?: boolean }) {
+  const exact = mapExact(a);
+  const figure = formatCompact(mapUnits(a));
   return (
-    <span className="inline-flex items-center gap-1 tabular-nums" title={`${mapExact(a)} ${a.asset}`}>
-      {formatCompact(mapUnits(a))}
+    <span className="inline-flex items-center gap-1 tabular-nums" title={`${exact} ${a.asset}`}>
+      {receipt ? (
+        <Prov info={receiptProv(receipt)} value={exact} symbol={a.asset} echo={echo}>
+          {figure}
+        </Prov>
+      ) : (
+        figure
+      )}
       <TokenChipIcon symbol={a.asset} address={a.address} size={14} filterable={false} untitled />
     </span>
   );
 }
 
-function Amounts({ amounts }: { amounts: MapAmount[] }) {
+function Amounts({ amounts, receipt, echo }: { amounts: MapAmount[]; receipt?: MapReceipt; echo?: boolean }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
       {amounts.map((a, i) => (
-        <Amount key={`${a.address ?? a.asset}-${i}`} a={a} />
+        <Amount key={`${a.address ?? a.asset}-${i}`} a={a} receipt={receipt} echo={echo} />
       ))}
     </span>
   );
@@ -66,7 +90,7 @@ function Line({ line }: { line: MapLine }) {
       {line.amounts.length > 0 && (
         <span className="ml-auto flex flex-wrap justify-end gap-x-2">
           {line.amounts.map((a, i) => (
-            <Amount key={`${a.address ?? a.asset}-${i}`} a={a} />
+            <Amount key={`${a.address ?? a.asset}-${i}`} a={a} receipt={line.receipt} />
           ))}
         </span>
       )}
@@ -232,7 +256,7 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
           </span>
           {f.amounts.length > 0 && (
             <>
-              : <Amounts amounts={f.amounts} />
+              : <Amounts amounts={f.amounts} receipt={f.receipt} echo />
             </>
           )}
           , over {plural(f.rowCount, "transaction")}.
@@ -264,7 +288,7 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
   const rows = Math.max(...layout.nodes.map((n) => n.row));
 
   return (
-    <div className="space-y-3" data-protocol-map={layout.id}>
+    <div className="space-y-3" data-protocol-map={layout.id} data-anatomy="O1">
       <div className="overflow-x-auto">
         <div ref={frame} className="relative min-w-[1040px] py-1">
           <svg
@@ -286,6 +310,7 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
                   key={x.edge.id}
                   className={`${tone} ${dim && x.used ? "opacity-20" : ""}`}
                   data-map-edge={x.edge.id}
+                  data-anatomy="O3"
                   data-map-used={x.used ? "" : undefined}
                 >
                   <path
@@ -351,6 +376,7 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
                   style={style}
                   aria-pressed={isHot}
                   data-map-node={n.id}
+                  data-anatomy="O2"
                   onClick={() => toggle({ type: "node", id: n.id })}
                 >
                   {body}
@@ -364,6 +390,7 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
                   className={cls}
                   style={style}
                   data-map-node={n.id}
+                  data-anatomy="O2"
                   data-map-idle=""
                 >
                   {body}
@@ -384,6 +411,7 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
                   } ${hot.any && !isHot ? "opacity-40" : ""}`}
                   style={{ left: x.chip[0], top: x.chip[1] }}
                   data-map-receipt={x.edge.id}
+                  data-anatomy="O4"
                 >
                   <button
                     type="button"
@@ -392,7 +420,11 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
                     aria-label={`${title(x.edge.from)} to ${title(x.edge.to)}`}
                     onClick={() => toggle({ type: "edge", id: x.edge.id })}
                   >
-                    {f.amounts.length > 0 ? <Amounts amounts={f.amounts} /> : plural(f.rowCount, "transaction")}
+                    {f.amounts.length > 0 ? (
+                      <Amounts amounts={f.amounts} receipt={f.receipt} />
+                    ) : (
+                      plural(f.rowCount, "transaction")
+                    )}
                   </button>
                   <a
                     href={f.timelineHref}
@@ -412,7 +444,7 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
         </div>
       </div>
       {!unknown && (
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-rb-500">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-rb-500" data-anatomy="O6">
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block w-6 border-t-2 border-blue-500/70" aria-hidden="true" />
             Used by this address
@@ -431,6 +463,7 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
         <div
           className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-xl border border-blue-500/40 bg-[var(--surface-inset)] px-3 py-2 text-sm text-rb-500"
           data-map-selection=""
+          data-anatomy="O5"
         >
           <p className="min-w-0">{sentence}</p>
           <span className="flex gap-4">
