@@ -207,18 +207,18 @@ function clickToOpenIfClosed(id: string): void {
   if (toggle instanceof HTMLElement) toggle.click();
 }
 
-/** After a `?at=` landing's first scroll, re-centre the target each time the
- *  document's height changes for the next `KEEP_CENTRED_MS` — the content
- *  above the timeline (chain-state reads, market tables) keeps landing after
- *  the scroll on a live page and would otherwise push the card back under
- *  the fold. Ends early on the reader's own wheel/touch/key scroll, so it
- *  never fights them. */
 /** The window's timers, for `restartTimer`. */
 const TIMER_CLOCK: TimerClock<ReturnType<typeof setTimeout>> = {
   set: (run, ms) => setTimeout(run, ms),
   clear: (t) => clearTimeout(t),
 };
 
+/** After a `?at=` landing's first scroll, re-centre the target each time the
+ *  document's height changes for the next `KEEP_CENTRED_MS` — the content
+ *  above the timeline (chain-state reads, market tables) keeps landing after
+ *  the scroll on a live page and would otherwise push the card back under
+ *  the fold. Ends early on the reader's own wheel/touch/key scroll, so it
+ *  never fights them. */
 const KEEP_CENTRED_MS = 2500;
 function keepCentred(el: HTMLElement, reduced: boolean): void {
   if (typeof window === "undefined" || typeof ResizeObserver === "undefined") return;
@@ -1055,8 +1055,12 @@ function ChainTruthTimelineBody({
   // included. Without `landAt` this never runs.
   const landSeq = landAt?.seq;
   const landId = landAt?.id;
+  // The landing a folder lookup was asked for: a lookup that answers after a
+  // newer `landAt` is dropped. Without `landAt` it stays unset.
+  const landSeqRef = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (pinnedId || landSeq == null || !landId) return;
+    landSeqRef.current = landSeq;
     setPendingLandingId(null);
     setLandingRunMember(null);
     setLandingNotFoundId(null);
@@ -1088,8 +1092,10 @@ function ChainTruthTimelineBody({
     }
     if (folders.enabled) {
       const wanted = landingWantedId;
+      const seq = landSeqRef.current;
       setLandingWantedId(null);
       void folders.resolveEventKey(wanted).then((id) => {
+        if (landSeqRef.current !== seq) return;
         // A refusal is a stated fact and the notice says the same thing it
         // says for any id this page has not served — the route distinguishes
         // "already its own row", "below the window" and "no such folder", and

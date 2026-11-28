@@ -22,8 +22,17 @@ register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
 const { buildPethMapFill } = await import("../../lib/polaris/peth-map-fill.ts");
 const { POLARIS_MAP_LAYOUT, PM } = await import("../../lib/polaris/peth-map-layout.ts");
-const { MAP_HOLDER, mapCompactGrid, mapFullGrid, mapJoined, mapRoutesFromSearch, mapRoutesHref, usedNodes } =
-  await import("../../lib/shared/protocol-map/types.ts");
+const {
+  MAP_HOLDER,
+  MAP_ROUTES_PARAM,
+  mapCompactGrid,
+  mapFullGrid,
+  mapJoined,
+  mapNothingUnused,
+  mapRoutesFromParam,
+  mapRoutesHref,
+  usedNodes,
+} = await import("../../lib/shared/protocol-map/types.ts");
 
 const fx = (name) =>
   JSON.parse(readFileSync(new URL(`../fixtures/polaris-peth/${name}.json`, import.meta.url), "utf8"));
@@ -115,22 +124,23 @@ test("the used set: the holder, each box a filled arrow touches, each box with a
   assert.deepEqual([...usedNodes(POLARIS_MAP_LAYOUT, noted)].sort(), [MAP_HOLDER, PM.splitter].sort());
 });
 
-test("compact grid, CDPs and a loan: each row's used boxes in layout order, centred, the holder across", () => {
+test("compact grid, CDPs and a loan: unused columns dropped, columns kept aligned, the holder centred", () => {
   const { g } = grid("map-38d7");
   assert.deepEqual(rowsOf(g), [[PM.eth, PM.fee], [PM.zap, PM.curve], [MAP_HOLDER], [PM.cdp, PM.loan]]);
-  // The widest row is the holder's, three layout columns: two grid columns each.
-  assert.equal(g.columns, 6);
-  assert.deepEqual(g.cells[MAP_HOLDER], { col: 1, span: 6, row: 3 });
-  assert.deepEqual(g.cells[PM.eth], { col: 2, span: 2, row: 1 });
-  assert.deepEqual(g.cells[PM.fee], { col: 4, span: 2, row: 1 });
-  // The zap router's arrow to the bonding curve keeps a unit between them.
-  assert.deepEqual(g.cells[PM.zap], { col: 1, span: 2, row: 2 });
-  assert.deepEqual(g.cells[PM.curve], { col: 5, span: 2, row: 2 });
-  assert.equal(g.scale, 3 / 7);
+  // Layout columns 2 and 7 hold no used box: five columns are left.
+  assert.equal(g.columns, 5);
+  assert.equal(g.scale, 5 / 7);
+  // ETH and WETH stays over the zap router, the fee router over the curve.
+  assert.equal(g.cells[PM.eth].col, g.cells[PM.zap].col);
+  assert.equal(g.cells[PM.fee].col, g.cells[PM.curve].col);
+  assert.deepEqual(g.cells[MAP_HOLDER], { col: 2, span: 3, row: 3 });
+  assert.deepEqual(g.cells[PM.cdp], { col: 1, span: 1, row: 4 });
+  assert.deepEqual(g.cells[PM.loan], { col: 2, span: 1, row: 4 });
+  assert.equal(centre(g.cells[MAP_HOLDER]), g.columns / 2);
   assertSound(g);
 });
 
-test("compact grid, zaps, pools and svpETH: a span carries over, every row centred on the holder", () => {
+test("compact grid, zaps, pools and svpETH: every column used, so every box keeps its layout cell", () => {
   const { g } = grid("map-c513");
   assert.deepEqual(rowsOf(g), [
     [PM.eth, PM.fee],
@@ -138,45 +148,84 @@ test("compact grid, zaps, pools and svpETH: a span carries over, every row centr
     [MAP_HOLDER],
     [PM.pools, PM.svpeth],
   ]);
-  // Other tokens spans two layout columns; with a unit kept on each side of
-  // the zap router, whose arrows join it to both neighbours, the row is seven.
-  assert.equal(g.columns, 14);
-  assert.equal(g.cells[PM.zap].col - (g.cells[PM.other].col + g.cells[PM.other].span), 2);
-  assert.equal(g.cells[PM.curve].col - (g.cells[PM.zap].col + g.cells[PM.zap].span), 2);
-  // The bonding curve and the other addresses share no arrow: no gap.
-  assert.equal(g.cells[PM.outside].col, g.cells[PM.curve].col + g.cells[PM.curve].span);
-  assert.equal(g.cells[PM.other].span, 2 * g.cells[PM.zap].span);
-  for (const r of rowsOf(g)) {
-    const first = g.cells[r[0]];
-    const last = g.cells[r[r.length - 1]];
-    assert.equal((first.col - 1 + last.col - 1 + last.span) / 2, g.columns / 2, r.join());
+  assert.equal(g.columns, 7);
+  const byId = new Map(POLARIS_MAP_LAYOUT.nodes.map((n) => [n.id, n]));
+  for (const [id, c] of Object.entries(g.cells)) {
+    const n = byId.get(id);
+    assert.deepEqual({ col: c.col, span: c.span }, { col: n.col, span: n.span }, id);
   }
-  assert.equal(centre(g.cells[MAP_HOLDER]), g.columns / 2);
+  assert.equal(g.cells[PM.eth].col, g.cells[PM.zap].col);
+  assert.equal(g.cells[PM.fee].col, g.cells[PM.curve].col);
   assertSound(g);
 });
 
-test("compact grid: a row with no used box is dropped; the holder stays centred among boxes of its row", () => {
-  const layout = {
-    id: "t",
-    columns: 5,
-    nodes: [
-      { id: "a", band: "source", col: 1, span: 1, row: 1, title: "A", blurb: "" },
-      { id: "b", band: "source", col: 2, span: 1, row: 2, title: "B", blurb: "" },
-      { id: "l", band: "holder", col: 1, span: 1, row: 3, title: "L", blurb: "" },
-      { id: MAP_HOLDER, band: "holder", col: 2, span: 2, row: 3, title: "H", blurb: "" },
-      { id: "r1", band: "holder", col: 4, span: 1, row: 3, title: "R1", blurb: "" },
-      { id: "r2", band: "holder", col: 5, span: 1, row: 3, title: "R2", blurb: "" },
-    ],
-    edges: [],
-  };
-  const g = mapCompactGrid(layout, new Set(["a", "l", MAP_HOLDER, "r1", "r2"]));
-  assert.deepEqual(rowsOf(g), [["a"], ["l", MAP_HOLDER, "r1", "r2"]]);
-  // Two units right of the holder, one left: the row is 2 + 2 + 2 units wide.
-  assert.equal(g.columns, 12);
-  assert.equal(centre(g.cells[MAP_HOLDER]), 6);
-  assert.equal(centre(g.cells.a), 6);
-  assert.deepEqual(g.cells.l, { col: 3, span: 2, row: 2 });
-  assertSound(g);
+test("compact grid: the holder alone", () => {
+  const g = mapCompactGrid(POLARIS_MAP_LAYOUT, new Set([MAP_HOLDER]));
+  assert.deepEqual(g, { columns: 3, rows: 1, cells: { [MAP_HOLDER]: { col: 1, span: 3, row: 1 } }, scale: 3 / 7 });
+});
+
+test("compact grid: every box used is the full grid", () => {
+  const all = new Set(POLARIS_MAP_LAYOUT.nodes.map((n) => n.id));
+  assert.deepEqual(
+    mapCompactGrid(POLARIS_MAP_LAYOUT, all, () => true),
+    mapFullGrid(POLARIS_MAP_LAYOUT),
+  );
+});
+
+/** A small layout: three boxes in the holder's row, two others below. */
+const SMALL = {
+  id: "t",
+  columns: 7,
+  nodes: [
+    { id: "l", band: "holder", col: 1, span: 1, row: 1, title: "L", blurb: "" },
+    { id: MAP_HOLDER, band: "holder", col: 3, span: 3, row: 1, title: "H", blurb: "" },
+    { id: "r", band: "holder", col: 7, span: 1, row: 1, title: "R", blurb: "" },
+    { id: "x", band: "mechanism", col: 2, span: 1, row: 2, title: "X", blurb: "" },
+    { id: "y", band: "mechanism", col: 6, span: 1, row: 2, title: "Y", blurb: "" },
+  ],
+  edges: [],
+};
+
+test("compact grid: a joined neighbour of the holder keeps a column for the receipt, the holder kept centred", () => {
+  const joined = (a, b) => [a, b].sort().join() === [MAP_HOLDER, "l"].sort().join();
+  const g = mapCompactGrid(SMALL, new Set(["l", MAP_HOLDER, "r"]), joined);
+  // Column 2 stays for the arrow from L; column 6 goes, R joins the holder by
+  // no arrow; one empty column at the right edge centres the holder.
+  assert.equal(g.rows, 1);
+  assert.equal(g.columns, 7);
+  assert.deepEqual(g.cells.l, { col: 1, span: 1, row: 1 });
+  assert.deepEqual(g.cells[MAP_HOLDER], { col: 3, span: 3, row: 1 });
+  assert.deepEqual(g.cells.r, { col: 6, span: 1, row: 1 });
+  assert.equal(centre(g.cells[MAP_HOLDER]), g.columns / 2);
+  // Unjoined, both gaps go and the holder sits centred between L and R.
+  const plain = mapCompactGrid(SMALL, new Set(["l", MAP_HOLDER, "r"]));
+  assert.equal(plain.columns, 5);
+  assert.deepEqual(plain.cells[MAP_HOLDER], { col: 2, span: 3, row: 1 });
+});
+
+test("compact grid: a row with no used box is dropped, and a column one row uses stays for all", () => {
+  const g = mapCompactGrid(SMALL, new Set([MAP_HOLDER, "x"]));
+  assert.equal(g.rows, 2);
+  assert.deepEqual(rowsOf(g), [[MAP_HOLDER], ["x"]]);
+  // Column 2 stays for X; the holder is padded on the right to stay centred.
+  assert.deepEqual(g.cells.x, { col: 1, span: 1, row: 2 });
+  assert.deepEqual(g.cells[MAP_HOLDER], { col: 2, span: 3, row: 1 });
+  assert.equal(g.columns, 5);
+  const top = mapCompactGrid(SMALL, new Set([MAP_HOLDER, "l"]));
+  assert.equal(top.rows, 1);
+});
+
+test("nothing unused: only where every box is used and every arrow drawn", () => {
+  for (const name of ["map-38d7", "map-c513"]) assert.equal(mapNothingUnused(POLARIS_MAP_LAYOUT, grid(name).f), false);
+  const f = grid("map-38d7").f;
+  const edges = Object.fromEntries(POLARIS_MAP_LAYOUT.edges.map((e) => [e.id, f.edges[Object.keys(f.edges)[0]]]));
+  assert.equal(mapNothingUnused(POLARIS_MAP_LAYOUT, { ...f, edges }), true);
+  // One direction of each pair is enough: the unused reverse is not drawn.
+  const oneWay = Object.fromEntries(
+    POLARIS_MAP_LAYOUT.edges.filter((e) => e.lane !== 1).map((e) => [e.id, edges[e.id]]),
+  );
+  assert.equal(mapNothingUnused(POLARIS_MAP_LAYOUT, { ...f, edges: oneWay }), true);
+  assert.equal(mapNothingUnused(POLARIS_MAP_LAYOUT, { ...f, edges: {}, edgesUnknown: true }), true);
 });
 
 test("arrows unknown: every box is used, and the full grid is the layout as written", () => {
@@ -205,17 +254,18 @@ test("a partial read: arrows over the newest rows, boxes with their whole-ledger
   const used = usedNodes(POLARIS_MAP_LAYOUT, f);
   // Every box with a count of its own is kept, arrow or none.
   for (const [id, n] of Object.entries(f.nodes)) if ((n.rowCount ?? 0) > 0) assert.ok(used.has(id), id);
-  const g = mapCompactGrid(POLARIS_MAP_LAYOUT, used);
+  const g = mapCompactGrid(POLARIS_MAP_LAYOUT, used, mapJoined(POLARIS_MAP_LAYOUT, f));
   assert.deepEqual(Object.keys(g.cells).sort(), [...used].sort());
   assertSound(g);
 });
 
 test("?routes=: all draws the whole layout; anything else, or none, the used routes", () => {
-  assert.equal(mapRoutesFromSearch("?routes=all"), "all");
-  assert.equal(mapRoutesFromSearch("?map=a->b&routes=all"), "all");
-  assert.equal(mapRoutesFromSearch("?routes=used"), "used");
-  assert.equal(mapRoutesFromSearch("?routes=ALL"), "used");
-  assert.equal(mapRoutesFromSearch(""), "used");
+  assert.equal(mapRoutesFromParam("all"), "all");
+  assert.equal(mapRoutesFromParam(new URLSearchParams("?map=a->b&routes=all").get("routes")), "all");
+  assert.equal(mapRoutesFromParam("used"), "used");
+  assert.equal(mapRoutesFromParam("ALL"), "used");
+  assert.equal(mapRoutesFromParam(""), "used");
+  assert.equal(mapRoutesFromParam(null), "used");
   const base = "https://x.test/sepolia/polaris/peth/0xab?map=polaris%3Azap-%3Eholder#peth-timeline";
   const on = mapRoutesHref(base, "all");
   assert.equal(new URL(on).searchParams.get("routes"), "all");
@@ -224,6 +274,6 @@ test("?routes=: all draws the whole layout; anything else, or none, the used rou
   const off = mapRoutesHref(on, "used");
   assert.equal(new URL(off).searchParams.has("routes"), false);
   assert.equal(new URL(off).searchParams.get("map"), "polaris:zap->holder");
-  assert.equal(mapRoutesFromSearch(new URL(on).search), "all");
-  assert.equal(mapRoutesFromSearch(new URL(off).search), "used");
+  assert.equal(mapRoutesFromParam(new URL(on).searchParams.get(MAP_ROUTES_PARAM)), "all");
+  assert.equal(mapRoutesFromParam(new URL(off).searchParams.get(MAP_ROUTES_PARAM)), "used");
 });

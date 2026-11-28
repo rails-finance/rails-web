@@ -6,14 +6,15 @@
 // the address's box, mechanisms below it. Each filled edge is an arrow with its
 // receipt (the summed amounts, each with its asset's icon) and a link to the
 // timeline filtered to it. By default the map draws only the boxes and arrows
-// the address used, without gaps (`mapCompactGrid`); its "Show unused routes"
+// the address used, its empty columns dropped (`mapCompactGrid`); its "Show unused routes"
 // switch, kept in the URL as `?routes=all`, draws the whole layout, an edge or
 // box with no fill dashed (ui-jobs 882).
 //
 // Clicking a box, a receipt or a timeline row selects it: the page holds the
 // selection and passes it back, and `hotSets` says what it lights.
 
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
@@ -23,12 +24,14 @@ import { EXPLAIN_GROUP_RULE, ExplainBullet, ExplainHeading } from "@/components/
 import {
   hotSets,
   MAP_HOLDER,
+  MAP_ROUTES_PARAM,
   mapCompactGrid,
   mapExact,
   mapFullGrid,
   mapJoined,
   mapPlainClick,
-  mapRoutesFromSearch,
+  mapNothingUnused,
+  mapRoutesFromParam,
   mapRoutesHref,
   mapSeries,
   mapUnits,
@@ -449,11 +452,10 @@ export function ProtocolMap({
   const frame = useRef<HTMLDivElement>(null);
   const boxRefs = useRef<Record<string, HTMLElement | null>>({});
   const [geo, setGeo] = useState<{ w: number; h: number; boxes: Record<string, Box> } | null>(null);
-  // Used routes only, or the whole layout (`?routes=all`), read on load.
-  const [routes, setRoutes] = useState<MapRoutes>("used");
-  useEffect(() => {
-    setRoutes(mapRoutesFromSearch(window.location.search));
-  }, []);
+  // Used routes only, or the whole layout (`?routes=all`): seeded from the
+  // request's query, so the server render and the first paint agree.
+  const params = useSearchParams();
+  const [routes, setRoutes] = useState<MapRoutes>(() => mapRoutesFromParam(params?.get(MAP_ROUTES_PARAM)));
   const showRoutes = (next: MapRoutes) => {
     setRoutes(next);
     window.history.replaceState(window.history.state, "", mapRoutesHref(window.location.href, next));
@@ -487,6 +489,8 @@ export function ProtocolMap({
   // switch.
   const unknown = fill.edgesUnknown === true;
   const all = unknown || routes === "all";
+  // Nothing unused: the switch is not drawn, nor the legend's dashed entry.
+  const nothingUnused = useMemo(() => mapNothingUnused(layout, fill), [layout, fill]);
   const grid = useMemo(
     () => (all ? mapFullGrid(layout) : mapCompactGrid(layout, used, mapJoined(layout, fill))),
     [all, layout, used, fill],
@@ -728,7 +732,7 @@ export function ProtocolMap({
             <span className="inline-block w-6 border-t-2 border-blue-500/70" aria-hidden="true" />
             Used by this address
           </span>
-          {all && (
+          {all && !nothingUnused && (
             <span className="inline-flex items-center gap-1.5">
               <span
                 className="inline-block w-6 border-t border-dashed border-rb-300 dark:border-rb-500"
@@ -740,29 +744,33 @@ export function ProtocolMap({
           <span>Each arrow&rsquo;s ↓ link opens the timeline filtered to its transactions.</span>
           {/* O9: the routes switch, at the legend's right end; below sm on a
               line of its own. */}
-          <span className="h-0 basis-full sm:hidden" aria-hidden="true" />
-          <button
-            type="button"
-            className="group/routes inline-flex cursor-pointer items-center gap-1.5 rounded-md py-0.5 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:ml-auto"
-            aria-pressed={all}
-            onClick={() => showRoutes(all ? "used" : "all")}
-            data-map-routes-toggle=""
-            data-anatomy="O9"
-          >
-            <span
-              className={`relative inline-flex h-3.5 w-6 shrink-0 items-center rounded-full ${
-                all ? "bg-blue-500/70 dark:bg-blue-400/70" : "bg-rb-300 dark:bg-rb-600"
-              }`}
-              aria-hidden="true"
-            >
-              <span
-                className={`absolute h-2.5 w-2.5 rounded-full bg-white shadow-sm ${
-                  all ? "translate-x-[11px]" : "translate-x-0.5"
-                }`}
-              />
-            </span>
-            Show unused routes
-          </button>
+          {!nothingUnused && (
+            <>
+              <span className="h-0 basis-full sm:hidden" aria-hidden="true" />
+              <button
+                type="button"
+                className="group/routes inline-flex cursor-pointer items-center gap-1.5 rounded-md min-h-6 py-1 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:ml-auto"
+                aria-pressed={all}
+                onClick={() => showRoutes(all ? "used" : "all")}
+                data-map-routes-toggle=""
+                data-anatomy="O9"
+              >
+                <span
+                  className={`relative inline-flex h-3.5 w-6 shrink-0 items-center rounded-full ${
+                    all ? "bg-blue-500/70 dark:bg-blue-400/70" : "bg-rb-300 dark:bg-rb-600"
+                  }`}
+                  aria-hidden="true"
+                >
+                  <span
+                    className={`absolute h-2.5 w-2.5 rounded-full bg-white shadow-sm ${
+                      all ? "translate-x-[11px]" : "translate-x-0.5"
+                    }`}
+                  />
+                </span>
+                Show unused routes
+              </button>
+            </>
+          )}
         </div>
       )}
       {sentence && (

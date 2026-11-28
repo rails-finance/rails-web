@@ -146,7 +146,7 @@ export interface MapHot {
 }
 
 /** The nodes this address used: the holder, every node a filled edge
- *  touches, and every node with a "now" line or a row count of its own.
+ *  touches, and every node with a "now" line or its row count.
  *  With the edges unknown, every node. */
 export function usedNodes(layout: MapLayout, fill: MapFill): Set<string> {
   const out = new Set<string>([MAP_HOLDER]);
@@ -163,7 +163,7 @@ export function usedNodes(layout: MapLayout, fill: MapFill): Set<string> {
 
 // ── Used routes only (ui-jobs 882) ─────────────────────────────────────────
 // By default the map draws only the nodes this address used (`usedNodes`)
-// and its filled edges, laid out without gaps; `?routes=all` draws the whole
+// and its filled edges, its empty columns dropped; `?routes=all` draws the whole
 // layout, the unused parts muted.
 
 /** Where a node sits on the drawn grid: 1-based column, span and row. */
@@ -190,57 +190,74 @@ export function mapFullGrid(layout: MapLayout): MapGrid {
   return { columns: layout.columns, rows: Math.max(...layout.nodes.map((n) => n.row)), cells, scale: 1 };
 }
 
-/** The layout with only the `shown` nodes. Each row keeps its shown nodes in
- *  layout order, left to right; a row with none is dropped. Every row is
- *  measured in the same unit, a layout column, so a node's span carries over
- *  as its relative width: the grid is as wide as its widest row, and each row
- *  sits centred in it. In the holder's row the nodes left of the holder sit
- *  left of it and the rest right, with the holder at the centre. Two
- *  neighbours that `joined` names (an arrow between them in the row) keep one
- *  unit between them, room for the arrow and its receipt. The grid has two
- *  columns per unit, so a centred row starts on a whole column. */
+/** The layout with only the `shown` nodes, compacted by columns. Each shown
+ *  node keeps its layout column and span; a row with no shown node is
+ *  dropped, and so is every layout column that no shown node covers in any
+ *  row, so the nodes left stay aligned between rows. Two neighbours in a row
+ *  that `joined` names (an arrow between them) keep one layout column
+ *  between them where the layout has one, room for the arrow's receipt.
+ *  Where the layout centres the holder, empty columns added at the shorter
+ *  edge keep it centred. With every node shown, the full grid. */
 export function mapCompactGrid(
   layout: MapLayout,
   shown: ReadonlySet<string>,
   joined: (a: string, b: string) => boolean = () => false,
 ): MapGrid {
-  const byRow = new Map<number, MapNode[]>();
-  for (const n of layout.nodes) {
-    if (!shown.has(n.id)) continue;
-    const xs = byRow.get(n.row) ?? [];
-    xs.push(n);
-    byRow.set(n.row, xs);
-  }
-  const rows = [...byRow.keys()].sort((a, b) => a - b).map((r) => byRow.get(r)!.sort((a, b) => a.col - b.col));
-  // The unit kept before each node of a row: one after a joined neighbour.
-  const gapBefore = (xs: MapNode[], i: number) => (i > 0 && joined(xs[i - 1].id, xs[i].id) ? 1 : 0);
-  // The width of nodes `from` to `to` (exclusive) of a row, their gaps between them.
-  const width = (xs: MapNode[], from: number, to: number) => {
-    let w = 0;
-    for (let i = from; i < to; i++) w += xs[i].span + (i > from ? gapBefore(xs, i) : 0);
-    return w;
-  };
-  // Each row's width in units, and where its first node starts.
-  const placed = rows.map((xs) => {
-    const h = xs.findIndex((n) => n.id === MAP_HOLDER);
-    if (h === -1) return { xs, w: width(xs, 0, xs.length), lead: 0 };
-    const left = h > 0 ? width(xs, 0, h) + gapBefore(xs, h) : 0;
-    const right = h < xs.length - 1 ? width(xs, h + 1, xs.length) + gapBefore(xs, h + 1) : 0;
-    const side = Math.max(left, right);
-    return { xs, w: 2 * side + xs[h].span, lead: side - left };
-  });
-  const units = Math.max(1, ...placed.map((p) => p.w));
-  const cells: Record<string, MapCell> = {};
-  placed.forEach(({ xs, w, lead }, i) => {
-    // In half units: (units - w) / 2 + lead, doubled.
-    let at = units - w + 2 * lead + 1;
-    for (const [j, n] of xs.entries()) {
-      at += 2 * gapBefore(xs, j);
-      cells[n.id] = { col: at, span: 2 * n.span, row: i + 1 };
-      at += 2 * n.span;
+  if (layout.nodes.every((n) => shown.has(n.id))) return mapFullGrid(layout);
+  const kept = layout.nodes.filter((n) => shown.has(n.id));
+  // The layout columns kept, 1-based.
+  const keep = new Array<boolean>(layout.columns + 1).fill(false);
+  for (const n of kept) for (let c = n.col; c < n.col + n.span; c++) keep[c] = true;
+  const rowNums = [...new Set(kept.map((n) => n.row))].sort((a, b) => a - b);
+  for (const r of rowNums) {
+    const xs = kept.filter((n) => n.row === r).sort((a, b) => a.col - b.col);
+    for (let i = 1; i < xs.length; i++) {
+      const from = xs[i - 1].col + xs[i - 1].span;
+      const to = xs[i].col - 1;
+      if (from > to || !joined(xs[i - 1].id, xs[i].id)) continue;
+      let room = false;
+      for (let c = from; c <= to; c++) room ||= keep[c];
+      if (!room) keep[from + Math.floor((to - from) / 2)] = true;
     }
-  });
-  return { columns: 2 * units, rows: rows.length, cells, scale: units / layout.columns };
+  }
+  // Each layout column's place among the kept ones, 1-based.
+  const at = new Array<number>(layout.columns + 2).fill(0);
+  for (let c = 1; c <= layout.columns; c++) at[c] = at[c - 1] + (keep[c] ? 1 : 0);
+  const total = at[layout.columns];
+  // Padding at the shorter edge, where the layout centres the holder.
+  let padLeft = 0;
+  let padRight = 0;
+  const holder = kept.find((n) => n.id === MAP_HOLDER);
+  if (holder) {
+    const end = holder.col + holder.span - 1;
+    const centred = holder.col - 1 === layout.columns - end;
+    const left = at[holder.col - 1];
+    const right = total - at[end];
+    if (centred) {
+      padLeft = Math.max(0, right - left);
+      padRight = Math.max(0, left - right);
+    }
+  }
+  const cells: Record<string, MapCell> = {};
+  for (const n of kept)
+    cells[n.id] = {
+      col: padLeft + at[n.col],
+      span: at[n.col + n.span - 1] - at[n.col] + 1,
+      row: rowNums.indexOf(n.row) + 1,
+    };
+  const columns = padLeft + total + padRight;
+  return { columns, rows: rowNums.length, cells, scale: columns / layout.columns };
+}
+
+/** Whether the map has nothing unused to show: every node used, and every
+ *  edge filled or the reverse of a filled one (an unused edge beside its
+ *  used reverse is not drawn). With the edges unknown, nothing to show. */
+export function mapNothingUnused(layout: MapLayout, fill: MapFill): boolean {
+  if (fill.edgesUnknown) return true;
+  const used = usedNodes(layout, fill);
+  if (!layout.nodes.every((n) => used.has(n.id))) return false;
+  const filled = new Set(layout.edges.filter((e) => fill.edges[e.id]).map((e) => `${e.from}|${e.to}`));
+  return layout.edges.every((e) => filled.has(`${e.from}|${e.to}`) || filled.has(`${e.to}|${e.from}`));
 }
 
 /** Whether a filled edge joins two nodes, either way. */
@@ -259,9 +276,9 @@ export const MAP_ROUTES_PARAM = "routes";
 
 export type MapRoutes = "used" | "all";
 
-/** The routes a page's query asks for: "all" for `routes=all`, else "used". */
-export function mapRoutesFromSearch(search: string): MapRoutes {
-  return new URLSearchParams(search).get(MAP_ROUTES_PARAM) === "all" ? "all" : "used";
+/** The routes a `?routes=` value asks for: "all" for `all`, else "used". */
+export function mapRoutesFromParam(raw: string | null | undefined): MapRoutes {
+  return raw === "all" ? "all" : "used";
 }
 
 /** The url with the routes set: `routes=all`, or no param for "used". The
