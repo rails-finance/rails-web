@@ -85,7 +85,8 @@ export function SpineVal({
   value?: string | number;
   side: "left" | "right";
   /** The amount opens this page: the figure keeps its look at rest and
-   *  takes the link cue (underline, the focus ring) on hover and focus. */
+   *  takes the link cue (underline, the focus ring) on hover and focus; on a
+   *  screen without hover it rests on a dotted hairline underline. */
   link?: SpineAmountLink;
   /** A symbol printed after the figure, smaller and muted. */
   unit?: string;
@@ -126,6 +127,10 @@ export function SpineVal({
     // Below 640px the spine node passes taps through to the row's phone
     // toggle (spine-column.tsx); a tap on the link opens the link.
     " pointer-events-auto" +
+    // A screen without hover never shows the hover cue: there the link rests
+    // on a dotted hairline underline (anatomy L3.2).
+    " [@media(hover:none)]:underline [@media(hover:none)]:decoration-dotted [@media(hover:none)]:decoration-1" +
+    " [@media(hover:none)]:decoration-[var(--edge-row-line)]" +
     mark;
   const common = {
     title: link.tip,

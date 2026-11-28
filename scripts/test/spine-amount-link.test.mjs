@@ -44,6 +44,21 @@ test("an amountLink wraps the amount alone, and the rest of the spine is unchang
   assert.match(whole, /data-anatomy="L3.3"/);
   assert.match(whole, /aria-label="4.2K: Went to reserve loan #28"/, "the name reads the words without the arrow");
   assert.match(whole, /pointer-events-auto/, "a tap on the link opens the link");
+  const cls = /class="([^"]*)"/.exec(whole)?.[1].split(" ") ?? [];
+  for (const c of [
+    "[@media(hover:none)]:underline",
+    "[@media(hover:none)]:decoration-dotted",
+    "[@media(hover:none)]:decoration-1",
+    "[@media(hover:none)]:decoration-[var(--edge-row-line)]",
+  ]) {
+    assert.ok(cls.includes(c), `on a screen without hover the link rests on a dotted hairline underline: ${c}`);
+  }
+  assert.ok(
+    cls
+      .filter((c) => /underline|decoration/.test(c))
+      .every((c) => /^(\[@media\(hover:none\)\]|hover|focus-visible):|^underline-offset-/.test(c)),
+    "with hover the link has no underline at rest",
+  );
   assert.match(
     html,
     /data-spine-node=""[^>]*class="relative z-10 max-sm:z-30 max-sm:pointer-events-none/,
