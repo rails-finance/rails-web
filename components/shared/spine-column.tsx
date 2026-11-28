@@ -1417,7 +1417,7 @@ export function SpineColumn({
         // to it; a tap on the link opens the link (SpineVal, pointer-events-auto).
         // While the amount's tooltip is open the node stands above the other
         // rows' nodes, the number column and a group's range (z-40).
-        className={`relative z-10${rows.some((r) => r.amountLink) ? " max-sm:z-30 max-sm:pointer-events-none has-[[data-tip-open]]:z-50!" : ""}${effectiveIcon && !(effectiveIcon === "market" && rows.length) ? "" : " flex flex-col gap-y-1 items-center"}`}
+        className={`relative z-10${rows.some((r) => r.amountLink && !r.amountLink.external) ? " max-sm:z-30 max-sm:pointer-events-none has-[[data-tip-open]]:z-50!" : ""}${effectiveIcon && !(effectiveIcon === "market" && rows.length) ? "" : " flex flex-col gap-y-1 items-center"}`}
         style={{ backgroundColor: ground, boxShadow: `0 0 0 4px ${ground}`, paddingBottom: hasBadge ? 6 : undefined }}
       >
         {leadIn}
