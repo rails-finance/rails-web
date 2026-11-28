@@ -169,10 +169,9 @@ export function RevealTip({
           : undefined
       }
       onClick={(e) => {
-        // A click in the bubble stops there: it belongs to the bubble's
-        // control, or to nobody on its padding or arrow, where it also follows
-        // no link around the tip (a listing card's row). A control in the
-        // bubble that navigates starts the progress bar itself.
+        // A click in the bubble stops there. On its padding or arrow it also
+        // follows no link around the tip (a listing card's row); a control in
+        // the bubble that navigates starts the progress bar.
         if (interactive && bubbleRef.current?.contains(e.target as Node)) {
           const control = (e.target as Element).closest("a[href],button");
           if (!control || !bubbleRef.current.contains(control)) e.preventDefault();

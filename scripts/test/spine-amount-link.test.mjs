@@ -125,7 +125,7 @@ test("a click in an interactive RevealTip's bubble stops there, and on its paddi
     /if \(interactive && bubbleRef\.current\?\.contains\(e\.target as Node\)\) \{\s*const control = \(e\.target as Element\)\.closest\("a\[href\],button"\);\s*if \(!control \|\| !bubbleRef\.current\.contains\(control\)\) e\.preventDefault\(\);\s*e\.stopPropagation\(\);\s*return;\s*\}/,
   );
 });
-test("the links that stop their click start the progress bar themselves", () => {
+test("the links that stop their click start the progress bar", () => {
   const spine = src("components/shared/activity-timeline.tsx");
   assert.match(
     spine,
