@@ -18,6 +18,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { CHAIN_TRUTH_DISPLAY_ITEMS, TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
@@ -28,11 +29,17 @@ import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { PETH_HEAVY, PETH_UNREAD, PolarisPethCard } from "@/components/protocol/polaris/polaris-peth-card";
 import { PolarisPethPlaces } from "@/components/protocol/polaris/polaris-peth-places";
 import { PETH_NAMES, PolarisPethEventCard } from "@/components/protocol/polaris/polaris-peth-event-card";
+import { PolarisPethMap } from "@/components/protocol/polaris/polaris-peth-map";
+import { buildPethMapFill, pethMapRowEdges } from "@/lib/polaris/peth-map-fill";
+import { pethMapContext } from "@/lib/polaris/peth-map-context";
+import { POLARIS_MAP_LAYOUT } from "@/lib/polaris/peth-map-layout";
+import { hotSets, MAP_EDGE_PARAM, type MapFill, type MapSelection } from "@/lib/shared/protocol-map/types";
 import { PETH, POLARIS_VENUES } from "@/lib/polaris/asset-catalog";
 import {
   pethAmountText,
   pethHeadlines,
   pethHeadRead,
+  pethKindLabel,
   pethLedgerGap,
   pethLedgerUnchecked,
   pethScannedTo,
@@ -117,12 +124,37 @@ function PethExplanation({
   );
 }
 
+/** The timeline's notice while it is filtered to one arrow of the map. */
+function MapFilterNotice({ edgeId, count, onClear }: { edgeId: string; count: number; onClear: () => void }) {
+  const e = POLARIS_MAP_LAYOUT.edges.find((x) => x.id === edgeId);
+  const name = (id: string | undefined) => POLARIS_MAP_LAYOUT.nodes.find((n) => n.id === id)?.title ?? id;
+  return (
+    <p className="text-sm text-rb-500" data-map-filter={edgeId}>
+      The timeline shows the {count.toLocaleString("en-US")} {count === 1 ? "transaction" : "transactions"} on the
+      map&rsquo;s{" "}
+      <span className="font-semibold text-foreground">
+        {name(e?.from)} → {name(e?.to)}
+      </span>{" "}
+      arrow.{" "}
+      <button type="button" className={`${INLINE_LINK} cursor-pointer`} onClick={onClear}>
+        Show every transaction
+      </button>
+    </p>
+  );
+}
+
 export default function PethView({
   address,
   initial,
+  mapFill,
+  handAddedPlaces,
 }: {
   address: string;
   initial: PolarisPethResponse | PethRefusal | null;
+  /** The map's fill, summed on the server (ui-jobs 873). */
+  mapFill?: MapFill | null;
+  /** DEV ONLY: rows whose places were added by hand. */
+  handAddedPlaces?: string[] | null;
 }) {
   const [data, setData] = useState<PolarisPethResponse | null>(isPethRefusal(initial) ? null : initial);
   const [refused, setRefused] = useState<PethRefusal | null>(isPethRefusal(initial) ? initial : null);
@@ -190,9 +222,56 @@ export default function PethView({
       .reverse();
   }, [rows, older]);
   const rowById = useMemo(() => new Map(listed.map((r) => [pethRowId(r), r])), [listed]);
-  const events = useMemo(() => listed.map((r) => pethTimelineEvent(r, PETH_NAMES, POLARIS_VENUES)), [listed]);
+
+  // The map (ui-jobs 873): the server's fill, or the same builder over the
+  // client's read where the server read did not answer. Rows read past the
+  // first name their edges through the same function, so the map lights them.
+  const mapCtx = useMemo(() => pethMapContext(address), [address]);
+  const baseFill = useMemo(() => mapFill ?? (data ? buildPethMapFill(data, mapCtx) : null), [mapFill, data, mapCtx]);
+  const fill = useMemo(() => {
+    if (!baseFill || older.length === 0) return baseFill;
+    const seen = new Set(baseFill.rows.map((r) => r.id));
+    const more = older
+      .filter((r) => !seen.has(pethRowId(r)))
+      .map((r) => ({ id: pethRowId(r), edgeIds: pethMapRowEdges(r, mapCtx) }));
+    return { ...baseFill, rows: [...baseFill.rows, ...more] };
+  }, [baseFill, older, mapCtx]);
+  const [selection, setSelection] = useState<MapSelection>(null);
+  const [filterEdge, setFilterEdge] = useState<string | null>(null);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get(MAP_EDGE_PARAM);
+    if (id && POLARIS_MAP_LAYOUT.edges.some((e) => e.id === id)) {
+      setFilterEdge(id);
+      setSelection({ type: "edge", id });
+    }
+  }, []);
+  const applyFilter = (edgeId: string | null) => {
+    setFilterEdge(edgeId);
+    if (edgeId) setSelection({ type: "edge", id: edgeId });
+    const url = new URL(window.location.href);
+    if (edgeId) url.searchParams.set(MAP_EDGE_PARAM, edgeId);
+    else url.searchParams.delete(MAP_EDGE_PARAM);
+    window.history.replaceState(window.history.state, "", url);
+    if (edgeId) document.getElementById("timeline")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const hot = useMemo(() => (fill ? hotSets(POLARIS_MAP_LAYOUT, fill, selection) : null), [fill, selection]);
+  const edgeRows = useMemo(() => {
+    if (!fill || !filterEdge) return null;
+    return new Set(fill.rows.filter((r) => r.edgeIds.includes(filterEdge)).map((r) => r.id));
+  }, [fill, filterEdge]);
+  const rowLabel = (id: string) => {
+    const r = rowById.get(id);
+    return r ? pethKindLabel(r.kind) : null;
+  };
+
+  const shown = useMemo(
+    () => (edgeRows ? listed.filter((r) => edgeRows.has(pethRowId(r))) : listed),
+    [listed, edgeRows],
+  );
+  const events = useMemo(() => shown.map((r) => pethTimelineEvent(r, PETH_NAMES, POLARIS_VENUES)), [shown]);
   const total = data?.total_rows ?? listed.length;
-  const olderCount = Math.max(0, total - listed.length);
+  // Filtered to an edge, the list is the rows read so far on it.
+  const olderCount = edgeRows ? 0 : Math.max(0, total - listed.length);
 
   const tl = useTimelineEvents(events, {
     storageKey: `polaris-peth-${address}`,
@@ -292,31 +371,63 @@ export default function PethView({
             headBlock={headBlock}
             storedAsOf={pethStoredAsOf(data)}
           />
+          {fill && (
+            <PolarisPethMap
+              address={address}
+              fill={fill}
+              ledgerGap={ledgerGap}
+              selection={selection}
+              onSelect={setSelection}
+              onFilter={applyFilter}
+              rowLabel={rowLabel}
+              handAddedPlaces={handAddedPlaces}
+            />
+          )}
         </>
       )}
-      <ChainTruthTimeline
-        persistKeyPrefix="polaris-peth"
-        closed={false}
-        tl={tl}
-        boundary={boundary}
-        loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
-        displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-        emptyLabel={
-          ledgerGap === "too_heavy"
-            ? PETH_HEAVY
-            : ledgerGap === "reading"
-              ? "The history of this address is still being read"
-              : "No pETH, fpETH or vpETH transactions recorded for this address"
-        }
-        toolbarLeading={
-          <TimelineActivityHeader events={events} closed={false} firstAt={firstAt} tenurePending={firstAt == null} />
-        }
-        eventPage={(slot) => polarisPethEventPage({ ...slot, address, row: rowById.get(slot.event.id) })}
-        renderCard={(event, meta) => {
-          const r = rowById.get(event.id);
-          return r ? <PolarisPethEventCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} /> : null;
-        }}
-      />
+      <div id="timeline" className="scroll-mt-4">
+        <ChainTruthTimeline
+          persistKeyPrefix="polaris-peth"
+          closed={false}
+          tl={tl}
+          boundary={boundary}
+          loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
+          notice={
+            filterEdge && fill ? (
+              <MapFilterNotice edgeId={filterEdge} count={shown.length} onClear={() => applyFilter(null)} />
+            ) : undefined
+          }
+          displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+          emptyLabel={
+            ledgerGap === "too_heavy"
+              ? PETH_HEAVY
+              : ledgerGap === "reading"
+                ? "The history of this address is still being read"
+                : "No pETH, fpETH or vpETH transactions recorded for this address"
+          }
+          toolbarLeading={
+            <TimelineActivityHeader events={events} closed={false} firstAt={firstAt} tenurePending={firstAt == null} />
+          }
+          eventPage={(slot) => polarisPethEventPage({ ...slot, address, row: rowById.get(slot.event.id) })}
+          renderCard={(event, meta) => {
+            const r = rowById.get(event.id);
+            if (!r) return null;
+            // A click on a row selects it on the map (ui-jobs 873), and a
+            // selection on the map marks its rows here.
+            const lit = hot?.any === true && hot.rows.has(event.id);
+            return (
+              <div
+                className={lit ? "rounded-xl ring-2 ring-[var(--focus-ring)]" : undefined}
+                data-map-row={event.id}
+                data-map-lit={lit ? "" : undefined}
+                onClick={() => setSelection({ type: "row", id: event.id })}
+              >
+                <PolarisPethEventCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} />
+              </div>
+            );
+          }}
+        />
+      </div>
       <ProvInspectorLayer />
     </div>
   );

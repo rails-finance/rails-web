@@ -1,0 +1,510 @@
+{
+  "_note": "Production answer of GET /api/polaris/peth/0x38d77e28865fe9a412a0fa5f5f12cbea1f25a704, read 28 Nov 2026, with `place`, `places` and `place_counts` ADDED BY HAND in ui-jobs 872's shape (ui-jobs 873), before the route sends them.",
+  "status": "ok",
+  "reason": null,
+  "address": "0x38d77e28865fe9a412a0fa5f5f12cbea1f25a704",
+  "deployment_id": "sepolia-2026-08",
+  "ledger": {
+    "complete": true,
+    "scanned_to_block": "12229120",
+    "scanned_to_timestamp": "2026-11-28T09:11:12.000Z",
+    "deploy_block": "11482700",
+    "head_block": "12229142",
+    "fresh_within_blocks": 7200
+  },
+  "head": {
+    "block": "12229142",
+    "source": "multicall at head (POLARIS_RPC_URL)"
+  },
+  "head_unread_reason": null,
+  "prices": {
+    "spot_raw": "3200066469713812942",
+    "floor_raw": "2019034385725135776",
+    "block": "12229142",
+    "source": "multicall at head (POLARIS_RPC_URL)"
+  },
+  "figures": {
+    "eth_in": {
+      "raw": "30000000000000000000",
+      "source": "ledger: reserveIn on curve buys, amountIn on zap swaps from ETH or the reserve token into pETH or fpETH, and the reserve token paid into splitter BuyFpToken",
+      "block": "12229120"
+    },
+    "eth_out": {
+      "raw": "0",
+      "source": "ledger: reserveOut on curve sells, amountOut on zap swaps to ETH or the reserve token from pETH or fpETH, and the reserve token paid by splitter Redeem for fpETH",
+      "block": "12229120"
+    },
+    "curve_fees_paid": {
+      "raw": "173605765590902838",
+      "source": "ledger: feeAmount on the address's curve trades and on its zap-routed ones with pETH or fpETH on one side",
+      "block": "12229120"
+    },
+    "peth_held": {
+      "raw": "457336014283415572",
+      "head_raw": "457336014283415572",
+      "stored_raw": "457336014283415572",
+      "block": "12229142",
+      "source": "multicall at head (POLARIS_RPC_URL)",
+      "stored_block": "12229120"
+    }
+  },
+  "rollup": {
+    "wallet_peth": {
+      "raw": "457336014283415572",
+      "at_spot_raw": "1463505644700915600",
+      "at_floor_raw": "923377138668697880",
+      "block": "12229142",
+      "source": "multicall at head (POLARIS_RPC_URL)"
+    },
+    "cdp_collateral": {
+      "raw": "10925000000000000000",
+      "source": "polaris_cdp_updated: new_coll at the CDP's last touch",
+      "items": [
+        {
+          "market": "goldp",
+          "cdp_id": "22",
+          "coll_raw": "5962500000000000000",
+          "as_of_block": "11514797",
+          "as_of_tx": "0xf1a901059db910646188f933912947d98b4b7598f36c799b01d83cc58d2ad226"
+        },
+        {
+          "market": "usdp",
+          "cdp_id": "36",
+          "coll_raw": "4962500000000000000",
+          "as_of_block": "11514793",
+          "as_of_tx": "0x5f8c5387c206c681ef57014645e4416cdf978079b8562381a06ddf0c8b8a2bbe"
+        }
+      ]
+    },
+    "sp_peth": {
+      "raw": "0",
+      "source": "polaris_sp_deposit_updated: stashed_bc_tokens at the deposit's last operation",
+      "items": []
+    },
+    "loans_fpeth": {
+      "raw": "5000000000000000000",
+      "source": "polaris_loan_opened + polaris_loan_adjusted: fpETH collateral",
+      "items": [
+        {
+          "loan_id": "28",
+          "fpeth_raw": "5000000000000000000",
+          "opened_block": "11514800"
+        }
+      ]
+    },
+    "wallet_fpeth": {
+      "raw": "3778050067873262182",
+      "at_floor_raw": "7628012998027299435",
+      "block": "12229142",
+      "source": "multicall at head (POLARIS_RPC_URL)"
+    },
+    "lp": [
+      {
+        "venue": "venue_curve_tripool",
+        "address": "0x28b6f412904834dee78a4fa464f2089f5264770c",
+        "lp_balance_raw": "0",
+        "lp_supply_raw": "6931098115122065348123",
+        "pool_peth_raw": "4315661522761189260013",
+        "peth_share_raw": "0",
+        "block": "12229142",
+        "source": "multicall at head (POLARIS_RPC_URL)"
+      },
+      {
+        "venue": "venue_univ2_polar_peth",
+        "address": "0xdce2d72d07760cdb29604baee6271fcb1f3a7565",
+        "lp_balance_raw": "0",
+        "lp_supply_raw": "316342661487886431539777",
+        "pool_peth_raw": "60631692405287706536617",
+        "peth_share_raw": "0",
+        "block": "12229142",
+        "source": "multicall at head (POLARIS_RPC_URL)"
+      },
+      {
+        "venue": "venue_univ2_peth_weth",
+        "address": "0xb3348b1c358aa118b6304a91c48f3ee5a13f06a8",
+        "lp_balance_raw": "0",
+        "lp_supply_raw": "117620765739216387",
+        "pool_peth_raw": "814239444445395",
+        "peth_share_raw": "0",
+        "block": "12229142",
+        "source": "multicall at head (POLARIS_RPC_URL)"
+      }
+    ],
+    "wallet_vpeth": {
+      "raw": "0",
+      "valued": false,
+      "block": "12229142",
+      "source": "multicall at head (POLARIS_RPC_URL)"
+    },
+    "wallet_svpeth": {
+      "raw": "0",
+      "vpeth_raw": "0",
+      "valued": false,
+      "block": "12229142",
+      "source": "multicall at head (POLARIS_RPC_URL)"
+    }
+  },
+  "total_rows": 5,
+  "limit": 500,
+  "offset": 0,
+  "rows": [
+    {
+      "tx_hash": "0x259e83f49d5b5f9b5ee2c78fca04ef550626d141fde66281b6267888322df6b2",
+      "block_number": "11514800",
+      "tx_index": 44,
+      "first_log_index": 6,
+      "block_timestamp": "1787052612",
+      "kind": "loan_collateral",
+      "effect": "change_of_place",
+      "lines": [
+        {
+          "rule": "loan_collateral",
+          "effect": "change_of_place",
+          "token": "fpeth",
+          "direction": "out",
+          "amount_raw": "5000000000000000000",
+          "counterparty": "0xcaa0757808a96f9f4ee76c04256536d6c17e6e27",
+          "counterparty_role": "reserve_loans_manager",
+          "counterparty_code_size": null,
+          "log_index": 6
+        }
+      ],
+      "peth_delta_raw": "0",
+      "fpeth_delta_raw": "-5000000000000000000",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": null,
+      "balances": {
+        "peth": {
+          "before_raw": "457336014283415572",
+          "after_raw": "457336014283415572"
+        },
+        "fpeth": {
+          "before_raw": "8778050067873262182",
+          "after_raw": "3778050067873262182"
+        },
+        "vpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "30000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "173605765590902838"
+      },
+      "place": {
+        "kind": "loan",
+        "id": "28"
+      },
+      "places": [
+        {
+          "kind": "loan",
+          "id": "28"
+        }
+      ]
+    },
+    {
+      "tx_hash": "0xf1a901059db910646188f933912947d98b4b7598f36c799b01d83cc58d2ad226",
+      "block_number": "11514797",
+      "tx_index": 10,
+      "first_log_index": 33,
+      "block_timestamp": "1787052576",
+      "kind": "cdp_deposit",
+      "effect": "change_of_place",
+      "lines": [
+        {
+          "rule": "cdp_deposit",
+          "effect": "change_of_place",
+          "token": "peth",
+          "direction": "out",
+          "amount_raw": "6000000000000000000",
+          "counterparty": "0x18f652c41a5d30b4b49a9962800b34a6f1abfe41",
+          "counterparty_role": "goldp_cdp_manager",
+          "counterparty_code_size": null,
+          "log_index": 33
+        }
+      ],
+      "peth_delta_raw": "-6000000000000000000",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": null,
+      "balances": {
+        "peth": {
+          "before_raw": "6457336014283415572",
+          "after_raw": "457336014283415572"
+        },
+        "fpeth": {
+          "before_raw": "8778050067873262182",
+          "after_raw": "8778050067873262182"
+        },
+        "vpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "30000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "173605765590902838"
+      },
+      "place": {
+        "kind": "cdp",
+        "id": "22",
+        "market": "goldp"
+      },
+      "places": [
+        {
+          "kind": "cdp",
+          "id": "22",
+          "market": "goldp"
+        }
+      ]
+    },
+    {
+      "tx_hash": "0x5f8c5387c206c681ef57014645e4416cdf978079b8562381a06ddf0c8b8a2bbe",
+      "block_number": "11514793",
+      "tx_index": 16,
+      "first_log_index": 154,
+      "block_timestamp": "1787052528",
+      "kind": "cdp_deposit",
+      "effect": "change_of_place",
+      "lines": [
+        {
+          "rule": "cdp_deposit",
+          "effect": "change_of_place",
+          "token": "peth",
+          "direction": "out",
+          "amount_raw": "5000000000000000000",
+          "counterparty": "0xbdc1fe97e787ae7f653ffbccd74ec49814fe6aa1",
+          "counterparty_role": "usdp_cdp_manager",
+          "counterparty_code_size": null,
+          "log_index": 154
+        }
+      ],
+      "peth_delta_raw": "-5000000000000000000",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": null,
+      "balances": {
+        "peth": {
+          "before_raw": "11457336014283415572",
+          "after_raw": "6457336014283415572"
+        },
+        "fpeth": {
+          "before_raw": "8778050067873262182",
+          "after_raw": "8778050067873262182"
+        },
+        "vpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "30000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "173605765590902838"
+      },
+      "place": {
+        "kind": "cdp",
+        "id": "36",
+        "market": "usdp"
+      },
+      "places": [
+        {
+          "kind": "cdp",
+          "id": "36",
+          "market": "usdp"
+        }
+      ]
+    },
+    {
+      "tx_hash": "0x8e21f0c50d013c28f109d6132e858c2668f25960071b74bbd0a7ba96f9ed9033",
+      "block_number": "11514789",
+      "tx_index": 91,
+      "first_log_index": 234,
+      "block_timestamp": "1787052480",
+      "kind": "zap_in",
+      "effect": "acquisition",
+      "lines": [
+        {
+          "rule": "zap_in",
+          "effect": "acquisition",
+          "token": "peth",
+          "direction": "in",
+          "amount_raw": "11457336014283415572",
+          "counterparty": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8",
+          "counterparty_role": "zap_router",
+          "counterparty_code_size": null,
+          "log_index": 235
+        }
+      ],
+      "peth_delta_raw": "11457336014283415572",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "20000000000000000000",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "115730666810943591",
+      "event_price_raw": "1745606480866649735",
+      "event_price_source": "MultiSwap: amountIn / amountOut",
+      "valuation": null,
+      "zap": {
+        "token_in": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+        "token_out": "0x07ea2ff889e6228cded329a09f66e370f12c705e",
+        "amount_in": "20000000000000000000",
+        "amount_out": "11457336014283415572"
+      },
+      "balances": {
+        "peth": {
+          "before_raw": "0",
+          "after_raw": "11457336014283415572"
+        },
+        "fpeth": {
+          "before_raw": "8778050067873262182",
+          "after_raw": "8778050067873262182"
+        },
+        "vpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "30000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "173605765590902838"
+      },
+      "place": {
+        "kind": "zap",
+        "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+      },
+      "places": [
+        {
+          "kind": "zap",
+          "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+        }
+      ]
+    },
+    {
+      "tx_hash": "0xaae5b20f216619616d5300466e6bed11fea2270b878f5d6b84d9a90c27feb8a5",
+      "block_number": "11514783",
+      "tx_index": 11,
+      "first_log_index": 44,
+      "block_timestamp": "1787052408",
+      "kind": "zap_in",
+      "effect": "acquisition",
+      "lines": [
+        {
+          "rule": "zap_in",
+          "effect": "acquisition",
+          "token": "fpeth",
+          "direction": "in",
+          "amount_raw": "8778050067873262182",
+          "counterparty": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8",
+          "counterparty_role": "zap_router",
+          "counterparty_code_size": null,
+          "log_index": 69
+        }
+      ],
+      "peth_delta_raw": "0",
+      "fpeth_delta_raw": "8778050067873262182",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "10000000000000000000",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "57875098779959247",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": {
+        "token_in": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+        "token_out": "0x94220c1c340336527c719bcf06067ca7769ac185",
+        "amount_in": "10000000000000000000",
+        "amount_out": "8778050067873262182"
+      },
+      "balances": {
+        "peth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        },
+        "fpeth": {
+          "before_raw": "0",
+          "after_raw": "8778050067873262182"
+        },
+        "vpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "10000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "57875098779959247"
+      },
+      "place": {
+        "kind": "zap",
+        "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+      },
+      "places": [
+        {
+          "kind": "zap",
+          "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+        }
+      ]
+    }
+  ],
+  "code_sizes_read": {
+    "read": 0,
+    "cap": 50,
+    "page_outside_counterparties": 0,
+    "capped": false,
+    "unread_reason": null
+  },
+  "place_counts": [
+    {
+      "place": {
+        "kind": "loan",
+        "id": "28"
+      },
+      "rows": 1
+    },
+    {
+      "place": {
+        "kind": "cdp",
+        "id": "22",
+        "market": "goldp"
+      },
+      "rows": 1
+    },
+    {
+      "place": {
+        "kind": "cdp",
+        "id": "36",
+        "market": "usdp"
+      },
+      "rows": 1
+    },
+    {
+      "place": {
+        "kind": "zap",
+        "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+      },
+      "rows": 2
+    }
+  ]
+}

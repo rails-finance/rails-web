@@ -103,7 +103,26 @@ export interface PethValuation {
   eth_at_floor_raw: string | null;
 }
 
+// MIRROR of ui-jobs 872's place type (rails-web c99587e56, field for field),
+// so the map (ui-jobs 873) builds before 872 lands; 872's merge replaces it.
+
+/** A row's place (api services/polaris-peth-ledger.ts, placesOf): a CDP, a
+ *  reserve loan or a Stability Pool deposit by its id (and market), or a
+ *  contract of the deployment by its address (a venue with its deployment
+ *  column in `market`). */
+export interface PethPlace {
+  kind: "cdp" | "loan" | "sp_deposit" | "venue" | "svpeth" | "splitter" | "curve" | "morpho" | "zap";
+  id?: string;
+  market?: string;
+  address?: string;
+}
+
 export interface PethLedgerRow {
+  /** Where the row's tokens went or came from: its primary line's place, or
+   *  null; absent on a server before ui-jobs 872. (872 mirror.) */
+  place?: PethPlace | null;
+  /** Every place the row's lines touch, in line order, once each. (872 mirror.) */
+  places?: PethPlace[];
   tx_hash: string;
   block_number: string;
   block_timestamp: string | null;
@@ -187,6 +206,10 @@ export interface PolarisPethResponse {
   limit: number;
   offset: number;
   rows: PethLedgerRow[] | null;
+  /** The rows per place over the whole ledger, a row once under each of its
+   *  places; null unless status is "ok", absent on a server before ui-jobs
+   *  872. (872 mirror.) */
+  place_counts?: { place: PethPlace; rows: number }[] | null;
   code_sizes_read?: {
     read: number;
     cap?: number;
