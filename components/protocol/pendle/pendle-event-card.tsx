@@ -6,9 +6,8 @@
 // negative from the caller). T1 the verb and the legs on the spine's flanks;
 // T2 each leg, the asset value at the SY's exchange rate at the event's block,
 // the trade's fixed APY where it priced PT, and the router; T3 the event in
-// words.
+// words. The router and a market row's wallet are LinkedValues (anatomy L14).
 
-import Link from "next/link";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { KIND_RING, PendleTokenIcon, type PendleTokenKind } from "@/components/protocol/pendle/pendle-token-icon";
 import { pendleWalletHref } from "@/lib/pendle/routes";
@@ -16,7 +15,7 @@ import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
 import { AssetPopover } from "@/components/shared/asset-popover";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { explorerUrl } from "@/lib/shared/chains";
+import { LinkedValue } from "@/components/shared/linked-value";
 import {
   KIND_LABEL,
   PENDLE_CHAIN_ID,
@@ -167,15 +166,15 @@ export function PendleEventCard({
     changed: false,
     value: {
       lines: [
-        <a
+        <LinkedValue
           key="r"
-          href={explorerUrl(PENDLE_CHAIN_ID, "address", router.address)}
-          target="_blank"
-          rel="noopener"
+          explorer={{ chainId: PENDLE_CHAIN_ID, kind: "address", value: router.address }}
+          context={`Router ${shortAddress(router.address)}`}
+          label={router.name}
           className="link-muted text-xs"
         >
           {router.name} ↗
-        </a>,
+        </LinkedValue>,
         <span key="e" className="text-xs text-rb-500">
           {row.event}
         </span>,
@@ -208,15 +207,16 @@ export function PendleEventCard({
       ...(side === "market" && wallet && tokens
         ? {
             clauses: [
-              <Link
+              <LinkedValue
                 key="w"
                 href={`${pendleWalletHref(wallet)}/${tokens.market.address}`}
-                onClick={(e) => e.stopPropagation()}
+                tip={`Pendle position of ${shortAddress(wallet)} →`}
+                label={shortAddress(wallet)}
                 className="font-mono text-xs text-rb-500 hover:text-foreground hover:underline"
-                data-pendle-row-wallet={wallet}
+                dataAttrs={{ "data-pendle-row-wallet": wallet }}
               >
                 {shortAddress(wallet)}
-              </Link>,
+              </LinkedValue>,
             ],
           }
         : {}),

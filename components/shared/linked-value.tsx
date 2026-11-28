@@ -97,14 +97,15 @@ export function linkedValueHref(d: Destination): string {
 const warned = new Set<number>();
 
 /** The caller's classes less those that dress a link (its colour, its hover
- *  and focus states, its underline), for the value rendered unlinked. */
+ *  and focus states, its underline), behind any variant prefix (`dark:`,
+ *  `group-hover:`, `sm:`), for the value rendered unlinked. */
 export function unlinkedClasses(className: string | undefined): string | undefined {
   const kept = (className ?? "")
     .split(/\s+/)
     .filter(
       (c) =>
         c &&
-        !/^(link-|hover:|focus-visible:|underline|decoration-|text-blue-|(dark:)?text-\[var\(--text-(link|external)\)\])/.test(
+        !/^(?:[a-z-]+:)*(link(-|$)|hover:|focus-visible:|underline|decoration-|text-blue-|text-\[var\(--text-(link|external)\)\])/.test(
           c,
         ),
     );

@@ -13,6 +13,7 @@ import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineColumnProps, SpineSwapLeg } from "@/components/shared/spine-column";
 import { txCell } from "@/components/shared/event-tx-cell";
+import { LinkedValue } from "@/components/shared/linked-value";
 import { Prov } from "@/components/shared/provenance";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { COW_TERMS } from "@/lib/cow/terms";
@@ -121,9 +122,15 @@ export function CowAaveSwapCard({
     changed: false,
     value: {
       lines: [
-        <Link key="w" href={cowSwapPositionHref(family, s)} className={`font-mono text-xs ${INLINE_LINK}`}>
+        <LinkedValue
+          key="w"
+          href={cowSwapPositionHref(family, s)}
+          tip={`${COW_AAVE_FAMILY_NAME[family]} position of ${shortAddress(s.wallet)} →`}
+          label={shortAddress(s.wallet)}
+          className={`font-mono text-xs ${INLINE_LINK}`}
+        >
           {shortAddress(s.wallet)}
-        </Link>,
+        </LinkedValue>,
         <span key="m" className="text-xs capitalize text-rb-500">
           {s.market}
         </span>,

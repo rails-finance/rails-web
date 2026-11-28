@@ -496,6 +496,18 @@ function VerifyRow({ v }: { v: ProvVerify }) {
   return <span className="prov-verify prov-verify-muted">{v.text}</span>;
 }
 
+/** The site a page outside a chain's explorer is on, as the via line's
+ *  tooltip names it: the URL's host less "www.", else the href. */
+export function viaSiteName(href: string): string {
+  try {
+    const host = new URL(href).host;
+    if (host) return host.replace(/^www\./i, "");
+  } catch {
+    // Not a URL: the regex below, then the href.
+  }
+  return /^https?:\/\/(?:www\.)?([^/?#]+)/i.exec(href)?.[1] ?? href;
+}
+
 /** The via line's verify link, a LinkedValue (anatomy L14) whose tooltip
  *  states the check ("Confirm in the tx event logs"), then the place: "View on
  *  Etherscan ↗" for a page on a chain's explorer, else "View on {site} ↗". */
@@ -513,7 +525,7 @@ export function ViaVerifyLink({ href, check, text }: { href: string; check: stri
         {body}
       </LinkedValue>
     );
-  const site = /^https?:\/\/(?:www\.)?([^/?#]+)/.exec(href)?.[1] ?? href;
+  const site = viaSiteName(href);
   return (
     <LinkedValue
       href={href}

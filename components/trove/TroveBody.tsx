@@ -386,7 +386,6 @@ export function TroveBody({
                   return (
                     <LiquityEventCard
                       event={event}
-                      addressDisplay="hidden"
                       isLast={meta.isLast}
                       previousEvent={previousEvent}
                       eventNumber={meta.eventNumber}

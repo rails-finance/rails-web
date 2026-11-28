@@ -228,7 +228,6 @@ export default function EventView({
                       <UnreadTokensProvider tokens={event.decimalsUnread}>
                         <LiquityEventCard
                           event={event}
-                          addressDisplay="hidden"
                           isLast
                           previousEvent={previous}
                           eventNumber={n}

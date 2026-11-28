@@ -45,8 +45,7 @@ import { clause, eventClauses, splitLead, type ClauseInput, type EventProseSlots
 import { balanceAfterProv, movedDeltaProv, type DolomiteCoords } from "@/lib/dolomite/event-provenance";
 import { otherAccountName } from "@/lib/dolomite/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
-import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { LinkedAddress } from "@/components/shared/linked-address";
 
 export type DolomiteEvent = BaseActivityEvent & {
   context: { protocol: "dolomite"; data: DolomiteContext };
@@ -124,21 +123,6 @@ function Fig({
   );
 }
 
-/** Etherscan address link, click-isolated from the card. */
-function Addr({ address }: { address: string }) {
-  return (
-    <a
-      href={explorerUrl(MAINNET_CHAIN_ID, "address", address)}
-      target="_blank"
-      rel="noopener"
-      className={INLINE_LINK}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {address.slice(0, 6)}…{address.slice(-4)}
-    </a>
-  );
-}
-
 const fmtAbs = (h?: string): string => formatNumber(Math.abs(Number(h)));
 
 /** A transfer's other side, named as the header names it: the account number,
@@ -148,7 +132,7 @@ export function OtherAccount({ ctx, owner }: { ctx: DolomiteContext; owner?: str
   if (ctx.counterpartyAccountNumber == null)
     return ctx.counterparty ? (
       <>
-        another Dolomite account (<Addr address={ctx.counterparty} />)
+        another Dolomite account (<LinkedAddress address={ctx.counterparty} />)
       </>
     ) : (
       <>another Dolomite account</>
@@ -159,7 +143,7 @@ export function OtherAccount({ ctx, owner }: { ctx: DolomiteContext; owner?: str
     <>{name} of this wallet</>
   ) : (
     <>
-      {name} of <Addr address={ctx.counterparty!} />
+      {name} of <LinkedAddress address={ctx.counterparty!} />
     </>
   );
 }
@@ -568,7 +552,7 @@ function dolomiteEventSlotsBase(
               {ctx.liquidator ? (
                 <>
                   {" "}
-                  (<Addr address={ctx.liquidator} />)
+                  (<LinkedAddress address={ctx.liquidator} />)
                 </>
               ) : null}
               .
@@ -608,7 +592,7 @@ function dolomiteEventSlotsBase(
               {ctx.liquidator ? (
                 <>
                   {" "}
-                  (seized by <Addr address={ctx.liquidator} />)
+                  (seized by <LinkedAddress address={ctx.liquidator} />)
                 </>
               ) : null}
               .
@@ -636,7 +620,7 @@ function dolomiteEventSlotsBase(
               {ctx.counterparty ? (
                 <>
                   {" "}
-                  from <Addr address={ctx.counterparty} />
+                  from <LinkedAddress address={ctx.counterparty} />
                 </>
               ) : null}
               .
@@ -664,7 +648,7 @@ function dolomiteEventSlotsBase(
               {ctx.counterparty ? (
                 <>
                   {" "}
-                  (borrower <Addr address={ctx.counterparty} />)
+                  (borrower <LinkedAddress address={ctx.counterparty} />)
                 </>
               ) : null}
               .

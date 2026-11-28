@@ -59,8 +59,7 @@ import {
 } from "@/lib/fluid/event-provenance";
 import { pairLabel, shortAddress } from "@/lib/fluid/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
-import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { LinkedAddress } from "@/components/shared/linked-address";
 
 /** The dust epsilon. Mirrors the DUST constant in lib/fluid/economics.ts — a
  *  balance whose magnitude sits below this is rounding dust from the vault's
@@ -790,17 +789,7 @@ function liquidationSlots(
     meansNow.push(
       clause(
         <>
-          Executed by a third-party liquidator:{" "}
-          <a
-            href={explorerUrl(MAINNET_CHAIN_ID, "address", ctx.liquidator)}
-            target="_blank"
-            rel="noopener"
-            className={INLINE_LINK}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {shortAddress(ctx.liquidator)}
-          </a>
-          .
+          Executed by a third-party liquidator: <LinkedAddress address={ctx.liquidator} />.
         </>,
       ),
     );

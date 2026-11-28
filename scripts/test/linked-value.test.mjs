@@ -70,6 +70,20 @@ test("on a chain with no explorer in lib/shared/chains.ts the value renders plai
   ]);
 });
 
+test("the plain form drops the link classes behind a variant prefix too", () => {
+  assert.equal(r.unlinked, "font-mono dark:bg-sunken text-xs [@media(hover:none)]:underline");
+});
+
+test("a verify link elsewhere names its site from the URL's host, whatever the scheme's case", () => {
+  assert.deepEqual(r.sites, {
+    "https://github.com/liquity/bold": "github.com",
+    "HTTPS://WWW.GitHub.com/liquity/bold": "github.com",
+    "ipfs://bafybeigdyrzt/readme": "bafybeigdyrzt",
+    "mailto:team@example.org": "mailto:team@example.org",
+    "not a url": "not a url",
+  });
+});
+
 test("hover opens and closes the tooltip for a mouse alone", () => {
   const src = readFileSync(path.join(REPO, "components/shared/linked-value.tsx"), "utf8");
   const guard = 'if (e.pointerType !== "mouse") return;';

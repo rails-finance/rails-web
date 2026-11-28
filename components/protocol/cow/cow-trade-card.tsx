@@ -12,7 +12,7 @@
 // oracle at a trade's block, so the slot stays empty (rails-ops chain-truth
 // charter §3).
 
-import Link from "next/link";
+import { LinkedValue } from "@/components/shared/linked-value";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
@@ -210,14 +210,15 @@ export function CowTradeCard({
               <>
                 {" "}
                 {COW_AAVE_SWAP_WORDS.lead}
-                <Link
+                <LinkedValue
                   href={cowSwapEventHref(aave.family, aave)}
-                  title={COW_AAVE_SWAP_WORDS.title}
+                  tip={`${COW_AAVE_SWAP_WORDS.title} →`}
+                  label={COW_AAVE_SWAP_WORDS.phrase(aave.kind, aave.family)}
                   className={INLINE_LINK}
-                  data-cow-aave-swap
+                  dataAttrs={{ "data-cow-aave-swap": "true" }}
                 >
                   {COW_AAVE_SWAP_WORDS.phrase(aave.kind, aave.family)}
-                </Link>
+                </LinkedValue>
                 .
               </>
             )}

@@ -46,8 +46,8 @@ export const COW_AAVE_SWAP_WORDS = {
   /** The linked phrase, e.g. "a collateral swap on Aave V3". */
   phrase: (kind: string, family: "aave-v3" | "aave-v4"): string =>
     `${COW_AAVE_SWAP_WORDS.kind[kind] ?? COW_AAVE_SWAP_WORDS.kindFallback} on ${COW_AAVE_SWAP_WORDS.family[family]}`,
-  /** The link's tooltip. */
-  title: "Opens this swap on the Aave position's timeline",
+  /** The link's tooltip, before its arrow. */
+  title: "This swap on the Aave position's timeline",
 } as const;
 
 /** The wallet page opened at one trade (`?at=`, lib/cow/landing.ts): the list starts there. */

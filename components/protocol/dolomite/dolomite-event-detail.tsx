@@ -25,9 +25,8 @@
 // balance cell stays, since it carries the interest since the previous row.
 
 import { useEffect, useState, type ReactNode } from "react";
-import Link from "next/link";
-import { formatDolomitePrice, otherAccountName } from "@/lib/dolomite/asset-catalog";
-import { DolomiteAccountLabel } from "@/components/protocol/dolomite/dolomite-position-card";
+import { accountLabel, formatDolomitePrice, otherAccountName } from "@/lib/dolomite/asset-catalog";
+import { LinkedValue } from "@/components/shared/linked-value";
 import type { DolomiteContext } from "@/lib/shared/types/event-shape";
 import type { ChainTruthStat, ChainTruthTransition } from "@/components/shared/chain-truth-event";
 import { useStatCells } from "@/components/shared/chain-truth-stat-cell";
@@ -340,12 +339,26 @@ function liquidationNotes(
   return out;
 }
 
-/** A transfer's other account, linked to its page. */
-export function OtherAccountLink({ other }: { other: { owner: string; number: string } }) {
+/** A transfer's other account, linked to its page: a LinkedValue (anatomy
+ *  L14) whose tooltip names the page, "Borrow Position #1 of 0x12…34 →". */
+export function OtherAccountLink({
+  other,
+  sameWallet,
+}: {
+  other: { owner: string; number: string };
+  sameWallet: boolean;
+}) {
+  const text = otherAccountName(other.number);
+  const of = sameWallet ? "" : ` of ${other.owner.slice(0, 6)}…${other.owner.slice(-4)}`;
   return (
-    <Link href={`/ethereum/dolomite/${other.owner}/${other.number}`} className="font-medium text-foreground">
-      <DolomiteAccountLabel text={otherAccountName(other.number)} accountNumber={other.number} />
-    </Link>
+    <LinkedValue
+      href={`/ethereum/dolomite/${other.owner}/${other.number}`}
+      tip={`${accountLabel(other.number)}${of} →`}
+      label={text}
+      className="font-medium text-foreground"
+    >
+      {text}
+    </LinkedValue>
   );
 }
 
@@ -523,7 +536,7 @@ export function useDolomiteCells({
     <>
       {other && (
         <p className="mt-2 px-5 text-xs text-rb-500" data-dolomite-other-account="">
-          {lead} <OtherAccountLink other={other} />
+          {lead} <OtherAccountLink other={other} sameWallet={sameWallet} />
           {sameWallet ? " of this wallet" : ` of ${other.owner.slice(0, 6)}…${other.owner.slice(-4)}`}, inside Dolomite:
           no tokens left the protocol.
         </p>

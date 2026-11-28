@@ -15,6 +15,7 @@ import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineTokenRow } from "@/components/shared/spine-column";
 import { txCell } from "@/components/shared/event-tx-cell";
+import { LinkedValue } from "@/components/shared/linked-value";
 import type { Provenance } from "@/components/shared/provenance";
 import { SEPOLIA_CHAIN_ID } from "@/lib/shared/chains";
 import {
@@ -86,23 +87,33 @@ function amountCell(
 function pethPlaceLinkOf(
   row: PethLedgerRow,
   direction?: "in" | "out",
-): { href: string; tip: string; external: boolean } | null {
+): { href: string; tip: string; words: string; external: boolean } | null {
   const p = row.place;
   const to = p ? pethPlaceHref(p) : null;
   if (!p || !to) return null;
-  return { ...to, tip: `${pethPlaceWords(row, p, PETH_PLACE_NAMES, direction)} ${to.external ? "↗" : "→"}` };
+  const words = pethPlaceWords(row, p, PETH_PLACE_NAMES, direction);
+  return { ...to, words, tip: `${words} ${to.external ? "↗" : "→"}` };
 }
 
-/** The row's place line in T3. Null where the row has none. */
+/** The row's place line in T3. Null where the row has none. A place outside
+ *  Rails is a LinkedValue (anatomy L14) whose tooltip is the line's words,
+ *  then "View on Etherscan ↗"; a Rails page's line names the page and takes
+ *  none. */
 export function PlaceLine({ row }: { row: PethLedgerRow }) {
   const to = pethPlaceLinkOf(row);
   if (!to) return null;
+  const address = row.place?.address;
   return (
     <p className="mt-2 text-sm leading-relaxed" data-anatomy="T10.1·polaris" data-peth-row-place={row.place?.kind}>
-      {to.external ? (
-        <a href={to.href} target="_blank" rel="noopener" className={INLINE_LINK}>
+      {to.external && address ? (
+        <LinkedValue
+          explorer={{ chainId: SEPOLIA_CHAIN_ID, kind: "address", value: address }}
+          context={to.words}
+          label={to.words}
+          className={INLINE_LINK}
+        >
           {to.tip}
-        </a>
+        </LinkedValue>
       ) : (
         <Link href={to.href} prefetch={false} className={INLINE_LINK}>
           {to.tip}

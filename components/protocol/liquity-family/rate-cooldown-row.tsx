@@ -15,6 +15,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { LinkedValue } from "@/components/shared/linked-value";
 import { NoteRowShell } from "@/components/shared/note-row-shell";
 import { Prov, type Provenance, type ProvInput } from "@/components/shared/provenance";
 import { formatDate } from "@/lib/date";
@@ -169,16 +170,29 @@ function delegateProv(clock: RateCooldownClock, chainId: ChainId): Provenance {
   };
 }
 
-/** The words for the row that set a clock, linked to its event page. */
+/** The event page each start opens, as its tooltip names it. */
+const STARTED_EVENT: Record<CooldownStart, string> = {
+  open: "The opening's event page →",
+  "open-batch": "The opening's event page →",
+  rate: "The rate change's event page →",
+  join: "The batch join's event page →",
+  leave: "The batch leave's event page →",
+  "batch-rate": "The batch rate change's event page →",
+};
+
+/** The words for the row that set a clock, linked to its event page: a
+ *  LinkedValue (anatomy L14) whose tooltip names that page. */
 export function CooldownEventLink({ clock, positionPath }: { clock: RateCooldownClock; positionPath: string }) {
   return (
-    <a
+    <LinkedValue
       href={`${positionPath}/event/${encodeURIComponent(clock.row.id)}`}
+      tip={STARTED_EVENT[clock.start]}
+      label={STARTED[clock.start]}
       className="underline decoration-dotted underline-offset-2"
-      data-rate-cooldown-event={clock.row.id}
+      dataAttrs={{ "data-rate-cooldown-event": clock.row.id }}
     >
       {STARTED[clock.start]}
-    </a>
+    </LinkedValue>
   );
 }
 

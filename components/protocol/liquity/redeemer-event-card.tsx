@@ -6,15 +6,16 @@
 // (sp-event-card.tsx). T1 the label with the BOLD redeemed on the spine and
 // the collateral paid out of the Trove in the head, T2 the Trove, its rate at the block, the two amounts and the transaction,
 // T3 the row in words. The Trove links open this redemption in the Trove's
-// timeline.
+// timeline, each a LinkedValue (anatomy L14) whose tooltip reads "Trove
+// 710946…7687 →".
 
-import Link from "next/link";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineTokenRow } from "@/components/shared/spine-column";
 import { txCell } from "@/components/shared/event-tx-cell";
+import { LinkedValue } from "@/components/shared/linked-value";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { useChainId } from "@/lib/shared/chain-context";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { shortPositionId } from "@/lib/shared/position-name";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
@@ -67,6 +68,9 @@ export function LiquityV2RedemptionCard({
   const bold = big(row.bold_raw);
   const coll = big(row.coll_raw);
   const id = shortPositionId(row.trove_id);
+  const chainId = useChainId();
+  const troveHref = redemptionTroveHref(row);
+  const troveTip = `Trove ${id} →`;
   // The Trove's annual rate at the block, from the row's TroveOperation log
   // (absent from a server before ui-jobs 762).
   const ratePct = row.rate_raw != null ? Number(big(row.rate_raw)) / 1e16 : null;
@@ -95,11 +99,11 @@ export function LiquityV2RedemptionCard({
       changed: false,
       value: {
         lines: [
-          <Link key="trove" href={redemptionTroveHref(row)} prefetch={false} className="link font-mono text-xs">
-            <Prov info={redemptionLogProv("trove", row)} value={row.trove_id}>
+          <Prov key="trove" info={redemptionLogProv("trove", row)} value={row.trove_id}>
+            <LinkedValue href={troveHref} tip={troveTip} label={`Trove ${id}`} className="link font-mono text-xs">
               {id}
-            </Prov>
-          </Link>,
+            </LinkedValue>
+          </Prov>,
           <span key="branch" className="text-xs text-rb-500">
             {c} branch
           </span>,
@@ -124,7 +128,7 @@ export function LiquityV2RedemptionCard({
       txHash: row.transaction_hash,
       block: row.block_number,
       info: redemptionLogProv("block", row),
-      chainId: MAINNET_CHAIN_ID,
+      chainId,
     }),
   ];
 
@@ -143,16 +147,16 @@ export function LiquityV2RedemptionCard({
       // The Trove it hit, linked to this redemption in its timeline; the row's
       // click stays the card's.
       clauses: [
-        <Link
+        <LinkedValue
           key="trove"
-          href={redemptionTroveHref(row)}
-          prefetch={false}
-          onClick={(e) => e.stopPropagation()}
+          href={troveHref}
+          tip={troveTip}
+          label={`Trove ${id}`}
           className="link"
-          data-redeemer-trove={row.trove_id}
+          dataAttrs={{ "data-redeemer-trove": row.trove_id }}
         >
           Trove {id} ({c})
-        </Link>,
+        </LinkedValue>,
         ...(rateText
           ? [
               <span key="rate" data-redeemer-rate="" data-anatomy="Q4·liquity">

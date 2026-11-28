@@ -237,6 +237,9 @@ out.dolomiteOtherWallet = html(
   h(OtherAccount, { ctx: { counterparty: ADDR, counterpartyAccountNumber: "1" }, owner: OWNER }),
 );
 out.dolomiteOtherUnnumbered = html(h(OtherAccount, { ctx: { counterparty: ADDR, counterpartyAccountNumber: null } }));
-out.dolomiteAccountLink = html(h(OtherAccountLink, { other: { owner: ADDR, number: "0" } }));
+out.dolomiteAccountLink = html(h(OtherAccountLink, { other: { owner: ADDR, number: "0" }, sameWallet: false }));
+out.dolomiteAccountLinkSameWallet = html(
+  h(OtherAccountLink, { other: { owner: OWNER, number: "1" }, sameWallet: true }),
+);
 
 process.stdout.write(JSON.stringify(out, null, 1));
