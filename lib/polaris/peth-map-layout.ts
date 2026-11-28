@@ -24,6 +24,11 @@ export const PM = {
   morpho: `${P}:morpho`,
 } as const;
 
+/** The name of the stablecoin deposit pools, on the map's box and in its
+ *  explanation (Miles, 28 Nov 2026: Polaris's docs say "Earn Pool"). The rest
+ *  of the explorer still says "Stability Pool" until ui-jobs 876. */
+export const POLARIS_POOL_NAME = "Earn Pools";
+
 /** The edge between two nodes, by its one spelling. */
 export const pmEdge = (from: string, to: string): string => `${from}->${to}`;
 
@@ -82,7 +87,7 @@ const nodes: MapNode[] = [
     col: 2,
     span: 1,
     row: 4,
-    title: "Stability Pools",
+    title: POLARIS_POOL_NAME,
     blurb: "deposit USDp or GOLDp, earn pETH",
   },
   {

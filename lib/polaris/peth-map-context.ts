@@ -1,5 +1,6 @@
 // The deployment's names the Polaris map's fill reads (ui-jobs 873), from the
-// asset catalog, and the link to an address's timeline filtered to one edge.
+// asset catalog, the link to an address's timeline filtered to one edge, and
+// the explanation drawer's links.
 
 import { MAP_EDGE_PARAM } from "@/lib/shared/protocol-map/types";
 import {
@@ -15,6 +16,7 @@ import {
 } from "@/lib/polaris/asset-catalog";
 import { polarisPethAccountHref } from "@/lib/polaris/routes";
 import type { PethMapContext } from "@/lib/polaris/peth-map-fill";
+import type { PethMapExplainContext } from "@/lib/polaris/peth-map-explanation";
 import {
   pethCdpPlaceProv,
   pethCdpTotalProv,
@@ -69,5 +71,16 @@ export function pethMapContext(address: string): PethMapContext {
     },
     timelineHref: (edgeId) =>
       `${polarisPethAccountHref(address)}?${MAP_EDGE_PARAM}=${encodeURIComponent(edgeId)}#peth-timeline`,
+  };
+}
+
+/** The explanation drawer's links: an event on the timeline (its `?at=`
+ *  landing) and the timeline filtered to several arrows. */
+export function pethMapExplainContext(address: string): PethMapExplainContext {
+  const base = polarisPethAccountHref(address);
+  return {
+    eventHref: (eventId) => `${base}?at=${encodeURIComponent(eventId)}`,
+    edgesHref: (edgeIds) => `${base}?${MAP_EDGE_PARAM}=${edgeIds.map(encodeURIComponent).join(",")}#peth-timeline`,
+    marketOrder: POLARIS_MARKETS.map((m) => POLARIS_MARKET_CONFIG[m].stable.symbol),
   };
 }

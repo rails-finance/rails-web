@@ -77,12 +77,43 @@ export interface MapLine {
   receipt?: MapReceipt;
 }
 
+/** One end of an edge's span: a row's block time (unix seconds) and the id
+ *  of the timeline event the row is. */
+export interface MapEdgeEnd {
+  at: number;
+  id: string;
+}
+
 export interface MapEdgeFill {
   amounts: MapAmount[];
   rowCount: number;
   timelineHref: string;
   /** The amounts' receipt. */
   receipt: MapReceipt;
+  /** The earliest and latest of the rows summed on this edge, over the rows
+   *  the fill read (all of them, or the newest `counted.rows`). Absent where
+   *  no row carries a time. */
+  first?: MapEdgeEnd;
+  last?: MapEdgeEnd;
+}
+
+/** A row the fill summed: the edges it used and its block time. */
+export interface MapFillRow {
+  id: string;
+  edgeIds: string[];
+  at?: number | null;
+}
+
+/** Widens an edge's first and last to take in one row. Ties keep the end
+ *  already set, so rows read newest first give the earliest row of a time as
+ *  `first` only if it comes later in the list. */
+export function spanWith(e: Pick<MapEdgeFill, "first" | "last">, row: MapFillRow): Pick<MapEdgeFill, "first" | "last"> {
+  if (row.at == null) return { first: e.first, last: e.last };
+  const end = { at: row.at, id: row.id };
+  return {
+    first: !e.first || row.at <= e.first.at ? end : e.first,
+    last: !e.last || row.at > e.last.at ? end : e.last,
+  };
 }
 
 export interface MapFill {
@@ -92,7 +123,7 @@ export interface MapFill {
   nodes: Record<string, { lines: MapLine[]; rowCount?: number }>;
   edges: Record<string, MapEdgeFill>;
   /** The rows the fill summed, each naming its edges. */
-  rows: { id: string; edgeIds: string[] }[];
+  rows: MapFillRow[];
   /** How many rows the fill summed, of how many the address has. */
   counted: { rows: number; total: number };
   /** The server does not say which edges the rows used: the map draws no
@@ -158,7 +189,7 @@ export function hotSets(layout: MapLayout, fill: MapFill, sel: MapSelection): Ma
  *  an edge never shows a count beside amounts summed over fewer rows. */
 export function mergeFillRows(
   fill: MapFill,
-  more: { id: string; edgeIds: string[] }[],
+  more: MapFillRow[],
   newEdge: (edgeId: string, rowCount: number) => Pick<MapEdgeFill, "timelineHref" | "receipt">,
 ): MapFill {
   if (fill.edgesUnknown) return fill;
@@ -174,6 +205,15 @@ export function mergeFillRows(
     edges[id] = e ? { ...e, amounts: [], rowCount: n } : { amounts: [], rowCount: n, ...newEdge(id, n) };
   }
   for (const [id, e] of Object.entries(fill.edges)) if (!edges[id]) edges[id] = { ...e, amounts: [], rowCount: 0 };
+  // The added rows widen each edge's first and last.
+  for (const r of added)
+    for (const id of r.edgeIds) {
+      const e = edges[id];
+      if (!e) continue;
+      const span = spanWith(e, r);
+      if (span.first) e.first = span.first;
+      if (span.last) e.last = span.last;
+    }
   return { ...fill, rows, edges, counted: { ...fill.counted, rows: rows.length } };
 }
 
@@ -199,5 +239,74 @@ export function mapExact(a: MapAmount): string {
 /** An amount as a number of tokens. */
 export const mapUnits = (a: MapAmount): number => Number(mapExact(a));
 
-/** The query param that filters an address's timeline to one edge. */
+/** The query param that filters an address's timeline to one edge, or to
+ *  several, comma-separated. */
 export const MAP_EDGE_PARAM = "map";
+
+/** The edges a `?map=` value names that the fill has, in its order, once each. */
+export function mapEdgesFromParam(raw: string | null, fill: MapFill): string[] {
+  if (!raw) return [];
+  const ids = raw.split(",").map((x) => x.trim());
+  return ids.filter((id, i) => id !== "" && fill.edges[id] != null && ids.indexOf(id) === i);
+}
+
+// ── The explanation drawer (ui-jobs 873.5) ─────────────────────────────────
+// Under the legend, the map's plain-language account of the address: groups
+// of bullets the protocol builds from its fill (Polaris:
+// lib/polaris/peth-map-explanation.ts) and the shared map draws. A bullet is
+// text and parts: each figure is a fill amount drawn bold with its receipt,
+// each time a link to its event on the timeline.
+
+/** A time in the account, as the drawer prints it: "at T", or "from T1 to
+ *  T2". Each end's text is set by the builder (the first time in the drawer
+ *  carries its date, a later one on the same day the time alone), and links
+ *  to its event on the timeline. Counts as one word and one figure. */
+export interface MapWhen {
+  from: { text: string; href: string };
+  to?: { text: string; href: string };
+  /** Starts the bullet: "At", "From". */
+  cap?: boolean;
+}
+
+export type MapTextPart =
+  | string
+  /** A series: "a", "a and b", "a, b and c". Its commas list, and join no clause. */
+  | { list: string[] }
+  /** A fill amount, bold, with the receipt the map shows it with. */
+  | { figure: MapAmount; receipt?: MapReceipt }
+  | { when: MapWhen }
+  | { link: string; href: string };
+
+export interface MapBullet {
+  parts: MapTextPart[];
+  /** The protocol's key for a "?" modal, drawn after the bullet. */
+  learnMore?: string;
+}
+
+export interface MapExplanationGroup {
+  /** A stable name for the group (`data-map-explanation-group`). */
+  id: string;
+  heading?: string;
+  /** A sentence before the bullets. */
+  lead?: MapTextPart[];
+  bullets: MapBullet[];
+}
+
+export interface MapExplanation {
+  groups: MapExplanationGroup[];
+}
+
+/** A part as plain text, a figure by `figure`. */
+export function mapPartText(p: MapTextPart, figure: (a: MapAmount) => string): string {
+  if (typeof p === "string") return p;
+  if ("list" in p) return mapSeries(p.list);
+  if ("figure" in p) return `${figure(p.figure)} ${p.figure.asset}`;
+  if ("link" in p) return p.link;
+  const { from, to, cap } = p.when;
+  return to ? `${cap ? "From" : "from"} ${from.text} to ${to.text}` : `${cap ? "At" : "at"} ${from.text}`;
+}
+
+/** "a", "a and b", "a, b and c". */
+export function mapSeries(xs: string[]): string {
+  return xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+}

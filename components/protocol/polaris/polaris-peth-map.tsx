@@ -2,10 +2,16 @@
 
 // The Polaris map on a pETH account page (ui-jobs 873): the shared protocol
 // map (components/shared/protocol-map/) on the Polaris layout, filled with
-// this address's activity, in the places panel's frame. The page holds the
-// selection, which it shares with the timeline below.
+// this address's activity, in the places panel's frame, and its explanation
+// drawer (lib/polaris/peth-map-explanation.ts). The page holds the selection,
+// which it shares with the timeline below.
 
+import { useMemo } from "react";
 import { ProtocolMap } from "@/components/shared/protocol-map/protocol-map";
+import { LearnMore } from "@/components/shared/learn-more-modal";
+import { polarisModal, type PolarisL5Key } from "@/lib/polaris/event-templates";
+import { pethMapExplanation } from "@/lib/polaris/peth-map-explanation";
+import { pethMapExplainContext } from "@/lib/polaris/peth-map-context";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { CARD_PAD_X, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import { POLARIS_MAP_LAYOUT } from "@/lib/polaris/peth-map-layout";
@@ -33,6 +39,8 @@ export function PolarisPethMap({
 }) {
   const { rows, total } = fill.counted;
   const registry = useReceiptRegistry();
+  // The drawer's words (O8·polaris), from the fill alone.
+  const explanation = useMemo(() => pethMapExplanation(fill, pethMapExplainContext(address)), [fill, address]);
   // Without arrows, the intro speaks of the boxes alone.
   const boxesOnly = fill.edgesUnknown === true || ledgerGap != null;
   return (
@@ -105,6 +113,9 @@ export function PolarisPethMap({
             onFilter={onFilter}
             holderNote={<span className="font-mono">{`${address.slice(0, 6)}…${address.slice(-4)}`}</span>}
             rowLabel={rowLabel}
+            explanation={explanation}
+            learnMore={(key) => <LearnMore inline content={polarisModal(key as PolarisL5Key)} />}
+            explanationAnatomy="O8·polaris"
           />
         </div>
       </section>
