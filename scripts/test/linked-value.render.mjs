@@ -26,6 +26,8 @@ const CASES = {
     dataAttrs: { "data-trove-link": "123" },
   },
 };
+// The Rails link with an in-place jump: the markup is the same, href and all.
+CASES.railsFollow = { ...CASES.rails, onFollow: () => {} };
 const out = {};
 for (const [k, c] of Object.entries(CASES)) {
   out[k] = { html: renderToStaticMarkup(h(LinkedValue, c, c.label)), tip: linkedValueTip(c), href: linkedValueHref(c) };

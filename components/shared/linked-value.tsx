@@ -19,13 +19,15 @@
 // pointer event (a screen reader's activation), `(hover: none)` decides
 // (lib/shared/spine-amount-press.ts `valuePress`). A tap elsewhere or Escape
 // closes it. While the receipts inspector is armed, a press on a value inside
-// a receipt pins the receipt. Tested by scripts/test/linked-value.test.mjs.
+// a receipt pins the receipt. A Rails link given `onFollow` jumps in place:
+// each press that would follow runs it, starts no progress bar and closes the
+// tooltip, and the href stays for a new tab (`followsInPlace`). Tested by scripts/test/linked-value.test.mjs.
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { CHAINS, chainMeta, explorerUrl, type ChainId, type ExplorerLinkKind } from "@/lib/shared/chains";
-import { valuePress } from "@/lib/shared/spine-amount-press";
+import { followsInPlace, valuePress } from "@/lib/shared/spine-amount-press";
 import { PICKABLE_SELECTOR } from "@/lib/shared/tip-yields";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { startNavigationProgressOnClick } from "@/components/nav/navigation-progress";
@@ -49,13 +51,19 @@ export interface ExplorerPage {
   value: string | number;
 }
 
+/** The caller's jump in place of a Rails link's navigation. */
+export type FollowHandler = (e: React.MouseEvent) => void;
+
 type Destination =
   /** The page and its words: "Trove 123 →" for a Rails page; an outside page
-   *  that is not a block explorer sets `external`, and may carry `context`. */
-  | { href: string; tip: string; external?: boolean; context?: string; explorer?: never }
+   *  that is not a block explorer sets `external`, and may carry `context`.
+   *  A Rails page may set `onFollow`: a press that follows calls it in place
+   *  of loading the page, and a new tab still opens the href. */
+  | { href: string; tip: string; external?: false; context?: string; onFollow?: FollowHandler; explorer?: never }
+  | { href: string; tip: string; external: true; context?: string; onFollow?: never; explorer?: never }
   /** A block explorer page: the tooltip's link reads "View on {explorer} ↗",
    *  under `context`, the place in words, where the caller has them. */
-  | { explorer: ExplorerPage; context?: string; href?: never; tip?: never; external?: never };
+  | { explorer: ExplorerPage; context?: string; href?: never; tip?: never; external?: never; onFollow?: never };
 
 export type LinkedValueProps = Destination & {
   /** The value as words, for the accessible name: the name reads it, then
@@ -129,7 +137,7 @@ export function LinkedValue(props: LinkedValueProps) {
 }
 
 function LinkedValueLink(props: LinkedValueProps) {
-  const { label, children, className, align = "start", dataAttrs } = props;
+  const { label, children, className, align = "start", dataAttrs, onFollow } = props;
   const href = linkedValueHref(props);
   const tip = linkedValueTip(props);
   const context = props.context;
@@ -153,6 +161,12 @@ function LinkedValueLink(props: LinkedValueProps) {
     hoverClose.current = setTimeout(() => setOpen(false), HOVER_CLOSE_MS);
   };
   useEffect(() => keepHover, []);
+  // The caller's jump, for a press that follows.
+  const jump = (e: React.MouseEvent, follow: FollowHandler) => {
+    e.preventDefault();
+    follow(e);
+    setOpen(false);
+  };
   const common = {
     className: `${LINK_CUE}${className ? ` ${className}` : ""}`,
     "aria-expanded": discloses ? open : undefined,
@@ -193,6 +207,10 @@ function LinkedValueLink(props: LinkedValueProps) {
         hoverless: pressedBy === undefined && window.matchMedia("(hover: none)").matches,
         keyboard: e.detail === 0,
       });
+      if (onFollow && followsInPlace(press, e)) {
+        jump(e, onFollow);
+        return;
+      }
       if (!press.follow) e.preventDefault();
       else if (!external) startNavigationProgressOnClick(e, href);
       if (press.open) setDiscloses(true);
@@ -209,6 +227,13 @@ function LinkedValueLink(props: LinkedValueProps) {
       if (!external) startNavigationProgressOnClick(e, href);
     },
   };
+  if (onFollow) {
+    // The link in the tooltip always follows.
+    tipLink.onClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (followsInPlace({ follow: true }, e)) jump(e, onFollow);
+    };
+  }
   const outside = { on: "outside", hoverless: false, keyboard: false } as const;
   return (
     <RevealTip
