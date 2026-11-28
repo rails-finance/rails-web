@@ -1,11 +1,21 @@
 // The shared timeline link sites on LinkedValue (ui-jobs 878 round 2, anatomy
 // L14): the T1 hash, BlockRef, LinkedAddress, LinkedTx, the prose words, the
 // boundary card, the coverage footer, a vault row's counterparty, the receipt's
-// contract and source tx, and T2's transaction cell. The markup captured
-// before the change is scripts/fixtures/shared-links/before.json: an unlinked
-// form renders it byte for byte, and a linked form reads the same text inside
-// the LinkedValue wrapper, its name holding the tooltip's words. The render
-// runs in tsx (shared-links.render.mjs). Run: npm test
+// contract and source tx, the receipt's verify link, and T2's transaction
+// cell. scripts/fixtures/shared-links/before.json was rendered before the
+// sites moved, from 6a34aaeab with three edits that change no markup: the
+// Display context exported for the render, the vault row's counterparty line
+// drawn as `VaultCounterpartyLine`, and two families' local transaction
+// cells exported in place of the shared `txCell`. The linked prose case's
+// title was then edited by hand to the words Aave V3 now uses. The fixture
+// pins, byte for byte, the unlinked forms of BlockRef (a number and a
+// string), a prose sentence with no links, the boundary card's header block
+// and a receipt contract with no address; each linked case is checked to
+// read the same text it read before, inside the LinkedValue wrapper, its name
+// holding the tooltip's words. The cases absent from the fixture (T2's cell on
+// Base, on Arbitrum and with no receipt, the unknown-chain stamp and the
+// verify links) are checked against the render alone. The render runs in tsx
+// (shared-links.render.mjs). Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -13,6 +23,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { CHAINS } from "./shared-links.cases.mjs";
+import { CHAINS as REGISTRY, explorerPageOf, explorerUrl } from "../../lib/shared/chains.ts";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const after = JSON.parse(
@@ -166,4 +177,35 @@ test("prose links its address, its transaction and its words, each naming where 
   const a = linked(html, "the trade: This trade on the wallet&#x27;s CoW page");
   assert.match(a, /data-prose-link=""/);
   assert.match(a, /href="\/wallet\/0x1234\/cow"/);
+});
+
+test("a block stamp on a chain with no explorer keeps the plain stamp and its name", () => {
+  assert.equal(after.blockRefNoExplorer, after.blockRefPlain);
+  assert.match(after.blockRefNoExplorer, /aria-label="Block 12,345,678"/);
+});
+
+test("a receipt's verify link on the chain's explorer states the check, then the explorer", () => {
+  const a = linked(after.viaExplorer, "Deposit log: Confirm in the tx event logs, View on Basescan");
+  external(a, `https://basescan.org/tx/${TX}#eventlog`);
+  assert.match(a, /class="[^"]*\bprov-via-verify\b/);
+});
+
+test("a receipt's verify link elsewhere states the check, then names the site", () => {
+  const a = linked(after.viaSite, "verify: Read the contract&#x27;s source, View on github.com");
+  external(a, "https://github.com/liquity/bold/blob/main/README.md");
+});
+
+test("an explorer URL reads back as the chain, the kind and the value that build it", () => {
+  for (const c of Object.values(REGISTRY))
+    for (const kind of ["tx", "tx-logs", "address", "block", "token"]) {
+      const value = kind === "block" ? "12345678" : kind.startsWith("tx") ? TX : ADDR;
+      assert.deepEqual(
+        explorerPageOf(explorerUrl(c.id, kind, value)),
+        { chainId: c.id, kind, value },
+        `${c.id} ${kind}`,
+      );
+    }
+  assert.equal(explorerPageOf("https://github.com/liquity/bold"), null);
+  assert.equal(explorerPageOf(`https://polygonscan.com/tx/${TX}`), null);
+  assert.equal(explorerPageOf(`https://etherscan.io/tx/${TX}?x=1`), null);
 });

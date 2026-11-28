@@ -34,7 +34,11 @@ for (const [k, c] of Object.entries(CASES)) {
 const warnings = [];
 const warn = console.warn;
 console.warn = (...a) => warnings.push(a.join(" "));
-const polygon = { explorer: { chainId: 137, kind: "tx", value: TX }, label: "0x5c50…2060", className: "font-mono" };
+const polygon = {
+  explorer: { chainId: 137, kind: "tx", value: TX },
+  label: "0x5c50…2060",
+  className: "link-external font-mono text-xs text-blue-600 dark:text-[var(--text-link)] hover:underline",
+};
 out.unknownChain = {
   html: [1, 2].map(() => renderToStaticMarkup(h(LinkedValue, polygon, polygon.label))),
   warnings,

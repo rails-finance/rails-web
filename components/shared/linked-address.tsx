@@ -53,7 +53,7 @@ export function LinkedAddress({ address, label, className = "", chainId, holderO
   if (inside)
     return (
       // LinkedValue does not prefetch: the wallet page is dynamic and reads
-      // the API and the chain, a cost a link merely seen should not pay.
+      // the API and the chain, a cost a link only seen should not pay.
       <LinkedValue href={inside} tip={railsPageTip(inside, short, holderOf)} label={text} className={cls}>
         {text}
       </LinkedValue>

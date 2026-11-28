@@ -63,8 +63,8 @@ test("every chain lib/shared/chains.ts names links its explorer", () => {
   }
 });
 
-test("on a chain with no explorer in lib/shared/chains.ts the value renders plain, warning once", () => {
-  for (const html of r.unknownChain.html) assert.equal(html, '<span class="font-mono">0x5c50…2060</span>');
+test("on a chain with no explorer in lib/shared/chains.ts the value renders plain, less its link classes, warning once", () => {
+  for (const html of r.unknownChain.html) assert.equal(html, '<span class="font-mono text-xs">0x5c50…2060</span>');
   assert.deepEqual(r.unknownChain.warnings, [
     '[LinkedValue] no explorer for chain 137: "0x5c50…2060" renders unlinked',
   ]);
@@ -79,10 +79,14 @@ test("hover opens and closes the tooltip for a mouse alone", () => {
   assert.equal(leave?.[1], guard, "onPointerLeave closes for a mouse only");
 });
 
-test("while the receipts inspector is armed, a press on the value goes to the receipt around it", () => {
+test("while the receipts inspector is armed, a press, Enter or Space on the value goes to the receipt around it", () => {
   const src = readFileSync(path.join(REPO, "components/shared/linked-value.tsx"), "utf8");
+  const yields = /if \(e\.currentTarget\.closest\(PICKABLE_SELECTOR\)\) return;/;
   const click = /onClick: \(e: React\.MouseEvent<HTMLElement>\) => \{([\s\S]*?)e\.stopPropagation\(\);/.exec(src);
-  assert.match(click?.[1] ?? "", /if \(e\.currentTarget\.closest\("\[data-prov-pickable\]"\)\) return;/);
+  assert.match(click?.[1] ?? "", yields, "the click");
+  const key = /onKeyDown: \(e: React\.KeyboardEvent<HTMLElement>\) => \{([\s\S]*?)e\.stopPropagation\(\);/.exec(src);
+  assert.match(key?.[1] ?? "", yields, "Enter and Space");
+  assert.match(src, /import \{ PICKABLE_SELECTOR \} from "@\/lib\/shared\/tip-yields";/);
 });
 
 test("an explorer link's name reads the context line, then the link's words", () => {

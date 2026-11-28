@@ -238,3 +238,16 @@ export function explorerUrl(chainId: ChainId, kind: ExplorerLinkKind, value: str
     return `${chainMeta(chainId).explorerBase}/tx/${value}?tab=logs`;
   return `${chainMeta(chainId).explorerBase}${PATHS[kind](String(value))}`;
 }
+
+/** The chain, the kind of page and the value an explorer URL opens: the
+ *  inverse of `explorerUrl`, for a link stored as a URL (a receipt's verify
+ *  link). Null for a URL `explorerUrl` would not build. */
+export function explorerPageOf(href: string): { chainId: ChainId; kind: ExplorerLinkKind; value: string } | null {
+  const m = /^(https:\/\/[^/]+)\/(tx|address|block|token)\/([^/?#]+)/.exec(href);
+  if (!m) return null;
+  const chain = Object.values(CHAINS).find((c) => c.explorerBase === m[1]);
+  if (!chain) return null;
+  const logs = m[2] === "tx" && /(#eventlog|\?tab=logs)$/.test(href);
+  const kind = (logs ? "tx-logs" : m[2]) as ExplorerLinkKind;
+  return explorerUrl(chain.id, kind, m[3]) === href ? { chainId: chain.id, kind, value: m[3] } : null;
+}

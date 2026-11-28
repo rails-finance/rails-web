@@ -1,5 +1,5 @@
 import { BlockClockIcon } from "@/components/icons/block-clock-icon";
-import { LinkedValue } from "@/components/shared/linked-value";
+import { hasExplorer, LinkedValue } from "@/components/shared/linked-value";
 import type { ChainId } from "@/lib/shared/chains";
 
 // A stated block number: [block-clock icon] 26,076,814. The icon stands in
@@ -45,7 +45,8 @@ export function BlockRef({
   const number = <span className={`tabular-nums ${numberClassName ?? ""}`}>{formatted}</span>;
   const shell = `inline-flex items-baseline gap-1 whitespace-nowrap align-baseline ${className ?? ""}`;
 
-  if (chainId != null) {
+  // A chain with no explorer in lib/shared/chains.ts keeps the plain stamp.
+  if (chainId != null && hasExplorer(chainId)) {
     return (
       <LinkedValue
         explorer={{ chainId, kind: "block", value: String(block).replace(/,/g, "") }}

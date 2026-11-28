@@ -26,6 +26,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { CHAINS, chainMeta, explorerUrl, type ChainId, type ExplorerLinkKind } from "@/lib/shared/chains";
 import { valuePress } from "@/lib/shared/spine-amount-press";
+import { PICKABLE_SELECTOR } from "@/lib/shared/tip-yields";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { startNavigationProgressOnClick } from "@/components/nav/navigation-progress";
 
@@ -50,8 +51,8 @@ export interface ExplorerPage {
 
 type Destination =
   /** The page and its words: "Trove 123 →" for a Rails page; an outside page
-   *  that is not a block explorer sets `external`. */
-  | { href: string; tip: string; external?: boolean; explorer?: never; context?: never }
+   *  that is not a block explorer sets `external`, and may carry `context`. */
+  | { href: string; tip: string; external?: boolean; context?: string; explorer?: never }
   /** A block explorer page: the tooltip's link reads "View on {explorer} ↗",
    *  under `context`, the place in words, where the caller has them. */
   | { explorer: ExplorerPage; context?: string; href?: never; tip?: never; external?: never };
@@ -95,6 +96,21 @@ export function linkedValueHref(d: Destination): string {
 /** The chains already warned about, so a page warns once per chain. */
 const warned = new Set<number>();
 
+/** The caller's classes less those that dress a link (its colour, its hover
+ *  and focus states, its underline), for the value rendered unlinked. */
+export function unlinkedClasses(className: string | undefined): string | undefined {
+  const kept = (className ?? "")
+    .split(/\s+/)
+    .filter(
+      (c) =>
+        c &&
+        !/^(link-|hover:|focus-visible:|underline|decoration-|text-blue-|(dark:)?text-\[var\(--text-(link|external)\)\])/.test(
+          c,
+        ),
+    );
+  return kept.length > 0 ? kept.join(" ") : undefined;
+}
+
 export function LinkedValue(props: LinkedValueProps) {
   if (props.explorer && !hasExplorer(props.explorer.chainId)) {
     const { chainId } = props.explorer;
@@ -103,7 +119,7 @@ export function LinkedValue(props: LinkedValueProps) {
       console.warn(`[LinkedValue] no explorer for chain ${chainId}: "${props.label}" renders unlinked`);
     }
     return (
-      <span className={props.className} {...props.dataAttrs}>
+      <span className={unlinkedClasses(props.className)} {...props.dataAttrs}>
         {props.children}
       </span>
     );
@@ -115,7 +131,7 @@ function LinkedValueLink(props: LinkedValueProps) {
   const { label, children, className, align = "start", dataAttrs } = props;
   const href = linkedValueHref(props);
   const tip = linkedValueTip(props);
-  const context = props.explorer ? props.context : undefined;
+  const context = props.context;
   // The arrows are visual: the name reads the words alone.
   const words = [context, tip.replace(/\s*[→↗]\s*$/u, "")].filter(Boolean).join(", ");
   const name = words.includes(label) ? words : `${label}: ${words}`;
@@ -156,14 +172,16 @@ function LinkedValueLink(props: LinkedValueProps) {
       pointer.current = undefined;
     },
     "aria-label": name,
-    // The value may sit inside a card's header, which opens on Enter and Space.
-    onKeyDown: (e: React.KeyboardEvent) => {
+    // The value may sit inside a card's header, which opens on Enter and
+    // Space; while the inspector is armed the receipt around it takes them.
+    onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => {
+      if (e.currentTarget.closest(PICKABLE_SELECTOR)) return;
       if (e.key === "Enter" || e.key === " ") e.stopPropagation();
     },
     onClick: (e: React.MouseEvent<HTMLElement>) => {
       // While the receipts inspector is armed, a receipt around the value
       // takes the press and pins its receipt (decision 0062 point 4).
-      if (e.currentTarget.closest("[data-prov-pickable]")) return;
+      if (e.currentTarget.closest(PICKABLE_SELECTOR)) return;
       // The value may sit inside a card's link: a press is the value's.
       e.stopPropagation();
       const pressedBy = pointer.current;

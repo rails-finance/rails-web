@@ -14,7 +14,7 @@ import { ProseSentenceText } from "@/components/shared/prose-sentence-text";
 import { TimelineBoundaryCard } from "@/components/shared/timeline-boundary-card";
 import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
 import { VaultCounterpartyLine } from "@/components/vaults/vault-timeline-row";
-import { ProvReceipt } from "@/components/shared/provenance";
+import { ProvReceipt, ViaVerifyLink } from "@/components/shared/provenance";
 import { liquityV2RedeemerHref } from "@/lib/liquity-v2/redeemer-routes";
 import { txCell } from "@/components/shared/event-tx-cell";
 import { TX, ADDR, CHAINS } from "./shared-links.cases.mjs";
@@ -133,5 +133,24 @@ out.addressWallet = html(h(LinkedAddress, { address: ADDR, holderOf: "liquity-v2
 out.addressListing = html(h(LinkedAddress, { address: ADDR, holderOf: "aave-v3" }));
 out.addressRedeemer = html(h(LinkedAddress, { address: ADDR, href: liquityV2RedeemerHref(ADDR) }));
 out.prose = html(h(ProseSentenceText, { s: PROSE_LINKED, echo: () => null, holderOf: "liquity-v2" }));
+// A chain with no explorer in lib/shared/chains.ts (Polygon): the plain stamp.
+const warn = console.warn;
+console.warn = () => {};
+out.blockRefNoExplorer = html(h(BlockRef, { block: 12345678, chainId: 137 }));
+console.warn = warn;
+out.blockRefPlain = html(h(BlockRef, { block: 12345678 }));
+// A receipt's via-line verify link: a page on the chain's explorer, and a
+// page elsewhere (a repository).
+const check = "Confirm in the tx event logs";
+out.viaExplorer = html(
+  h(ViaVerifyLink, { href: `https://basescan.org/tx/${TX}#eventlog`, check, text: "Deposit log" }),
+);
+out.viaSite = html(
+  h(ViaVerifyLink, {
+    href: "https://github.com/liquity/bold/blob/main/README.md",
+    check: "Read the contract's source",
+    text: "verify",
+  }),
+);
 for (const [name, lines] of Object.entries(txCellLines())) out[name] = html(h("div", null, ...lines));
 process.stdout.write(JSON.stringify(out));
