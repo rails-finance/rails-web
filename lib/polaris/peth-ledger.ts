@@ -492,9 +492,23 @@ export function pethPlaceDirection(r: Pick<PethLedgerRow, "kind" | "lines">): "t
   return read.some((l) => l.direction === "out") ? "to" : "from";
 }
 
-/** The row's place line in T3, without its arrow: "Went to USDp CDP #12". */
-export function pethPlaceWords(r: Pick<PethLedgerRow, "kind" | "lines">, p: PethPlace, names: PethPlaceNames): string {
-  const verb = { to: "Went to", from: "Came from", seized: "Seized from" }[pethPlaceDirection(r)];
+/** The row's place line in T3, without its arrow: "Went to USDp CDP #12".
+ *  With a line's direction, the words for that line's amount on the spine
+ *  (ui-jobs 878): a CDP's collateral sent reads "Went to USDp CDP #12" and a
+ *  Stability Pool deposit's gain paid "Came from USDp deposit #3"; a
+ *  liquidation's lines all read "Seized from". */
+export function pethPlaceWords(
+  r: Pick<PethLedgerRow, "kind" | "lines">,
+  p: PethPlace,
+  names: PethPlaceNames,
+  direction?: "in" | "out",
+): string {
+  const way = pethPlaceDirection(r);
+  const verb = {
+    to: "Went to",
+    from: "Came from",
+    seized: "Seized from",
+  }[way === "seized" || !direction ? way : direction === "in" ? "from" : "to"];
   return `${verb} ${pethPlaceName(p, names)}`;
 }
 

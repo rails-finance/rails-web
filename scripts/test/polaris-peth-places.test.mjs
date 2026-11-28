@@ -111,6 +111,17 @@ test("the T3 line reads verb and place", () => {
   );
 });
 
+test("a spine amount's words follow its line's direction", () => {
+  const sent = row("cdp_deposit", [line("cdp_deposit", "peth", "out")]);
+  assert.equal(pethPlaceWords(sent, CDP, NAMES, "out"), "Went to USDp CDP #26", "a CDP's collateral sent");
+  const gain = row("sp_gain", [line("sp_gain", "peth", "in")]);
+  assert.equal(pethPlaceWords(gain, DEPOSIT, NAMES, "in"), "Came from USDp deposit #3", "a deposit's gain paid");
+  // The line's direction decides where the row's would read otherwise.
+  assert.equal(pethPlaceWords(sent, CDP, NAMES, "in"), "Came from USDp CDP #26");
+  const seized = row("liquidated", [line("liquidated", "peth", "out")]);
+  assert.equal(pethPlaceWords(seized, CDP, NAMES, "out"), "Seized from USDp CDP #26");
+});
+
 test("every row files under its place on the Place axis, a row with none under Other", () => {
   const venues = { venue_curve_tripool: { address: POOL.address } };
   const withPlace = pethTimelineEvent(

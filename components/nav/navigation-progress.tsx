@@ -70,6 +70,17 @@ export function startNavigationProgress(href?: string): void {
   startFromOutside();
 }
 
+/** Start the bar from a link's onClick, for a link whose handler stops the
+ *  click before `window` (the spine's linked amount, a tooltip's link): a plain
+ *  left click only, as the window listener would take. */
+export function startNavigationProgressOnClick(
+  e: { button: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean },
+  href: string,
+): void {
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  startNavigationProgress(href);
+}
+
 function NavigationProgressBar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();

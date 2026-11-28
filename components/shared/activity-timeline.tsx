@@ -11,10 +11,10 @@
 // If we later port the full timeline (e.g. for the address page), this
 // shim can be replaced with the verbatim 1200-line file.
 
-import Link from "next/link";
 import { createContext, useContext, useState, useRef } from "react";
 import { fmtSpine } from "@/lib/shared/spine-format";
 import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
+import { LinkedValue } from "@/components/shared/linked-value";
 export { fmtSpine };
 
 // ── Timeline scale ─────────────────────────────────────────────────────
@@ -57,9 +57,10 @@ export function SingleWalletProvider({ children, value }: { children: React.Reac
 
 // ── Spine value formatter ───────────────────────────────────────────────
 
-/** A spine amount that opens another page (SpineTokenRow `amountLink`): the
- *  href, its tooltip (also the accessible name), whether it leaves Rails, and
- *  whether the amount wears the hairline border that marks a pETH account link. */
+/** A spine amount that opens a Rails page (SpineTokenRow `amountLink`): the
+ *  href, its tooltip (also the accessible name), and whether the amount wears
+ *  the hairline border that marks a pETH account link. The spine links no
+ *  page outside Rails: with `external` it draws the plain amount. */
 export interface SpineAmountLink {
   href: string;
   tip: string;
@@ -85,7 +86,8 @@ export function SpineVal({
   value?: string | number;
   side: "left" | "right";
   /** The amount opens this page: the figure keeps its look at rest and
-   *  takes the link cue (underline, the focus ring) on hover and focus. */
+   *  takes the link cue (underline, the focus ring) on hover and focus; on a
+   *  screen without hover it rests on a dotted hairline underline. */
   link?: SpineAmountLink;
   /** A symbol printed after the figure, smaller and muted. */
   unit?: string;
@@ -116,38 +118,58 @@ export function SpineVal({
       {unit ? <span className={`ml-1 text-xs font-normal ${unitClass ?? "text-rb-500"}`}>{unit}</span> : null}
     </>
   );
-  if (!link) return <span className={`text-base font-semibold whitespace-nowrap ${sideClass}`}>{body}</span>;
+  // The spine links Rails pages only: an outside link draws the plain amount.
+  if (!link || link.external)
+    return <span className={`text-base font-semibold whitespace-nowrap ${sideClass}`}>{body}</span>;
   // The link sits inside the card's row: a press opens the page and leaves
   // the card as it was.
   const mark = link.marked ? " rounded-md border border-edge-raised px-1.5 -my-px" : "";
   const cls =
-    "text-base font-semibold whitespace-nowrap underline-offset-2 hover:underline focus-visible:underline " +
-    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] rounded-sm" +
+    "text-base font-semibold whitespace-nowrap" +
     // Below 640px the spine node passes taps through to the row's phone
     // toggle (spine-column.tsx); a tap on the link opens the link.
     " pointer-events-auto" +
     mark;
-  const common = {
-    title: link.tip,
-    // The arrows are visual: the name reads the words alone.
-    "aria-label": `${txt}${unit ? ` ${unit}` : ""}: ${link.tip.replace(/\s*[→↗]\s*$/u, "")}`,
-    onClick: (e: React.MouseEvent) => e.stopPropagation(),
-    // "marked" while the border is drawn, "plain" while Display has it off.
-    "data-spine-amount-link": link.marked ? "marked" : "plain",
-    "data-anatomy": link.marked ? "L3.3" : "L3.2",
-  };
   return (
     <span className={sideClass}>
-      {link.external ? (
-        <a href={link.href} target="_blank" rel="noopener" className={cls} {...common}>
-          {body}
-        </a>
-      ) : (
-        <Link href={link.href} prefetch={false} className={cls} {...common}>
-          {body}
-        </Link>
-      )}
+      <SpineAmountLinkView link={link} cls={cls} side={side} name={`${txt}${unit ? ` ${unit}` : ""}`}>
+        {body}
+      </SpineAmountLinkView>
     </span>
+  );
+}
+
+/** The linked amount (anatomy L3.2), a LinkedValue (L14) on the spine's flank:
+ *  the tooltip lines up with the amount's outer edge, and the hooks name the
+ *  amount's border state. */
+function SpineAmountLinkView({
+  link,
+  cls,
+  side,
+  name,
+  children,
+}: {
+  link: SpineAmountLink;
+  cls: string;
+  side: "left" | "right";
+  name: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <LinkedValue
+      href={link.href}
+      tip={link.tip}
+      label={name}
+      className={cls}
+      align={side === "left" ? "end" : "start"}
+      dataAttrs={{
+        // "marked" while the border is drawn, "plain" while Display has it off.
+        "data-spine-amount-link": link.marked ? "marked" : "plain",
+        "data-anatomy": link.marked ? "L3.3" : "L3.2",
+      }}
+    >
+      {children}
+    </LinkedValue>
   );
 }
 
