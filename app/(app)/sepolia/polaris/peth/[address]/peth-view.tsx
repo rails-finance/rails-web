@@ -10,6 +10,11 @@
 // page draws one row on the shared event page (P4): the timeline alone, in its
 // pinned mode.
 //
+// Each row's Explanation links the place its tokens went to or came from, and
+// each place in the box links its rows: "N events" narrows the timeline to
+// that place on the Place axis (`?hidePlaces=`, every other place hidden), on
+// the page without a reload (ui-jobs 872).
+//
 // The answer can lack either half. While the ledger lane reads the history,
 // the ledger's figures and rows are absent and the head reads stand; with no
 // chain read the head figures are absent and the stored ledger stands. Each
@@ -27,7 +32,7 @@ import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { PETH_HEAVY, PETH_UNREAD, PolarisPethCard } from "@/components/protocol/polaris/polaris-peth-card";
-import { PolarisPethPlaces } from "@/components/protocol/polaris/polaris-peth-places";
+import { PolarisPethPlaces, type PethPlaceEvents } from "@/components/protocol/polaris/polaris-peth-places";
 import { PETH_NAMES, PolarisPethEventCard } from "@/components/protocol/polaris/polaris-peth-event-card";
 import { PolarisPethMap } from "@/components/protocol/polaris/polaris-peth-map";
 import { buildPethMapFill, pethMapRowEdges } from "@/lib/polaris/peth-map-fill";
@@ -43,6 +48,9 @@ import {
   pethLedgerGap,
   pethLedgerUnchecked,
   pethScannedTo,
+  pethPlaceKey,
+  pethPlaceName,
+  pethPlaceView,
   pethPlaces,
   pethRowId,
   pethTimelineEvent,
@@ -50,6 +58,8 @@ import {
   type PethHeadlines,
 } from "@/lib/polaris/peth-ledger";
 import { pethHeadProv } from "@/lib/polaris/peth-provenance";
+import { PETH_PLACE_NAMES } from "@/lib/polaris/peth-place-links";
+import { polarisPethAccountHref } from "@/lib/polaris/routes";
 import { polarisPethEventPage } from "@/lib/polaris/peth-explorer";
 import { pethStoredAsOf } from "@/lib/polaris/peth-as-of";
 import { isPethRefusal, PETH_FIRST_READ, PETH_OLDER_READ, type PethRefusal } from "@/lib/polaris/peth-page-data-shared";
@@ -163,7 +173,8 @@ export default function PethView({
   // missing) where the deployment is not set up for this page: a reload does
   // not change that.
   const [notSetUp, setNotSetUp] = useState(false);
-  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
+  const pinnedId = useParams<{ eventId?: string }>()?.eventId;
+  const onEventPage = pinnedId != null;
 
   useEffect(() => {
     if (initial) return;
@@ -209,10 +220,34 @@ export default function PethView({
     }
   };
 
+  // The event page's row where the reads above do not hold it (past the
+  // first read, or an address too heavy to list): read alone by `tx`. While
+  // it runs the timeline draws a skeleton; a failed read says so; a read
+  // with no row leaves the not-found notice.
+  const [pinned, setPinned] = useState<PethLedgerRow | null>(null);
+  const [pinnedRead, setPinnedRead] = useState<"idle" | "loading" | "done" | "failed">("idle");
+  const pinnedTx = pinnedId ? decodeURIComponent(pinnedId).toLowerCase() : null;
+  const pinnedLoaded = pinnedTx == null || [...(data?.rows ?? []), ...older].some((r) => pethRowId(r) === pinnedTx);
+  useEffect(() => {
+    if (!data || pinnedLoaded || !pinnedTx || !/^0x[0-9a-f]{64}$/.test(pinnedTx)) return;
+    let cancelled = false;
+    setPinnedRead("loading");
+    readPolarisPeth(address, { tx: pinnedTx })
+      .then((d) => {
+        if (cancelled) return;
+        setPinned(d.rows?.[0] ?? null);
+        setPinnedRead("done");
+      })
+      .catch(() => !cancelled && setPinnedRead("failed"));
+    return () => {
+      cancelled = true;
+    };
+  }, [data, pinnedLoaded, pinnedTx, address]);
+
   const rows = data?.rows;
   const listed = useMemo(() => {
     const seen = new Set<string>();
-    return [...(rows ?? []), ...older]
+    return [...(rows ?? []), ...older, ...(pinned ? [pinned] : [])]
       .filter((r) => {
         const id = pethRowId(r);
         if (seen.has(id)) return false;
@@ -220,7 +255,7 @@ export default function PethView({
         return true;
       })
       .reverse();
-  }, [rows, older]);
+  }, [rows, older, pinned]);
   const rowById = useMemo(() => new Map(listed.map((r) => [pethRowId(r), r])), [listed]);
 
   // The map (ui-jobs 873): the server's fill, or the same builder over the
@@ -252,7 +287,7 @@ export default function PethView({
     if (edgeId) url.searchParams.set(MAP_EDGE_PARAM, edgeId);
     else url.searchParams.delete(MAP_EDGE_PARAM);
     window.history.replaceState(window.history.state, "", url);
-    if (edgeId) document.getElementById("timeline")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (edgeId) document.getElementById("peth-timeline")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
   const hot = useMemo(() => (fill ? hotSets(POLARIS_MAP_LAYOUT, fill, selection) : null), [fill, selection]);
   const edgeRows = useMemo(() => {
@@ -268,7 +303,10 @@ export default function PethView({
     () => (edgeRows ? listed.filter((r) => edgeRows.has(pethRowId(r))) : listed),
     [listed, edgeRows],
   );
-  const events = useMemo(() => shown.map((r) => pethTimelineEvent(r, PETH_NAMES, POLARIS_VENUES)), [shown]);
+  const events = useMemo(
+    () => shown.map((r) => pethTimelineEvent(r, PETH_NAMES, POLARIS_VENUES, PETH_PLACE_NAMES)),
+    [shown],
+  );
   const total = data?.total_rows ?? listed.length;
   // Filtered to an edge, the list is the rows read so far on it.
   const olderCount = edgeRows ? 0 : Math.max(0, total - listed.length);
@@ -289,6 +327,38 @@ export default function PethView({
       state: null,
     });
   }, [olderCount, total, listed.length, tl.sortedEvents]);
+
+  // A place's "N events": its rows over the whole ledger, and the timeline
+  // narrowed to it by hiding every other place of the whole ledger and the
+  // rows with none (pethPlaceView). A place with rows past those loaded
+  // reads the older events first; the cut notice shows the read.
+  const placeCounts = data?.place_counts;
+  const placeOptions = tl.placeOptions;
+  const hidePlacesExactly = tl.hidePlacesExactly;
+  const loadRestRef = useRef(loadRest);
+  loadRestRef.current = loadRest;
+  const placeEvents = useMemo<PethPlaceEvents>(
+    () => (match) => {
+      const hit = placeCounts?.find((c) => match(c.place));
+      if (!hit) return null;
+      const key = pethPlaceKey(hit.place);
+      const loaded = placeOptions.find((o) => o.key === key)?.count ?? 0;
+      const view = pethPlaceView(placeCounts ?? [], key, loaded);
+      if (!view) return null;
+      const q = new URLSearchParams({ hidePlaces: view.hide.join(",") }).toString();
+      return {
+        rows: view.rows,
+        name: pethPlaceName(hit.place, PETH_PLACE_NAMES),
+        href: `${polarisPethAccountHref(address)}?${q}#peth-timeline`,
+        show: () => {
+          hidePlacesExactly(view.hide);
+          if (view.needsOlder) void loadRestRef.current();
+          document.getElementById("peth-timeline")?.scrollIntoView({ block: "start" });
+        },
+      };
+    },
+    [placeCounts, placeOptions, hidePlacesExactly, address],
+  );
 
   const figures = useMemo(() => (data ? pethHeadlines(data) : null), [data]);
   const places = useMemo(() => (data ? pethPlaces(data) : null), [data]);
@@ -370,6 +440,7 @@ export default function PethView({
             headRead={headRead}
             headBlock={headBlock}
             storedAsOf={pethStoredAsOf(data)}
+            events={placeEvents}
           />
           {fill && (
             <PolarisPethMap
@@ -385,9 +456,18 @@ export default function PethView({
           )}
         </>
       )}
-      <div id="timeline" className="scroll-mt-4">
+      <div id="peth-timeline" className="scroll-mt-4">
         <ChainTruthTimeline
           persistKeyPrefix="polaris-peth"
+          pinnedRead={
+            pinnedTx && !pinnedLoaded && !pinned && /^0x[0-9a-f]{64}$/.test(pinnedTx)
+              ? pinnedRead === "failed"
+                ? "failed"
+                : pinnedRead === "done"
+                  ? undefined
+                  : "loading"
+              : undefined
+          }
           closed={false}
           tl={tl}
           boundary={boundary}

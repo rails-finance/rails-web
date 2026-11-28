@@ -8,7 +8,8 @@ export type TimelineDisplayKey =
   | "showMarketNotes"
   | "showTxHashes"
   | "followChart"
-  | "figuresFirst";
+  | "figuresFirst"
+  | "showPethAccountLinks";
 
 export interface TimelineDisplayState {
   /** When true, position-snapshot rows show the asset ticker text alongside
@@ -37,6 +38,11 @@ export interface TimelineDisplayState {
    *  A tab clicked on a card changes that card alone; changing this resets
    *  every opened card to it. The event page stands both open and ignores it. */
   figuresFirst: boolean;
+  /** "pETH account links" in Display (ui-jobs 872): on a Polaris CDP, deposit or
+   *  reserve loan, the amount of an event that moved pETH or fpETH between
+   *  the owner's wallet and the position wears a hairline border; it links
+   *  the owner's pETH account event either way. On by default. */
+  showPethAccountLinks: boolean;
   toggle: (key: TimelineDisplayKey) => void;
   set: (key: TimelineDisplayKey, value: boolean) => void;
 }
@@ -48,6 +54,7 @@ const DEFAULTS = {
   showTxHashes: false,
   followChart: false,
   figuresFirst: false,
+  showPethAccountLinks: true,
 };
 // A NEW key with a default needs no bump: the provider restores by spreading
 // the stored object over DEFAULTS, so a reader whose stored preferences

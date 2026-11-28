@@ -3444,6 +3444,13 @@ export interface BaseActivityEvent {
    *  carrying one is not cached. Absent when every token loaded. */
   decimalsUnread?: UnreadToken[];
 
+  /** Where the event's tokens went or came from, as the timeline's Place
+   *  axis files it (getEventPlaceKeys): each place's key and the option's
+   *  label. A Polaris pETH account row carries every place its lines touch,
+   *  `none` where it names none; every other family leaves it absent and has
+   *  no Place axis. */
+  places?: { key: string; label: string }[];
+
   // ── Protocol-specific detail ──
   //
   // `context.protocol` is the discriminant every type guard below reads — an

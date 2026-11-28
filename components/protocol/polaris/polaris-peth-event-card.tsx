@@ -6,9 +6,11 @@
 // (components/protocol/liquity/redeemer-event-card.tsx). T1 the kind with the
 // tokens it moved on the spine, T2 the effect, the ETH figures, the curve fee,
 // the trade's price, any valuation at its block and the transaction, T3
-// the row in words (T10·polaris). A valuation is labelled as one and is never
-// added into ETH out.
+// the row in words (T10·polaris), closed by the link to the place its tokens
+// went to or came from (T10.1·polaris; ui-jobs 872). A valuation is labelled
+// as one and is never added into ETH out.
 
+import Link from "next/link";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineTokenRow } from "@/components/shared/spine-column";
@@ -30,6 +32,7 @@ import {
   pethAmountText,
   pethKindLabel,
   pethLineToken,
+  pethPlaceWords,
   pethRowBullets,
   pethRowEffect,
   pethRowId,
@@ -39,6 +42,8 @@ import {
   type PethTokenNames,
 } from "@/lib/polaris/peth-ledger";
 import { pethLineProv, pethRowEthProv, pethRowPriceProv, pethRowValuationProv } from "@/lib/polaris/peth-provenance";
+import { PETH_PLACE_NAMES, pethPlaceHref } from "@/lib/polaris/peth-place-links";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import type { PethLedgerRow } from "@/lib/sources/api/polaris-peth";
 import { polarisPethSheet } from "./polaris-peth-sheet";
 
@@ -76,6 +81,34 @@ function amountCell(
   };
 }
 
+/** The row's primary place as a link: its page (→) or the contract on the
+ *  block explorer (↗), with the T3 line's text. Null where the row has none. */
+function pethPlaceLinkOf(row: PethLedgerRow): { href: string; tip: string; external: boolean } | null {
+  const p = row.place;
+  const to = p ? pethPlaceHref(p) : null;
+  if (!p || !to) return null;
+  return { ...to, tip: `${pethPlaceWords(row, p, PETH_PLACE_NAMES)} ${to.external ? "↗" : "→"}` };
+}
+
+/** The row's place line in T3. Null where the row has none. */
+function PlaceLine({ row }: { row: PethLedgerRow }) {
+  const to = pethPlaceLinkOf(row);
+  if (!to) return null;
+  return (
+    <p className="mt-2 text-sm leading-relaxed" data-anatomy="T10.1·polaris" data-peth-row-place={row.place?.kind}>
+      {to.external ? (
+        <a href={to.href} target="_blank" rel="noopener" className={INLINE_LINK}>
+          {to.tip}
+        </a>
+      ) : (
+        <Link href={to.href} prefetch={false} className={INLINE_LINK}>
+          {to.tip}
+        </Link>
+      )}
+    </p>
+  );
+}
+
 export function PolarisPethEventCard({
   row,
   isLast,
@@ -96,19 +129,29 @@ export function PolarisPethEventCard({
   // The spine: each token the address's lines moved, one row per token and
   // direction, toward the wallet (left) or away from it (right).
   const byToken = new Map<string, { symbol: string; address: string; raw: bigint; dir: "in" | "out" }>();
+  // Keyed by token address and direction, as `primary` below is.
   for (const l of lines) {
     const t = pethLineToken(l.token, PETH_NAMES, POLARIS_VENUES);
     const k = `${t.address}:${l.direction}`;
     const prev = byToken.get(k);
     byToken.set(k, { ...t, raw: (prev?.raw ?? ZERO) + big(l.amount_raw), dir: l.direction });
   }
-  const tokens: SpineTokenRow[] = [...byToken.values()].map((t) => ({
+  // The amounts of the row's primary lines open its place, with the T3
+  // line's words as the tooltip (ui-jobs 872).
+  const placeLink = pethPlaceLinkOf(row);
+  const primary = new Set(
+    lines
+      .filter((l) => l.rule === row.kind)
+      .map((l) => `${pethLineToken(l.token, PETH_NAMES, POLARIS_VENUES).address}:${l.direction}`),
+  );
+  const tokens: SpineTokenRow[] = [...byToken.entries()].map(([k, t]) => ({
     symbol: t.symbol,
     address: t.address,
     direction: t.dir === "in" ? "left" : "right",
     popover: true,
     value: units(t.raw),
     display: pethAmountText(t.raw),
+    ...(placeLink && primary.has(k) ? { amountLink: placeLink } : {}),
   }));
 
   const lineCells: EventCellSpec[] = lines.map((l, i) => {
@@ -265,18 +308,22 @@ export function PolarisPethEventCard({
     sheet: polarisPethSheet(row),
     ledgers: { none: "Each balance is its side's total." },
     explainer: {
-      body:
-        bullets.length > 0 ? (
-          <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed" data-anatomy="T10·polaris">
-            {bullets.map((b) => (
-              <li key={b}>{b}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm leading-relaxed" data-anatomy="T10·polaris">
-            This transaction moved no pETH for this address.
-          </p>
-        ),
+      body: (
+        <>
+          {bullets.length > 0 ? (
+            <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed" data-anatomy="T10·polaris">
+              {bullets.map((b) => (
+                <li key={b}>{b}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm leading-relaxed" data-anatomy="T10·polaris">
+              This transaction moved no pETH for this address.
+            </p>
+          )}
+          <PlaceLine row={row} />
+        </>
+      ),
     },
     learnMore: null,
   };

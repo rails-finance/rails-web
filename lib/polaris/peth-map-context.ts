@@ -34,6 +34,6 @@ export function pethMapContext(address: string): PethMapContext {
       venue_univ2_peth_weth: "pETH/WETH pair",
     } satisfies Record<keyof typeof POLARIS_VENUES, string>,
     timelineHref: (edgeId) =>
-      `${polarisPethAccountHref(address)}?${MAP_EDGE_PARAM}=${encodeURIComponent(edgeId)}#timeline`,
+      `${polarisPethAccountHref(address)}?${MAP_EDGE_PARAM}=${encodeURIComponent(edgeId)}#peth-timeline`,
   };
 }

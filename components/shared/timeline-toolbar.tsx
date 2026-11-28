@@ -4,7 +4,7 @@
 // listings' filter-bar style (ui-jobs 735): the heading line (the tenure, with
 // Sync to chart, the 30-day projection's switch and Display at its right), then
 // the pill row (ui-jobs 801): the Filters button, one N1.10 pill per axis that
-// is set (Type, Asset, Version, Address; timeline-filter-bar.tsx), the Date
+// is set (Type, Asset, Version, Address, Place; timeline-filter-bar.tsx), the Date
 // where the page has a date axis, a round calendar button at rest and a pill
 // once set (`tl.datesAxis`; a timeline the Lifetime flows chart ties to has
 // none, `timelineDates` in lib/shared/timeline-dates.ts, and draws the
@@ -298,6 +298,14 @@ export const FIGURES_FIRST_ITEM: TimelineDisplayItem = { key: "figuresFirst", la
  *  Transaction hashes and Figures first are the items. ChainTruthTimeline appends Collapse-runs
  *  whenever the page passes `runs`. */
 export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [TX_HASH_ITEM, FIGURES_FIRST_ITEM];
+
+/** "pETH account links" (ui-jobs 872): the hairline border on a Polaris
+ *  position's amounts that moved pETH or fpETH with the owner's wallet. The
+ *  CDP, deposit and reserve-loan pages add it after the preset. */
+export const PETH_ACCOUNT_LINKS_ITEM: TimelineDisplayItem = {
+  key: "showPethAccountLinks",
+  label: "pETH account links",
+};
 
 /** The shared display "eye" menu — one FilterDropdown over a chosen subset of
  *  the timeline-display flags. Replaces the per-protocol TimelineDisplayToggle
