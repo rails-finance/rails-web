@@ -307,6 +307,13 @@ export default function PethView({
       if (ids.length === 1) setSelection({ type: "edge", id: ids[0] });
     }
   }, [onEventPage, baseFill]);
+  // The explanation's times land on their event in place, as `?at=` does on
+  // load; a map filter that hides the event is cleared first.
+  const [landAt, setLandAt] = useState<{ id: string; seq: number } | null>(null);
+  const landOn = (id: string) => {
+    if (hideIds?.has(id)) applyFilter(null);
+    setLandAt((l) => ({ id, seq: (l?.seq ?? 0) + 1 }));
+  };
   const applyFilter = (edgeIds: string[] | null) => {
     const ids = edgeIds ?? [];
     setFilterEdges(ids);
@@ -486,6 +493,9 @@ export default function PethView({
               selection={selection}
               onSelect={setSelection}
               onFilter={(edgeId) => applyFilter([edgeId])}
+              onAt={landOn}
+              // Any edge the page's fill has, older rows' included.
+              onEdges={(ids) => applyFilter(ids.filter((id) => fill.edges[id] != null))}
               rowLabel={rowLabel}
               handAddedPlaces={handAddedPlaces}
             />
@@ -500,6 +510,7 @@ export default function PethView({
           tl={tl}
           boundary={boundary}
           loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
+          landAt={landAt}
           notice={
             filterEdges.length > 0 && edgeRows ? (
               <MapFilterNotice edgeIds={filterEdges} count={shownCount} onClear={() => applyFilter(null)} />

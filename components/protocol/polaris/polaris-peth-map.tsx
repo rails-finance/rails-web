@@ -26,6 +26,8 @@ export function PolarisPethMap({
   onFilter,
   rowLabel,
   handAddedPlaces,
+  onAt,
+  onEdges,
 }: {
   address: string;
   fill: MapFill;
@@ -34,6 +36,9 @@ export function PolarisPethMap({
   onSelect: (s: MapSelection) => void;
   onFilter: (edgeId: string) => void;
   rowLabel: (rowId: string) => string | null;
+  /** The drawer's links in place: land on an event, filter to arrows. */
+  onAt?: (eventId: string) => void;
+  onEdges?: (edgeIds: string[]) => void;
   /** DEV ONLY: rows whose places were added by hand (lib/polaris/peth-dev-cache.ts). */
   handAddedPlaces?: string[] | null;
 }) {
@@ -116,6 +121,8 @@ export function PolarisPethMap({
             explanation={explanation}
             learnMore={(key) => <LearnMore inline content={polarisModal(key as PolarisL5Key)} />}
             explanationAnatomy="O8·polaris"
+            onExplanationAt={onAt}
+            onExplanationEdges={onEdges}
           />
         </div>
       </section>

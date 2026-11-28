@@ -9,15 +9,15 @@
 // THE STORY ("Its steps", then an untitled group): one step per filled arrow, in
 // the order of each arrow's first row, ties in the map's order. Two pairs
 // read as one step: ETH into the zap router with what the router gave back
-// (the zap buy), and the bonding curve's fee after it, which carries no time
-// of its own. Each dated bullet states one time or span and one amount. Past
+// (the zap buy), and the bonding curve's fee after it, which carries no
+// time. Each dated bullet states one time or span and one amount. Past
 // the bullets Now leaves, the middle steps give way to a line linking the
 // timeline filtered to their arrows. NOW: what each mechanism holds now, two
 // figures to a bullet; the address's balances are on the map's box (Miles,
 // 28 Nov 2026), and with none in a mechanism there is no Now. With the
 // arrows unknown and nothing in a mechanism, the map's note says why and the
 // Explanation tab is not drawn. PARTS: each part this address used, in the
-// documented term, and the dashed boxes, eight bullets at most: past that the
+// box's term, and the dashed boxes, eight bullets at most: past that the
 // CDPs, Earn Pools and Floor Loans share a bullet, and then the dashed boxes'
 // line goes.
 //
@@ -39,6 +39,7 @@ import type {
   MapLine,
   MapReceipt,
   MapTextPart,
+  MapWhenEnd,
 } from "../shared/protocol-map/types";
 import { MAP_HOLDER, mapUnusedWords, usedNodes } from "../shared/protocol-map/types";
 import { PM, POLARIS_LOAN_NAME, POLARIS_MAP_LAYOUT, POLARIS_POOL_NAME, pmEdge } from "./peth-map-layout";
@@ -165,7 +166,12 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
     const sp = now(PM.sp);
     if (sp) {
       const n = noteNames(lines(PM.sp), /deposit #/).length;
-      clauses.push([`its ${POOL_ONE} ${n === 1 ? "deposit holds" : "deposits hold"} `, ...nowFig(sp)]);
+      // sp_peth: the pETH gains the deposits left unclaimed at their last touch.
+      clauses.push(
+        n === 1
+          ? [`its ${POOL_ONE} deposit held `, ...nowFig(sp), " in unclaimed gains at its last touch"]
+          : [`its ${POOL_ONE} deposits held `, ...nowFig(sp), " in unclaimed gains at their last touch"],
+      );
     }
     const loan = now(PM.loan);
     if (loan)
@@ -280,7 +286,8 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
           r.edgeIds.includes(otherZap) ||
           (r.edgeIds.includes(zapHolder) && !r.edgeIds.some((id) => id === ethZap || id === holderZap)),
       );
-      if (E[zapOther] || E[otherZap]) {
+      // A wallet that only zapped ETH into vpETH has neither other-token arrow.
+      if (E[zapOther] || E[otherZap] || vp.length > 0) {
         let first: MapEdgeEnd | undefined;
         let last: MapEdgeEnd | undefined;
         for (const r of rows) {
@@ -289,7 +296,7 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
           if (!first || r.at <= first.at) first = end;
           if (!last || r.at > last.at) last = end;
         }
-        const verb = !E[otherZap] ? "bought" : !E[zapOther] ? "sold" : "traded";
+        const verb = !E[otherZap] ? "bought" : !E[zapOther] && vp.length === 0 ? "sold" : "traded";
         const names =
           verb === "sold"
             ? sold
@@ -297,7 +304,7 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
               ? bought
               : [...new Set([...bought, ...sold])].sort((x, y) => rank(x) - rank(y));
         step(
-          [E[zapOther] ? zapOther : otherZap, ...(E[zapOther] && E[otherZap] ? [otherZap] : [])],
+          [zapOther, otherZap, ...(E[zapOther] || E[otherZap] ? [] : [zapHolder])].filter((id) => E[id]),
           [`, it ${verb} `, names.length > 0 ? { list: names } : "other tokens", " through the zap router."],
           [],
           first && last ? { first, last } : null,
@@ -379,23 +386,30 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
     // Each time's words: the first in the drawer with its date, a later one
     // on the same day by its time alone.
     let day: string | null = null;
-    const stamp = (end: MapEdgeEnd, sameDayAs?: string): { text: string; href: string } => {
+    const stamp = (end: MapEdgeEnd, sameDayAs?: string): MapWhenEnd => {
       const d = dayOf(end.at);
       const ref = sameDayAs ?? day;
       day = d;
       return {
         text: d === ref ? timeOf(end.at) : `${d}, ${timeOf(end.at)}`,
+        id: end.id,
         href: ctx.eventHref(end.id, end.later === true),
+        ...(end.later ? { later: true as const } : {}),
       };
     };
     const told = [...did, ...then];
+    // "Most recently" only on a step whose last row is the latest told: the
+    // steps run in the order of their first rows, so the last of them may
+    // have ended before another.
+    const latest = Math.max(...told.map((s) => s.span?.last.at ?? -Infinity));
     const lastStep = told[told.length - 1];
+    const mostRecent = lastStep?.span != null && lastStep.span.last.at === latest ? lastStep : null;
     const bulletsOf = (xs: Step[], startsThen: boolean): MapBullet[] =>
       xs.flatMap((s, i) => {
         const opener =
           told.length < 2
             ? ""
-            : s === lastStep
+            : s === mostRecent
               ? "Most recently, "
               : s === told[0]
                 ? "First, "
@@ -432,7 +446,17 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
         bullets: bulletsOf(did, false),
       });
       if (skipped.length > 0) {
-        const ids = [...new Set(skipped.flatMap((s) => s.edges).filter((id) => E[id]))];
+        // The skipped steps' own arrows: an arrow a told step also reads (the
+        // zap router's arrow back, say) would bring that step's rows too.
+        const toldEdges = new Set(told.flatMap((s) => s.edges));
+        const ids = [
+          ...new Set(
+            skipped.flatMap((s) => {
+              const own = s.edges.filter((id) => E[id] && !toldEdges.has(id));
+              return own.length > 0 ? own : s.edges.slice(0, 1);
+            }),
+          ),
+        ];
         story.push({
           id: "more",
           lead: [
@@ -440,6 +464,7 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
             {
               link: `${skipped.length.toLocaleString("en-US")} more ${skipped.length === 1 ? "step" : "steps"}`,
               href: ctx.edgesHref(ids),
+              edges: ids,
             },
             " in the timeline.",
           ],
@@ -497,11 +522,11 @@ const PART_ORDER = [PM.zap, PM.curve, PM.cdp, PM.sp, PM.loan, PM.splitter, PM.po
  *  and the svpETH vault nowhere, so those are the map's coined names (rails-ops
  *  reference/official-docs/polaris.md, Terms). */
 const PART_WORDS: Record<string, string> = {
-  [PM.zap]: "Zap router: trades ETH for Polaris tokens in one transaction.",
+  [PM.zap]: "Zap router: one-click trades between ETH and Polaris tokens.",
   [PM.curve]: "Bonding curve: mints pETH against ETH and burns pETH to release ETH; its fees go to the fee router.",
   [PM.cdp]: "CDPs: lock pETH as collateral to mint USDp or GOLDp.",
-  [PM.sp]: `${POLARIS_POOL_NAME}: hold USDp or GOLDp deposits that repay liquidated debt and take the pETH collateral.`,
-  [PM.loan]: `${POLARIS_LOAN_NAME}: lend ETH from the bonding curve reserve against fpETH collateral.`,
+  [PM.sp]: `${POLARIS_POOL_NAME}: hold USDp or GOLDp deposits that repay liquidated debt and receive the pETH collateral.`,
+  [PM.loan]: `${POLARIS_LOAN_NAME}: borrow ETH from the bonding curve reserve against fpETH collateral.`,
   [PM.splitter]: "Splitter: splits pETH into fpETH and vpETH, and merges them back.",
   [PM.pools]: "Pools: hold pETH paired with other tokens for trading.",
   [PM.svpeth]: "svpETH vault: stakes vpETH and supplies it to Morpho Blue.",
@@ -513,7 +538,7 @@ const PART_WORDS: Record<string, string> = {
 const SHARED_CLAUSE: Record<string, string> = {
   [PM.cdp]: "CDPs mint USDp or GOLDp against pETH",
   [PM.sp]: `${POLARIS_POOL_NAME} repay liquidated debt`,
-  [PM.loan]: `${POLARIS_LOAN_NAME} lend reserve ETH against fpETH`,
+  [PM.loan]: `${POLARIS_LOAN_NAME} borrow reserve ETH against fpETH`,
 };
 
 /** The Polaris "?" modal a part's bullet opens, where one explains it. */

@@ -29,6 +29,7 @@ import {
   type MapEdge,
   type MapExplanation,
   type MapTextPart,
+  type MapWhenEnd,
   type MapFill,
   type MapLayout,
   type MapLine,
@@ -206,11 +207,33 @@ export interface ProtocolMapProps {
   learnMore?: (key: string) => ReactNode;
   /** The app-anatomy code of the protocol's words in the drawer ("O8·polaris"). */
   explanationAnatomy?: string;
+  /** A drawer time's click, handled in place: land on that event on the
+   *  page's timeline. Unset, the link's href loads. */
+  onExplanationAt?: (eventId: string) => void;
+  /** A drawer link to several edges, handled in place: filter the page's
+   *  timeline to them. Unset, the link's href loads. */
+  onExplanationEdges?: (edgeIds: string[]) => void;
 }
 
 /** One part of a drawer bullet: a figure bold with its receipt, a time or a
  *  link to the timeline. */
-function Part({ p }: { p: MapTextPart }) {
+/** The page's in-place handlers for the drawer's links; each link keeps its
+ *  href for a new tab or a page without script. */
+interface DrawerLinks {
+  /** Land on one event on the page's timeline. */
+  onAt?: (eventId: string) => void;
+  /** Filter the page's timeline to these edges. */
+  onEdges?: (edgeIds: string[]) => void;
+}
+
+/** A plain click that the page handles in place. */
+const inPlace = (ev: React.MouseEvent, run: (() => void) | null) => {
+  if (!run || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+  ev.preventDefault();
+  run();
+};
+
+function Part({ p, links }: { p: MapTextPart; links: DrawerLinks }) {
   if (typeof p === "string") return <>{p}</>;
   if ("list" in p) return <>{mapSeries(p.list)}</>;
   if ("figure" in p) {
@@ -230,19 +253,35 @@ function Part({ p }: { p: MapTextPart }) {
       </strong>
     );
   }
-  if ("link" in p)
+  if ("link" in p) {
+    const edges = p.edges;
     return (
-      <a href={p.href} className={INLINE_LINK}>
+      <a
+        href={p.href}
+        className={INLINE_LINK}
+        onClick={(ev) => inPlace(ev, edges && links.onEdges ? () => links.onEdges!(edges) : null)}
+      >
         {p.link}
       </a>
     );
+  }
   const { from, to, cap } = p.when;
-  const at = (x: { text: string; href: string }) => (
-    <a href={x.href} className={`${INLINE_LINK} tabular-nums`} title="Opens this event on the timeline">
-      {x.text}
-      <span className="sr-only"> on the timeline</span>
-    </a>
-  );
+  // An event read after the page's first read opens on its own page; the
+  // rest land on the timeline.
+  const at = (x: MapWhenEnd) => {
+    const where = x.later ? "on its event page" : "on the timeline";
+    return (
+      <a
+        href={x.href}
+        className={`${INLINE_LINK} tabular-nums`}
+        title={`Opens this event ${where}`}
+        onClick={(ev) => inPlace(ev, !x.later && links.onAt ? () => links.onAt!(x.id) : null)}
+      >
+        {x.text}
+        <span className="sr-only"> {where}</span>
+      </a>
+    );
+  };
   return to ? (
     <>
       {cap ? "From" : "from"} {at(from)} to {at(to)}
@@ -263,10 +302,12 @@ function MapExplanationDrawer({
   explanation,
   learnMore,
   anatomy,
+  links,
 }: {
   explanation: MapExplanation;
   learnMore?: (key: string) => ReactNode;
   anatomy?: string;
+  links: DrawerLinks;
 }) {
   const [open, setOpen] = useState(false);
   // The tabs as the opened timeline card draws Explanation and Figures
@@ -352,7 +393,7 @@ function MapExplanationDrawer({
                 {g.lead && (
                   <p className="mt-1 text-sm leading-snug text-rb-500">
                     {g.lead.map((p, i) => (
-                      <Part key={i} p={p} />
+                      <Part key={i} p={p} links={links} />
                     ))}
                   </p>
                 )}
@@ -361,7 +402,7 @@ function MapExplanationDrawer({
                     {g.bullets.map((b, i) => (
                       <ExplainBullet key={i}>
                         {b.parts.map((p, j) => (
-                          <Part key={j} p={p} />
+                          <Part key={j} p={p} links={links} />
                         ))}
                         {b.learnMore && learnMore && (
                           <span className="ml-1.5 inline-flex align-middle">{learnMore(b.learnMore)}</span>
@@ -390,6 +431,8 @@ export function ProtocolMap({
   explanation,
   learnMore,
   explanationAnatomy,
+  onExplanationAt,
+  onExplanationEdges,
 }: ProtocolMapProps) {
   const frame = useRef<HTMLDivElement>(null);
   const boxRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -688,7 +731,12 @@ export function ProtocolMap({
       )}
       {/* The selection line stays next to the map; the drawer follows. */}
       {explanation && explanation.tabs.length > 0 && (
-        <MapExplanationDrawer explanation={explanation} learnMore={learnMore} anatomy={explanationAnatomy} />
+        <MapExplanationDrawer
+          explanation={explanation}
+          learnMore={learnMore}
+          anatomy={explanationAnatomy}
+          links={{ onAt: onExplanationAt, onEdges: onExplanationEdges }}
+        />
       )}
     </div>
   );

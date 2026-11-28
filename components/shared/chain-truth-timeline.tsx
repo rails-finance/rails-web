@@ -500,6 +500,10 @@ export interface ChainTruthTimelineProps {
    *  reading the first card, and on a position with 900 loaded rows the footer
    *  slot would hide it behind seventeen presses of "Show N more". */
   notice?: ReactNode;
+  /** Lands on one event in place, as a `?at=` landing does on load (reveal,
+   *  open, scroll, highlight). A new `seq` lands again. Unset renders
+   *  identically to today. */
+  landAt?: { id: string; seq: number } | null;
   /** The boundary — the events before the oldest drawn row, stated as ONE
    *  card on the spine after that row (rails-ops decision 0019; see
    *  <TimelineBoundaryCard>). The WINDOW arm needs no prop: the card is
@@ -793,6 +797,7 @@ function ChainTruthTimelineBody({
   footer,
   footerWhileMore,
   notice,
+  landAt,
   boundary,
   loadOlder,
   csvExportCeiling,
@@ -1028,6 +1033,14 @@ function ChainTruthTimelineBody({
     appliedAtRef.current = true;
     setLandingWantedId(decodeEventId(raw));
   }, [pinnedId]);
+  // The same landing, asked for in place by the page (`landAt`).
+  const landSeq = landAt?.seq;
+  const landId = landAt?.id;
+  useEffect(() => {
+    if (pinnedId || landSeq == null || !landId) return;
+    setLandingNotFoundId(null);
+    setLandingWantedId(landId);
+  }, [pinnedId, landSeq, landId]);
 
   // The folder a `?at=` landing resolved its event key to — held open while
   // the landing runs, so the member card mounts and the DOM step below can

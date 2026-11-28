@@ -261,13 +261,23 @@ export function mapEdgesFromParam(raw: string | null, fill: MapFill): string[] {
 // text and parts: each figure is a fill amount drawn bold with its receipt,
 // each time a link to its event on the timeline.
 
+/** One end of a time: its words, its event and where it links. `later`: the
+ *  row was read after the page's first read, and the link opens the event's
+ *  page, not the timeline. */
+export interface MapWhenEnd {
+  text: string;
+  id: string;
+  href: string;
+  later?: true;
+}
+
 /** A time in the account, as the drawer prints it: "at T", or "from T1 to
  *  T2". Each end's text is set by the builder (the first time in the drawer
  *  carries its date, a later one on the same day the time alone), and links
  *  to its event on the timeline. Counts as one word and one figure. */
 export interface MapWhen {
-  from: { text: string; href: string };
-  to?: { text: string; href: string };
+  from: MapWhenEnd;
+  to?: MapWhenEnd;
   /** Starts the bullet: "At", "From". */
   cap?: boolean;
 }
@@ -279,7 +289,8 @@ export type MapTextPart =
   /** A fill amount, bold, with the receipt the map shows it with. */
   | { figure: MapAmount; receipt?: MapReceipt }
   | { when: MapWhen }
-  | { link: string; href: string };
+  /** A link; `edges` where it opens the timeline filtered to those edges. */
+  | { link: string; href: string; edges?: string[] };
 
 export interface MapBullet {
   parts: MapTextPart[];

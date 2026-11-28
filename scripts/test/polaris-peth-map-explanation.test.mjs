@@ -293,10 +293,10 @@ test("0x38d7: the drawer's words", () => {
     [
       null,
       [
-        "Zap router: trades ETH for Polaris tokens in one transaction.",
+        "Zap router: one-click trades between ETH and Polaris tokens.",
         "Bonding curve: mints pETH against ETH and burns pETH to release ETH; its fees go to the fee router.",
         "CDPs: lock pETH as collateral to mint USDp or GOLDp.",
-        `${POLARIS_LOAN_NAME}: lend ETH from the bonding curve reserve against fpETH collateral.`,
+        `${POLARIS_LOAN_NAME}: borrow ETH from the bonding curve reserve against fpETH collateral.`,
       ],
     ],
     [
@@ -499,7 +499,7 @@ test("Parts past eight bullets: CDPs, Earn Pools and Floor Loans share one, then
   assert.equal(t9.length, 7);
   assert.ok(
     t9.includes(
-      `CDPs mint USDp or GOLDp against pETH; ${POLARIS_POOL_NAME} repay liquidated debt; ${POLARIS_LOAN_NAME} lend reserve ETH against fpETH.`,
+      `CDPs mint USDp or GOLDp against pETH; ${POLARIS_POOL_NAME} repay liquidated debt; ${POLARIS_LOAN_NAME} borrow reserve ETH against fpETH.`,
     ),
   );
   assert.ok(!p9.some((g) => g.id === "unused"));
@@ -581,4 +581,135 @@ test("no group passes four bullets, however the steps' sizes fall", () => {
     );
     for (const t of pethMapExplanation(f, XC).tabs) assertPane(t.groups, `${n} ${t.key}`);
   }
+});
+
+// ── Ops review fixes ──
+const day = (iso) => Date.parse(iso) / 1000;
+const span = (edgeId, a, b, amounts, ids = ["0xa", "0xb"]) => [
+  edgeId,
+  {
+    amounts,
+    rowCount: 2,
+    timelineHref: "",
+    receipt: R(edgeId),
+    first: { at: day(a), id: ids[0] },
+    last: { at: day(b), id: ids[1] },
+  },
+];
+const story = (x) => tab(x, "explanation").flatMap((g) => (g.id === "now" ? [] : g.bullets.map((b) => text(b.parts))));
+
+test('"Most recently" only on a step that ended last', () => {
+  // Zap buys from 1 Jan to 20 Nov; one CDP open on 3 Mar sorts after them but ended before.
+  const f = fillOf({
+    edges: Object.fromEntries([
+      span(pmEdge(PM.eth, PM.zap), "2026-01-01T10:00:00Z", "2026-11-20T10:00:00Z", [one("WETH")]),
+      span(pmEdge(MAP_HOLDER, PM.cdp), "2026-03-03T10:00:00Z", "2026-03-03T10:00:00Z", [one("pETH")], ["0xc", "0xc"]),
+    ]),
+  });
+  const t = story(pethMapExplanation(f, XC));
+  assert.equal(t.length, 2);
+  assert.ok(
+    t.every((x) => !/Most recently/.test(x)),
+    t.join(" | "),
+  );
+  assert.match(t[1], /^Then, at 3 Mar 2026, 10:00, it put 1 pETH into its CDPs\.$/);
+  // Where the last step did end last, it says so.
+  const g = fillOf({
+    edges: Object.fromEntries([
+      span(pmEdge(PM.eth, PM.zap), "2026-01-01T10:00:00Z", "2026-01-02T10:00:00Z", [one("WETH")]),
+      span(pmEdge(MAP_HOLDER, PM.cdp), "2026-03-03T10:00:00Z", "2026-03-03T10:00:00Z", [one("pETH")], ["0xc", "0xc"]),
+    ]),
+  });
+  assert.match(story(pethMapExplanation(g, XC))[1], /^Most recently, at 3 Mar 2026, 10:00, /);
+});
+
+test("vpETH zap buys are told: alone, and beside pETH zaps", () => {
+  const zapHolder = pmEdge(PM.zap, MAP_HOLDER);
+  const ethZap = pmEdge(PM.eth, PM.zap);
+  // Only ETH → vpETH zaps: the router's arrow back carries vpETH and nothing else.
+  const only = fillOf({
+    edges: Object.fromEntries([span(zapHolder, "2026-08-18T10:00:00Z", "2026-08-18T10:05:00Z", [one("vpETH")])]),
+    rows: [
+      { id: "0xa", edgeIds: [zapHolder], at: day("2026-08-18T10:00:00Z") },
+      { id: "0xb", edgeIds: [zapHolder], at: day("2026-08-18T10:05:00Z") },
+    ],
+  });
+  assert.deepEqual(story(pethMapExplanation(only, XC)), [
+    "From 18 Aug 2026, 10:00 to 10:05, it bought vpETH through the zap router.",
+  ]);
+  // A pETH zap buy and a later vpETH one.
+  const both = fillOf({
+    edges: Object.fromEntries([
+      span(ethZap, "2026-08-18T10:00:00Z", "2026-08-18T10:00:00Z", [one("WETH")], ["0xa", "0xa"]),
+      span(zapHolder, "2026-08-18T10:00:00Z", "2026-08-18T10:05:00Z", [one("pETH"), one("vpETH")]),
+    ]),
+    rows: [
+      { id: "0xa", edgeIds: [ethZap, zapHolder], at: day("2026-08-18T10:00:00Z") },
+      { id: "0xb", edgeIds: [zapHolder], at: day("2026-08-18T10:05:00Z") },
+    ],
+  });
+  assert.deepEqual(story(pethMapExplanation(both, XC)), [
+    "First, at 18 Aug 2026, 10:00, it paid 1 WETH through the zap router for pETH.",
+    "Most recently, at 10:05, it bought vpETH through the zap router.",
+  ]);
+});
+
+test("the more-steps link names only the skipped steps' own arrows", () => {
+  // A zap buy told first; then eight mechanism steps, one of them skipped
+  // with the vpETH zap, which reads the zap router's arrow back too.
+  const zapHolder = pmEdge(PM.zap, MAP_HOLDER);
+  const ethZap = pmEdge(PM.eth, PM.zap);
+  const f = tenSteps();
+  f.edges[ethZap] = { ...f.edges[pmEdge(PM.outside, MAP_HOLDER)], amounts: [one("WETH")], receipt: R("ethzap") };
+  f.edges[zapHolder] = { ...f.edges[ethZap], amounts: [one("pETH"), one("vpETH")], receipt: R("zapholder") };
+  delete f.edges[pmEdge(PM.outside, MAP_HOLDER)];
+  f.rows = [
+    { id: "0x0", edgeIds: [ethZap, zapHolder], at: t0 },
+    { id: "0xv", edgeIds: [zapHolder], at: t0 + 330 },
+    ...f.rows.slice(1),
+  ];
+  const g = tab(pethMapExplanation(f, XC), "explanation");
+  const more = g.find((x) => x.id === "more");
+  const link = more.lead.find((p) => typeof p === "object" && "link" in p);
+  // Skipped: the Earn Pool's arrow back, the Floor Loans' arrow in, and the
+  // vpETH zap, whose one arrow the told buy also reads, so it keeps that one.
+  assert.equal(text(more.lead), "… and 3 more steps in the timeline.");
+  assert.deepEqual(link.edges, [pmEdge(PM.sp, MAP_HOLDER), pmEdge(MAP_HOLDER, PM.loan), zapHolder]);
+  assert.ok(!link.edges.includes(ethZap));
+  assert.equal(link.href, XC.edgesHref(link.edges));
+});
+
+test("a time read after the first read is marked for its event page", () => {
+  const f = fillOf({
+    edges: Object.fromEntries([on(MAP_HOLDER, PM.cdp, 0, undefined, true), on(MAP_HOLDER, PM.loan, 1)]),
+  });
+  const ends = tab(pethMapExplanation(f, XC), "explanation")
+    .flatMap((g) => g.bullets)
+    .map((b) => b.parts.find((p) => typeof p === "object" && "when" in p).when.from);
+  assert.deepEqual(
+    ends.map((e) => [e.id, e.later ?? false]),
+    [
+      ["0x0", true],
+      ["0x1", false],
+    ],
+  );
+});
+
+test("Earn Pool deposits' now is their unclaimed gains at the last touch", () => {
+  const f = fillOf({
+    nodes: {
+      [PM.sp]: {
+        lines: [
+          { label: "now", amounts: [one("pETH")], receipt: R("spTotal") },
+          { label: "note", text: "USDp deposit #3", amounts: [one("pETH")], receipt: R("sp 3") },
+          { label: "note", text: "GOLDp deposit #4", amounts: [one("pETH")], receipt: R("sp 4") },
+        ],
+      },
+    },
+  });
+  const now = tab(pethMapExplanation(f, XC), "explanation").find((g) => g.id === "now");
+  assert.deepEqual(
+    now.bullets.map((b) => text(b.parts)),
+    [`Its ${POLARIS_POOL_NAME.replace(/s$/, "")} deposits held 1 pETH in unclaimed gains at their last touch.`],
+  );
 });
