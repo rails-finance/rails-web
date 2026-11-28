@@ -299,12 +299,13 @@ export const FIGURES_FIRST_ITEM: TimelineDisplayItem = { key: "figuresFirst", la
  *  whenever the page passes `runs`. */
 export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [TX_HASH_ITEM, FIGURES_FIRST_ITEM];
 
-/** "pETH account links" (ui-jobs 872): the hairline border on a Polaris
- *  position's amounts that moved pETH or fpETH with the owner's wallet. The
- *  CDP, deposit and reserve-loan pages add it after the preset. */
+/** "Mark pETH account links" (ui-jobs 872): adds or removes the hairline
+ *  border on a Polaris position's amounts that moved pETH or fpETH with the
+ *  owner's wallet; the amounts link either way. The CDP, deposit and
+ *  reserve-loan pages add it after the preset. */
 export const PETH_ACCOUNT_LINKS_ITEM: TimelineDisplayItem = {
   key: "showPethAccountLinks",
-  label: "pETH account links",
+  label: "Mark pETH account links",
 };
 
 /** The shared display "eye" menu — one FilterDropdown over a chosen subset of

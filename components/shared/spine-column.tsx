@@ -1414,7 +1414,7 @@ export function SpineColumn({
         {...nodeAttrs}
         // A node with a linked amount stands above the row's phone toggle
         // (event-card.tsx, z-20) below 640px and lets every other tap through
-        // to it; the link takes its own (SpineVal, pointer-events-auto).
+        // to it; a tap on the link opens the link (SpineVal, pointer-events-auto).
         className={`relative z-10${rows.some((r) => r.amountLink) ? " max-sm:z-30 max-sm:pointer-events-none" : ""}${effectiveIcon && !(effectiveIcon === "market" && rows.length) ? "" : " flex flex-col gap-y-1 items-center"}`}
         style={{ backgroundColor: ground, boxShadow: `0 0 0 4px ${ground}`, paddingBottom: hasBadge ? 6 : undefined }}
       >

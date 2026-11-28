@@ -107,7 +107,7 @@ interface PolarisPositionViewProps {
   initialEvents: BaseActivityEvent[] | null;
 }
 
-/** The preset and "pETH account links" (ui-jobs 872). */
+/** The preset and "Mark pETH account links" (ui-jobs 872). */
 const POLARIS_POSITION_DISPLAY_ITEMS = [...CHAIN_TRUTH_DISPLAY_ITEMS, PETH_ACCOUNT_LINKS_ITEM];
 
 export default function PolarisPositionView({
