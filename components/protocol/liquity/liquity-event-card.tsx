@@ -1,12 +1,10 @@
 "use client";
 
 import { useContext } from "react";
-import Link from "next/link";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { SpineColumnProps, SpineTokenRow, SpineWarningLeg } from "@/components/shared/spine-column";
-import { Facehash } from "@/components/shared/facehash";
 import { useLiquityHeadSpec } from "./liquity-head";
 import { liquityT1Caption, liquityT1Words } from "@/lib/liquity/event-prose";
 import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
@@ -34,16 +32,8 @@ import { useEventShareHref } from "@/components/shared/event-share-context";
 import { LedgerOpenContext } from "@/components/shared/event-ledger";
 import { L1_WORDS, L2_WORDS } from "@/lib/liquity/event-templates";
 
-function shortenAddress(addr: string): string {
-  return `${addr.slice(0, 6)}\u2026${addr.slice(-4)}`;
-}
-
 export interface LiquityEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "liquity-v2-troves"; data: LiquityContext } };
-  addressDisplay?: "full" | "compact" | "hidden";
-  ensName?: string | null;
-  hoveredAddress?: string | null;
-  setHoveredAddress?: (addr: string | null) => void;
   isLast?: boolean;
   /** When provided, replaces the internally-built avatar slot */
   avatarOverride?: React.ReactNode;
@@ -58,10 +48,6 @@ export interface LiquityEventCardProps {
 
 export function LiquityEventCard({
   event,
-  addressDisplay = "full",
-  ensName,
-  hoveredAddress,
-  setHoveredAddress,
   isLast,
   avatarOverride,
   previousEvent,
@@ -78,39 +64,9 @@ export function LiquityEventCard({
   const shareHref = useEventShareHref();
   const buildMarkdown = useLiquityEventMarkdown(prose, event, eventNumber, shareHref);
 
-  // Column 1 — Avatar
-  const avatarSlot =
-    addressDisplay === "hidden" ? (
-      <div className="hidden sm:block" />
-    ) : addressDisplay === "compact" ? (
-      <div className="flex items-center justify-center pt-4">
-        <Link
-          href={`/address/${wallet}`}
-          onClick={(e) => e.stopPropagation()}
-          onMouseEnter={() => setHoveredAddress?.(wallet.toLowerCase())}
-          onMouseLeave={() => setHoveredAddress?.(null)}
-          className={`inline-flex items-center justify-center rounded-full border-2 p-1.5 bg-sunken transition-colors ${hoveredAddress === wallet.toLowerCase() ? "border-rb-500 dark:border-rb-500" : "border-rb-300 dark:border-rb-700"} hover:border-rb-500 dark:hover:border-rb-500`}
-          title={ensName || wallet}
-        >
-          <Facehash address={wallet} size={20} />
-        </Link>
-      </div>
-    ) : (
-      <div className="flex items-center pt-4">
-        <Link
-          href={`/address/${wallet}`}
-          onClick={(e) => e.stopPropagation()}
-          onMouseEnter={() => setHoveredAddress?.(wallet.toLowerCase())}
-          onMouseLeave={() => setHoveredAddress?.(null)}
-          className={`flex items-center rounded-full bg-sunken px-3 py-2 text-blue-600 dark:text-[var(--text-link)] transition-colors ${hoveredAddress === wallet.toLowerCase() ? "border-rb-500 dark:border-rb-500" : ""} hover:border-rb-500 dark:hover:border-rb-500`}
-        >
-          <span className="inline-flex items-center gap-1.5 w-[140px]">
-            <Facehash address={wallet} size={16} />
-            <span className="truncate font-mono text-xs">{ensName || shortenAddress(wallet)}</span>
-          </span>
-        </Link>
-      </div>
-    );
+  // Column 1: the avatar's place, empty; neither page that draws this card
+  // shows an avatar.
+  const avatarSlot = <div className="hidden sm:block" />;
 
   // Column 2 — Spine column with semantic icon modes
   const WARNING_ACTIONS = new Set(["redeemCollateral", "liquidate", "applyPendingDebt"]);

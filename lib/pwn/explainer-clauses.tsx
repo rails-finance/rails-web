@@ -51,7 +51,7 @@ import {
 import { aprText, fixedInterestRate, interestRateText, minutesText } from "@/lib/pwn/economics";
 import { shortAddress, shortTokenId } from "@/lib/pwn/asset-catalog";
 import { formatDate } from "@/lib/date";
-import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { LinkedTx } from "@/components/shared/linked-tx";
 import { formatNumber } from "@/lib/utils/format";
 import { AmountText } from "@/components/shared/amount-text";
 
@@ -256,16 +256,7 @@ export function pwnEventSlots(
                 <>
                   The same collateral went to the lender when loan #{back.priorLoanId} defaulted; it came back to the
                   borrower from {back.from === ctx.lender ? "the lender" : shortAddress(back.from)} on{" "}
-                  {formatDate(back.timestamp)} (transaction{" "}
-                  <a
-                    href={explorerUrl(MAINNET_CHAIN_ID, "tx", back.txHash)}
-                    target="_blank"
-                    rel="noopener"
-                    className="link-external font-mono"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {back.txHash.slice(0, 10)}…
-                  </a>
+                  {formatDate(back.timestamp)} (transaction <LinkedTx txHash={back.txHash} />
                   ).
                 </>,
               )

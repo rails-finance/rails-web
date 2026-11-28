@@ -15,6 +15,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { LinkedValue } from "@/components/shared/linked-value";
 import { NoteRowShell } from "@/components/shared/note-row-shell";
 import { Prov, type Provenance, type ProvInput } from "@/components/shared/provenance";
 import { formatDate } from "@/lib/date";
@@ -169,6 +170,32 @@ function delegateProv(clock: RateCooldownClock, chainId: ChainId): Provenance {
   };
 }
 
+/** The event page each start opens, as its tooltip names it. */
+const STARTED_EVENT: Record<CooldownStart, string> = {
+  open: "Opening event →",
+  "open-batch": "Opening event →",
+  rate: "Rate change event →",
+  join: "Batch join event →",
+  leave: "Batch leave event →",
+  "batch-rate": "Batch rate change event →",
+};
+
+/** The words for the row that set a clock, linked to its event page: a
+ *  LinkedValue (anatomy L14) whose tooltip names that page. */
+export function CooldownEventLink({ clock, positionPath }: { clock: RateCooldownClock; positionPath: string }) {
+  return (
+    <LinkedValue
+      href={`${positionPath}/event/${encodeURIComponent(clock.row.id)}`}
+      tip={STARTED_EVENT[clock.start]}
+      label={STARTED[clock.start]}
+      className="underline decoration-dotted underline-offset-2"
+      dataAttrs={{ "data-rate-cooldown-event": clock.row.id }}
+    >
+      {STARTED[clock.start]}
+    </LinkedValue>
+  );
+}
+
 export function RateCooldownRow({
   state,
   now,
@@ -179,15 +206,7 @@ export function RateCooldownRow({
   positionPath: string;
 }) {
   const chainId = useChainId();
-  const eventLink = (clock: RateCooldownClock) => (
-    <a
-      href={`${positionPath}/event/${encodeURIComponent(clock.row.id)}`}
-      className="underline decoration-dotted underline-offset-2"
-      data-rate-cooldown-event={clock.row.id}
-    >
-      {STARTED[clock.start]}
-    </a>
-  );
+  const eventLink = (clock: RateCooldownClock) => <CooldownEventLink clock={clock} positionPath={positionPath} />;
   const batched = state.batchManager != null;
   const ends = dateTime(state.clock.endsAt);
   const left = cooldownLeft(state.clock.endsAt - now);

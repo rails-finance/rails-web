@@ -216,9 +216,8 @@ function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
   );
 }
 
-/** An account's name that explains the account number on hover or tap: the
- *  card header and a transfer row's other account carry the same tip. The
- *  tip is a paragraph, so it wraps at a fixed width. */
+/** An account's name that explains the account number on hover or tap, in
+ *  the card header. The tip is a paragraph, so it wraps at a fixed width. */
 export function DolomiteAccountLabel({ text, accountNumber }: { text: string; accountNumber: string }) {
   const tip = accountLabelTip(accountNumber);
   return (

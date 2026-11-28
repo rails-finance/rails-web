@@ -68,8 +68,7 @@ import {
   type LlamalendNextRow,
 } from "@/lib/llamalend/event-figures";
 import { formatDate } from "@/lib/date";
-import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { LinkedAddress } from "@/components/shared/linked-address";
 
 /** A delta's receipt value, as the shared row keys it (chainTruthDeltaValue in
  *  chain-truth-event.tsx, a client module): the event page's server-side title
@@ -134,22 +133,6 @@ function Fig({
     <Prov info={info} value={value} symbol={symbol} echo={echo}>
       <strong className="font-semibold text-foreground">{children}</strong>
     </Prov>
-  );
-}
-
-/** Etherscan address link, click-isolated from the card. Muted-blue, never bold
- *  — a party address is not a chrome-mirrored figure. */
-function Addr({ address }: { address: string }) {
-  return (
-    <a
-      href={explorerUrl(MAINNET_CHAIN_ID, "address", address)}
-      target="_blank"
-      rel="noopener"
-      className={INLINE_LINK}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {address.slice(0, 6)}…{address.slice(-4)}
-    </a>
   );
 }
 
@@ -379,7 +362,7 @@ function liquidationSlots(
         {ctx.positionUser ? (
           <>
             {" "}
-            (borrower <Addr address={ctx.positionUser} />)
+            (borrower <LinkedAddress address={ctx.positionUser} />)
           </>
         ) : null}
         : put {liqDebtFig()} toward its debt and received {liqCollFig()}.
@@ -421,7 +404,7 @@ function liquidationSlots(
       {ctx.liquidator ? (
         <>
           {" "}
-          (<Addr address={ctx.liquidator} />)
+          (<LinkedAddress address={ctx.liquidator} />)
         </>
       ) : null}{" "}
       settled this position: {debtMoved ? <>{liqDebtFig()} of debt cleared</> : <>the debt cleared</>}

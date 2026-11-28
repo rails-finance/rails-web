@@ -4,8 +4,8 @@
 // address, an amount, an id or a name), with a tooltip naming where it goes
 // (anatomy L14, ui-jobs 878). A Rails link's tooltip is one line, the page's
 // name as the link ("Trove 123 →"). An explorer link's is the context line
-// ("Went to the Curve pETH/fpETH/vpETH pool"), then the link "View on
-// Etherscan ↗"; the chain, the kind and the value build the href and name the
+// where it adds to the value's words ("Router 0x8888…f946"), then the link
+// "View on Etherscan ↗"; the chain, the kind and the value build the href and name the
 // explorer, both from lib/shared/chains.ts; on a chain that file does not
 // name the value renders plain, with no link or tooltip. The timeline
 // spine links Rails pages only. The value keeps its look at rest and takes
@@ -97,14 +97,15 @@ export function linkedValueHref(d: Destination): string {
 const warned = new Set<number>();
 
 /** The caller's classes less those that dress a link (its colour, its hover
- *  and focus states, its underline), for the value rendered unlinked. */
+ *  and focus states, its underline), behind any variant prefix (`dark:`,
+ *  `group-hover:`, `sm:`), for the value rendered unlinked. */
 export function unlinkedClasses(className: string | undefined): string | undefined {
   const kept = (className ?? "")
     .split(/\s+/)
     .filter(
       (c) =>
         c &&
-        !/^(link-|hover:|focus-visible:|underline|decoration-|text-blue-|(dark:)?text-\[var\(--text-(link|external)\)\])/.test(
+        !/^(?:[a-z-]+:)*(link(-|$)|hover:|focus-visible:|underline|decoration-|text-blue-|text-\[var\(--text-(link|external)\)\])/.test(
           c,
         ),
     );

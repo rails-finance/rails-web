@@ -25,10 +25,17 @@ interface LinkedAddressProps {
   href?: string | null;
 }
 
+const shortAddress = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
+
+/** An explorer link's context line for an address: "Address 0x12…34". */
+export function addressContext(address: string): string {
+  return `Address ${shortAddress(address)}`;
+}
+
 /** The tooltip's words for a page inside Rails: "Wallet 0x12…34 →",
  *  "Redeemer 0x12…34 →", or a family's listing searched for the address,
  *  "Aave V3 positions of 0x12…34 →". */
-function railsPageTip(href: string, short: string, holderOf: SessionProtocol | undefined): string {
+export function railsPageTip(href: string, short: string, holderOf?: SessionProtocol): string {
   if (href.startsWith("/wallet/")) return `Wallet ${short} →`;
   if (href.startsWith(`${LIQUITY_V2_REDEEMER_PATH}/`)) return `Redeemer ${short} →`;
   const family = holderOf ? protocolForSession(holderOf)?.label : undefined;
@@ -46,7 +53,7 @@ function railsPageTip(href: string, short: string, holderOf: SessionProtocol | u
 export function LinkedAddress({ address, label, className = "", chainId, holderOf, href }: LinkedAddressProps) {
   const ctxChain = useChainId();
   const pathname = usePathname();
-  const short = `${address.slice(0, 6)}…${address.slice(-4)}`;
+  const short = shortAddress(address);
   const inside = href ?? (holderOf ? holderHref(holderOf, address, listingHrefForWallet, pathname) : null);
   const cls = `text-blue-600 dark:text-[var(--text-link)] hover:underline font-mono text-xs ${className}`;
   const text = label || short;
@@ -61,7 +68,7 @@ export function LinkedAddress({ address, label, className = "", chainId, holderO
   return (
     <LinkedValue
       explorer={{ chainId: chainId ?? ctxChain, kind: "address", value: address }}
-      context={`Address ${short}`}
+      context={addressContext(address)}
       label={text}
       className={cls}
     >

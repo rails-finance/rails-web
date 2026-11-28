@@ -6,15 +6,15 @@
 // character, and the Copy for LLM build the event page's actions row copies.
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import Link from "next/link";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { Prov } from "@/components/shared/provenance";
-import { LinkedAddress } from "@/components/shared/linked-address";
+import { addressContext, LinkedAddress, railsPageTip } from "@/components/shared/linked-address";
+import { LinkedValue } from "@/components/shared/linked-value";
+import { useChainId } from "@/lib/shared/chain-context";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { usePreferences } from "@/lib/shared/preferences-context";
-import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { liquityEventProse, type EchoKey, type LiquityEventProse, type ProseSentence } from "@/lib/liquity/event-prose";
 import { liquityEventDecimals, liquityEventLedger } from "@/lib/liquity/event-ledgers";
 import { liquityEventMarkdown } from "@/lib/liquity/event-markdown";
@@ -90,14 +90,17 @@ function echoProv(key: EchoKey, ctx: LiquityContext, coords: EventCoords) {
   }
 }
 
+const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
 const Bold = ({ children }: { children: ReactNode }) => (
   <strong className="font-semibold text-foreground">{children}</strong>
 );
 
 /** The redemption sentence's "redeemer", linked to this redemption on the
  *  redeemer's page: the redemption's sender, as the redeemer note under the
- *  grid reads it (the same read, cached per transaction). Plain words until
- *  it is known. */
+ *  grid reads it (the same read, cached per transaction). A LinkedValue
+ *  (anatomy L14) whose tooltip reads "Redeemer 0x12…34 →"; plain words until
+ *  the redeemer is known. */
 function RedeemerWord({
   ctx,
   txHash,
@@ -107,20 +110,22 @@ function RedeemerWord({
   ctx: LiquityContext;
   txHash?: string;
   eventId: string;
-  children: ReactNode;
+  children: string;
 }) {
   const tx = useTxTroves(!ctx.redeemer && txHash ? txHash : "");
   const redeemer = ctx.redeemer ?? tx?.rows.find((r) => r.operation === "redeemCollateral")?.transaction_from;
   if (!redeemer) return <span>{children}</span>;
+  const href = redeemerEventHref(redeemer, eventId);
   return (
-    <Link
-      href={redeemerEventHref(redeemer, eventId)}
-      onClick={(e) => e.stopPropagation()}
-      data-redeemer-link=""
+    <LinkedValue
+      href={href}
+      tip={railsPageTip(href, shortAddr(redeemer))}
+      label={children}
       className="text-blue-600 dark:text-[var(--text-link)] hover:underline"
+      dataAttrs={{ "data-redeemer-link": "" }}
     >
       {children}
-    </Link>
+    </LinkedValue>
   );
 }
 
@@ -139,6 +144,7 @@ export function ProseSentenceText({
   eventId: string;
 }) {
   const { prefs } = usePreferences();
+  const chainId = useChainId();
   return (
     <>
       {s.segs.map((seg, i) => {
@@ -154,16 +160,17 @@ export function ProseSentenceText({
           );
         if (seg.address)
           return seg.tone === "manager" ? (
-            <a
+            // A batch manager wears the pink every delegate name wears
+            // (liquity-head.tsx); its tooltip is LinkedAddress's.
+            <LinkedValue
               key={i}
-              href={explorerUrl(MAINNET_CHAIN_ID, "address", seg.address)}
-              target="_blank"
-              rel="noopener"
-              onClick={(e) => e.stopPropagation()}
+              explorer={{ chainId, kind: "address", value: seg.address }}
+              context={addressContext(seg.address)}
+              label={seg.text}
               className="text-pink-500 hover:text-pink-600 transition-colors"
             >
               {seg.text}
-            </a>
+            </LinkedValue>
           ) : (
             <LinkedAddress key={i} address={seg.address} holderOf={seg.tone === "wallet" ? "liquity-v2" : undefined} />
           );

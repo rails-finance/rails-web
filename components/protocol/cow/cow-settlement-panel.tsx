@@ -9,7 +9,7 @@
 // its price, then the settlement's other pairs as a count.
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { LinkedValue } from "@/components/shared/linked-value";
 import { Prov } from "@/components/shared/provenance";
 import type { EventCardOpened } from "@/components/shared/event-card";
 import { SECTION_HEADING } from "@/lib/shared/ui-grammar";
@@ -173,9 +173,14 @@ export function CowSettlementPanel({
                       {t === view.self ? (
                         <span className="text-foreground">This trade</span>
                       ) : (
-                        <Link href={`/ethereum/cow/${t.owner}`} className="link-muted font-mono">
+                        <LinkedValue
+                          href={`/ethereum/cow/${t.owner}`}
+                          tip={`CoW trades of ${shortAddress(t.owner)} →`}
+                          label={shortAddress(t.owner)}
+                          className="link-muted font-mono"
+                        >
                           {shortAddress(t.owner)}
-                        </Link>
+                        </LinkedValue>
                       )}
                     </td>
                     <td className="py-0.5 pr-3">

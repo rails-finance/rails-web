@@ -3,7 +3,8 @@
 // words and the href for each, and prints them as JSON.
 import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { LinkedValue, linkedValueHref, linkedValueTip } from "@/components/shared/linked-value";
+import { LinkedValue, linkedValueHref, linkedValueTip, unlinkedClasses } from "@/components/shared/linked-value";
+import { viaSiteName } from "@/components/shared/provenance";
 import { CHAINS } from "@/lib/shared/chains";
 
 const TX = "0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060";
@@ -58,5 +59,20 @@ out.everyChain = Object.fromEntries(
       },
     ];
   }),
+);
+// The link classes the plain form drops, behind a variant prefix or none.
+out.unlinked = unlinkedClasses(
+  "link font-mono dark:text-[var(--text-link)] group-hover:text-blue-600 sm:link-muted dark:hover:underline " +
+    "md:decoration-dotted hover:bg-raised dark:bg-sunken text-xs [@media(hover:none)]:underline",
+);
+// The site a verify link elsewhere names.
+out.sites = Object.fromEntries(
+  [
+    "https://github.com/liquity/bold",
+    "HTTPS://WWW.GitHub.com/liquity/bold",
+    "ipfs://bafybeigdyrzt/readme",
+    "mailto:team@example.org",
+    "not a url",
+  ].map((href) => [href, viaSiteName(href)]),
 );
 process.stdout.write(JSON.stringify(out));
