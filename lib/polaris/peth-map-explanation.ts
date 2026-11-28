@@ -538,7 +538,7 @@ const PART_WORDS: Record<string, string> = {
 const SHARED_CLAUSE: Record<string, string> = {
   [PM.cdp]: "CDPs mint USDp or GOLDp against pETH",
   [PM.sp]: `${POLARIS_POOL_NAME} repay liquidated debt`,
-  [PM.loan]: `${POLARIS_LOAN_NAME} lend it reserve ETH against fpETH`,
+  [PM.loan]: `${POLARIS_LOAN_NAME} lend reserve ETH against fpETH`,
 };
 
 /** The Polaris "?" modal a part's bullet opens, where one explains it. */

@@ -266,7 +266,7 @@ export const mapLandingClearsFilter = (eventId: string, hidden: ReadonlySet<stri
   hidden?.has(eventId) === true;
 
 /** A plain primary click, which a page may handle in place; a modifier or
- *  another button keeps the link's own behaviour (a new tab, a download). */
+ *  another button keeps the link's behaviour (a new tab, a download). */
 export const mapPlainClick = (ev: {
   button: number;
   metaKey: boolean;

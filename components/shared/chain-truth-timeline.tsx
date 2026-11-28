@@ -501,8 +501,8 @@ export interface ChainTruthTimelineProps {
    *  slot would hide it behind seventeen presses of "Show N more". */
   notice?: ReactNode;
   /** Lands on one event in place, as a `?at=` landing does on load (reveal,
-   *  open, scroll, highlight). A new `seq` lands again. Unset, the timeline
-   *  renders as without it. */
+   *  open, scroll, highlight). A new `seq` lands again. Unset, it changes
+   *  nothing. */
   landAt?: { id: string; seq: number } | null;
   /** The boundary — the events before the oldest drawn row, stated as ONE
    *  card on the spine after that row (rails-ops decision 0019; see

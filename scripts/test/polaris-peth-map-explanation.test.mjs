@@ -498,7 +498,7 @@ test("Parts past eight bullets: CDPs, Earn Pools and Floor Loans share one, then
   assert.equal(t9.length, 7);
   assert.ok(
     t9.includes(
-      `CDPs mint USDp or GOLDp against pETH; ${POLARIS_POOL_NAME} repay liquidated debt; ${POLARIS_LOAN_NAME} lend it reserve ETH against fpETH.`,
+      `CDPs mint USDp or GOLDp against pETH; ${POLARIS_POOL_NAME} repay liquidated debt; ${POLARIS_LOAN_NAME} lend reserve ETH against fpETH.`,
     ),
   );
   assert.ok(!p9.some((g) => g.id === "unused"));
@@ -774,4 +774,29 @@ test("the in-place helpers: the filter's arrows, the landing's clear, the plain 
     assert.equal(mapPlainClick({ ...click, [k]: true }), false, k);
   assert.equal(mapPlainClick({ ...click, button: 1 }), false);
   assert.equal(mapPlainClick({ ...click, button: 2 }), false);
+});
+
+test("a skipped vpETH zap with no ETH zap links the router's arrow back", () => {
+  // No ETH → zap arrow: the router's arrow back is the other tokens' step's
+  // alone, so the link to the skipped step carries it with the other tokens' arrow.
+  const zapHolder = pmEdge(PM.zap, MAP_HOLDER);
+  const zapOther = pmEdge(PM.zap, PM.other);
+  const f = tenSteps();
+  f.edges[zapHolder] = { ...f.edges[pmEdge(PM.outside, MAP_HOLDER)], amounts: [one("vpETH")], receipt: R("zh") };
+  f.edges[zapOther] = { ...f.edges[zapHolder], amounts: [one("USDp")], receipt: R("zo") };
+  f.edges[zapHolder].first = f.edges[zapOther].first = { at: t0 + 330, id: "0xu" };
+  f.edges[zapHolder].last = f.edges[zapOther].last = { at: t0 + 335, id: "0xv" };
+  f.rows = [
+    ...f.rows,
+    { id: "0xu", edgeIds: [zapOther], at: t0 + 330 },
+    { id: "0xv", edgeIds: [zapHolder], at: t0 + 335 },
+  ];
+  const g = tab(pethMapExplanation(f, XC), "explanation");
+  const link = g.find((x) => x.id === "more").lead.find((p) => typeof p === "object" && "link" in p);
+  assert.ok(
+    !g.flatMap((x) => x.bullets.map((b) => text(b.parts))).some((t) => /bought/.test(t)),
+    "the other tokens' step is skipped",
+  );
+  assert.ok(link.edges.includes(zapOther), link.edges.join(","));
+  assert.ok(link.edges.includes(zapHolder), link.edges.join(","));
 });
