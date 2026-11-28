@@ -78,3 +78,6 @@ scripts/redemption-stats.mjs
 # Rendered exports (scripts/exports-liquity-v2.mjs): written on demand, never
 # committed. The fixture list and manifest that pin them live in scripts/exports/.
 /exports/
+
+# the pETH map's dev cache of route answers (lib/polaris/peth-dev-cache.ts)
+/.map-fixtures/

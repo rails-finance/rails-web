@@ -12,7 +12,9 @@ import { assetKey } from "@/lib/shared/asset-family";
 import { PETH_ACCOUNT_DESCRIPTION, pethAddressForMetadata, pethAddressOf } from "@/lib/polaris/peth-address";
 import { FPETH, PETH, POLARIS_CHAIN_ID, POLARIS_WETH } from "@/lib/polaris/asset-catalog";
 import { polarisPethAccountHref } from "@/lib/polaris/routes";
-import { loadPolarisPeth } from "@/lib/polaris/peth-page-data";
+import { isPethRefusal, loadPethDevCache, loadPolarisPeth } from "@/lib/polaris/peth-page-data";
+import { buildPethMapFill } from "@/lib/polaris/peth-map-fill";
+import { pethMapContext } from "@/lib/polaris/peth-map-context";
 import PethView from "./peth-view";
 
 interface Props {
@@ -43,9 +45,20 @@ export default async function PolarisPethPage({ params }: Props) {
   const { address: raw } = await params;
   const address = await pethAddressOf(raw);
   const initial = await loadPolarisPeth(address);
+  // The map's fill is summed here (ui-jobs 873): the browser receives each
+  // arrow's and box's figures with their receipts and, where the arrows are
+  // known, the arrows each row used.
+  const mapFill = initial && !isPethRefusal(initial) ? buildPethMapFill(initial, pethMapContext(address)) : null;
+  const handAdded = (await loadPethDevCache(address))?.handAddedPlaces ?? null;
   return (
     <AimGate keys={KEYS} chain={POLARIS_CHAIN_ID} what="This pETH account">
-      <PethView key={address} address={address} initial={initial} />
+      <PethView
+        key={address}
+        address={address}
+        initial={initial}
+        mapFill={mapFill}
+        handAddedPlaces={handAdded && handAdded.length > 0 ? handAdded : null}
+      />
     </AimGate>
   );
 }

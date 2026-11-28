@@ -29,6 +29,10 @@ import { exactUnits, ZERO, type PethPlaces } from "@/lib/polaris/peth-ledger";
 import type { PethPlace } from "@/lib/sources/api/polaris-peth";
 import {
   pethCdpPlaceProv,
+  pethCdpTotalProv,
+  pethLoanTotalProv,
+  pethLpTotalProv,
+  pethSpTotalProv,
   pethHeadProv,
   pethLoanPlaceProv,
   pethLpProv,
@@ -149,9 +153,6 @@ export function PolarisPethPlaces({
 }) {
   const registry = useReceiptRegistry();
   const asOfWords = pethAsOfWords(storedAsOf === true);
-  const asOfReceipt = storedAsOf
-    ? " The chain did not answer, so this is the stored index; later changes are not counted."
-    : "";
   const headUnread = unread(headRead ? "Not read" : PETH_UNREAD.head);
   const lpTotal = p.lp.every((x) => x.share != null) ? p.lp.reduce((s, x) => s + (x.share ?? ZERO), ZERO) : null;
   const lpHeld = p.lp.filter((x) => x.lp != null && x.lp > ZERO);
@@ -201,15 +202,7 @@ export function PolarisPethPlaces({
                     raw={p.cdp.total}
                     symbol={PETH.symbol}
                     address={PETH.address}
-                    info={{
-                      kind: "chain-derived",
-                      pclass: "emitted",
-                      summary:
-                        "CDP collateral — the sum of each CDP's collateral at its last touch, for the CDPs this address holds." +
-                        asOfReceipt,
-                      formula: "Σ newColl (last CDPUpdated of each CDP held)",
-                      via: "GET /api/polaris/peth/<address> · polaris_cdp_updated",
-                    }}
+                    info={pethCdpTotalProv(storedAsOf === true)}
                   />
                 ) : (
                   unread("Not read")
@@ -245,15 +238,7 @@ export function PolarisPethPlaces({
                     raw={p.sp.total}
                     symbol={PETH.symbol}
                     address={PETH.address}
-                    info={{
-                      kind: "chain-derived",
-                      pclass: "emitted",
-                      summary:
-                        "Stability Pool pETH — the sum of the pETH gains each deposit this address holds left unclaimed at its last touch. pETH paid in since is not counted." +
-                        asOfReceipt,
-                      formula: "Σ stashed pETH (last DepositUpdated of each deposit held)",
-                      via: "GET /api/polaris/peth/<address> · polaris_sp_deposit_updated",
-                    }}
+                    info={pethSpTotalProv(storedAsOf === true)}
                   />
                 ) : (
                   unread("Not read")
@@ -289,15 +274,7 @@ export function PolarisPethPlaces({
                     raw={p.loans.total}
                     symbol={FPETH.symbol}
                     address={FPETH.address}
-                    info={{
-                      kind: "chain-derived",
-                      pclass: "indexed",
-                      summary:
-                        "Reserve-loan collateral — the sum of the fpETH collateral of each open loan this address holds." +
-                        asOfReceipt,
-                      formula: "Σ (LoanOpened fpCollateral + Σ LoanAdjusted collChange)",
-                      via: "GET /api/polaris/peth/<address> · polaris_loan_opened + polaris_loan_adjusted",
-                    }}
+                    info={pethLoanTotalProv(storedAsOf === true)}
                   />
                 ) : (
                   unread("Not read")
@@ -348,20 +325,7 @@ export function PolarisPethPlaces({
               note="This address's share of the pETH in three pools. LP tokens staked in another contract are not counted."
               figure={
                 lpTotal != null ? (
-                  <Figure
-                    raw={lpTotal}
-                    symbol={PETH.symbol}
-                    address={PETH.address}
-                    info={{
-                      kind: "chain-derived",
-                      pclass: "state",
-                      summary:
-                        "Pool shares — the sum of this address's share of the pETH in the three pools, at the head block.",
-                      formula: "Σ balanceOf(address) × pool pETH ÷ totalSupply()",
-                      via: "GET /api/polaris/peth/<address> · Multicall3 @ head",
-                      source: headBlock ? { block: headBlock } : undefined,
-                    }}
-                  />
+                  <Figure raw={lpTotal} symbol={PETH.symbol} address={PETH.address} info={pethLpTotalProv(headBlock)} />
                 ) : (
                   headUnread
                 )

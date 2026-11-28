@@ -1,0 +1,959 @@
+{
+  "_note": "Production answer of GET /api/polaris/peth/0xc513fb4b979f1cefc43682ca7ab4a19cee1cacc2, read 28 Nov 2026, with `place`, `places` and `place_counts` ADDED BY HAND in ui-jobs 872's shape (ui-jobs 873), before the route sends them.",
+  "status": "ok",
+  "reason": null,
+  "address": "0xc513fb4b979f1cefc43682ca7ab4a19cee1cacc2",
+  "deployment_id": "sepolia-2026-08",
+  "ledger": {
+    "complete": true,
+    "scanned_to_block": "12229120",
+    "scanned_to_timestamp": "2026-11-28T09:11:12.000Z",
+    "deploy_block": "11482700",
+    "head_block": "12229142",
+    "fresh_within_blocks": 7200
+  },
+  "head": {
+    "block": "12229142",
+    "source": "multicall at head (POLARIS_RPC_URL)"
+  },
+  "head_unread_reason": null,
+  "prices": {
+    "spot_raw": "3200066469713812942",
+    "floor_raw": "2019034385725135776",
+    "block": "12229142",
+    "source": "multicall at head (POLARIS_RPC_URL)"
+  },
+  "figures": {
+    "eth_in": {
+      "raw": "60000000000000000000",
+      "source": "ledger: reserveIn on curve buys, amountIn on zap swaps from ETH or the reserve token into pETH or fpETH, and the reserve token paid into splitter BuyFpToken",
+      "block": "12229120"
+    },
+    "eth_out": {
+      "raw": "0",
+      "source": "ledger: reserveOut on curve sells, amountOut on zap swaps to ETH or the reserve token from pETH or fpETH, and the reserve token paid by splitter Redeem for fpETH",
+      "block": "12229120"
+    },
+    "curve_fees_paid": {
+      "raw": "363701755726164583",
+      "source": "ledger: feeAmount on the address's curve trades and on its zap-routed ones with pETH or fpETH on one side",
+      "block": "12229120"
+    },
+    "peth_held": {
+      "raw": "42971127707204003272",
+      "head_raw": "42971127707204003272",
+      "stored_raw": "42971127707204003272",
+      "block": "12229142",
+      "source": "multicall at head (POLARIS_RPC_URL)",
+      "stored_block": "12229120"
+    }
+  },
+  "rollup": {
+    "wallet_peth": {
+      "raw": "42971127707204003272",
+      "at_spot_raw": "137510464941613727703",
+      "at_floor_raw": "86760184434230996851",
+      "block": "12229142",
+      "source": "multicall at head (POLARIS_RPC_URL)"
+    },
+    "cdp_collateral": {
+      "raw": "0",
+      "source": "polaris_cdp_updated: new_coll at the CDP's last touch",
+      "items": []
+    },
+    "sp_peth": {
+      "raw": "0",
+      "source": "polaris_sp_deposit_updated: stashed_bc_tokens at the deposit's last operation",
+      "items": []
+    },
+    "loans_fpeth": {
+      "raw": "0",
+      "source": "polaris_loan_opened + polaris_loan_adjusted: fpETH collateral",
+      "items": []
+    },
+    "wallet_fpeth": {
+      "raw": "17815558569765583",
+      "at_floor_raw": "35970225353256832",
+      "block": "12229142",
+      "source": "multicall at head (POLARIS_RPC_URL)"
+    },
+    "lp": [
+      {
+        "venue": "venue_curve_tripool",
+        "address": "0x28b6f412904834dee78a4fa464f2089f5264770c",
+        "lp_balance_raw": "7618505159249931868",
+        "lp_supply_raw": "6931098115122065348123",
+        "pool_peth_raw": "4315661522761189260013",
+        "peth_share_raw": "4743676835997797599",
+        "block": "12229142",
+        "source": "multicall at head (POLARIS_RPC_URL)"
+      },
+      {
+        "venue": "venue_univ2_polar_peth",
+        "address": "0xdce2d72d07760cdb29604baee6271fcb1f3a7565",
+        "lp_balance_raw": "205947281896617036953",
+        "lp_supply_raw": "316342661487886431539777",
+        "pool_peth_raw": "60631692405287706536617",
+        "peth_share_raw": "39472805181981179296",
+        "block": "12229142",
+        "source": "multicall at head (POLARIS_RPC_URL)"
+      },
+      {
+        "venue": "venue_univ2_peth_weth",
+        "address": "0xb3348b1c358aa118b6304a91c48f3ee5a13f06a8",
+        "lp_balance_raw": "0",
+        "lp_supply_raw": "117620765739216387",
+        "pool_peth_raw": "814239444445395",
+        "peth_share_raw": "0",
+        "block": "12229142",
+        "source": "multicall at head (POLARIS_RPC_URL)"
+      }
+    ],
+    "wallet_vpeth": {
+      "raw": "17824851655933580",
+      "valued": false,
+      "block": "12229142",
+      "source": "multicall at head (POLARIS_RPC_URL)"
+    },
+    "wallet_svpeth": {
+      "raw": "19999713948939849029",
+      "vpeth_raw": "20053398120281420363",
+      "valued": false,
+      "block": "12229142",
+      "source": "multicall at head (POLARIS_RPC_URL)"
+    }
+  },
+  "total_rows": 11,
+  "limit": 500,
+  "offset": 0,
+  "rows": [
+    {
+      "tx_hash": "0xeb31cded136c2d6e0eca0b7d76034cda0541913b3442ce4949941da44acae678",
+      "block_number": "11512785",
+      "tx_index": 66,
+      "first_log_index": 102,
+      "block_timestamp": "1787027688",
+      "kind": "zap_in",
+      "effect": "acquisition",
+      "lines": [
+        {
+          "rule": "zap_out",
+          "effect": "sale",
+          "token": "fpeth",
+          "direction": "out",
+          "amount_raw": "2107623962359256268",
+          "counterparty": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8",
+          "counterparty_role": "zap_router",
+          "counterparty_code_size": null,
+          "log_index": 102
+        },
+        {
+          "rule": "zap_in",
+          "effect": "acquisition",
+          "token": "peth",
+          "direction": "in",
+          "amount_raw": "1763740298406792640",
+          "counterparty": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8",
+          "counterparty_role": "zap_router",
+          "counterparty_code_size": null,
+          "log_index": 110
+        },
+        {
+          "rule": "zap_in",
+          "effect": "acquisition",
+          "token": "fpeth",
+          "direction": "in",
+          "amount_raw": "17815558569765583",
+          "counterparty": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8",
+          "counterparty_role": "zap_router",
+          "counterparty_code_size": null,
+          "log_index": 112
+        },
+        {
+          "rule": "zap_in",
+          "effect": "acquisition",
+          "token": "vpeth",
+          "direction": "in",
+          "amount_raw": "17824851655933580",
+          "counterparty": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8",
+          "counterparty_role": "zap_router",
+          "counterparty_code_size": null,
+          "log_index": 113
+        }
+      ],
+      "peth_delta_raw": "1763740298406792640",
+      "fpeth_delta_raw": "-2089808403789490685",
+      "vpeth_delta_raw": "17824851655933580",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": {
+        "token_in": "0x94220c1c340336527c719bcf06067ca7769ac185",
+        "token_out": "0x07ea2ff889e6228cded329a09f66e370f12c705e",
+        "amount_in": "2107623962359256268",
+        "amount_out": "1763740298406792640"
+      },
+      "balances": {
+        "peth": {
+          "before_raw": "41207387408797210632",
+          "after_raw": "42971127707204003272"
+        },
+        "fpeth": {
+          "before_raw": "2107623962359256268",
+          "after_raw": "17815558569765583"
+        },
+        "vpeth": {
+          "before_raw": "0",
+          "after_raw": "17824851655933580"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "60000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "363701755726164583"
+      },
+      "place": {
+        "kind": "zap",
+        "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+      },
+      "places": [
+        {
+          "kind": "zap",
+          "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+        }
+      ]
+    },
+    {
+      "tx_hash": "0x497a897d458fc045a8ea6de73034d8be3fa8fce8250a8fcc2023371b4608f845",
+      "block_number": "11512779",
+      "tx_index": 72,
+      "first_log_index": 182,
+      "block_timestamp": "1787027616",
+      "kind": "lp_add",
+      "effect": "change_of_place",
+      "lines": [
+        {
+          "rule": "lp_add",
+          "effect": "change_of_place",
+          "token": "peth",
+          "direction": "out",
+          "amount_raw": "3792612591202789368",
+          "counterparty": "0x28b6f412904834dee78a4fa464f2089f5264770c",
+          "counterparty_role": "venue_curve_tripool",
+          "counterparty_code_size": null,
+          "log_index": 182
+        },
+        {
+          "rule": "lp_add",
+          "effect": "change_of_place",
+          "token": "fpeth",
+          "direction": "out",
+          "amount_raw": "4643862233868366798",
+          "counterparty": "0x28b6f412904834dee78a4fa464f2089f5264770c",
+          "counterparty_role": "venue_curve_tripool",
+          "counterparty_code_size": null,
+          "log_index": 183
+        },
+        {
+          "rule": "lp_add",
+          "effect": "change_of_place",
+          "token": "vpeth",
+          "direction": "out",
+          "amount_raw": "25152302212963898885",
+          "counterparty": "0x28b6f412904834dee78a4fa464f2089f5264770c",
+          "counterparty_role": "venue_curve_tripool",
+          "counterparty_code_size": null,
+          "log_index": 184
+        },
+        {
+          "rule": "lp_add",
+          "effect": "change_of_place",
+          "token": "lp_tripool",
+          "direction": "in",
+          "amount_raw": "7618505159249931868",
+          "counterparty": "0x0000000000000000000000000000000000000000",
+          "counterparty_role": "zero",
+          "counterparty_code_size": null,
+          "log_index": 185
+        }
+      ],
+      "peth_delta_raw": "-3792612591202789368",
+      "fpeth_delta_raw": "-4643862233868366798",
+      "vpeth_delta_raw": "-25152302212963898885",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": null,
+      "balances": {
+        "peth": {
+          "before_raw": "45000000000000000000",
+          "after_raw": "41207387408797210632"
+        },
+        "fpeth": {
+          "before_raw": "6751486196227623066",
+          "after_raw": "2107623962359256268"
+        },
+        "vpeth": {
+          "before_raw": "25152302212963898885",
+          "after_raw": "0"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "60000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "363701755726164583"
+      },
+      "place": {
+        "kind": "venue",
+        "market": "venue_curve_tripool",
+        "address": "0x28b6f412904834dee78a4fa464f2089f5264770c"
+      },
+      "places": [
+        {
+          "kind": "venue",
+          "market": "venue_curve_tripool",
+          "address": "0x28b6f412904834dee78a4fa464f2089f5264770c"
+        }
+      ]
+    },
+    {
+      "tx_hash": "0x71964bc712ea805cd9b82e77bd3b7778af2736067cb3da8f5b9747bac05264eb",
+      "block_number": "11512762",
+      "tx_index": 65,
+      "first_log_index": 203,
+      "block_timestamp": "1787027400",
+      "kind": "lp_add",
+      "effect": "change_of_place",
+      "lines": [
+        {
+          "rule": "lp_add",
+          "effect": "change_of_place",
+          "token": "peth",
+          "direction": "out",
+          "amount_raw": "5776573470452743126",
+          "counterparty": "0xdce2d72d07760cdb29604baee6271fcb1f3a7565",
+          "counterparty_role": "venue_univ2_polar_peth",
+          "counterparty_code_size": null,
+          "log_index": 203
+        },
+        {
+          "rule": "lp_add",
+          "effect": "change_of_place",
+          "token": "lp_polar_peth",
+          "direction": "in",
+          "amount_raw": "205947281896617036953",
+          "counterparty": "0x0000000000000000000000000000000000000000",
+          "counterparty_role": "zero",
+          "counterparty_code_size": null,
+          "log_index": 205
+        }
+      ],
+      "peth_delta_raw": "-5776573470452743126",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": null,
+      "balances": {
+        "peth": {
+          "before_raw": "50776573470452743126",
+          "after_raw": "45000000000000000000"
+        },
+        "fpeth": {
+          "before_raw": "6751486196227623066",
+          "after_raw": "6751486196227623066"
+        },
+        "vpeth": {
+          "before_raw": "25152302212963898885",
+          "after_raw": "25152302212963898885"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "60000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "363701755726164583"
+      },
+      "place": {
+        "kind": "venue",
+        "market": "venue_univ2_polar_peth",
+        "address": "0xdce2d72d07760cdb29604baee6271fcb1f3a7565"
+      },
+      "places": [
+        {
+          "kind": "venue",
+          "market": "venue_univ2_polar_peth",
+          "address": "0xdce2d72d07760cdb29604baee6271fcb1f3a7565"
+        }
+      ]
+    },
+    {
+      "tx_hash": "0xa4b9e976aa455a6043a3358ba39262c9e373e2c6e6d21a67c68cfcc2ec1539b7",
+      "block_number": "11512722",
+      "tx_index": 44,
+      "first_log_index": 88,
+      "block_timestamp": "1787026908",
+      "kind": "svpeth_stake",
+      "effect": "change_of_place",
+      "lines": [
+        {
+          "rule": "svpeth_stake",
+          "effect": "change_of_place",
+          "token": "vpeth",
+          "direction": "out",
+          "amount_raw": "20000000000000000000",
+          "counterparty": "0x7b118bd63bbe9023a2a509cecd48bc283d150539",
+          "counterparty_role": "svp_token",
+          "counterparty_code_size": null,
+          "log_index": 88
+        }
+      ],
+      "peth_delta_raw": "0",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "-20000000000000000000",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": null,
+      "balances": {
+        "peth": {
+          "before_raw": "50776573470452743126",
+          "after_raw": "50776573470452743126"
+        },
+        "fpeth": {
+          "before_raw": "6751486196227623066",
+          "after_raw": "6751486196227623066"
+        },
+        "vpeth": {
+          "before_raw": "45152302212963898885",
+          "after_raw": "25152302212963898885"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "60000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "363701755726164583"
+      },
+      "place": {
+        "kind": "svpeth",
+        "address": "0x7b118bd63bbe9023a2a509cecd48bc283d150539"
+      },
+      "places": [
+        {
+          "kind": "svpeth",
+          "address": "0x7b118bd63bbe9023a2a509cecd48bc283d150539"
+        }
+      ]
+    },
+    {
+      "tx_hash": "0x27f53feba2d9e4a5f4e063e422f0e046f5c739d1d333937619adf0cf07652b99",
+      "block_number": "11512714",
+      "tx_index": 55,
+      "first_log_index": 169,
+      "block_timestamp": "1787026812",
+      "kind": "zap_in",
+      "effect": "acquisition",
+      "lines": [
+        {
+          "rule": "zap_in",
+          "effect": "acquisition",
+          "token": "vpeth",
+          "direction": "in",
+          "amount_raw": "45152302212963898885",
+          "counterparty": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8",
+          "counterparty_role": "zap_router",
+          "counterparty_code_size": null,
+          "log_index": 230
+        }
+      ],
+      "peth_delta_raw": "0",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "45152302212963898885",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": {
+        "token_in": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+        "token_out": "0x43cc4978e11bc1e1d8cfcd8348cb7e7246c49b6e",
+        "amount_in": "10000000000000000000",
+        "amount_out": "45152302212963898885"
+      },
+      "balances": {
+        "peth": {
+          "before_raw": "50776573470452743126",
+          "after_raw": "50776573470452743126"
+        },
+        "fpeth": {
+          "before_raw": "6751486196227623066",
+          "after_raw": "6751486196227623066"
+        },
+        "vpeth": {
+          "before_raw": "0",
+          "after_raw": "45152302212963898885"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "60000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "363701755726164583"
+      },
+      "place": {
+        "kind": "zap",
+        "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+      },
+      "places": [
+        {
+          "kind": "zap",
+          "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+        }
+      ]
+    },
+    {
+      "tx_hash": "0x9184b990554611e97a077d5232a176c6bdad34c587fbe4e896a1a0432126bd5e",
+      "block_number": "11512707",
+      "tx_index": 61,
+      "first_log_index": 125,
+      "block_timestamp": "1787026728",
+      "kind": "zap_in",
+      "effect": "acquisition",
+      "lines": [
+        {
+          "rule": "zap_in",
+          "effect": "acquisition",
+          "token": "fpeth",
+          "direction": "in",
+          "amount_raw": "6751486196227623066",
+          "counterparty": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8",
+          "counterparty_role": "zap_router",
+          "counterparty_code_size": null,
+          "log_index": 133
+        }
+      ],
+      "peth_delta_raw": "0",
+      "fpeth_delta_raw": "6751486196227623066",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "10000000000000000000",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "60439552710588802",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": {
+        "token_in": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+        "token_out": "0x94220c1c340336527c719bcf06067ca7769ac185",
+        "amount_in": "10000000000000000000",
+        "amount_out": "6751486196227623066"
+      },
+      "balances": {
+        "peth": {
+          "before_raw": "50776573470452743126",
+          "after_raw": "50776573470452743126"
+        },
+        "fpeth": {
+          "before_raw": "0",
+          "after_raw": "6751486196227623066"
+        },
+        "vpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "60000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "363701755726164583"
+      },
+      "place": {
+        "kind": "zap",
+        "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+      },
+      "places": [
+        {
+          "kind": "zap",
+          "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+        }
+      ]
+    },
+    {
+      "tx_hash": "0x102d7d5f54032db04c883563414d4ca91ee90aa649bd23d41e0c8c1592c5c683",
+      "block_number": "11512703",
+      "tx_index": 63,
+      "first_log_index": 141,
+      "block_timestamp": "1787026680",
+      "kind": "zap_out",
+      "effect": "sale",
+      "lines": [
+        {
+          "rule": "zap_out",
+          "effect": "sale",
+          "token": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+          "direction": "out",
+          "amount_raw": "10000000000000000000",
+          "counterparty": "0xc513fb4b979f1cefc43682ca7ab4a19cee1cacc2",
+          "counterparty_role": "zap_router",
+          "counterparty_code_size": null,
+          "log_index": null
+        }
+      ],
+      "peth_delta_raw": "0",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": {
+        "token_in": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+        "token_out": "0x1068ed496d21bf5357b2f1e9d25f46934f43ca99",
+        "amount_in": "10000000000000000000",
+        "amount_out": "3946341956775913294"
+      },
+      "balances": {
+        "peth": {
+          "before_raw": "50776573470452743126",
+          "after_raw": "50776573470452743126"
+        },
+        "fpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        },
+        "vpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "50000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "303262203015575781"
+      },
+      "place": {
+        "kind": "zap",
+        "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+      },
+      "places": [
+        {
+          "kind": "zap",
+          "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+        }
+      ]
+    },
+    {
+      "tx_hash": "0x81b8a65fe9e92d847c0d94bbb62de5544eefa953e53c2566c4a59dc4286db567",
+      "block_number": "11512695",
+      "tx_index": 77,
+      "first_log_index": 192,
+      "block_timestamp": "1787026572",
+      "kind": "zap_out",
+      "effect": "sale",
+      "lines": [
+        {
+          "rule": "zap_out",
+          "effect": "sale",
+          "token": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+          "direction": "out",
+          "amount_raw": "10000000000000000000",
+          "counterparty": "0xc513fb4b979f1cefc43682ca7ab4a19cee1cacc2",
+          "counterparty_role": "zap_router",
+          "counterparty_code_size": null,
+          "log_index": null
+        }
+      ],
+      "peth_delta_raw": "0",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": {
+        "token_in": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+        "token_out": "0x899d225d779f41fa1ab422ab1b8a9408296dd5c6",
+        "amount_in": "10000000000000000000",
+        "amount_out": "18253556104813665056993"
+      },
+      "balances": {
+        "peth": {
+          "before_raw": "50776573470452743126",
+          "after_raw": "50776573470452743126"
+        },
+        "fpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        },
+        "vpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "50000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "303262203015575781"
+      },
+      "place": {
+        "kind": "zap",
+        "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+      },
+      "places": [
+        {
+          "kind": "zap",
+          "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+        }
+      ]
+    },
+    {
+      "tx_hash": "0x17aebbe6b3b32a94f7041884f72b9933ecea15810d8eb312e0f0a47b29db9f00",
+      "block_number": "11512685",
+      "tx_index": 16,
+      "first_log_index": 140,
+      "block_timestamp": "1787026440",
+      "kind": "zap_out",
+      "effect": "sale",
+      "lines": [
+        {
+          "rule": "zap_out",
+          "effect": "sale",
+          "token": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+          "direction": "out",
+          "amount_raw": "10000000000000000000",
+          "counterparty": "0xc513fb4b979f1cefc43682ca7ab4a19cee1cacc2",
+          "counterparty_role": "zap_router",
+          "counterparty_code_size": null,
+          "log_index": null
+        }
+      ],
+      "peth_delta_raw": "0",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": null,
+      "zap": {
+        "token_in": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+        "token_out": "0x5543ca71ed8c88daf217488b1808994e080d925b",
+        "amount_in": "10000000000000000000",
+        "amount_out": "7757532577271558962114"
+      },
+      "balances": {
+        "peth": {
+          "before_raw": "50776573470452743126",
+          "after_raw": "50776573470452743126"
+        },
+        "fpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        },
+        "vpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "50000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "303262203015575781"
+      },
+      "place": {
+        "kind": "zap",
+        "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+      },
+      "places": [
+        {
+          "kind": "zap",
+          "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+        }
+      ]
+    },
+    {
+      "tx_hash": "0xc96f2196fd0c2d47a3eb94e9ed550ef81de8172639029bba75a06d738181c649",
+      "block_number": "11512670",
+      "tx_index": 62,
+      "first_log_index": 180,
+      "block_timestamp": "1787026248",
+      "kind": "contract_receive",
+      "effect": "acquisition",
+      "lines": [
+        {
+          "rule": "contract_receive",
+          "effect": "acquisition",
+          "token": "peth",
+          "direction": "in",
+          "amount_raw": "20753615371910740758",
+          "counterparty": "0x7565d3b95206b7c2c447b781530d49c954100ac6",
+          "counterparty_role": null,
+          "counterparty_code_size": 9920,
+          "log_index": 180
+        }
+      ],
+      "peth_delta_raw": "20753615371910740758",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "0",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "0",
+      "event_price_raw": null,
+      "event_price_source": null,
+      "valuation": {
+        "kind": "peth_arrival",
+        "peth_raw": "20753615371910740758",
+        "basis": "spot_and_floor",
+        "block": "11512670",
+        "source": "polaris_oracle_at_block",
+        "price_at_block_filled": true,
+        "eth_raw": null,
+        "eth_at_spot_raw": "34231064077448865258",
+        "eth_at_floor_raw": "21857649307850959837"
+      },
+      "zap": null,
+      "balances": {
+        "peth": {
+          "before_raw": "30022958098542002368",
+          "after_raw": "50776573470452743126"
+        },
+        "fpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        },
+        "vpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "50000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "303262203015575781"
+      },
+      "place": null,
+      "places": []
+    },
+    {
+      "tx_hash": "0x37b5fcbb0e8252340cd8a078a3d49053a9dddf4f2c9b58a09986054fbe35e3fa",
+      "block_number": "11512661",
+      "tx_index": 63,
+      "first_log_index": 144,
+      "block_timestamp": "1787026140",
+      "kind": "zap_in",
+      "effect": "acquisition",
+      "lines": [
+        {
+          "rule": "zap_in",
+          "effect": "acquisition",
+          "token": "peth",
+          "direction": "in",
+          "amount_raw": "30022958098542002368",
+          "counterparty": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8",
+          "counterparty_role": "zap_router",
+          "counterparty_code_size": null,
+          "log_index": 145
+        }
+      ],
+      "peth_delta_raw": "30022958098542002368",
+      "fpeth_delta_raw": "0",
+      "vpeth_delta_raw": "0",
+      "eth_in_raw": "50000000000000000000",
+      "eth_out_raw": "0",
+      "curve_fee_raw": "303262203015575781",
+      "event_price_raw": "1665392192064783179",
+      "event_price_source": "MultiSwap: amountIn / amountOut",
+      "valuation": null,
+      "zap": {
+        "token_in": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+        "token_out": "0x07ea2ff889e6228cded329a09f66e370f12c705e",
+        "amount_in": "50000000000000000000",
+        "amount_out": "30022958098542002368"
+      },
+      "balances": {
+        "peth": {
+          "before_raw": "0",
+          "after_raw": "30022958098542002368"
+        },
+        "fpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        },
+        "vpeth": {
+          "before_raw": "0",
+          "after_raw": "0"
+        }
+      },
+      "to_date": {
+        "eth_in_raw": "50000000000000000000",
+        "eth_out_raw": "0",
+        "curve_fees_raw": "303262203015575781"
+      },
+      "place": {
+        "kind": "zap",
+        "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+      },
+      "places": [
+        {
+          "kind": "zap",
+          "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+        }
+      ]
+    }
+  ],
+  "code_sizes_read": {
+    "read": 1,
+    "cap": 50,
+    "page_outside_counterparties": 1,
+    "capped": false,
+    "unread_reason": null
+  },
+  "place_counts": [
+    {
+      "place": {
+        "kind": "zap",
+        "address": "0xd09416d328dfaa07a422a1df233d1d968b80fbf8"
+      },
+      "rows": 7
+    },
+    {
+      "place": {
+        "kind": "venue",
+        "market": "venue_curve_tripool",
+        "address": "0x28b6f412904834dee78a4fa464f2089f5264770c"
+      },
+      "rows": 1
+    },
+    {
+      "place": {
+        "kind": "venue",
+        "market": "venue_univ2_polar_peth",
+        "address": "0xdce2d72d07760cdb29604baee6271fcb1f3a7565"
+      },
+      "rows": 1
+    },
+    {
+      "place": {
+        "kind": "svpeth",
+        "address": "0x7b118bd63bbe9023a2a509cecd48bc283d150539"
+      },
+      "rows": 1
+    }
+  ]
+}

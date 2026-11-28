@@ -192,6 +192,66 @@ export function pethLoanPlaceProv(loanId: string): Provenance {
   };
 }
 
+/** The words a stored total's receipt ends with when the chain did not
+ *  answer (the places panel and the map share them). */
+const storedTail = (stored: boolean) =>
+  stored ? " The chain did not answer, so this is the stored index; later changes are not counted." : "";
+const atBlock = (block?: string | null) => (block ? { source: { block } } : {});
+
+/** The CDPs' collateral, summed: the places panel's total and the map's box. */
+export function pethCdpTotalProv(stored: boolean, block?: string | null): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "emitted",
+    summary:
+      "CDP collateral — the sum of each CDP's collateral at its last touch, for the CDPs this address holds." +
+      storedTail(stored),
+    formula: "Σ newColl (last CDPUpdated of each CDP held)",
+    via: `${VIA} · polaris_cdp_updated`,
+    ...atBlock(block),
+  };
+}
+
+/** The deposits' unclaimed pETH, summed. */
+export function pethSpTotalProv(stored: boolean, block?: string | null): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "emitted",
+    summary:
+      "Stability Pool pETH — the sum of the pETH gains each deposit this address holds left unclaimed at its last touch. pETH paid in since is not counted." +
+      storedTail(stored),
+    formula: "Σ stashed pETH (last DepositUpdated of each deposit held)",
+    via: `${VIA} · polaris_sp_deposit_updated`,
+    ...atBlock(block),
+  };
+}
+
+/** The open loans' fpETH collateral, summed. */
+export function pethLoanTotalProv(stored: boolean, block?: string | null): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "indexed",
+    summary:
+      "Reserve-loan collateral — the sum of the fpETH collateral of each open loan this address holds." +
+      storedTail(stored),
+    formula: "Σ (LoanOpened fpCollateral + Σ LoanAdjusted collChange)",
+    via: `${VIA} · polaris_loan_opened + polaris_loan_adjusted`,
+    ...atBlock(block),
+  };
+}
+
+/** The address's pETH share across the pools, summed at the head. */
+export function pethLpTotalProv(block: string | null): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: "Pool shares — the sum of this address's share of the pETH in the three pools, at the head block.",
+    formula: "Σ balanceOf(address) × pool pETH ÷ totalSupply()",
+    via: `${VIA} · Multicall3 @ head`,
+    ...atBlock(block),
+  };
+}
+
 export function pethLpProv(venue: PolarisVenueKey, block: string | null): Provenance {
   const v = POLARIS_VENUES[venue];
   const reserve = venue === "venue_curve_tripool" ? "balances(0)" : "getReserves() reserve0";
