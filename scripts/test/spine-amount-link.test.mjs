@@ -43,12 +43,19 @@ test("an amountLink wraps the amount alone, and the rest of the spine is unchang
   assert.match(whole, /data-spine-amount-link="marked"/);
   assert.match(whole, /data-anatomy="L3.3"/);
   assert.match(whole, /aria-label="4.2K: Went to reserve loan #28"/, "the name reads the words without the arrow");
-  assert.match(whole, /relative z-30/, "the link sits above the phone toggle");
+  assert.match(whole, /pointer-events-auto/, "the link takes its own tap");
+  assert.match(
+    html,
+    /data-spine-node=""[^>]*class="relative z-10 max-sm:z-30 max-sm:pointer-events-none/,
+    "its node stands above the phone toggle and passes other taps through",
+  );
   // Put the plain figure back where the link stands: the spine is the
   // unlinked one, so nothing beside the amount moved.
-  const plain = html.replace(
-    /<span class="(justify-self-(?:end|start) p[rl]-5)"><a\b[^>]*>(.*?)<\/a><\/span>/,
-    (_, side, txt) => `<span class="text-base font-semibold whitespace-nowrap ${side}">${txt}</span>`,
-  );
+  const plain = html
+    .replace(
+      /<span class="(justify-self-(?:end|start) p[rl]-5)"><a\b[^>]*>(.*?)<\/a><\/span>/,
+      (_, side, txt) => `<span class="text-base font-semibold whitespace-nowrap ${side}">${txt}</span>`,
+    )
+    .replace(" max-sm:z-30 max-sm:pointer-events-none", "");
   assert.equal(plain, expected.liquityAdjust);
 });

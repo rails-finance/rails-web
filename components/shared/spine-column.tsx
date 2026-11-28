@@ -199,7 +199,7 @@ export interface SpineTokenRow {
   /** The flanking amount opens a page (the place a pETH account row's
    *  tokens went; the pETH account behind a Polaris position's collateral
    *  move): href, tooltip, and `marked` for the hairline border. Unset draws
-   *  the plain amount, as every other family does. */
+   *  the plain amount. */
   amountLink?: SpineAmountLink;
 }
 
@@ -1412,7 +1412,10 @@ export function SpineColumn({
       <div
         data-spine-node=""
         {...nodeAttrs}
-        className={`relative z-10${effectiveIcon && !(effectiveIcon === "market" && rows.length) ? "" : " flex flex-col gap-y-1 items-center"}`}
+        // A node with a linked amount stands above the row's phone toggle
+        // (event-card.tsx, z-20) below 640px and lets every other tap through
+        // to it; the link takes its own (SpineVal, pointer-events-auto).
+        className={`relative z-10${rows.some((r) => r.amountLink) ? " max-sm:z-30 max-sm:pointer-events-none" : ""}${effectiveIcon && !(effectiveIcon === "market" && rows.length) ? "" : " flex flex-col gap-y-1 items-center"}`}
         style={{ backgroundColor: ground, boxShadow: `0 0 0 4px ${ground}`, paddingBottom: hasBadge ? 6 : undefined }}
       >
         {leadIn}

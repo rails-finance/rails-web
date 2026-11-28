@@ -42,6 +42,7 @@ import {
   pethLedgerUnchecked,
   pethScannedTo,
   pethPlaceKey,
+  pethPlaceName,
   pethPlaceView,
   pethPlaces,
   pethRowId,
@@ -188,16 +189,24 @@ export default function PethView({
   };
 
   // The event page's row where the reads above do not hold it (past the
-  // first read, or an address too heavy to list): read alone by `tx`.
+  // first read, or an address too heavy to list): read alone by `tx`. While
+  // it runs the timeline draws a skeleton; a failed read says so; a read
+  // with no row leaves the not-found notice.
   const [pinned, setPinned] = useState<PethLedgerRow | null>(null);
+  const [pinnedRead, setPinnedRead] = useState<"idle" | "loading" | "done" | "failed">("idle");
   const pinnedTx = pinnedId ? decodeURIComponent(pinnedId).toLowerCase() : null;
   const pinnedLoaded = pinnedTx == null || [...(data?.rows ?? []), ...older].some((r) => pethRowId(r) === pinnedTx);
   useEffect(() => {
     if (!data || pinnedLoaded || !pinnedTx || !/^0x[0-9a-f]{64}$/.test(pinnedTx)) return;
     let cancelled = false;
+    setPinnedRead("loading");
     readPolarisPeth(address, { tx: pinnedTx })
-      .then((d) => !cancelled && setPinned(d.rows?.[0] ?? null))
-      .catch(() => {});
+      .then((d) => {
+        if (cancelled) return;
+        setPinned(d.rows?.[0] ?? null);
+        setPinnedRead("done");
+      })
+      .catch(() => !cancelled && setPinnedRead("failed"));
     return () => {
       cancelled = true;
     };
@@ -260,6 +269,7 @@ export default function PethView({
       const q = new URLSearchParams({ hidePlaces: view.hide.join(",") }).toString();
       return {
         rows: view.rows,
+        name: pethPlaceName(hit.place, PETH_PLACE_NAMES),
         href: `${polarisPethAccountHref(address)}?${q}#peth-timeline`,
         show: () => {
           hidePlacesExactly(view.hide);
@@ -358,6 +368,15 @@ export default function PethView({
       <div id="peth-timeline" className="scroll-mt-4">
         <ChainTruthTimeline
           persistKeyPrefix="polaris-peth"
+          pinnedRead={
+            pinnedTx && !pinnedLoaded && !pinned && /^0x[0-9a-f]{64}$/.test(pinnedTx)
+              ? pinnedRead === "failed"
+                ? "failed"
+                : pinnedRead === "done"
+                  ? undefined
+                  : "loading"
+              : undefined
+          }
           closed={false}
           tl={tl}
           boundary={boundary}

@@ -97,6 +97,8 @@ const unread = (why: string) => <span className="text-xs text-rb-500">{why}</spa
  *  that opens the timeline narrowed to it, and the in-page apply. */
 export type PethPlaceEvents = (match: (p: PethPlace) => boolean) => {
   rows: number;
+  /** The place in a sentence ("USDp CDP #26"), for the link's name. */
+  name: string;
   href: string;
   show: () => void;
 } | null;
@@ -110,7 +112,7 @@ function EventsLink({ events, match }: { events?: PethPlaceEvents; match: (p: Pe
       className={`${INLINE_LINK} text-xs`}
       data-anatomy="C24.1·polaris"
       data-peth-place-events={e.rows}
-      aria-label={`${e.rows.toLocaleString("en-US")} ${e.rows === 1 ? "event" : "events"}`}
+      aria-label={`${e.rows.toLocaleString("en-US")} ${e.rows === 1 ? "event" : "events"} on ${e.name}`}
       onClick={(ev) => {
         if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return;
         ev.preventDefault();

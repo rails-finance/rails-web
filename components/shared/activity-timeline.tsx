@@ -123,16 +123,17 @@ export function SpineVal({
   const cls =
     "text-base font-semibold whitespace-nowrap underline-offset-2 hover:underline focus-visible:underline " +
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] rounded-sm" +
-    // Above the row's phone toggle (event-card.tsx, z-20), so a tap on the
-    // amount opens the link and a tap beside it still opens the card.
-    " relative z-30" +
+    // The spine node passes taps through to the row's phone toggle below
+    // 640px (spine-column.tsx); the link takes its own.
+    " pointer-events-auto" +
     mark;
   const common = {
     title: link.tip,
     // The arrows are visual: the name reads the words alone.
     "aria-label": `${txt}${unit ? ` ${unit}` : ""}: ${link.tip.replace(/\s*[→↗]\s*$/u, "")}`,
     onClick: (e: React.MouseEvent) => e.stopPropagation(),
-    "data-spine-amount-link": link.marked ? "marked" : "",
+    // "marked" while the border is drawn, "plain" while Display has it off.
+    "data-spine-amount-link": link.marked ? "marked" : "plain",
     "data-anatomy": link.marked ? "L3.3" : "L3.2",
   };
   return (

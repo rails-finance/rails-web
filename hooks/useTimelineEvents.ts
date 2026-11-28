@@ -1230,7 +1230,9 @@ export function useTimelineEvents(
     hiddenAssetSet.size > 0 ||
     hiddenCounterpartySet.size > 0 ||
     hiddenVersionSet.size > 0 ||
-    hiddenPlaceSet.size > 0 ||
+    // A stale ?hidePlaces= on a timeline with no Place axis has no pill to
+    // clear it, so it does not count.
+    (placeOptions.length > 0 && hiddenPlaceSet.size > 0) ||
     dateRange !== null ||
     sizeView != null;
 
