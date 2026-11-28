@@ -14,7 +14,9 @@
 import Link from "next/link";
 import { createContext, useContext, useState, useRef } from "react";
 import { fmtSpine } from "@/lib/shared/spine-format";
-import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
+import { INLINE_LINK, INPLACE_TEXT } from "@/lib/shared/ui-grammar";
+import { spineAmountPress } from "@/lib/shared/spine-amount-press";
+import { RevealTip } from "@/components/shared/reveal-tip";
 export { fmtSpine };
 
 // ── Timeline scale ─────────────────────────────────────────────────────
@@ -132,27 +134,87 @@ export function SpineVal({
     " [@media(hover:none)]:underline [@media(hover:none)]:decoration-dotted [@media(hover:none)]:decoration-1" +
     " [@media(hover:none)]:decoration-[var(--edge-row-line)]" +
     mark;
+  return (
+    <span className={sideClass}>
+      <SpineAmountLinkView link={link} cls={cls} side={side} name={`${txt}${unit ? ` ${unit}` : ""}`}>
+        {body}
+      </SpineAmountLinkView>
+    </span>
+  );
+}
+
+/** The linked amount in the house tooltip (RevealTip, held open here): on a
+ *  screen without hover the first tap opens the link's words with the link in
+ *  them, and the second tap follows it (lib/shared/spine-amount-press.ts). */
+function SpineAmountLinkView({
+  link,
+  cls,
+  side,
+  name,
+  children,
+}: {
+  link: SpineAmountLink;
+  cls: string;
+  side: "left" | "right";
+  name: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
   const common = {
     title: link.tip,
     // The arrows are visual: the name reads the words alone.
-    "aria-label": `${txt}${unit ? ` ${unit}` : ""}: ${link.tip.replace(/\s*[→↗]\s*$/u, "")}`,
-    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+    "aria-label": `${name}: ${link.tip.replace(/\s*[→↗]\s*$/u, "")}`,
+    onClick: (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const press = spineAmountPress(open, {
+        on: "amount",
+        hoverless: window.matchMedia("(hover: none)").matches,
+        keyboard: e.detail === 0,
+      });
+      if (!press.follow) e.preventDefault();
+      setOpen(press.open);
+    },
     // "marked" while the border is drawn, "plain" while Display has it off.
     "data-spine-amount-link": link.marked ? "marked" : "plain",
     "data-anatomy": link.marked ? "L3.3" : "L3.2",
   };
+  const tipLink = {
+    className: `font-semibold ${INLINE_LINK}`,
+    // The press is the link's, not the card row's.
+    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+  };
+  const outside = { on: "outside", hoverless: true, keyboard: false } as const;
   return (
-    <span className={sideClass}>
+    <RevealTip
+      tip={
+        link.external ? (
+          <a href={link.href} target="_blank" rel="noopener" {...tipLink}>
+            {link.tip}
+          </a>
+        ) : (
+          <Link href={link.href} prefetch={false} {...tipLink}>
+            {link.tip}
+          </Link>
+        )
+      }
+      interactive
+      wrap
+      align={side === "left" ? "end" : "start"}
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) setOpen(spineAmountPress(open, outside).open);
+      }}
+    >
       {link.external ? (
         <a href={link.href} target="_blank" rel="noopener" className={cls} {...common}>
-          {body}
+          {children}
         </a>
       ) : (
         <Link href={link.href} prefetch={false} className={cls} {...common}>
-          {body}
+          {children}
         </Link>
       )}
-    </span>
+    </RevealTip>
   );
 }
 

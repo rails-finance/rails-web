@@ -10,6 +10,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { spineAmountPress } from "../../lib/shared/spine-amount-press.ts";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const rendered = JSON.parse(
@@ -61,6 +62,12 @@ test("an amountLink wraps the amount alone, and the rest of the spine is unchang
   );
   assert.match(
     html,
+    /<span data-reveal-tip="" class="relative inline-flex cursor-pointer items-center "><a\b/,
+    "the link stands in the house tooltip (RevealTip)",
+  );
+  assert.doesNotMatch(html, /role="tooltip"/, "the tooltip is closed at rest");
+  assert.match(
+    html,
     /data-spine-node=""[^>]*class="relative z-10 max-sm:z-30 max-sm:pointer-events-none/,
     "its node stands above the phone toggle and passes other taps through",
   );
@@ -68,7 +75,7 @@ test("an amountLink wraps the amount alone, and the rest of the spine is unchang
   // unlinked one, so nothing beside the amount moved.
   const plain = html
     .replace(
-      /<span class="(justify-self-(?:end|start) p[rl]-5)"><a\b[^>]*>(.*?)<\/a><\/span>/,
+      /<span class="(justify-self-(?:end|start) p[rl]-5)"><span data-reveal-tip=""[^>]*><a\b[^>]*>(.*?)<\/a><\/span><\/span>/,
       (_, side, txt) => `<span class="text-base font-semibold whitespace-nowrap ${side}">${txt}</span>`,
     )
     .replace(" max-sm:z-30 max-sm:pointer-events-none", "");
@@ -96,4 +103,35 @@ test("below 640px the number column and the group range stand above a linked nod
   const range = Number(/\.group-range \{\s*z-index: (\d+);/.exec(phone)?.[1]);
   assert.ok(range > node, `.group-range z-index ${range} is above the node's ${node} below 640px`);
   assert.match(css, /\.group-range \{[^}]*pointer-events: none;/, ".group-range passes taps through");
+});
+
+// A press on the linked amount (lib/shared/spine-amount-press.ts): on a screen
+// without hover the first tap opens the tooltip and the second follows the
+// link; a mouse click and a keyboard Enter follow at once.
+const touch = { hoverless: true, keyboard: false };
+test("on a screen without hover the first tap on the amount opens its tooltip and does not follow the link", () => {
+  assert.deepEqual(spineAmountPress(false, { on: "amount", ...touch }), { open: true, follow: false });
+});
+test("on a screen without hover a second tap on the amount follows the link", () => {
+  const first = spineAmountPress(false, { on: "amount", ...touch });
+  assert.deepEqual(spineAmountPress(first.open, { on: "amount", ...touch }), { open: true, follow: true });
+});
+test("the link in the open tooltip follows it", () => {
+  assert.equal(spineAmountPress(true, { on: "tip", ...touch }).follow, true);
+});
+test("a tap elsewhere closes the tooltip and follows nothing", () => {
+  assert.deepEqual(spineAmountPress(true, { on: "outside", ...touch }), { open: false, follow: false });
+});
+test("with hover a click on the amount follows the link and opens no tooltip", () => {
+  assert.deepEqual(spineAmountPress(false, { on: "amount", hoverless: false, keyboard: false }), {
+    open: false,
+    follow: true,
+  });
+});
+test("Enter on the amount follows the link, with or without hover", () => {
+  for (const hoverless of [true, false])
+    assert.deepEqual(spineAmountPress(false, { on: "amount", hoverless, keyboard: true }), {
+      open: false,
+      follow: true,
+    });
 });

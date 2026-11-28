@@ -43,6 +43,8 @@ export function RevealTip({
   align = "start",
   wrap,
   interactive = false,
+  open: openProp,
+  onOpenChange,
 }: {
   tip: ReactNode;
   children: ReactNode;
@@ -61,8 +63,18 @@ export function RevealTip({
    *  takes pointer events, a click inside it is the control's, and focus
    *  moving into it keeps it open. */
   interactive?: boolean;
+  /** Held by the caller, which opens it (the spine's linked amount on a first
+   *  tap); a press elsewhere and Escape still close it, through `onOpenChange`. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = openProp ?? ownOpen;
+  const setOpen = (next: boolean | ((o: boolean) => boolean)) => {
+    const v = typeof next === "function" ? next(open) : next;
+    if (onOpenChange) onOpenChange(v);
+    else setOwnOpen(v);
+  };
   const quiet = useContext(QuietTipsContext);
   const ref = useRef<HTMLSpanElement>(null);
   const bubbleRef = useRef<HTMLSpanElement>(null);
