@@ -63,7 +63,7 @@ const PROSE_LINKED = prose([
   { text: " in " },
   { text: "0xab12…cdef", tx: TX },
   { text: ", " },
-  { text: "the trade", href: "/wallet/0x1234/cow", title: "Opens this trade on the wallet's CoW page" },
+  { text: "the trade", href: "/wallet/0x1234/cow", title: "This trade on the wallet's CoW page" },
   { text: "." },
 ]);
 

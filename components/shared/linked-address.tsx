@@ -25,9 +25,9 @@ interface LinkedAddressProps {
   href?: string | null;
 }
 
-/** The tooltip's words for a page inside Rails, named as the page heads
- *  itself: "Wallet 0x12…34 →", "Redeemer 0x12…34 →", or a family's listing
- *  searched for the address, "Aave V3 positions of 0x12…34 →". */
+/** The tooltip's words for a page inside Rails: "Wallet 0x12…34 →",
+ *  "Redeemer 0x12…34 →", or a family's listing searched for the address,
+ *  "Aave V3 positions of 0x12…34 →". */
 function railsPageTip(href: string, short: string, holderOf: SessionProtocol | undefined): string {
   if (href.startsWith("/wallet/")) return `Wallet ${short} →`;
   if (href.startsWith(`${LIQUITY_V2_REDEEMER_PATH}/`)) return `Redeemer ${short} →`;

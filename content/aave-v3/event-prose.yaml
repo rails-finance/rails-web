@@ -290,10 +290,11 @@ words:
     ParaSwap adapter
   venue_cow: |-
     CoW settlement
-  # The CoW settlement's link where the wallet owns the order: it opens the
-  # trade on the wallet's CoW page.
+  # The CoW settlement's link where the wallet owns the order: its tooltip
+  # names the page it opens, the trade on the wallet's CoW page, and the
+  # page adds "→".
   cow_trade_link: |-
-    Opens this trade on the wallet's CoW page
+    This trade on the wallet's CoW page
   and: |-
     and
   assets: |-

@@ -163,7 +163,7 @@ test("prose links its address, its transaction and its words, each naming where 
   const html = after.prose;
   linked(html, "Wallet 0x1234…5678");
   linked(html, "Transaction 0x5c504e…2060, View on Etherscan");
-  const a = linked(html, "the trade: Opens this trade on the wallet&#x27;s CoW page");
+  const a = linked(html, "the trade: This trade on the wallet&#x27;s CoW page");
   assert.match(a, /data-prose-link=""/);
   assert.match(a, /href="\/wallet\/0x1234\/cow"/);
 });

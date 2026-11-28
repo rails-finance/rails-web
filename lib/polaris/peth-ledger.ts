@@ -492,9 +492,8 @@ export function pethPlaceDirection(r: Pick<PethLedgerRow, "kind" | "lines">): "t
   return read.some((l) => l.direction === "out") ? "to" : "from";
 }
 
-/** The link a row's amount on the spine takes to its place: the place's
- *  page in Rails, or null for a place outside Rails, since the spine links
- *  no page outside Rails (ui-jobs 878). */
+/** The link a row's amount on the spine takes: the place's page in Rails,
+ *  or null, since the spine links Rails pages only (ui-jobs 878). */
 export function pethSpineAmountLink<T extends { external: boolean }>(place: T | null): T | null {
   return place && !place.external ? place : null;
 }

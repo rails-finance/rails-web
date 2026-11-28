@@ -13,8 +13,8 @@
 //
 // A mouse opens the tooltip on hover and a click follows at once. A touch or a
 // pen opens the tooltip first (RevealTip, held open here), holding the words as
-// a link, and a second press or that link follows. Enter follows, and its key
-// stops at the value, as a press does. With no
+// a link, and a second press or that link follows. Enter follows; Enter and Space
+// stop at the value, as a press does. With no
 // pointer event (a screen reader's activation), `(hover: none)` decides
 // (lib/shared/spine-amount-press.ts `valuePress`). A tap elsewhere or Escape
 // closes it. While the receipts inspector is armed, a press on a value inside
