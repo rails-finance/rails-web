@@ -240,6 +240,7 @@ function Part({ p }: { p: MapTextPart }) {
   const at = (x: { text: string; href: string }) => (
     <a href={x.href} className={`${INLINE_LINK} tabular-nums`} title="Opens this event on the timeline">
       {x.text}
+      <span className="sr-only"> on the timeline</span>
     </a>
   );
   return to ? (
@@ -286,6 +287,7 @@ function MapExplanationDrawer({
         type="button"
         className="group/mapx inline-flex cursor-pointer items-center gap-1.5 rounded-md py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
         aria-expanded={open}
+        aria-controls={`${domId}-pane`}
         aria-label={open ? "Hide map explanation" : "Show map explanation"}
         data-map-explanation-toggle=""
         onClick={() => setOpen((o) => !o)}
@@ -298,7 +300,9 @@ function MapExplanationDrawer({
         >
           <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
         </svg>
-        <span className={`text-sm transition-colors duration-200 ${tone}`}>Map explanation</span>
+        <span id={`${domId}-name`} className={`text-sm transition-colors duration-200 ${tone}`}>
+          Map explanation
+        </span>
         <svg
           className={`h-3 w-3 transition-[color,transform] duration-200 ${tone} ${open ? "rotate-180" : ""}`}
           viewBox="0 0 24 24"
@@ -313,14 +317,24 @@ function MapExplanationDrawer({
         </svg>
       </button>
       {open && tab && (
-        <div className="pt-2" data-map-explanation="" data-anatomy={anatomy} data-card-tab-open={tab.key}>
+        <div
+          id={`${domId}-pane`}
+          className="pt-2"
+          data-map-explanation=""
+          data-anatomy={anatomy}
+          data-card-tab-open={tab.key}
+        >
           {explanation.tabs.length > 1 && (
-            <CardTabStrip
-              idBase={domId}
-              tabs={explanation.tabs.map((t) => ({ key: t.key, label: t.label }))}
-              openTab={tab.key}
-              onOpenTabChange={setOpenTab}
-            />
+            // CardTabStrip takes no name; the group around it is named
+            // "Map explanation" from the toggle's words.
+            <div role="group" aria-labelledby={`${domId}-name`}>
+              <CardTabStrip
+                idBase={domId}
+                tabs={explanation.tabs.map((t) => ({ key: t.key, label: t.label }))}
+                openTab={tab.key}
+                onOpenTabChange={setOpenTab}
+              />
+            </div>
           )}
           <div
             id={`${domId}-panel`}

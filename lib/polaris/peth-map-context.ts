@@ -14,7 +14,7 @@ import {
   SVPETH,
   VPETH,
 } from "@/lib/polaris/asset-catalog";
-import { polarisPethAccountHref } from "@/lib/polaris/routes";
+import { polarisPethAccountHref, polarisPethEventHref } from "@/lib/polaris/routes";
 import type { PethMapContext } from "@/lib/polaris/peth-map-fill";
 import type { PethMapExplainContext } from "@/lib/polaris/peth-map-explanation";
 import {
@@ -75,11 +75,13 @@ export function pethMapContext(address: string): PethMapContext {
 }
 
 /** The explanation drawer's links: an event on the timeline (its `?at=`
- *  landing) and the timeline filtered to several arrows. */
+ *  landing), or on its event page where its row was read after the first
+ *  read, and the timeline filtered to several arrows. */
 export function pethMapExplainContext(address: string): PethMapExplainContext {
   const base = polarisPethAccountHref(address);
   return {
-    eventHref: (eventId) => `${base}?at=${encodeURIComponent(eventId)}`,
+    eventHref: (eventId, later) =>
+      later ? polarisPethEventHref(address, eventId) : `${base}?at=${encodeURIComponent(eventId)}`,
     edgesHref: (edgeIds) => `${base}?${MAP_EDGE_PARAM}=${edgeIds.map(encodeURIComponent).join(",")}#peth-timeline`,
     marketOrder: POLARIS_MARKETS.map((m) => POLARIS_MARKET_CONFIG[m].stable.symbol),
   };

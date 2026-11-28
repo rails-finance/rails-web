@@ -69,7 +69,7 @@ const CTX = {
   },
 };
 const XC = {
-  eventHref: (id) => `/sepolia/polaris/peth/x?at=${id}`,
+  eventHref: (id, later) => (later ? `/sepolia/polaris/peth/x/event/${id}` : `/sepolia/polaris/peth/x?at=${id}`),
   edgesHref: (ids) => `/sepolia/polaris/peth/x?map=${ids.join(",")}#peth-timeline`,
   marketOrder: ["USDp", "GOLDp"],
 };
@@ -140,6 +140,7 @@ const bulletCount = (groups) => groups.reduce((n, g) => n + g.bullets.length, 0)
 /** Z1's pane (§2.1): 8 bullets, 4 groups, 150 words over bullets and headings,
  *  3 words a heading. */
 function assertPane(groups, label) {
+  for (const g of groups) assert.ok(g.bullets.length <= 4, `${label} ${g.id}: ${g.bullets.length} bullets`);
   assert.ok(bulletCount(groups) <= 8, `${label}: ${bulletCount(groups)} bullets`);
   assert.ok(groups.length <= 4, `${label}: ${groups.length} groups`);
   const words = groups.reduce(
@@ -276,7 +277,7 @@ test("0x38d7: the drawer's words", () => {
       "Its steps",
       [
         "First, from 18 Aug 2026, 11:26 to 11:28, it paid 30 WETH through the zap router for pETH and fpETH.",
-        "The bonding curve took 0.173605765590902838 pETH of it in fees.",
+        "The bonding curve charged 0.173605765590902838 pETH in fees.",
       ],
     ],
     [
@@ -308,8 +309,8 @@ test("0x38d7: the drawer's words", () => {
   // Each time links to its event on the timeline: the arrow's first, and its last.
   const first = tab(x, "explanation")[0].bullets[0].parts.find((p) => p.when).when;
   const f = full("map-38d7").edges[pmEdge(PM.eth, PM.zap)];
-  assert.equal(first.from.href, XC.eventHref(f.first.id));
-  assert.equal(first.to.href, XC.eventHref(f.last.id));
+  assert.equal(first.from.href, XC.eventHref(f.first.id, false));
+  assert.equal(first.to.href, XC.eventHref(f.last.id, false));
   // The CDPs' "?" opens Polaris's market modal.
   assert.equal(tab(x, "parts")[0].bullets[2].learnMore, "market");
 });
@@ -329,18 +330,15 @@ test("0xc513: all seven steps, in order, and Now's one bullet", () => {
   assert.equal(bulletCount(g), 8);
   const did = g[0].bullets.map((b) => text(b.parts));
   assert.match(did[0], /^First, from 18 Aug 2026, 04:09 to 04:18, it paid 60 WETH through the zap router/);
-  assert.match(did[1], /^The bonding curve took 0\.3637\d+ pETH of it in fees\.$/);
+  assert.match(did[1], /^The bonding curve charged 0\.3637\d+ pETH in fees\.$/);
   assert.match(did[2], /^At 04:10, it received 20\.75\d+ pETH from other addresses\.$/);
-  assert.equal(
-    did[3],
-    "From 04:14 to 04:20, it bought vpETH, USDp, GOLDp and POLAR through the zap router; these are not counted in ETH here.",
-  );
+  assert.equal(did[3], "From 04:14 to 04:20, it bought vpETH, USDp, GOLDp and POLAR through the zap router.");
   assert.deepEqual(
     g[1].bullets.map((b) => text(b.parts)),
     [
       "Then, at 04:21, it staked 20 vpETH in the svpETH vault.",
-      "From 04:30 to 04:33, it put 9.569186061655532494 pETH along with fpETH and vpETH into the pools.",
-      "Most recently, at 04:34, it traded 2.107623962359256268 fpETH through the zap router.",
+      "From 04:30 to 04:33, it put 9.569186061655532494 pETH with fpETH and vpETH into the pools.",
+      "Most recently, at 04:34, it sold 2.107623962359256268 fpETH through the zap router.",
     ],
   );
   // Now: the mechanisms' figures only; the svpETH the address holds is a balance.
@@ -385,11 +383,7 @@ test("arrows unknown and nothing in a mechanism: no Explanation tab, since the m
 test("0xc513 partial: the other tokens' bullet names none and keeps its span", () => {
   const x = pethMapExplanation(partial("map-c513"), XC);
   const t = all(x).flatMap((g) => g.bullets.map((b) => text(b.parts)));
-  assert.ok(
-    t.includes(
-      "From 04:14 to 04:20, it bought other tokens through the zap router; these are not counted in ETH here.",
-    ),
-  );
+  assert.ok(t.includes("From 04:14 to 04:20, it bought other tokens through the zap router."));
   assert.ok(!tab(x, "explanation").some((g) => g.id === "more"), "all seven steps");
 });
 
@@ -442,7 +436,7 @@ test("past eight bullets: the earliest four, a line to the rest in the timeline,
   );
   assertPane(g, "ten steps");
   const more = g[1].lead;
-  assert.equal(text(more), "… and 2 more steps, in the timeline.");
+  assert.equal(text(more), "… and 2 more steps in the timeline.");
   const link = more.find((p) => typeof p === "object" && "link" in p);
   assert.equal(link.href, XC.edgesHref([pmEdge(PM.sp, MAP_HOLDER), pmEdge(MAP_HOLDER, PM.loan)]));
   assert.match(text(g[0].bullets[0].parts), /^First, at 18 Aug 2026, 10:00, it received/);
@@ -466,10 +460,125 @@ test("with Now in the pane, the story takes what is left of eight bullets", () =
   );
   assert.equal(bulletCount(g), 8);
   assertPane(g, "ten steps and Now");
-  assert.equal(text(g[1].lead), "… and 4 more steps, in the timeline.");
+  assert.equal(text(g[1].lead), "… and 4 more steps in the timeline.");
   assert.match(text(g[2].bullets[2].parts), /^Most recently, at 10:09, /);
   assert.deepEqual(
     g[3].bullets.map((b) => text(b.parts)),
     ["Its CDPs held 1 pETH at their last touch, and its Floor Loans hold 1 pETH.", "Its pool shares hold 1 pETH."],
   );
+});
+
+// ── Review fixes ──
+const fillOf = ({ edges = {}, nodes = {}, rows = [], counted = { rows: rows.length, total: rows.length } }) => ({
+  subject: { address: "0x", chain: "sepolia", asOf: { block: null, time: null } },
+  nodes,
+  edges,
+  rows,
+  counted,
+});
+const one = (asset) => ({ asset, raw: "1000000000000000000", decimals: 18 });
+const t0 = Date.parse("2026-08-18T10:00:00Z") / 1000;
+const on = (from, to, i, amounts = [one("pETH")], later = false) => {
+  const end = { at: t0 + i * 60, id: `0x${i}`, ...(later ? { later: true } : {}) };
+  return [
+    pmEdge(from, to),
+    { amounts, rowCount: 1, timelineHref: "", receipt: R(`${from}>${to}`), first: end, last: end },
+  ];
+};
+
+/** A fill whose arrows touch the given mechanism boxes, one arrow in each. */
+const touching = (ids) => fillOf({ edges: Object.fromEntries(ids.map((id, i) => on(MAP_HOLDER, id, i))) });
+
+test("Parts past eight bullets: CDPs, Earn Pools and Floor Loans share one, then the untouched line goes", () => {
+  // All nine parts: the zap and the curve through the zap buy, the seven boxes below.
+  const nine = touching([PM.cdp, PM.sp, PM.loan, PM.splitter, PM.pools, PM.svpeth, PM.morpho]);
+  Object.assign(nine.edges, Object.fromEntries([on(PM.eth, PM.zap, 8, [one("WETH")]), on(PM.zap, PM.curve, 8, [])]));
+  const p9 = tab(pethMapExplanation(nine, XC), "parts");
+  assertPane(p9, "nine parts");
+  const t9 = p9.flatMap((g) => g.bullets.map((b) => text(b.parts)));
+  assert.equal(t9.length, 7);
+  assert.ok(
+    t9.includes(
+      `CDPs mint USDp or GOLDp against pETH; ${POLARIS_POOL_NAME} repay liquidated debt; ${POLARIS_LOAN_NAME} lend reserve ETH against fpETH.`,
+    ),
+  );
+  assert.ok(!p9.some((g) => g.id === "unused"));
+  assert.equal(p9.flatMap((g) => g.bullets).find((b) => /^CDPs mint/.test(text(b.parts))).learnMore, "market");
+
+  // Eight parts (no Morpho): eight bullets and the untouched line would be nine.
+  const eight = touching([PM.cdp, PM.sp, PM.loan, PM.splitter, PM.pools, PM.svpeth]);
+  Object.assign(eight.edges, Object.fromEntries([on(PM.eth, PM.zap, 8, [one("WETH")]), on(PM.zap, PM.curve, 8, [])]));
+  const p8 = tab(pethMapExplanation(eight, XC), "parts");
+  assertPane(p8, "eight parts");
+  assert.equal(bulletCount(p8), 7);
+  assert.equal(text(p8.find((g) => g.id === "unused").bullets[0].parts), "Not used by this address: Morpho Blue.");
+  // Seven parts and the line fit: no sharing.
+  const seven = tab(pethMapExplanation(touching([PM.cdp, PM.sp, PM.loan, PM.splitter, PM.pools]), XC), "parts");
+  assert.ok(seven.flatMap((g) => g.bullets).some((b) => /^CDPs: lock/.test(text(b.parts))));
+});
+
+test("the curve's fee is told once, with the zap buy and both direct curve arrows", () => {
+  const f = fillOf({
+    edges: Object.fromEntries([
+      on(PM.eth, PM.zap, 0, [one("WETH")]),
+      on(PM.zap, MAP_HOLDER, 0, [one("pETH")]),
+      on(MAP_HOLDER, PM.curve, 1, [one("WETH")]),
+      on(PM.curve, MAP_HOLDER, 2, [one("pETH")]),
+      on(PM.curve, PM.fee, 0, [one("pETH")]),
+    ]),
+  });
+  const t = tab(pethMapExplanation(f, XC), "explanation").flatMap((g) => g.bullets.map((b) => text(b.parts)));
+  assert.equal(t.filter((x) => /fees/.test(x)).length, 1);
+  assert.ok(t.includes("The bonding curve charged 1 pETH in fees."));
+});
+
+test("a time whose row was read after the first read links to its event page", () => {
+  const f = fillOf({
+    edges: Object.fromEntries([on(MAP_HOLDER, PM.cdp, 0, undefined, true), on(MAP_HOLDER, PM.loan, 1)]),
+  });
+  const whens = tab(pethMapExplanation(f, XC), "explanation")
+    .flatMap((g) => g.bullets)
+    .map((b) => b.parts.find((p) => typeof p === "object" && "when" in p).when.from.href);
+  assert.deepEqual(whens, ["/sepolia/polaris/peth/x/event/0x0", "/sepolia/polaris/peth/x?at=0x1"]);
+});
+
+test("mergeFillRows marks the rows it adds, and their ends carry it", async () => {
+  const { mergeFillRows } = await import("../../lib/shared/protocol-map/types.ts");
+  const [id, e] = on(MAP_HOLDER, PM.cdp, 5);
+  const m = mergeFillRows(
+    fillOf({ edges: { [id]: e }, rows: [{ id: "0x5", edgeIds: [id], at: t0 + 300 }] }),
+    [{ id: "0x1", edgeIds: [id], at: t0 + 60 }],
+    () => ({ timelineHref: "", receipt: R("new") }),
+  );
+  assert.deepEqual(m.edges[id].first, { at: t0 + 60, id: "0x1", later: true });
+  assert.equal(m.edges[id].last.later, undefined);
+  assert.equal(m.rows.find((r) => r.id === "0x1").later, true);
+});
+
+test("Now names a line's other assets and keeps one figure a clause", () => {
+  const f = fillOf({
+    nodes: {
+      [PM.pools]: { lines: [{ label: "now", amounts: [one("fpETH"), one("pETH"), one("vpETH")], receipt: R("lp") }] },
+      [PM.cdp]: { lines: [{ label: "now", amounts: [one("pETH")], receipt: R("cdp") }] },
+    },
+  });
+  const now = tab(pethMapExplanation(f, XC), "explanation").find((g) => g.id === "now");
+  assert.deepEqual(
+    now.bullets.map((b) => text(b.parts)),
+    ["Its CDPs held 1 pETH at their last touch, and its pool shares hold 1 pETH with fpETH and vpETH."],
+  );
+  assert.equal(now.bullets[0].parts.filter((p) => typeof p === "object" && "figure" in p).length, 2);
+});
+
+test("no group passes four bullets, however the steps' sizes fall", () => {
+  // Steps of two bullets (a zap buy and its fee) beside single ones.
+  for (let n = 1; n <= 10; n++) {
+    const ids = [PM.cdp, PM.sp, PM.loan, PM.splitter, PM.pools, PM.svpeth, PM.morpho].slice(0, Math.min(7, n));
+    const f = touching(ids);
+    Object.assign(
+      f.edges,
+      Object.fromEntries([on(PM.eth, PM.zap, 0, [one("WETH")]), on(PM.curve, PM.fee, 0, [one("pETH")])]),
+    );
+    for (const t of pethMapExplanation(f, XC).tabs) assertPane(t.groups, `${n} ${t.key}`);
+  }
 });

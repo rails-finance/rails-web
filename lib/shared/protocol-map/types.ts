@@ -82,6 +82,8 @@ export interface MapLine {
 export interface MapEdgeEnd {
   at: number;
   id: string;
+  /** The row was read after the page's first read (`mergeFillRows`). */
+  later?: true;
 }
 
 export interface MapEdgeFill {
@@ -102,6 +104,8 @@ export interface MapFillRow {
   id: string;
   edgeIds: string[];
   at?: number | null;
+  /** Read after the page's first read (`mergeFillRows` sets it). */
+  later?: true;
 }
 
 /** Widens an edge's first and last to take in one row. Ties keep the end
@@ -109,7 +113,7 @@ export interface MapFillRow {
  *  `first` only if it comes later in the list. */
 export function spanWith(e: Pick<MapEdgeFill, "first" | "last">, row: MapFillRow): Pick<MapEdgeFill, "first" | "last"> {
   if (row.at == null) return { first: e.first, last: e.last };
-  const end = { at: row.at, id: row.id };
+  const end: MapEdgeEnd = { at: row.at, id: row.id, ...(row.later ? { later: true as const } : {}) };
   return {
     first: !e.first || row.at <= e.first.at ? end : e.first,
     last: !e.last || row.at > e.last.at ? end : e.last,
@@ -194,7 +198,7 @@ export function mergeFillRows(
 ): MapFill {
   if (fill.edgesUnknown) return fill;
   const seen = new Set(fill.rows.map((r) => r.id));
-  const added = more.filter((r) => !seen.has(r.id) && seen.add(r.id));
+  const added = more.filter((r) => !seen.has(r.id) && seen.add(r.id)).map((r): MapFillRow => ({ ...r, later: true }));
   if (added.length === 0) return fill;
   const rows = [...fill.rows, ...added];
   const counts = new Map<string, number>();
