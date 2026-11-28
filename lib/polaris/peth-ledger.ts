@@ -494,8 +494,9 @@ export function pethPlaceDirection(r: Pick<PethLedgerRow, "kind" | "lines">): "t
 
 /** The row's place line in T3, without its arrow: "Went to USDp CDP #12".
  *  With a line's direction, the words for that line's amount on the spine
- *  (ui-jobs 878): an LP add's shares "Came from" the pool and the tokens sent
- *  "Went to" it; a liquidation's lines all read "Seized from". */
+ *  (ui-jobs 878): a CDP's collateral sent reads "Went to USDp CDP #12" and a
+ *  Stability Pool deposit's gain paid "Came from USDp deposit #3"; a
+ *  liquidation's lines all read "Seized from". */
 export function pethPlaceWords(
   r: Pick<PethLedgerRow, "kind" | "lines">,
   p: PethPlace,

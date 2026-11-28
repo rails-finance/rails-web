@@ -35,7 +35,7 @@ for (const name of ["liquityAdjust", "aaveWithdraw", "touch"]) {
   });
 }
 
-test("an amountLink outside Rails leaves the spine as drawn without one", () => {
+test("an amountLink outside Rails draws the plain amount", () => {
   assert.equal(rendered.linkedExternal, expected.liquityAdjust);
 });
 

@@ -141,9 +141,11 @@ export function PolarisPethEventCard({
     byToken.set(k, { ...t, raw: (prev?.raw ?? ZERO) + big(l.amount_raw), dir: l.direction });
   }
   // The amounts of the row's primary lines open its place where it has a
-  // Rails page, with the T3 line's words for each amount's direction as the
-  // tooltip (ui-jobs 872, 878). The spine links no page outside Rails: a place
-  // on the block explorer leaves its amounts plain.
+  // Rails page, each with the T3 line's words for its line's direction as the
+  // tooltip (ui-jobs 872, 878): a CDP's collateral sent reads "Went to USDp
+  // CDP #12", a deposit's gain paid "Came from USDp deposit #3". The spine
+  // links no page outside Rails: a place on the block explorer leaves its
+  // amounts plain.
   const primary = new Set(
     lines
       .filter((l) => l.rule === row.kind)
