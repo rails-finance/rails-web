@@ -42,6 +42,8 @@ import {
   hotSets,
   MAP_EDGE_PARAM,
   mapEdgesFromParam,
+  mapEdgesIn,
+  mapLandingClearsFilter,
   mergeFillRows,
   type MapFill,
   type MapSelection,
@@ -311,7 +313,10 @@ export default function PethView({
   // load; a map filter that hides the event is cleared first.
   const [landAt, setLandAt] = useState<{ id: string; seq: number } | null>(null);
   const landOn = (id: string) => {
-    if (hideIds?.has(id)) applyFilter(null);
+    if (mapLandingClearsFilter(id, hideIds)) {
+      applyFilter(null);
+      setSelection(null);
+    }
     setLandAt((l) => ({ id, seq: (l?.seq ?? 0) + 1 }));
   };
   const applyFilter = (edgeIds: string[] | null) => {
@@ -495,7 +500,7 @@ export default function PethView({
               onFilter={(edgeId) => applyFilter([edgeId])}
               onAt={landOn}
               // Any edge the page's fill has, older rows' included.
-              onEdges={(ids) => applyFilter(ids.filter((id) => fill.edges[id] != null))}
+              onEdges={(ids) => applyFilter(mapEdgesIn(ids, fill))}
               rowLabel={rowLabel}
               handAddedPlaces={handAddedPlaces}
             />

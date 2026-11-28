@@ -501,8 +501,8 @@ export interface ChainTruthTimelineProps {
    *  slot would hide it behind seventeen presses of "Show N more". */
   notice?: ReactNode;
   /** Lands on one event in place, as a `?at=` landing does on load (reveal,
-   *  open, scroll, highlight). A new `seq` lands again. Unset renders
-   *  identically to today. */
+   *  open, scroll, highlight). A new `seq` lands again. Unset, the timeline
+   *  renders as without it. */
   landAt?: { id: string; seq: number } | null;
   /** The boundary — the events before the oldest drawn row, stated as ONE
    *  card on the spine after that row (rails-ops decision 0019; see
@@ -1033,19 +1033,23 @@ function ChainTruthTimelineBody({
     appliedAtRef.current = true;
     setLandingWantedId(decodeEventId(raw));
   }, [pinnedId]);
-  // The same landing, asked for in place by the page (`landAt`).
-  const landSeq = landAt?.seq;
-  const landId = landAt?.id;
-  useEffect(() => {
-    if (pinnedId || landSeq == null || !landId) return;
-    setLandingNotFoundId(null);
-    setLandingWantedId(landId);
-  }, [pinnedId, landSeq, landId]);
 
   // The folder a `?at=` landing resolved its event key to — held open while
   // the landing runs, so the member card mounts and the DOM step below can
   // find it. Response-scoped, so it never leaves this component.
   const [landedFolderId, setLandedFolderId] = useState<string | null>(null);
+
+  // The same landing, asked for in place by the page (`landAt`): each new one
+  // starts from a clean landing state. Without `landAt` this never runs.
+  const landSeq = landAt?.seq;
+  const landId = landAt?.id;
+  useEffect(() => {
+    if (pinnedId || landSeq == null || !landId) return;
+    setLandingNotFoundId(null);
+    setLandingTries(0);
+    setLandedFolderId(null);
+    setLandingWantedId(landId);
+  }, [pinnedId, landSeq, landId]);
 
   // Second stage of the `?at=` landing: resolve the wanted id against
   // whatever is served now; re-runs as the served list grows.

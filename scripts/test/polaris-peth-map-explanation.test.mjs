@@ -27,9 +27,8 @@ const { pethMapExplanation } = await import("../../lib/polaris/peth-map-explanat
 const { POLARIS_LOAN_NAME, POLARIS_LOAN_ONE, POLARIS_MAP_LAYOUT, POLARIS_POOL_NAME, PM, pmEdge } = await import(
   "../../lib/polaris/peth-map-layout.ts"
 );
-const { MAP_HOLDER, mapExact, mapPartText, mapSeries, mapUnusedWords, usedNodes } = await import(
-  "../../lib/shared/protocol-map/types.ts"
-);
+const TYPES = await import("../../lib/shared/protocol-map/types.ts");
+const { MAP_HOLDER, mapExact, mapPartText, mapSeries, mapUnusedWords, usedNodes } = TYPES;
 
 const fx = (name) =>
   JSON.parse(readFileSync(new URL(`../fixtures/polaris-peth/${name}.json`, import.meta.url), "utf8"));
@@ -499,7 +498,7 @@ test("Parts past eight bullets: CDPs, Earn Pools and Floor Loans share one, then
   assert.equal(t9.length, 7);
   assert.ok(
     t9.includes(
-      `CDPs mint USDp or GOLDp against pETH; ${POLARIS_POOL_NAME} repay liquidated debt; ${POLARIS_LOAN_NAME} borrow reserve ETH against fpETH.`,
+      `CDPs mint USDp or GOLDp against pETH; ${POLARIS_POOL_NAME} repay liquidated debt; ${POLARIS_LOAN_NAME} lend it reserve ETH against fpETH.`,
     ),
   );
   assert.ok(!p9.some((g) => g.id === "unused"));
@@ -695,7 +694,7 @@ test("a time read after the first read is marked for its event page", () => {
   );
 });
 
-test("Earn Pool deposits' now is their unclaimed gains at the last touch", () => {
+test("Earn Pool deposits' now is what they held unclaimed at the last touch", () => {
   const f = fillOf({
     nodes: {
       [PM.sp]: {
@@ -710,6 +709,69 @@ test("Earn Pool deposits' now is their unclaimed gains at the last touch", () =>
   const now = tab(pethMapExplanation(f, XC), "explanation").find((g) => g.id === "now");
   assert.deepEqual(
     now.bullets.map((b) => text(b.parts)),
-    [`Its ${POLARIS_POOL_NAME.replace(/s$/, "")} deposits held 1 pETH in unclaimed gains at their last touch.`],
+    [`Its ${POLARIS_POOL_NAME.replace(/s$/, "")} deposits held 1 pETH unclaimed at their last touch.`],
   );
+});
+
+// ── Re-review fixes ──
+test('"Most recently" goes to no told step when a skipped one ended last', () => {
+  // Ten steps one a minute; the fourth from the start of the skipped middle
+  // (Earn Pool → this address, step 5) ran on to the day's end.
+  const f = tenSteps();
+  const late = pmEdge(PM.sp, MAP_HOLDER);
+  f.edges[late] = { ...f.edges[late], last: { at: t0 + 86000, id: "0xlate" } };
+  const g = tab(pethMapExplanation(f, XC), "explanation");
+  assert.ok(g.some((x) => x.id === "more"));
+  const t = g.flatMap((x) => x.bullets.map((b) => text(b.parts)));
+  assert.ok(
+    t.every((x) => !/Most recently/.test(x)),
+    t.join(" | "),
+  );
+});
+
+test("the other tokens' step reads the router's arrow back where vpETH came in, and the link de-dups it", () => {
+  const zapHolder = pmEdge(PM.zap, MAP_HOLDER);
+  const ethZap = pmEdge(PM.eth, PM.zap);
+  const zapOther = pmEdge(PM.zap, PM.other);
+  const f = tenSteps();
+  f.edges[ethZap] = { ...f.edges[pmEdge(PM.outside, MAP_HOLDER)], amounts: [one("WETH")], receipt: R("ethzap") };
+  f.edges[zapHolder] = { ...f.edges[ethZap], amounts: [one("pETH"), one("vpETH")], receipt: R("zapholder") };
+  f.edges[zapOther] = { ...f.edges[ethZap], amounts: [one("USDp")], receipt: R("zapother") };
+  delete f.edges[pmEdge(PM.outside, MAP_HOLDER)];
+  f.rows = [
+    { id: "0x0", edgeIds: [ethZap, zapHolder], at: t0 },
+    { id: "0xu", edgeIds: [zapOther], at: t0 + 330 },
+    { id: "0xv", edgeIds: [zapHolder], at: t0 + 335 },
+    ...f.rows.slice(1),
+  ];
+  const g = tab(pethMapExplanation(f, XC), "explanation");
+  const link = g.find((x) => x.id === "more").lead.find((p) => typeof p === "object" && "link" in p);
+  // The other tokens' step is skipped: its own arrow is the one to the other
+  // tokens; the router's arrow back is the told buy's too, so it is left out.
+  assert.ok(link.edges.includes(zapOther), link.edges.join(","));
+  assert.ok(!link.edges.includes(zapHolder) && !link.edges.includes(ethZap), link.edges.join(","));
+});
+
+test("the in-place helpers: the filter's arrows, the landing's clear, the plain click", () => {
+  const { mapEdgesIn, mapLandingClearsFilter, mapPlainClick, mergeFillRows } = TYPES;
+  // An arrow only older rows use joins the merged fill, and the filter takes it.
+  const base = fillOf({ edges: Object.fromEntries([on(MAP_HOLDER, PM.cdp, 0)]) });
+  const older = pmEdge(MAP_HOLDER, PM.loan);
+  assert.deepEqual(mapEdgesIn([older, pmEdge(MAP_HOLDER, PM.cdp)], base), [pmEdge(MAP_HOLDER, PM.cdp)]);
+  const merged = mergeFillRows(base, [{ id: "0xo", edgeIds: [older], at: t0 - 60 }], () => ({
+    timelineHref: "",
+    receipt: R("new"),
+  }));
+  assert.deepEqual(mapEdgesIn([older, "nope", older], merged), [older]);
+  // Landing clears the filter only where the filter hides the event.
+  assert.equal(mapLandingClearsFilter("0x1", new Set(["0x1"])), true);
+  assert.equal(mapLandingClearsFilter("0x2", new Set(["0x1"])), false);
+  assert.equal(mapLandingClearsFilter("0x1", null), false);
+  // A plain left click is handled in place; a modifier or another button is not.
+  const click = { button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false };
+  assert.equal(mapPlainClick(click), true);
+  for (const k of ["metaKey", "ctrlKey", "shiftKey", "altKey"])
+    assert.equal(mapPlainClick({ ...click, [k]: true }), false, k);
+  assert.equal(mapPlainClick({ ...click, button: 1 }), false);
+  assert.equal(mapPlainClick({ ...click, button: 2 }), false);
 });

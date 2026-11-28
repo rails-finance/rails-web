@@ -22,6 +22,7 @@ import {
   hotSets,
   MAP_HOLDER,
   mapExact,
+  mapPlainClick,
   mapSeries,
   mapUnits,
   usedNodes,
@@ -215,8 +216,6 @@ export interface ProtocolMapProps {
   onExplanationEdges?: (edgeIds: string[]) => void;
 }
 
-/** One part of a drawer bullet: a figure bold with its receipt, a time or a
- *  link to the timeline. */
 /** The page's in-place handlers for the drawer's links; each link keeps its
  *  href for a new tab or a page without script. */
 interface DrawerLinks {
@@ -228,11 +227,13 @@ interface DrawerLinks {
 
 /** A plain click that the page handles in place. */
 const inPlace = (ev: React.MouseEvent, run: (() => void) | null) => {
-  if (!run || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+  if (!run || !mapPlainClick(ev)) return;
   ev.preventDefault();
   run();
 };
 
+/** One part of a drawer bullet: a figure bold with its receipt, a time or a
+ *  link to the timeline. */
 function Part({ p, links }: { p: MapTextPart; links: DrawerLinks }) {
   if (typeof p === "string") return <>{p}</>;
   if ("list" in p) return <>{mapSeries(p.list)}</>;
@@ -274,7 +275,7 @@ function Part({ p, links }: { p: MapTextPart; links: DrawerLinks }) {
       <a
         href={x.href}
         className={`${INLINE_LINK} tabular-nums`}
-        title={`Opens this event ${where}`}
+        title={x.later ? "Opens this event's page" : "Opens this event on the timeline"}
         onClick={(ev) => inPlace(ev, !x.later && links.onAt ? () => links.onAt!(x.id) : null)}
       >
         {x.text}

@@ -249,10 +249,31 @@ export const MAP_EDGE_PARAM = "map";
 
 /** The edges a `?map=` value names that the fill has, in its order, once each. */
 export function mapEdgesFromParam(raw: string | null, fill: MapFill): string[] {
-  if (!raw) return [];
-  const ids = raw.split(",").map((x) => x.trim());
-  return ids.filter((id, i) => id !== "" && fill.edges[id] != null && ids.indexOf(id) === i);
+  return raw ? mapEdgesIn(raw.split(","), fill) : [];
 }
+
+/** The ids the fill has an edge for, once each, in their order: a filter's
+ *  arrows, checked against the fill as it stands (older rows' edges included
+ *  once merged). */
+export function mapEdgesIn(ids: string[], fill: MapFill): string[] {
+  const xs = ids.map((x) => x.trim());
+  return xs.filter((id, i) => id !== "" && fill.edges[id] != null && xs.indexOf(id) === i);
+}
+
+/** Whether landing on an event must first clear the edge filter: the filter
+ *  hides it. */
+export const mapLandingClearsFilter = (eventId: string, hidden: ReadonlySet<string> | null): boolean =>
+  hidden?.has(eventId) === true;
+
+/** A plain primary click, which a page may handle in place; a modifier or
+ *  another button keeps the link's own behaviour (a new tab, a download). */
+export const mapPlainClick = (ev: {
+  button: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}): boolean => ev.button === 0 && !ev.metaKey && !ev.ctrlKey && !ev.shiftKey && !ev.altKey;
 
 // ── The explanation drawer (ui-jobs 873.5) ─────────────────────────────────
 // Under the legend, the map's plain-language account of the address: tabs of

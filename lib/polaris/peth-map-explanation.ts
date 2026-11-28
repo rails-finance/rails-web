@@ -169,8 +169,8 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
       // sp_peth: the pETH gains the deposits left unclaimed at their last touch.
       clauses.push(
         n === 1
-          ? [`its ${POOL_ONE} deposit held `, ...nowFig(sp), " in unclaimed gains at its last touch"]
-          : [`its ${POOL_ONE} deposits held `, ...nowFig(sp), " in unclaimed gains at their last touch"],
+          ? [`its ${POOL_ONE} deposit held `, ...nowFig(sp), " unclaimed at its last touch"]
+          : [`its ${POOL_ONE} deposits held `, ...nowFig(sp), " unclaimed at their last touch"],
       );
     }
     const loan = now(PM.loan);
@@ -304,7 +304,7 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
               ? bought
               : [...new Set([...bought, ...sold])].sort((x, y) => rank(x) - rank(y));
         step(
-          [zapOther, otherZap, ...(E[zapOther] || E[otherZap] ? [] : [zapHolder])].filter((id) => E[id]),
+          [zapOther, otherZap, ...(vp.length > 0 ? [zapHolder] : [])].filter((id) => E[id]),
           [`, it ${verb} `, names.length > 0 ? { list: names } : "other tokens", " through the zap router."],
           [],
           first && last ? { first, last } : null,
@@ -398,10 +398,10 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
       };
     };
     const told = [...did, ...then];
-    // "Most recently" only on a step whose last row is the latest told: the
-    // steps run in the order of their first rows, so the last of them may
-    // have ended before another.
-    const latest = Math.max(...told.map((s) => s.span?.last.at ?? -Infinity));
+    // "Most recently" only on a step whose last row is the latest of all
+    // steps, skipped ones included: the steps run in the order of their first
+    // rows, so the last of them may have ended before another.
+    const latest = Math.max(...steps.map((s) => s.span?.last.at ?? -Infinity));
     const lastStep = told[told.length - 1];
     const mostRecent = lastStep?.span != null && lastStep.span.last.at === latest ? lastStep : null;
     const bulletsOf = (xs: Step[], startsThen: boolean): MapBullet[] =>
@@ -538,7 +538,7 @@ const PART_WORDS: Record<string, string> = {
 const SHARED_CLAUSE: Record<string, string> = {
   [PM.cdp]: "CDPs mint USDp or GOLDp against pETH",
   [PM.sp]: `${POLARIS_POOL_NAME} repay liquidated debt`,
-  [PM.loan]: `${POLARIS_LOAN_NAME} borrow reserve ETH against fpETH`,
+  [PM.loan]: `${POLARIS_LOAN_NAME} lend it reserve ETH against fpETH`,
 };
 
 /** The Polaris "?" modal a part's bullet opens, where one explains it. */
