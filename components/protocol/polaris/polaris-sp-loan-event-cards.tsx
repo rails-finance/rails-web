@@ -10,9 +10,7 @@
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
-import { BlockRef } from "@/components/shared/block-ref";
-import { Prov } from "@/components/shared/provenance";
-import { explorerUrl } from "@/lib/shared/chains";
+import { txCell } from "@/components/shared/event-tx-cell";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { FPETH, PETH, POLARIS_CHAIN_ID, POLARIS_MARKET_CONFIG, POLARIS_WETH } from "@/lib/polaris/asset-catalog";
 import { big, exactUnits, feeAtTouch, units } from "@/lib/polaris/sp-loan-math";
@@ -26,35 +24,6 @@ import { polarisDepositSheet, polarisLoanSheet } from "./polaris-sp-loan-sheet";
 import { usePethAccountPath, walletOwner } from "./polaris-peth-path";
 
 const ZERO = BigInt(0);
-const short = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
-
-function txCell(txHash: string, block: string, info: Provenance): EventCellSpec {
-  return {
-    kind: "stat",
-    key: "tx",
-    label: "Transaction",
-    changed: false,
-    value: {
-      lines: [
-        <a
-          key="tx"
-          href={explorerUrl(POLARIS_CHAIN_ID, "tx", txHash)}
-          target="_blank"
-          rel="noopener"
-          className="link-muted font-mono text-xs"
-        >
-          {short(txHash)} ↗
-        </a>,
-        <span key="block" className="text-xs text-rb-500">
-          Block{" "}
-          <Prov info={info} value={block}>
-            <BlockRef block={Number(block)} chainId={POLARIS_CHAIN_ID} size={12} />
-          </Prov>
-        </span>,
-      ],
-    },
-  };
-}
 
 function amountCell(
   key: string,
@@ -158,7 +127,14 @@ export function PolarisDepositEventCard({
 
   const cells: EventCellSpec[] =
     row.event_type === "transfer"
-      ? [txCell(row.tx_hash, row.block_number, coord("Block — the block the deposit NFT's Transfer was logged in."))]
+      ? [
+          txCell({
+            txHash: row.tx_hash,
+            block: row.block_number,
+            info: coord("Block — the block the deposit NFT's Transfer was logged in."),
+            chainId: POLARIS_CHAIN_ID,
+          }),
+        ]
       : [
           amountCell(
             "deposit-after",
@@ -210,7 +186,12 @@ export function PolarisDepositEventCard({
                 },
               ]
             : []),
-          txCell(row.tx_hash, row.block_number, coord("Block — the block this DepositOperation was logged in.")),
+          txCell({
+            txHash: row.tx_hash,
+            block: row.block_number,
+            info: coord("Block — the block this DepositOperation was logged in."),
+            chainId: POLARIS_CHAIN_ID,
+          }),
         ];
 
   const label = spEventLabel(row);
@@ -282,7 +263,14 @@ export function PolarisLoanEventCard({
   const dps = row.debt_per_share;
   const cells: EventCellSpec[] =
     row.event_type === "transfer"
-      ? [txCell(row.tx_hash, row.block_number, coord("Block — the block the loan NFT's Transfer was logged in."))]
+      ? [
+          txCell({
+            txHash: row.tx_hash,
+            block: row.block_number,
+            info: coord("Block — the block the loan NFT's Transfer was logged in."),
+            chainId: POLARIS_CHAIN_ID,
+          }),
+        ]
       : [
           amountCell(
             "coll-after",
@@ -335,7 +323,12 @@ export function PolarisLoanEventCard({
                 },
               ]
             : []),
-          txCell(row.tx_hash, row.block_number, coord("Block — the block this touch was logged in.")),
+          txCell({
+            txHash: row.tx_hash,
+            block: row.block_number,
+            info: coord("Block — the block this touch was logged in."),
+            chainId: POLARIS_CHAIN_ID,
+          }),
         ];
 
   const label = loanEventLabel(row);

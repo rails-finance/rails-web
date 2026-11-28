@@ -14,9 +14,9 @@ import Link from "next/link";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineTokenRow } from "@/components/shared/spine-column";
-import { BlockRef } from "@/components/shared/block-ref";
-import { Prov, type Provenance } from "@/components/shared/provenance";
-import { explorerUrl, SEPOLIA_CHAIN_ID } from "@/lib/shared/chains";
+import { txCell } from "@/components/shared/event-tx-cell";
+import type { Provenance } from "@/components/shared/provenance";
+import { SEPOLIA_CHAIN_ID } from "@/lib/shared/chains";
 import {
   FPETH,
   PETH,
@@ -37,6 +37,7 @@ import {
   pethRowEffect,
   pethRowId,
   pethRowLines,
+  pethSpineAmountLink,
   units,
   ZERO,
   type PethTokenNames,
@@ -46,8 +47,6 @@ import { PETH_PLACE_NAMES, pethPlaceHref } from "@/lib/polaris/peth-place-links"
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import type { PethLedgerRow } from "@/lib/sources/api/polaris-peth";
 import { polarisPethSheet } from "./polaris-peth-sheet";
-
-const short = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
 
 export const PETH_NAMES: PethTokenNames = {
   peth: { symbol: PETH.symbol, address: PETH.address },
@@ -153,7 +152,7 @@ export function PolarisPethEventCard({
   );
   const tokens: SpineTokenRow[] = [...byToken.entries()].map(([k, t]) => {
     const place = primary.has(k) ? pethPlaceLinkOf(row, t.dir) : null;
-    const amountLink = place && !place.external ? place : null;
+    const amountLink = pethSpineAmountLink(place);
     return {
       symbol: t.symbol,
       address: t.address,
@@ -247,40 +246,18 @@ export function PolarisPethEventCard({
           ),
         ]
       : []),
-    {
-      kind: "stat",
-      key: "tx",
-      label: "Transaction",
-      changed: false,
-      value: {
-        lines: [
-          <a
-            key="tx"
-            href={explorerUrl(SEPOLIA_CHAIN_ID, "tx", row.tx_hash)}
-            target="_blank"
-            rel="noopener"
-            className="link-muted font-mono text-xs"
-          >
-            {short(row.tx_hash)} ↗
-          </a>,
-          <span key="block" className="text-xs text-rb-500">
-            Block{" "}
-            <Prov
-              info={{
-                kind: "chain",
-                pclass: "emitted",
-                summary: "Block — the block this transaction landed in.",
-                via: "GET /api/polaris/peth/<address>",
-                source: { block: row.block_number, txHash: row.tx_hash },
-              }}
-              value={row.block_number}
-            >
-              <BlockRef block={Number(row.block_number)} chainId={SEPOLIA_CHAIN_ID} size={12} />
-            </Prov>
-          </span>,
-        ],
+    txCell({
+      txHash: row.tx_hash,
+      block: row.block_number,
+      info: {
+        kind: "chain",
+        pclass: "emitted",
+        summary: "Block — the block this transaction landed in.",
+        via: "GET /api/polaris/peth/<address>",
+        source: { block: row.block_number, txHash: row.tx_hash },
       },
-    },
+      chainId: SEPOLIA_CHAIN_ID,
+    }),
   ];
 
   const headline = lines[0];

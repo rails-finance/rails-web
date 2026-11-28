@@ -7,10 +7,10 @@
 // generator's, character for character.
 
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { LinkedAddress } from "@/components/shared/linked-address";
+import { LinkedValue } from "@/components/shared/linked-value";
 import { LinkedTx } from "@/components/shared/linked-tx";
 import type { ProseSentence } from "@/lib/shared/event-prose/types";
 import type { SessionProtocol } from "@/lib/shared/sessions";
@@ -50,20 +50,21 @@ export function ProseSentenceText<E extends string>({
             <LinkedAddress key={i} address={seg.address} holderOf={seg.tone === "wallet" ? holderOf : undefined} />
           );
         if (seg.tx) return <LinkedTx key={i} txHash={seg.tx} />;
-        // Words that open a page inside Rails (a swap's trade on the wallet's CoW page).
+        // Words that open a page inside Rails (a swap's trade on the wallet's
+        // CoW page), a LinkedValue (anatomy L14) whose tooltip is the
+        // generator's title for the link, or the words, then "→".
         if (seg.href)
           return (
-            <Link
+            <LinkedValue
               key={i}
               href={seg.href}
-              prefetch={false}
-              title={seg.title}
-              onClick={(e) => e.stopPropagation()}
+              tip={`${seg.title ?? seg.text} →`}
+              label={seg.text}
               className={INLINE_LINK}
-              data-prose-link=""
+              dataAttrs={{ "data-prose-link": "" }}
             >
               {seg.text}
-            </Link>
+            </LinkedValue>
           );
         if (!seg.emph) return <span key={i}>{seg.text}</span>;
         if (seg.emph === "bold") return <Bold key={i}>{seg.text}</Bold>;

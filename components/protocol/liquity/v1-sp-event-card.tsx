@@ -9,9 +9,9 @@
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineTokenRow } from "@/components/shared/spine-column";
-import { BlockRef } from "@/components/shared/block-ref";
-import { Prov, type Provenance } from "@/components/shared/provenance";
-import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { txCell } from "@/components/shared/event-tx-cell";
+import type { Provenance } from "@/components/shared/provenance";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { NATIVE } from "@/lib/shared/asset-roster";
@@ -23,35 +23,6 @@ import type { LiquityV1DepositEventRow } from "@/lib/sources/api/liquity-v1-sp";
 import { spDepositSheet } from "./v1-sp-sheet";
 
 const ZERO = BigInt(0);
-const short = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
-
-function txCell(txHash: string, block: string, info: Provenance): EventCellSpec {
-  return {
-    kind: "stat",
-    key: "tx",
-    label: "Transaction",
-    changed: false,
-    value: {
-      lines: [
-        <a
-          key="tx"
-          href={explorerUrl(MAINNET_CHAIN_ID, "tx", txHash)}
-          target="_blank"
-          rel="noopener"
-          className="link-muted font-mono text-xs"
-        >
-          {short(txHash)} ↗
-        </a>,
-        <span key="block" className="text-xs text-rb-500">
-          Block{" "}
-          <Prov info={info} value={block}>
-            <BlockRef block={Number(block)} chainId={MAINNET_CHAIN_ID} size={12} />
-          </Prov>
-        </span>,
-      ],
-    },
-  };
-}
 
 function amountCell(
   key: string,
@@ -142,7 +113,12 @@ export function LiquityV1DepositEventCard({
           ),
         ]
       : []),
-    txCell(row.tx_hash, row.block_number, coord("Block — the block this touch's logs were emitted in.")),
+    txCell({
+      txHash: row.tx_hash,
+      block: row.block_number,
+      info: coord("Block — the block this touch's logs were emitted in."),
+      chainId: MAINNET_CHAIN_ID,
+    }),
   ];
 
   const slots: EventCardSlots = {

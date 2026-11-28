@@ -59,7 +59,8 @@
 
 import type { ChainTimelineCoverage, TimelineConfirmation } from "@/lib/api/fetch-chain-timeline";
 import type { CaptureSource } from "@/lib/shared/capture-source";
-import { explorerUrl } from "@/lib/shared/chains";
+import type { ChainId } from "@/lib/shared/chains";
+import { LinkedValue } from "@/components/shared/linked-value";
 import { useChainId } from "@/lib/shared/chain-context";
 import { formatDateLong } from "@/lib/date";
 
@@ -87,11 +88,7 @@ export function TimelineCoverageFooter({ coverage, sourceLabel }: TimelineCovera
   const holed = coverage.gaps.length > 0;
   const undated = coverage.undated ?? 0;
 
-  const blockLink = (b: number) => (
-    <a href={explorerUrl(chainId, "block", b)} target="_blank" rel="noopener" className="link-external">
-      {b.toLocaleString("en-US")}
-    </a>
-  );
+  const blockLink = (b: number) => <BlockLink chainId={chainId} block={b} />;
 
   // Nothing missing, nothing to say — silence is the complete claim (header).
   // A capped list is not "missing" here: the boundary card on the spine
@@ -106,7 +103,7 @@ export function TimelineCoverageFooter({ coverage, sourceLabel }: TimelineCovera
           confirmation={confirmation}
           source={coverage.source}
           blockLink={blockLink}
-          txLink={(h) => explorerUrl(chainId, "tx-logs", h)}
+          chainId={chainId}
         />
       )}
       {coverage.throughBlock != null && <ThroughBlockLine block={blockLink(coverage.throughBlock)} />}
@@ -170,11 +167,7 @@ export function TimelineCoverageFooter({ coverage, sourceLabel }: TimelineCovera
 export function TimelineConfirmationFooter({ coverage }: { coverage: ChainTimelineCoverage }) {
   const chainId = useChainId();
   if (!coverage.confirmation && coverage.throughBlock == null) return null;
-  const blockLink = (b: number) => (
-    <a href={explorerUrl(chainId, "block", b)} target="_blank" rel="noopener" className="link-external">
-      {b.toLocaleString("en-US")}
-    </a>
-  );
+  const blockLink = (b: number) => <BlockLink chainId={chainId} block={b} />;
   return (
     <div className={`mt-2 pt-3 ${NOTE}`} data-anatomy="L10">
       {coverage.confirmation && (
@@ -182,11 +175,28 @@ export function TimelineConfirmationFooter({ coverage }: { coverage: ChainTimeli
           confirmation={coverage.confirmation}
           source={coverage.source}
           blockLink={blockLink}
-          txLink={(h) => explorerUrl(chainId, "tx-logs", h)}
+          chainId={chainId}
         />
       )}
       {coverage.throughBlock != null && <ThroughBlockLine block={blockLink(coverage.throughBlock)} />}
     </div>
+  );
+}
+
+/** A block number in the footer's prose, a LinkedValue (anatomy L14) to the
+ *  chain's explorer: the tooltip reads "Block 12,345,678", then "View on
+ *  Etherscan ↗". */
+function BlockLink({ chainId, block }: { chainId: ChainId; block: number }) {
+  const text = block.toLocaleString("en-US");
+  return (
+    <LinkedValue
+      explorer={{ chainId, kind: "block", value: block }}
+      context={`Block ${text}`}
+      label={`Block ${text}`}
+      className="link-external"
+    >
+      {text}
+    </LinkedValue>
   );
 }
 
@@ -207,12 +217,12 @@ function ConfirmationLine({
   confirmation,
   source,
   blockLink,
-  txLink,
+  chainId,
 }: {
   confirmation: TimelineConfirmation;
   source: CaptureSource | undefined;
   blockLink: (b: number) => React.ReactNode;
-  txLink: (hash: string) => string;
+  chainId: ChainId;
 }) {
   const body = source === "tenderly" ? "Tenderly" : source === "alchemy" ? "Alchemy" : "Etherscan";
   const withheld = "The highest balances, the lifetime flows and the interest figures wait for that check.";
@@ -239,9 +249,14 @@ function ConfirmationLine({
             {confirmation.dropped.map((d, i) => (
               <span key={`${d.txHash}-${d.logIndex}`}>
                 {i > 0 && ", "}
-                <a href={txLink(d.txHash)} target="_blank" rel="noopener" className="link-external">
+                <LinkedValue
+                  explorer={{ chainId, kind: "tx-logs", value: d.txHash }}
+                  context={`Transaction ${d.txHash.slice(0, 6)}…${d.txHash.slice(-4)}`}
+                  label={`Transaction ${d.txHash.slice(0, 6)}…${d.txHash.slice(-4)}`}
+                  className="link-external"
+                >
                   {d.txHash.slice(0, 10)}…
-                </a>{" "}
+                </LinkedValue>{" "}
                 log {d.logIndex} at block {d.blockNumber.toLocaleString("en-US")}
               </span>
             ))}

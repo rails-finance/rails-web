@@ -32,6 +32,8 @@
 // The verifiers (`scripts/verify/**/*.mjs` and `.ts`) are entries: a reference
 // only a verifier calls, such as the scrubber's event-level adapter
 // (`aaveV3FlowTimeline`) the index's day rows are tested against, is used.
+// So are the unit tests' .tsx helpers (`scripts/test/*.tsx`), which hold a
+// render's providers so each is the module instance the components read.
 //
 // Both of those are the whole exclusion list. An earlier version of this
 // comment also claimed `lib/shared/types/protocols/**` was excluded; `3021ebd`

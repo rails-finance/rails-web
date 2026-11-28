@@ -4,6 +4,7 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   PETH_NO_PLACE,
   pethPlaceDirection,
@@ -12,6 +13,7 @@ import {
   pethPlaceOption,
   pethPlaceWords,
   pethPlaceView,
+  pethSpineAmountLink,
   pethTimelineEvent,
 } from "../../lib/polaris/peth-ledger.ts";
 import { polarisPethQuery } from "../../lib/sources/api/polaris-peth.ts";
@@ -188,4 +190,17 @@ test("over 600 rows, the first 500 loaded: the CDP's loaded count is short of it
   assert.equal(v.rows, 550);
   assert.equal(v.needsOlder, true);
   assert.deepEqual(v.hide, [pethPlaceKey(POOL), "loan::28", PETH_NO_PLACE]);
+});
+
+test("a spine amount links its place's page in Rails and drops a place outside Rails", () => {
+  const rails = { href: "/sepolia/polaris/reserve-loans/28", tip: "Went to reserve loan #28 →", external: false };
+  const outside = { href: "https://sepolia.etherscan.io/address/0x1", tip: "Went to the splitter ↗", external: true };
+  assert.equal(pethSpineAmountLink(rails), rails);
+  assert.equal(pethSpineAmountLink(outside), null);
+  assert.equal(pethSpineAmountLink(null), null);
+  const card = readFileSync(
+    new URL("../../components/protocol/polaris/polaris-peth-event-card.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(card, /const amountLink = pethSpineAmountLink\(place\);/, "the pETH card's spine amounts take the rule");
 });

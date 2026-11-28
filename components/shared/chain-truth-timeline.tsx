@@ -160,7 +160,7 @@ import { IndexNotice } from "@/components/shared/index-notice";
 import { TimelineSearchedNotice, timelineSearched } from "@/components/shared/timeline-searched-notice";
 import { cutUnloadedWords, type TimelineLoadOlder } from "@/lib/shared/timeline-size";
 import { useChainId } from "@/lib/shared/chain-context";
-import { explorerUrl, type ChainId } from "@/lib/shared/chains";
+import { chainMeta, explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { decodeEventId } from "@/lib/shared/page-metadata";
 import {
   eventsWithin,
@@ -267,7 +267,7 @@ export function EventNotFoundNotice({ id, chainId }: { id: string; chainId: Chai
               rel="noopener"
               className="link-external"
             >
-              View the transaction on the chain&rsquo;s explorer
+              View the transaction on {chainMeta(chainId).explorerName}
             </a>
             .
           </>

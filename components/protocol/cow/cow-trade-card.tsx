@@ -16,12 +16,10 @@ import Link from "next/link";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
-import { BlockRef } from "@/components/shared/block-ref";
-import { Prov } from "@/components/shared/provenance";
+import { txCell } from "@/components/shared/event-tx-cell";
 import { AssetPopover } from "@/components/shared/asset-popover";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { UnknownTokenSvg } from "@/components/shared/unknown-token-svg";
-import { explorerUrl } from "@/lib/shared/chains";
 import type { CowTrade } from "@/lib/cow/types";
 import {
   COW_CHAIN_ID,
@@ -32,7 +30,6 @@ import {
   exactAmount,
   settlementBlockProv,
   settlementWords,
-  shortAddress,
   tokenText,
   tradeAmountProv,
   type CowTokenLabel,
@@ -159,32 +156,15 @@ export function CowTradeCard({
           },
         ]
       : []),
-    {
-      kind: "stat",
+    txCell({
       key: "settlement",
       label: "Settlement",
-      changed: false,
-      value: {
-        lines: [
-          <a
-            key="tx"
-            href={explorerUrl(COW_CHAIN_ID, "tx", trade.txHash)}
-            target="_blank"
-            rel="noopener"
-            className="link-muted font-mono text-xs"
-          >
-            {shortAddress(trade.txHash)} ↗
-          </a>,
-          <span key="block" className="text-xs text-rb-500">
-            Block{" "}
-            <Prov info={settlementBlockProv(trade)} value={String(trade.blockNumber)}>
-              <BlockRef block={trade.blockNumber} chainId={COW_CHAIN_ID} size={12} />
-            </Prov>
-          </span>,
-        ],
-      },
+      txHash: trade.txHash,
+      block: trade.blockNumber,
+      info: settlementBlockProv(trade),
+      chainId: COW_CHAIN_ID,
       sub: [{ content: settlementWords(trade) }],
-    },
+    }),
   ];
 
   const soldWords = `${amountText(trade.sellAmount, sell)} ${tokenText(sell)}`;

@@ -37,10 +37,10 @@ import { FeedbackModal } from "@/components/shared/feedback-modal";
 import { actionLabel } from "@/lib/shared/event-filter-helpers";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { formatDate } from "@/lib/date";
-import { explorerUrl } from "@/lib/shared/chains";
 import { useChainId } from "@/lib/shared/chain-context";
 import type { TimelineBoundary } from "@/lib/shared/timeline-boundary";
 import { BlockRef } from "@/components/shared/block-ref";
+import { LinkedValue } from "@/components/shared/linked-value";
 import { formatCompactTitled } from "@/lib/shared/format-compact";
 
 const n = (v: number) => v.toLocaleString("en-US");
@@ -163,15 +163,14 @@ export function TimelineBoundaryCard({ boundary: b, protocolKey, csvExport, isLa
   const noun = b.omitted === 1 ? "event" : "events";
 
   const blockLink = (
-    <a
-      href={explorerUrl(chainId, "block", b.cutBlock)}
-      target="_blank"
-      rel="noopener"
+    <LinkedValue
+      explorer={{ chainId, kind: "block", value: b.cutBlock }}
+      context={`Block ${n(b.cutBlock)}`}
+      label={`Block ${n(b.cutBlock)}`}
       className="link-external"
-      onClick={(e) => e.stopPropagation()}
     >
       {n(b.cutBlock)}
-    </a>
+    </LinkedValue>
   );
 
   // ── Header: the count, the span at the right, the range pill ─────────────

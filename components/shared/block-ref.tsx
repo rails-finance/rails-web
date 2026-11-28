@@ -1,6 +1,6 @@
-import type { MouseEventHandler } from "react";
 import { BlockClockIcon } from "@/components/icons/block-clock-icon";
-import { explorerUrl, type ChainId } from "@/lib/shared/chains";
+import { hasExplorer, LinkedValue } from "@/components/shared/linked-value";
+import type { ChainId } from "@/lib/shared/chains";
 
 // A stated block number: [block-clock icon] 26,076,814. The icon stands in
 // for the word "block" on a line whose job is to name a block (a chain
@@ -13,8 +13,9 @@ import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 // 14px is the floor. At 12px on a 1x screen the clock hands merge into the
 // circle, so an 11px line still takes the 14px icon.
 //
-// `chainId` links the number to the chain's explorer, as the plain-text lines
-// did; without it the number is text.
+// `chainId` links the number to the chain's explorer, a LinkedValue (anatomy
+// L14) whose tooltip reads "Block 26,076,814", then "View on Etherscan ↗";
+// without it the number is text.
 //
 // A stated block is a coordinate, the block a reading was taken at, so the
 // stamp carries `data-prov-exempt` (receipts grammar, the coverage tripwire:
@@ -27,7 +28,6 @@ export function BlockRef({
   className,
   numberClassName,
   linkClassName = "link-external",
-  onClick,
 }: {
   block: number | string;
   chainId?: ChainId;
@@ -38,8 +38,6 @@ export function BlockRef({
   /** The link's colour class where a line uses a quieter link than the
    *  default external one. */
   linkClassName?: string;
-  /** For a link inside a pressable card: stop the press reaching the card. */
-  onClick?: MouseEventHandler<HTMLAnchorElement>;
 }) {
   const formatted = typeof block === "number" ? block.toLocaleString("en-US") : block;
   const name = `Block ${formatted}`;
@@ -47,22 +45,19 @@ export function BlockRef({
   const number = <span className={`tabular-nums ${numberClassName ?? ""}`}>{formatted}</span>;
   const shell = `inline-flex items-baseline gap-1 whitespace-nowrap align-baseline ${className ?? ""}`;
 
-  if (chainId != null) {
+  // A chain with no explorer in lib/shared/chains.ts keeps the plain stamp.
+  if (chainId != null && hasExplorer(chainId)) {
     return (
-      <a
-        href={explorerUrl(chainId, "block", String(block).replace(/,/g, ""))}
-        target="_blank"
-        rel="noopener"
+      <LinkedValue
+        explorer={{ chainId, kind: "block", value: String(block).replace(/,/g, "") }}
+        context={name}
+        label={name}
         className={`${linkClassName} ${shell}`}
-        title={name}
-        aria-label={name}
-        data-block-ref=""
-        data-prov-exempt=""
-        onClick={onClick}
+        dataAttrs={{ "data-block-ref": "", "data-prov-exempt": "" }}
       >
         {icon}
         {number}
-      </a>
+      </LinkedValue>
     );
   }
   return (

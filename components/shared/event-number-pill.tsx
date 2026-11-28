@@ -16,7 +16,7 @@ import { useEventShareHref } from "@/components/shared/event-share-context";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { shortAddr } from "@/lib/shared/format-event";
 import { useChainId } from "@/lib/shared/chain-context";
-import { explorerUrl } from "@/lib/shared/chains";
+import { LinkedValue } from "@/components/shared/linked-value";
 
 /** The card's transaction hash, provided by `EventCard` around its header. */
 export const EventTxHashContext = createContext<string | null>(null);
@@ -92,26 +92,27 @@ export function EventNumberPill(props: { number: number; last?: number }) {
 /** The transaction hash, abbreviated ("0x53e0…fac5"), as a link to the
  *  chain's explorer, pink on hover as a link that leaves Rails (ui-jobs 535): "Transaction hashes" in Display, off by default, at
  *  >=640px; below it the row's ⋮ menu carries the explorer link. It
- *  is a pointer and carries no receipt (TO-DO-mobile-timeline decision 13). */
+ *  is a pointer and carries no receipt (TO-DO-mobile-timeline decision 13).
+ *  A LinkedValue (anatomy L14): the tooltip reads "Transaction 0x53e0…fac5",
+ *  then "View on Etherscan ↗", and the accessible name holds the whole hash. */
 function TxHashLink() {
   const txHash = useContext(EventTxHashContext);
   const { showTxHashes } = useTimelineDisplay();
   const chainId = useChainId();
   if (!showTxHashes || !txHash) return null;
   return (
-    <a
-      href={explorerUrl(chainId, "tx", txHash)}
-      target="_blank"
-      rel="noopener"
-      className="hidden font-mono text-xs text-rb-500 underline-offset-2 transition-colors hover:text-[var(--text-external)] hover:underline sm:inline"
-      title={txHash}
-      data-event-tx-hash={txHash}
-      data-prov-exempt=""
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => e.stopPropagation()}
-    >
-      {shortAddr(txHash)}
-    </a>
+    <span className="hidden sm:inline">
+      <LinkedValue
+        explorer={{ chainId, kind: "tx", value: txHash }}
+        context={`Transaction ${shortAddr(txHash)}`}
+        label={txHash}
+        align="end"
+        className="font-mono text-xs text-rb-500 transition-colors hover:text-[var(--text-external)]"
+        dataAttrs={{ "data-event-tx-hash": txHash, "data-prov-exempt": "" }}
+      >
+        {shortAddr(txHash)}
+      </LinkedValue>
+    </span>
   );
 }
 

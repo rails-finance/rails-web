@@ -78,7 +78,7 @@ import {
 import { EventDateContext, EventTime } from "@/components/shared/event-time";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { useChainId } from "@/lib/shared/chain-context";
-import { explorerUrl } from "@/lib/shared/chains";
+import { chainMeta, explorerUrl } from "@/lib/shared/chains";
 import { protocolIconSrc } from "@/lib/shared/protocols";
 import { marketNoteRateStepContent, marketNoteVaultTermsContent } from "@/lib/shared/learn-more-content";
 import { polarisModal } from "@/lib/polaris/event-templates";
@@ -187,6 +187,8 @@ interface NoteLinks {
   rails: (p: MarketNotePoint) => string | null;
   /** The transaction's logs on the chain's own explorer. */
   explorer: (p: MarketNotePoint) => string;
+  /** That explorer's name, which the link's words say ("on Etherscan"). */
+  explorerName: string;
 }
 
 /** A 0x address as a path segment — the position pages this row renders on key
@@ -472,6 +474,7 @@ function useNoteBody(note: MarketNote): NoteBody {
       return `${positionPath.slice(0, cut)}/${p.wallet}/event/${encodeURIComponent(id)}`;
     },
     explorer: (p) => explorerUrl(chainId, "tx-logs", p.txHash),
+    explorerName: chainMeta(chainId).explorerName,
   };
 
   // The one switch. Everything below it is the same row whatever was observed.
@@ -754,7 +757,7 @@ function observationLinks(p: MarketNotePoint, links: NoteLinks) {
         </>
       )}
       <a href={links.explorer(p)} target="_blank" rel="noopener" className="link-external">
-        log {p.logIndex} on the chain&rsquo;s explorer
+        log {p.logIndex} on {links.explorerName}
       </a>
       {")"}
     </>
@@ -840,7 +843,7 @@ function vaultTermsBody(note: VaultTermsNote, links: NoteLinks): NoteBody {
         {note.statement}, read from the vault&rsquo;s own <code>{note.termsKind}</code> configuration log at block{" "}
         {note.to.block.toLocaleString("en-US")} (
         <a href={links.explorer(note.to)} target="_blank" rel="noopener" className="link-external">
-          on the chain&rsquo;s explorer
+          on {links.explorerName}
         </a>
         ). It is not this address&rsquo;s event: it moved every holder&rsquo;s terms at once, which is why it sits among
         the rows and this page&rsquo;s event counts leave it out. The values are the log&rsquo;s words, raw. What the

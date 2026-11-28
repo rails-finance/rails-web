@@ -5,23 +5,28 @@
 // (anatomy L14, ui-jobs 878). A Rails link's tooltip is one line, the page's
 // name as the link ("Trove 123 →"). An explorer link's is the context line
 // ("Went to the Curve pETH/fpETH/vpETH pool"), then the link "View on
-// Etherscan ↗" (the chain's explorer, from lib/shared/chains.ts). The timeline
+// Etherscan ↗"; the chain, the kind and the value build the href and name the
+// explorer, both from lib/shared/chains.ts; on a chain that file does not
+// name the value renders plain, with no link or tooltip. The timeline
 // spine links Rails pages only. The value keeps its look at rest and takes
 // the underline and the focus ring on hover and focus; on a screen without
 // hover it rests on a dotted hairline underline.
 //
 // A mouse opens the tooltip on hover and a click follows at once. A touch or a
 // pen opens the tooltip first (RevealTip, held open here), holding the words as
-// a link, and a second press or that link follows. Enter follows. With no
+// a link, and a second press or that link follows. Enter follows; Enter and Space
+// stop at the value, as a press does. With no
 // pointer event (a screen reader's activation), `(hover: none)` decides
 // (lib/shared/spine-amount-press.ts `valuePress`). A tap elsewhere or Escape
-// closes it. Tested by scripts/test/linked-value.test.mjs.
+// closes it. While the receipts inspector is armed, a press on a value inside
+// a receipt pins the receipt. Tested by scripts/test/linked-value.test.mjs.
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
-import { chainMeta, type ChainId } from "@/lib/shared/chains";
+import { CHAINS, chainMeta, explorerUrl, type ChainId, type ExplorerLinkKind } from "@/lib/shared/chains";
 import { valuePress } from "@/lib/shared/spine-amount-press";
+import { PICKABLE_SELECTOR } from "@/lib/shared/tip-yields";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { startNavigationProgressOnClick } from "@/components/nav/navigation-progress";
 
@@ -37,18 +42,25 @@ const LINK_CUE =
  *  cross the gap to the link in it. */
 const HOVER_CLOSE_MS = 200;
 
+/** A page on a chain's block explorer. */
+export interface ExplorerPage {
+  chainId: ChainId;
+  kind: ExplorerLinkKind;
+  value: string | number;
+}
+
 type Destination =
-  /** The page's words: "Trove 123 →" for a Rails page; an outside page
-   *  that is not a block explorer sets `external`. */
-  | { tip: string; external?: boolean; explorer?: never; context?: never }
+  /** The page and its words: "Trove 123 →" for a Rails page; an outside page
+   *  that is not a block explorer sets `external`, and may carry `context`. */
+  | { href: string; tip: string; external?: boolean; context?: string; explorer?: never }
   /** A block explorer page: the tooltip's link reads "View on {explorer} ↗",
    *  under `context`, the place in words, where the caller has them. */
-  | { explorer: { chainId: ChainId }; context?: string; tip?: never; external?: never };
+  | { explorer: ExplorerPage; context?: string; href?: never; tip?: never; external?: never };
 
 export type LinkedValueProps = Destination & {
-  href: string;
   /** The value as words, for the accessible name: the name reads it, then
-   *  the tooltip's words without the arrow, the context line first. */
+   *  the tooltip's words without the arrow, the context line first. Where
+   *  those words hold the label, the name reads them alone. */
   label: string;
   /** The value as it renders unlinked. */
   children: ReactNode;
@@ -62,15 +74,67 @@ export type LinkedValueProps = Destination & {
   dataAttrs?: Record<`data-${string}`, string | undefined>;
 };
 
-/** The tooltip's words for a destination. */
+/** Whether lib/shared/chains.ts names the chain. `chainMeta` falls back to
+ *  Ethereum's, so a link on another chain would name one explorer and open
+ *  that chain's page on it. */
+export function hasExplorer(chainId: ChainId): boolean {
+  return chainId in CHAINS;
+}
+
+/** The tooltip's words for a destination whose chain has an explorer. */
 export function linkedValueTip(d: Destination): string {
   return d.explorer ? `View on ${chainMeta(d.explorer.chainId).explorerName} ↗` : d.tip;
 }
 
+/** Where a destination whose chain has an explorer opens. */
+export function linkedValueHref(d: Destination): string {
+  if (!d.explorer) return d.href;
+  const { chainId, kind, value } = d.explorer;
+  return explorerUrl(chainId, kind, value);
+}
+
+/** The chains already warned about, so a page warns once per chain. */
+const warned = new Set<number>();
+
+/** The caller's classes less those that dress a link (its colour, its hover
+ *  and focus states, its underline), for the value rendered unlinked. */
+export function unlinkedClasses(className: string | undefined): string | undefined {
+  const kept = (className ?? "")
+    .split(/\s+/)
+    .filter(
+      (c) =>
+        c &&
+        !/^(link-|hover:|focus-visible:|underline|decoration-|text-blue-|(dark:)?text-\[var\(--text-(link|external)\)\])/.test(
+          c,
+        ),
+    );
+  return kept.length > 0 ? kept.join(" ") : undefined;
+}
+
 export function LinkedValue(props: LinkedValueProps) {
-  const { href, label, children, className, align = "start", dataAttrs } = props;
+  if (props.explorer && !hasExplorer(props.explorer.chainId)) {
+    const { chainId } = props.explorer;
+    if (process.env.NODE_ENV !== "production" && !warned.has(chainId)) {
+      warned.add(chainId);
+      console.warn(`[LinkedValue] no explorer for chain ${chainId}: "${props.label}" renders unlinked`);
+    }
+    return (
+      <span className={unlinkedClasses(props.className)} {...props.dataAttrs}>
+        {props.children}
+      </span>
+    );
+  }
+  return <LinkedValueLink {...props} />;
+}
+
+function LinkedValueLink(props: LinkedValueProps) {
+  const { label, children, className, align = "start", dataAttrs } = props;
+  const href = linkedValueHref(props);
   const tip = linkedValueTip(props);
-  const context = props.explorer ? props.context : undefined;
+  const context = props.context;
+  // The arrows are visual: the name reads the words alone.
+  const words = [context, tip.replace(/\s*[→↗]\s*$/u, "")].filter(Boolean).join(", ");
+  const name = words.includes(label) ? words : `${label}: ${words}`;
   const external = Boolean(props.explorer || props.external);
   const [open, setOpen] = useState(false);
   // Once a press has opened the tooltip the link says whether it is open;
@@ -107,9 +171,17 @@ export function LinkedValue(props: LinkedValueProps) {
     onPointerCancel: () => {
       pointer.current = undefined;
     },
-    // The arrows are visual: the name reads the words alone.
-    "aria-label": `${label}: ${context ? `${context}, ` : ""}${tip.replace(/\s*[→↗]\s*$/u, "")}`,
-    onClick: (e: React.MouseEvent) => {
+    "aria-label": name,
+    // The value may sit inside a card's header, which opens on Enter and
+    // Space; while the inspector is armed the receipt around it takes them.
+    onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => {
+      if (e.currentTarget.closest(PICKABLE_SELECTOR)) return;
+      if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+    },
+    onClick: (e: React.MouseEvent<HTMLElement>) => {
+      // While the receipts inspector is armed, a receipt around the value
+      // takes the press and pins its receipt (decision 0062 point 4).
+      if (e.currentTarget.closest(PICKABLE_SELECTOR)) return;
       // The value may sit inside a card's link: a press is the value's.
       e.stopPropagation();
       const pressedBy = pointer.current;

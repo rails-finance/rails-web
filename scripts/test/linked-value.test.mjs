@@ -7,6 +7,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { valuePress, spineAmountPress } from "../../lib/shared/spine-amount-press.ts";
@@ -30,14 +31,17 @@ const anchor = (html) => {
   return all[0][0];
 };
 
-for (const [name, explorer] of [
-  ["ethereum", "Etherscan"],
-  ["base", "Basescan"],
-  ["arbitrum", "Arbiscan"],
+for (const [name, explorer, host] of [
+  ["ethereum", "Etherscan", "https://etherscan.io"],
+  ["base", "Basescan", "https://basescan.org"],
+  ["arbitrum", "Arbiscan", "https://arbiscan.io"],
 ]) {
-  test(`an explorer link names the chain's explorer: ${name}`, () => {
+  test(`an explorer link names the chain's explorer and opens it: ${name}`, () => {
     assert.equal(r[name].tip, `View on ${explorer} ↗`);
+    const href = `${host}/tx/0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060`;
+    assert.equal(r[name].href, href, "the chain builds the href");
     const a = anchor(r[name].html);
+    assert.ok(a.includes(`href="${href}"`));
     assert.match(
       a,
       new RegExp(`aria-label="0x5c50…2060: View on ${explorer}"`),
@@ -48,6 +52,42 @@ for (const [name, explorer] of [
     assert.match(a, /data-anatomy="L14"/);
   });
 }
+
+test("every chain lib/shared/chains.ts names links its explorer", () => {
+  const all = Object.entries(r.everyChain);
+  assert.ok(all.length >= 7);
+  for (const [id, c] of all) {
+    assert.ok(c.host && c.name, `chain ${id} has an explorer`);
+    assert.equal(c.href, `${c.host}/block/1`, `chain ${id}'s link opens its explorer`);
+    assert.equal(c.tip, `View on ${c.name} ↗`);
+  }
+});
+
+test("on a chain with no explorer in lib/shared/chains.ts the value renders plain, less its link classes, warning once", () => {
+  for (const html of r.unknownChain.html) assert.equal(html, '<span class="font-mono text-xs">0x5c50…2060</span>');
+  assert.deepEqual(r.unknownChain.warnings, [
+    '[LinkedValue] no explorer for chain 137: "0x5c50…2060" renders unlinked',
+  ]);
+});
+
+test("hover opens and closes the tooltip for a mouse alone", () => {
+  const src = readFileSync(path.join(REPO, "components/shared/linked-value.tsx"), "utf8");
+  const guard = 'if (e.pointerType !== "mouse") return;';
+  const enter = /onPointerEnter: \(e: React\.PointerEvent\) => \{\s*([^\n]*)/.exec(src);
+  const leave = /const leaveHover = \(e: React\.PointerEvent\) => \{\s*([^\n]*)/.exec(src);
+  assert.equal(enter?.[1], guard, "onPointerEnter opens for a mouse only");
+  assert.equal(leave?.[1], guard, "onPointerLeave closes for a mouse only");
+});
+
+test("while the receipts inspector is armed, a press, Enter or Space on the value goes to the receipt around it", () => {
+  const src = readFileSync(path.join(REPO, "components/shared/linked-value.tsx"), "utf8");
+  const yields = /if \(e\.currentTarget\.closest\(PICKABLE_SELECTOR\)\) return;/;
+  const click = /onClick: \(e: React\.MouseEvent<HTMLElement>\) => \{([\s\S]*?)e\.stopPropagation\(\);/.exec(src);
+  assert.match(click?.[1] ?? "", yields, "the click");
+  const key = /onKeyDown: \(e: React\.KeyboardEvent<HTMLElement>\) => \{([\s\S]*?)e\.stopPropagation\(\);/.exec(src);
+  assert.match(key?.[1] ?? "", yields, "Enter and Space");
+  assert.match(src, /import \{ PICKABLE_SELECTOR \} from "@\/lib\/shared\/tip-yields";/);
+});
 
 test("an explorer link's name reads the context line, then the link's words", () => {
   assert.equal(r.context.tip, "View on Etherscan ↗");

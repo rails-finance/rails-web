@@ -19,7 +19,6 @@
 import { shiftDecimal } from "@/lib/utils/format";
 export { shiftDecimal };
 import { useChainId } from "@/lib/shared/chain-context";
-import { explorerUrl } from "@/lib/shared/chains";
 import {
   createContext,
   Fragment,
@@ -39,6 +38,8 @@ import { Box, Check, CircleHelp, Copy, ExternalLink, TriangleAlert, X } from "lu
 import { ProvCoverageBounds } from "./prov-coverage-tripwire";
 import { formatExact } from "@/lib/utils/format";
 import { BlockRef } from "@/components/shared/block-ref";
+import { LinkedValue } from "@/components/shared/linked-value";
+import { explorerPageOf } from "@/lib/shared/chains";
 import { DustToggle } from "@/components/shared/dust-reserves";
 import { untracedInputs } from "@/lib/shared/prov-untraced";
 import { resolveClass, weakestClass } from "@/lib/shared/prov-class";
@@ -495,13 +496,52 @@ function VerifyRow({ v }: { v: ProvVerify }) {
   return <span className="prov-verify prov-verify-muted">{v.text}</span>;
 }
 
+/** The via line's verify link, a LinkedValue (anatomy L14) whose tooltip
+ *  states the check ("Confirm in the tx event logs"), then the place: "View on
+ *  Etherscan ↗" for a page on a chain's explorer, else "View on {site} ↗". */
+export function ViaVerifyLink({ href, check, text }: { href: string; check: string; text: string }) {
+  const page = explorerPageOf(href);
+  const body = (
+    <>
+      {text}
+      <ExternalLink aria-hidden />
+    </>
+  );
+  if (page)
+    return (
+      <LinkedValue explorer={page} context={check} label={text} className="prov-via-verify">
+        {body}
+      </LinkedValue>
+    );
+  const site = /^https?:\/\/(?:www\.)?([^/?#]+)/.exec(href)?.[1] ?? href;
+  return (
+    <LinkedValue
+      href={href}
+      tip={`View on ${site} ↗`}
+      external
+      context={check}
+      label={text}
+      className="prov-via-verify"
+    >
+      {body}
+    </LinkedValue>
+  );
+}
+
+/** A contract named in a receipt, a LinkedValue (anatomy L14) to its address
+ *  on the chain's explorer: the tooltip reads "Contract 0x12…34", then "View
+ *  on Etherscan ↗". */
 function ContractLink({ c }: { c: { name: string; address?: string } }) {
   const chainId = useChainId();
   if (!c.address) return <span>{c.name}</span>;
   return (
-    <a href={explorerUrl(chainId, "address", c.address)} target="_blank" rel="noopener">
+    <LinkedValue
+      explorer={{ chainId, kind: "address", value: c.address }}
+      context={`Contract ${shortHex(c.address)}`}
+      label={`${c.name} ${shortHex(c.address)}`}
+    >
       {c.name} {shortHex(c.address)}
-    </a>
+    </LinkedValue>
   );
 }
 
@@ -751,12 +791,7 @@ export function ProvReceipt({
     parts.forEach((s, i) => {
       if (/\blogs?\b/i.test(s)) linkIdx = i;
     });
-    const link = (text: string) => (
-      <a className="prov-via-verify" href={viaVerify.href} target="_blank" rel="noopener" title={viaVerify.text}>
-        {text}
-        <ExternalLink aria-hidden />
-      </a>
-    );
+    const link = (text: string) => <ViaVerifyLink href={viaVerify.href as string} check={viaVerify.text} text={text} />;
     if (parts.length === 0) return link("verify");
     if (linkIdx === -1)
       return (
@@ -884,9 +919,13 @@ export function ProvReceipt({
               )}
               {txHash && (
                 <span className="prov-src-item">
-                  <a href={explorerUrl(chainId, "tx-logs", txHash)} target="_blank" rel="noopener">
+                  <LinkedValue
+                    explorer={{ chainId, kind: "tx-logs", value: txHash }}
+                    context={`Transaction ${shortHex(txHash)}`}
+                    label={`Transaction ${shortHex(txHash)}`}
+                  >
                     tx {shortHex(txHash)}
-                  </a>
+                  </LinkedValue>
                   <CopyBtn text={txHash} title="Copy tx hash" />
                 </span>
               )}

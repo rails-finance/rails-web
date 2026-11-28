@@ -12,9 +12,8 @@ import Link from "next/link";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineColumnProps, SpineSwapLeg } from "@/components/shared/spine-column";
-import { BlockRef } from "@/components/shared/block-ref";
+import { txCell } from "@/components/shared/event-tx-cell";
 import { Prov } from "@/components/shared/provenance";
-import { explorerUrl } from "@/lib/shared/chains";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { COW_TERMS } from "@/lib/cow/terms";
 import { COW_CHAIN_ID, shortAddress } from "@/lib/cow/trade";
@@ -131,28 +130,9 @@ export function CowAaveSwapCard({
       ],
     },
   });
-  cells.push({
-    kind: "stat",
-    key: "settlement",
-    label: "Settlement",
-    changed: false,
-    value: {
-      lines: [
-        <a
-          key="tx"
-          href={explorerUrl(COW_CHAIN_ID, "tx", s.txHash)}
-          target="_blank"
-          rel="noopener"
-          className="link-muted font-mono text-xs"
-        >
-          {shortAddress(s.txHash)} ↗
-        </a>,
-        <span key="block" className="text-xs text-rb-500">
-          Block <BlockRef block={s.block} chainId={COW_CHAIN_ID} size={12} />
-        </span>,
-      ],
-    },
-  });
+  cells.push(
+    txCell({ key: "settlement", label: "Settlement", txHash: s.txHash, block: s.block, chainId: COW_CHAIN_ID }),
+  );
 
   const slots: EventCardSlots = {
     event: { id: s.swapKey, family: `cow-${family}`, txHash: s.txHash, blockNumber: s.block, timestamp: s.timestamp },
