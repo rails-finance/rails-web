@@ -62,7 +62,7 @@ import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import {
   TimelineActivityHeader,
   CHAIN_TRUTH_DISPLAY_ITEMS,
-  PROTOCOL_PATHS_ITEM,
+  PETH_ACCOUNT_LINKS_ITEM,
 } from "@/components/shared/timeline-toolbar";
 import { polarisExports } from "@/components/protocol/polaris/polaris-export-menu";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -107,8 +107,8 @@ interface PolarisPositionViewProps {
   initialEvents: BaseActivityEvent[] | null;
 }
 
-/** The preset and "Protocol paths" (ui-jobs 872). */
-const POLARIS_POSITION_DISPLAY_ITEMS = [...CHAIN_TRUTH_DISPLAY_ITEMS, PROTOCOL_PATHS_ITEM];
+/** The preset and "pETH account links" (ui-jobs 872). */
+const POLARIS_POSITION_DISPLAY_ITEMS = [...CHAIN_TRUTH_DISPLAY_ITEMS, PETH_ACCOUNT_LINKS_ITEM];
 
 export default function PolarisPositionView({
   market,

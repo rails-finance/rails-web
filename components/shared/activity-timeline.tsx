@@ -59,7 +59,7 @@ export function SingleWalletProvider({ children, value }: { children: React.Reac
 
 /** A spine amount that opens another page (SpineTokenRow `amountLink`): the
  *  href, its tooltip (also the accessible name), whether it leaves Rails, and
- *  whether the amount wears the hairline border that marks a protocol path. */
+ *  whether the amount wears the hairline border that marks a pETH account link. */
 export interface SpineAmountLink {
   href: string;
   tip: string;

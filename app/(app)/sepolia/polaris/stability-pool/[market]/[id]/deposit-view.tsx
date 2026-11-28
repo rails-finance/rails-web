@@ -29,7 +29,7 @@ import {
 } from "@/components/shared/flow-focus-context";
 import {
   CHAIN_TRUTH_DISPLAY_ITEMS,
-  PROTOCOL_PATHS_ITEM,
+  PETH_ACCOUNT_LINKS_ITEM,
   TimelineActivityHeader,
 } from "@/components/shared/timeline-toolbar";
 import { Prov } from "@/components/shared/provenance";
@@ -62,8 +62,8 @@ import {
   type PolarisDepositTimelineResponse,
 } from "@/lib/sources/api/polaris-sp-loans";
 
-/** The preset and "Protocol paths" (ui-jobs 872). */
-const POLARIS_POSITION_DISPLAY_ITEMS = [...CHAIN_TRUTH_DISPLAY_ITEMS, PROTOCOL_PATHS_ITEM];
+/** The preset and "pETH account links" (ui-jobs 872). */
+const POLARIS_POSITION_DISPLAY_ITEMS = [...CHAIN_TRUTH_DISPLAY_ITEMS, PETH_ACCOUNT_LINKS_ITEM];
 
 export default function DepositView({
   market,

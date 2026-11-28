@@ -4,7 +4,7 @@
 // a Stability Pool deposit or a reserve loan, an event that moved pETH or
 // fpETH between the owner's wallet and the position links that transaction on
 // the owner's pETH account, and wears the hairline border while Display's
-// "Protocol paths" is on. The cards pass the owner only where the owner sent
+// "pETH account links" is on. The cards pass the owner only where the owner sent
 // the transaction, so the wallet that moved the tokens is the account linked.
 
 import { useEnsName } from "@/lib/ens/use-ens-names";
@@ -22,13 +22,13 @@ export function usePethAccountPath(
   into: boolean,
 ): SpineAmountLink | undefined {
   const ens = useEnsName(owner ?? null);
-  const { showProtocolPaths } = useTimelineDisplay();
+  const { showPethAccountLinks } = useTimelineDisplay();
   if (!owner) return undefined;
   const name = ens ?? short(owner);
   return {
     href: polarisPethEventHref(owner, txHash),
     tip: `${into ? "Came from" : "Went to"} ${name}'s pETH account →`,
-    marked: showProtocolPaths,
+    marked: showPethAccountLinks,
   };
 }
 

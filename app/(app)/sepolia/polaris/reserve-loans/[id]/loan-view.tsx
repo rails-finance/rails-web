@@ -25,7 +25,7 @@ import {
 } from "@/components/shared/flow-focus-context";
 import {
   CHAIN_TRUTH_DISPLAY_ITEMS,
-  PROTOCOL_PATHS_ITEM,
+  PETH_ACCOUNT_LINKS_ITEM,
   TimelineActivityHeader,
 } from "@/components/shared/timeline-toolbar";
 import { Prov } from "@/components/shared/provenance";
@@ -60,8 +60,8 @@ import {
 
 const NO_FOCUS: never[] = [];
 
-/** The preset and "Protocol paths" (ui-jobs 872). */
-const POLARIS_POSITION_DISPLAY_ITEMS = [...CHAIN_TRUTH_DISPLAY_ITEMS, PROTOCOL_PATHS_ITEM];
+/** The preset and "pETH account links" (ui-jobs 872). */
+const POLARIS_POSITION_DISPLAY_ITEMS = [...CHAIN_TRUTH_DISPLAY_ITEMS, PETH_ACCOUNT_LINKS_ITEM];
 
 export default function LoanView({ loanId, initial }: { loanId: string; initial: PolarisLoanTimelineResponse | null }) {
   const [data, setData] = useState(initial);
