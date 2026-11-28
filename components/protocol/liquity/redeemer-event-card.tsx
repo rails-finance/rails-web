@@ -12,9 +12,9 @@ import Link from "next/link";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineTokenRow } from "@/components/shared/spine-column";
-import { BlockRef } from "@/components/shared/block-ref";
+import { txCell } from "@/components/shared/event-tx-cell";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { shortPositionId } from "@/lib/shared/position-name";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
@@ -25,7 +25,6 @@ import { redemptionLogProv } from "@/lib/liquity-v2/redeemer-provenance";
 import { REDEMPTION_LABEL, redemptionId, redemptionTroveHref } from "@/lib/liquity-v2/redeemer-timeline";
 import type { LiquityV2RedemptionRow } from "@/lib/sources/api/liquity-v2-redeemer";
 
-const short = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
 /** Four significant digits below one, the compact form above it. */
 const amountText = (raw: bigint): string => {
   const n = units(raw);
@@ -121,31 +120,12 @@ export function LiquityV2RedemptionCard({
       : []),
     amountCell("bold", "BOLD redeemed", bold, "BOLD", TOKEN_ADDRESSES.BOLD, redemptionLogProv("bold", row)),
     amountCell("coll", `${c} paid out of the Trove`, coll, c, branch.collateralAddr, redemptionLogProv("coll", row)),
-    {
-      kind: "stat",
-      key: "tx",
-      label: "Transaction",
-      changed: false,
-      value: {
-        lines: [
-          <a
-            key="tx"
-            href={explorerUrl(MAINNET_CHAIN_ID, "tx", row.transaction_hash)}
-            target="_blank"
-            rel="noopener"
-            className="link-muted font-mono text-xs"
-          >
-            {short(row.transaction_hash)} ↗
-          </a>,
-          <span key="block" className="text-xs text-rb-500">
-            Block{" "}
-            <Prov info={redemptionLogProv("block", row)} value={row.block_number}>
-              <BlockRef block={Number(row.block_number)} chainId={MAINNET_CHAIN_ID} size={12} />
-            </Prov>
-          </span>,
-        ],
-      },
-    },
+    txCell({
+      txHash: row.transaction_hash,
+      block: row.block_number,
+      info: redemptionLogProv("block", row),
+      chainId: MAINNET_CHAIN_ID,
+    }),
   ];
 
   const slots: EventCardSlots = {

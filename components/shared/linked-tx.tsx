@@ -1,7 +1,8 @@
 "use client";
 
+import { LinkedValue } from "@/components/shared/linked-value";
 import { useChainId } from "@/lib/shared/chain-context";
-import { explorerUrl, type ChainId } from "@/lib/shared/chains";
+import type { ChainId } from "@/lib/shared/chains";
 
 interface LinkedTxProps {
   txHash: string;
@@ -11,19 +12,20 @@ interface LinkedTxProps {
 }
 
 /** A transaction hash, shortened, as a link to the explorer's event-log view
- *  (the receipts' "Confirm in the tx event logs" target). Styled as
- *  LinkedAddress is. */
+ *  (the receipts' "Confirm in the tx event logs" target): a LinkedValue
+ *  (anatomy L14) whose tooltip reads "Transaction 0x5c504e…2060", then "View
+ *  on Etherscan ↗". Styled as LinkedAddress is. */
 export function LinkedTx({ txHash, className = "", chainId }: LinkedTxProps) {
   const ctxChain = useChainId();
+  const short = `${txHash.slice(0, 8)}…${txHash.slice(-4)}`;
   return (
-    <a
-      href={explorerUrl(chainId ?? ctxChain, "tx-logs", txHash)}
-      target="_blank"
-      rel="noopener"
-      onClick={(e) => e.stopPropagation()}
+    <LinkedValue
+      explorer={{ chainId: chainId ?? ctxChain, kind: "tx-logs", value: txHash }}
+      context={`Transaction ${short}`}
+      label={`Transaction ${short}`}
       className={`text-blue-600 dark:text-[var(--text-link)] hover:underline font-mono text-xs ${className}`}
     >
-      {`${txHash.slice(0, 8)}…${txHash.slice(-4)}`}
-    </a>
+      {short}
+    </LinkedValue>
   );
 }

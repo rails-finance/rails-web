@@ -111,7 +111,7 @@ const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
 const SCREENSHOT_DIR = process.env.SCREENSHOT_DIR ?? path.join(os.tmpdir(), "rails-share-events");
 
 // A definitely-nonexistent id — a hex-64-shaped segment too, so it also
-// exercises the not-found notice's "view on the chain's explorer" link.
+// exercises the not-found notice's "View the transaction on Etherscan" link.
 const FAKE_ID = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff:999999";
 
 // A comma-separated allowlist for a development run over a subset of the
@@ -2376,7 +2376,7 @@ console.log("RESULT " + JSON.stringify({
   const { ctx: nfCtx, page: nfPage } = await open(1280, `${BASE}${fakePath}`);
   await nfPage.waitForTimeout(400);
   const noticeHref = await nfPage
-    .locator('a:has-text("View the transaction on the chain")')
+    .locator('a:has-text("View the transaction on Etherscan")')
     .first()
     .getAttribute("href")
     .catch(() => null);

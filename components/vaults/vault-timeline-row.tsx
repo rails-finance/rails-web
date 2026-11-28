@@ -56,7 +56,8 @@ import type { SpineTokenRow } from "@/components/shared/spine-column";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import { assetText, shareText, shortAddress } from "@/components/protocol/morpho-base/vault-exposure-parts";
 import { sharePriceText } from "@/lib/shared/vault-amount-text";
-import { explorerUrl, type ChainId } from "@/lib/shared/chains";
+import type { ChainId } from "@/lib/shared/chains";
+import { LinkedValue } from "@/components/shared/linked-value";
 import type { VaultHolderEvent, VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
 import { VAULT_HEAD_WORDS, vaultT1Kind } from "@/lib/vaults/head-words";
 import { NotLoaded } from "@/components/shared/not-loaded";
@@ -406,23 +407,31 @@ function RowNotes({
         </p>
       )}
 
-      {event.counterparty && (
-        <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-rb-500" data-figure="row-counterparty">
-          The other end of the transfer was{" "}
-          <a
-            href={explorerUrl(chainId, "address", event.counterparty)}
-            target="_blank"
-            rel="noopener"
-            className="link-muted font-mono"
-          >
-            {shortAddress(event.counterparty)}
-          </a>
-          . An address, and nothing more: this page does not say who it is.
-        </p>
-      )}
+      {event.counterparty && <VaultCounterpartyLine address={event.counterparty} chainId={chainId} />}
 
       {detailNotes?.(coords)}
     </div>
+  );
+}
+
+/** A share transfer's other end, an address on the chain's explorer: a
+ *  LinkedValue (anatomy L14) whose tooltip reads "Address 0x12…34", then
+ *  "View on Etherscan ↗". */
+export function VaultCounterpartyLine({ address, chainId }: { address: string; chainId: ChainId }) {
+  const short = shortAddress(address);
+  return (
+    <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-rb-500" data-figure="row-counterparty">
+      The other end of the transfer was{" "}
+      <LinkedValue
+        explorer={{ chainId, kind: "address", value: address }}
+        context={`Address ${short}`}
+        label={short}
+        className="link-muted font-mono"
+      >
+        {short}
+      </LinkedValue>
+      . An address, and nothing more: this page does not say who it is.
+    </p>
   );
 }
 

@@ -67,6 +67,9 @@ const Ctx = createContext<TimelineDisplayState>({
   set: () => {},
 });
 
+/** The context, for a server render that sets a switch (the markup tests). */
+export const TimelineDisplayContext = Ctx;
+
 /** A stored preference drops the retired switches: `collapseRuns` (like
  *  events always collapse), `showTimelineValues`
  *  (the spine always carries the values), `showUsdValues`,
