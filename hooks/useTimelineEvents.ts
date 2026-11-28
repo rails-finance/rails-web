@@ -15,6 +15,7 @@
 //   ?hideAssets=USDT,WETH       hidden assets
 //   ?hideAddresses=0xab…,0xcd…  hidden counterparties
 //   ?hideVersions=V2            hidden protocol versions
+//   ?hidePlaces=cdp:usdp:12,none  hidden places (a pETH account, ui-jobs 872)
 //   ?from=2025-01-01&to=2025-03-31   date range, UTC calendar days inclusive
 //   ?debt=10000-&coll=-50       Size, on a page that offers it (ui-jobs 752)
 //
@@ -263,9 +264,10 @@ export interface TimelineEventsState {
   visiblePlaceKeys: Set<string>;
   toggleHiddenPlace: (key: string) => void;
   resetHiddenPlaces: () => void;
-  /** Show the rows of the places in `keys` and hide every other place, as one
-   *  live view: what a place's "N events" link applies on the page. */
-  showOnlyPlaces: (keys: string[]) => void;
+  /** Hide exactly the places in `keys`, as one live view: what a place's
+   *  "N events" link applies, its hide set taken from the whole history
+   *  (rows past the loaded ones included), not from the options. */
+  hidePlacesExactly: (keys: string[]) => void;
 
   dateRange: [number, number] | null;
   setDateRange: (next: [number, number] | null) => void;
@@ -1142,13 +1144,10 @@ export function useTimelineEvents(
     interactedRef.current = true;
     setHiddenPlaces([]);
   }, []);
-  const showOnlyPlaces = useCallback(
-    (keys: string[]) => {
-      interactedRef.current = true;
-      setHiddenPlaces(placeOptions.map((o) => o.key).filter((k) => !keys.includes(k)));
-    },
-    [placeOptions],
-  );
+  const hidePlacesExactly = useCallback((keys: string[]) => {
+    interactedRef.current = true;
+    setHiddenPlaces([...keys]);
+  }, []);
 
   const resetHiddenActions = useCallback(() => {
     interactedRef.current = true;
@@ -1265,7 +1264,7 @@ export function useTimelineEvents(
     visiblePlaceKeys,
     toggleHiddenPlace,
     resetHiddenPlaces,
-    showOnlyPlaces,
+    hidePlacesExactly,
     dateRange,
     setDateRange: setDateRangeLive,
     sizeDims,

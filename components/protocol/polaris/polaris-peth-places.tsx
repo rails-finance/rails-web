@@ -110,6 +110,7 @@ function EventsLink({ events, match }: { events?: PethPlaceEvents; match: (p: Pe
       className={`${INLINE_LINK} text-xs`}
       data-anatomy="C24.1·polaris"
       data-peth-place-events={e.rows}
+      aria-label={`${e.rows.toLocaleString("en-US")} ${e.rows === 1 ? "event" : "events"}`}
       onClick={(ev) => {
         if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return;
         ev.preventDefault();

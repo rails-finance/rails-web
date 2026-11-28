@@ -11,8 +11,10 @@ import {
   pethPlaceName,
   pethPlaceOption,
   pethPlaceWords,
+  pethPlaceView,
   pethTimelineEvent,
 } from "../../lib/polaris/peth-ledger.ts";
+import { polarisPethQuery } from "../../lib/sources/api/polaris-peth.ts";
 
 const NAMES = {
   stable: { usdp: "USDp", goldp: "GOLDp" },
@@ -129,4 +131,50 @@ test("every row files under its place on the Place axis, a row with none under O
   );
   // Without the names the event offers no place, so no page grows the axis by accident.
   assert.equal(pethTimelineEvent(row("cdp_deposit", [], CDP), TOKENS, venues).places, undefined);
+});
+
+// A ledger of 600 rows: 550 in USDp CDP #26, 40 in the pool, 10 in reserve
+// loan #28, and the counts the route sends with the first page.
+const BIG = [
+  { place: CDP, rows: 550 },
+  { place: POOL, rows: 40 },
+  { place: LOAN, rows: 10 },
+];
+
+test("N events hides every other place of the whole ledger and the rows with none, past the first read", () => {
+  const v = pethPlaceView(BIG, "cdp:usdp:26", 500);
+  assert.deepEqual(v.hide, [pethPlaceKey(POOL), "loan::28", PETH_NO_PLACE]);
+  assert.equal(v.rows, 550);
+  assert.equal(v.needsOlder, true, "50 of its rows are past the 500 loaded");
+  // A place whose loaded rows are all of them reads nothing more.
+  assert.equal(pethPlaceView(BIG, "loan::28", 10).needsOlder, false);
+  // A place not in the ledger's counts has no link.
+  assert.equal(pethPlaceView(BIG, "cdp:goldp:22", 0), null);
+});
+
+test("the proxy forwards a tx hash, lower-cased, and drops anything else under that name", () => {
+  const h = "0x" + "AB".repeat(32);
+  assert.equal(polarisPethQuery({ tx: h }), `tx=${h.toLowerCase()}`);
+  assert.equal(polarisPethQuery({ tx: "0x12", limit: "5" }), "limit=5");
+});
+
+test("over 600 rows, the first 500 loaded: the CDP's loaded count is short of its ledger count, so N events reads the rest", () => {
+  const venues = { venue_curve_tripool: { address: POOL.address } };
+  // Newest first, as the route pages them: the CDP's rows run through the
+  // ledger, so the first 500 hold 460 of its 550.
+  const ledger = Array.from({ length: 600 }, (_, i) => {
+    const place = i % 60 < 55 ? CDP : i % 60 < 59 ? POOL : LOAN;
+    return {
+      ...row("cdp_deposit", [line("cdp_deposit", "peth", "out")], place),
+      tx_hash: `0x${i.toString(16).padStart(64, "0")}`,
+    };
+  });
+  const counts = [CDP, POOL, LOAN].map((p) => ({ place: p, rows: ledger.filter((r) => r.place === p).length }));
+  const loadedEvents = ledger.slice(0, 500).map((r) => pethTimelineEvent(r, TOKENS, venues, NAMES));
+  const loaded = loadedEvents.filter((e) => e.places.some((p) => p.key === "cdp:usdp:26")).length;
+  assert.equal(loaded, 460);
+  const v = pethPlaceView(counts, "cdp:usdp:26", loaded);
+  assert.equal(v.rows, 550);
+  assert.equal(v.needsOlder, true);
+  assert.deepEqual(v.hide, [pethPlaceKey(POOL), "loan::28", PETH_NO_PLACE]);
 });

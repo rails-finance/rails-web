@@ -413,6 +413,21 @@ export const PETH_NO_PLACE = "none";
  *  the address. */
 export const pethPlaceKey = (p: PethPlace): string => [p.kind, p.market ?? "", p.id ?? p.address ?? ""].join(":");
 
+/** What a place's "N events" applies: the Place keys to hide (every other
+ *  place of the whole ledger, from the route's place_counts, and the rows
+ *  with none), and whether the place has rows past those loaded, which the
+ *  page reads first. Null where the place has no rows. */
+export function pethPlaceView(
+  counts: { place: PethPlace; rows: number }[],
+  key: string,
+  loaded: number,
+): { hide: string[]; rows: number; needsOlder: boolean } | null {
+  const hit = counts.find((c) => pethPlaceKey(c.place) === key);
+  if (!hit || hit.rows === 0) return null;
+  const hide = [...counts.map((c) => pethPlaceKey(c.place)).filter((k) => k !== key), PETH_NO_PLACE];
+  return { hide, rows: hit.rows, needsOlder: loaded < hit.rows };
+}
+
 /** The place's name in a sentence ("USDp CDP #12", "the bonding curve"). */
 export function pethPlaceName(p: PethPlace, names: PethPlaceNames): string {
   const stable = (m: string | undefined) => (m ? (names.stable[m] ?? m) : "");

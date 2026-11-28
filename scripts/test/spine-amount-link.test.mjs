@@ -42,6 +42,8 @@ test("an amountLink wraps the amount alone, and the rest of the spine is unchang
   assert.match(whole, /title="Went to reserve loan #28 →"/);
   assert.match(whole, /data-spine-amount-link="marked"/);
   assert.match(whole, /data-anatomy="L3.3"/);
+  assert.match(whole, /aria-label="4.2K: Went to reserve loan #28"/, "the name reads the words without the arrow");
+  assert.match(whole, /relative z-30/, "the link sits above the phone toggle");
   // Put the plain figure back where the link stands: the spine is the
   // unlinked one, so nothing beside the amount moved.
   const plain = html.replace(

@@ -123,10 +123,14 @@ export function SpineVal({
   const cls =
     "text-base font-semibold whitespace-nowrap underline-offset-2 hover:underline focus-visible:underline " +
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] rounded-sm" +
+    // Above the row's phone toggle (event-card.tsx, z-20), so a tap on the
+    // amount opens the link and a tap beside it still opens the card.
+    " relative z-30" +
     mark;
   const common = {
     title: link.tip,
-    "aria-label": `${txt}${unit ? ` ${unit}` : ""}: ${link.tip}`,
+    // The arrows are visual: the name reads the words alone.
+    "aria-label": `${txt}${unit ? ` ${unit}` : ""}: ${link.tip.replace(/\s*[→↗]\s*$/u, "")}`,
     onClick: (e: React.MouseEvent) => e.stopPropagation(),
     "data-spine-amount-link": link.marked ? "marked" : "",
     "data-anatomy": link.marked ? "L3.3" : "L3.2",

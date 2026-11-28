@@ -42,6 +42,7 @@ import {
   pethLedgerUnchecked,
   pethScannedTo,
   pethPlaceKey,
+  pethPlaceView,
   pethPlaces,
   pethRowId,
   pethTimelineEvent,
@@ -139,7 +140,8 @@ export default function PethView({
   // missing) where the deployment is not set up for this page: a reload does
   // not change that.
   const [notSetUp, setNotSetUp] = useState(false);
-  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
+  const pinnedId = useParams<{ eventId?: string }>()?.eventId;
+  const onEventPage = pinnedId != null;
 
   useEffect(() => {
     if (initial) return;
@@ -185,10 +187,26 @@ export default function PethView({
     }
   };
 
+  // The event page's row where the reads above do not hold it (past the
+  // first read, or an address too heavy to list): read alone by `tx`.
+  const [pinned, setPinned] = useState<PethLedgerRow | null>(null);
+  const pinnedTx = pinnedId ? decodeURIComponent(pinnedId).toLowerCase() : null;
+  const pinnedLoaded = pinnedTx == null || [...(data?.rows ?? []), ...older].some((r) => pethRowId(r) === pinnedTx);
+  useEffect(() => {
+    if (!data || pinnedLoaded || !pinnedTx || !/^0x[0-9a-f]{64}$/.test(pinnedTx)) return;
+    let cancelled = false;
+    readPolarisPeth(address, { tx: pinnedTx })
+      .then((d) => !cancelled && setPinned(d.rows?.[0] ?? null))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [data, pinnedLoaded, pinnedTx, address]);
+
   const rows = data?.rows;
   const listed = useMemo(() => {
     const seen = new Set<string>();
-    return [...(rows ?? []), ...older]
+    return [...(rows ?? []), ...older, ...(pinned ? [pinned] : [])]
       .filter((r) => {
         const id = pethRowId(r);
         if (seen.has(id)) return false;
@@ -196,7 +214,7 @@ export default function PethView({
         return true;
       })
       .reverse();
-  }, [rows, older]);
+  }, [rows, older, pinned]);
   const rowById = useMemo(() => new Map(listed.map((r) => [pethRowId(r), r])), [listed]);
   const events = useMemo(
     () => listed.map((r) => pethTimelineEvent(r, PETH_NAMES, POLARIS_VENUES, PETH_PLACE_NAMES)),
@@ -223,27 +241,34 @@ export default function PethView({
   }, [olderCount, total, listed.length, tl.sortedEvents]);
 
   // A place's "N events": its rows over the whole ledger, and the timeline
-  // narrowed to it by hiding every other place the rows file under.
+  // narrowed to it by hiding every other place of the whole ledger and the
+  // rows with none (pethPlaceView). A place with rows past those loaded
+  // reads the older events first; the cut notice shows the read.
   const placeCounts = data?.place_counts;
   const placeOptions = tl.placeOptions;
-  const showOnlyPlaces = tl.showOnlyPlaces;
+  const hidePlacesExactly = tl.hidePlacesExactly;
+  const loadRestRef = useRef(loadRest);
+  loadRestRef.current = loadRest;
   const placeEvents = useMemo<PethPlaceEvents>(
     () => (match) => {
       const hit = placeCounts?.find((c) => match(c.place));
-      if (!hit || hit.rows === 0) return null;
+      if (!hit) return null;
       const key = pethPlaceKey(hit.place);
-      const hide = placeOptions.map((o) => o.key).filter((k) => k !== key);
-      const q = new URLSearchParams(hide.length > 0 ? { hidePlaces: hide.join(",") } : {}).toString();
+      const loaded = placeOptions.find((o) => o.key === key)?.count ?? 0;
+      const view = pethPlaceView(placeCounts ?? [], key, loaded);
+      if (!view) return null;
+      const q = new URLSearchParams({ hidePlaces: view.hide.join(",") }).toString();
       return {
-        rows: hit.rows,
-        href: `${polarisPethAccountHref(address)}${q ? `?${q}` : ""}#peth-timeline`,
+        rows: view.rows,
+        href: `${polarisPethAccountHref(address)}?${q}#peth-timeline`,
         show: () => {
-          showOnlyPlaces([key]);
+          hidePlacesExactly(view.hide);
+          if (view.needsOlder) void loadRestRef.current();
           document.getElementById("peth-timeline")?.scrollIntoView({ block: "start" });
         },
       };
     },
-    [placeCounts, placeOptions, showOnlyPlaces, address],
+    [placeCounts, placeOptions, hidePlacesExactly, address],
   );
 
   const figures = useMemo(() => (data ? pethHeadlines(data) : null), [data]);
