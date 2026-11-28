@@ -35,7 +35,7 @@ import { PETH_HEAVY, PETH_UNREAD, PolarisPethCard } from "@/components/protocol/
 import { PolarisPethPlaces, type PethPlaceEvents } from "@/components/protocol/polaris/polaris-peth-places";
 import { PETH_NAMES, PolarisPethEventCard } from "@/components/protocol/polaris/polaris-peth-event-card";
 import { PolarisPethMap } from "@/components/protocol/polaris/polaris-peth-map";
-import { buildPethMapFill, pethMapRowEdges } from "@/lib/polaris/peth-map-fill";
+import { buildPethMapFill, pethMapNewEdge, pethMapRowEdges } from "@/lib/polaris/peth-map-fill";
 import { pethMapContext } from "@/lib/polaris/peth-map-context";
 import { POLARIS_MAP_LAYOUT } from "@/lib/polaris/peth-map-layout";
 import {
@@ -277,8 +277,9 @@ export default function PethView({
     return mergeFillRows(
       baseFill,
       older.map((r) => ({ id: pethRowId(r), edgeIds: pethMapRowEdges(r, mapCtx) })),
+      pethMapNewEdge(mapCtx, data?.ledger?.scanned_to_block ?? null),
     );
-  }, [baseFill, older, mapCtx]);
+  }, [baseFill, older, mapCtx, data]);
   const [selection, setSelection] = useState<MapSelection>(null);
   const [filterEdge, setFilterEdge] = useState<string | null>(null);
   // `?map=<arrow>` applies once, and only for an arrow this address used.

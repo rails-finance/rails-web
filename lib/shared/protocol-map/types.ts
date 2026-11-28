@@ -150,20 +150,30 @@ export function hotSets(layout: MapLayout, fill: MapFill, sel: MapSelection): Ma
 }
 
 /** The fill with rows the page read later: each names its edges, and the
- *  row count and each edge's count are recounted over every row. Amounts are
- *  summed on the server, and only over a ledger read in full, so a page with
- *  rows left to read has none. Should an edge carry amounts when rows are
- *  added, they are dropped: an edge never shows a count beside amounts summed
- *  over fewer rows. An edge only the added rows use stays unfilled. */
-export function mergeFillRows(fill: MapFill, more: { id: string; edgeIds: string[] }[]): MapFill {
+ *  row count and each edge's count are recounted over every row. An edge only
+ *  the added rows use joins as a count, its link and receipt from `newEdge`,
+ *  which the protocol's page supplies. Amounts are summed on the server, and
+ *  only over a ledger read in full, so a page with rows left to read has
+ *  none. Should an edge carry amounts when rows are added, they are dropped:
+ *  an edge never shows a count beside amounts summed over fewer rows. */
+export function mergeFillRows(
+  fill: MapFill,
+  more: { id: string; edgeIds: string[] }[],
+  newEdge: (edgeId: string, rowCount: number) => Pick<MapEdgeFill, "timelineHref" | "receipt">,
+): MapFill {
   if (fill.edgesUnknown) return fill;
   const seen = new Set(fill.rows.map((r) => r.id));
   const added = more.filter((r) => !seen.has(r.id) && seen.add(r.id));
   if (added.length === 0) return fill;
   const rows = [...fill.rows, ...added];
+  const counts = new Map<string, number>();
+  for (const r of rows) for (const id of r.edgeIds) counts.set(id, (counts.get(id) ?? 0) + 1);
   const edges: MapFill["edges"] = {};
-  for (const [id, e] of Object.entries(fill.edges))
-    edges[id] = { ...e, amounts: [], rowCount: rows.filter((r) => r.edgeIds.includes(id)).length };
+  for (const [id, n] of counts) {
+    const e = fill.edges[id];
+    edges[id] = e ? { ...e, amounts: [], rowCount: n } : { amounts: [], rowCount: n, ...newEdge(id, n) };
+  }
+  for (const [id, e] of Object.entries(fill.edges)) if (!edges[id]) edges[id] = { ...e, amounts: [], rowCount: 0 };
   return { ...fill, rows, edges, counted: { ...fill.counted, rows: rows.length } };
 }
 

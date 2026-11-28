@@ -253,7 +253,9 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
               : <Amounts amounts={f.amounts} receipt={f.receipt} echo />
             </>
           )}
-          , over {plural(f.rowCount, "transaction")}.
+          {fill.counted.rows < fill.counted.total
+            ? `, over ${f.rowCount.toLocaleString("en-US")} of the newest ${plural(fill.counted.rows, "transaction")}.`
+            : `, over ${plural(f.rowCount, "transaction")}.`}
         </>
       );
     }
@@ -442,7 +444,7 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
                     href={f.timelineHref}
                     className={`${INLINE_LINK} tabular-nums`}
                     title={`The timeline filtered to ${plural(f.rowCount, "transaction")} on this arrow`}
-                    aria-label={`Show the ${plural(f.rowCount, "transaction")} on this arrow in the timeline`}
+                    aria-label={`Show this arrow's ${plural(f.rowCount, "transaction")} in the timeline`}
                     onClick={(ev) => {
                       if (!onFilter || ev.metaKey || ev.ctrlKey || ev.shiftKey) return;
                       ev.preventDefault();

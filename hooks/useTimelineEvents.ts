@@ -269,7 +269,8 @@ export interface TimelineEventsState {
    *  (rows past the loaded ones included), not from the options. */
   hidePlacesExactly: (keys: string[]) => void;
   /** The page's hide-by-id filter (`hideIds`), for the toolbar's Clear all:
-   *  null where the page hides nothing by id. */
+   *  set while the page passes `hideIds` (even one that hides nothing), null
+   *  where it passes none. */
   clearHideIds: (() => void) | null;
 
   dateRange: [number, number] | null;
@@ -1283,7 +1284,7 @@ export function useTimelineEvents(
     toggleHiddenPlace,
     resetHiddenPlaces,
     hidePlacesExactly,
-    clearHideIds: (hideIds?.size ?? 0) > 0 && onClearHideIds ? onClearHideIds : null,
+    clearHideIds: hideIds != null && onClearHideIds ? onClearHideIds : null,
     dateRange,
     setDateRange: setDateRangeLive,
     sizeDims,

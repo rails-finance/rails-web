@@ -247,6 +247,35 @@ const PLACES_WORD: Record<string, string> = {
   [PM.pools]: "pools",
 };
 
+/** The receipt of a sum over an arrow's rows (an arrow, a box's "in"). */
+function arrowReceipt(name: string, n: number, what: string, block: string | null): MapReceipt {
+  return {
+    summary: `${name} — the amounts ${what}, summed over ${plural(n, "transaction")}.`,
+    kind: "chain-derived",
+    pclass: "indexed",
+    via: `${VIA} · rows`,
+    formula: "Σ amount over this arrow's transactions",
+    rows: n,
+    ...(block ? { source: { block } } : {}),
+  };
+}
+
+/** An arrow that only rows read later use (mergeFillRows): its link and
+ *  receipt. */
+export function pethMapNewEdge(
+  ctx: PethMapContext,
+  ledgerBlock: string | null,
+): (edgeId: string, rowCount: number) => { timelineHref: string; receipt: MapReceipt } {
+  return (edgeId, n) => {
+    const e = EDGES.get(edgeId);
+    const name = e ? `${TITLE.get(e.from)} → ${TITLE.get(e.to)}` : edgeId;
+    return {
+      timelineHref: ctx.timelineHref(edgeId),
+      receipt: arrowReceipt(name, n, "this address moved along this arrow", ledgerBlock),
+    };
+  };
+}
+
 const plural = (n: number, one: string) => `${n.toLocaleString("en-US")} ${n === 1 ? one : `${one}s`}`;
 
 export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): MapFill {
@@ -288,15 +317,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
   // and no amount, and each box what 872's place_counts gives for it.
   const total = ok ? (d.total_rows ?? rows.length) : 0;
   const full = rows.length >= total;
-  const sumReceipt = (name: string, n: number, what: string): MapReceipt => ({
-    summary: `${name} — the amounts ${what}, summed over ${plural(n, "transaction")}.`,
-    kind: "chain-derived",
-    pclass: "indexed",
-    via: `${VIA} · rows`,
-    formula: "Σ amount over this arrow's transactions",
-    rows: n,
-    ...(ledgerBlock ? { source: { block: ledgerBlock } } : {}),
-  });
+  const sumReceipt = (name: string, n: number, what: string) => arrowReceipt(name, n, what, ledgerBlock);
   const edges: MapFill["edges"] = {};
   for (const e of POLARIS_MAP_LAYOUT.edges) {
     const s = sums.get(e.id);

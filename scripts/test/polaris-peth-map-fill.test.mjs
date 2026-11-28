@@ -25,7 +25,9 @@ export async function resolve(specifier, context, next) {
 }`;
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
-const { buildPethMapFill, pethMapPlaces, pethMapRowEdges } = await import("../../lib/polaris/peth-map-fill.ts");
+const { buildPethMapFill, pethMapNewEdge, pethMapPlaces, pethMapRowEdges } = await import(
+  "../../lib/polaris/peth-map-fill.ts"
+);
 const { POLARIS_MAP_LAYOUT, PM, pmEdge } = await import("../../lib/polaris/peth-map-layout.ts");
 const { hotSets, MAP_HOLDER, mapExact, mapUnusedWords, mergeFillRows, usedNodes } = await import(
   "../../lib/shared/protocol-map/types.ts"
@@ -427,7 +429,7 @@ test("past the first read, a dashed arrow reads as unused in the newest rows", (
   d.total_rows = 600;
   const f = buildPethMapFill(d, CTX);
   assert.equal(mapUnusedWords(f), "Not used in the newest 11 transactions");
-  // No arrow is drawn from place_counts: only the rows read fill an arrow.
+  // Only the rows read fill an arrow.
   for (const id of Object.keys(f.edges))
     assert.ok(
       f.rows.some((r) => r.edgeIds.includes(id)),
@@ -442,20 +444,55 @@ test("older rows merged in recount the rows and each arrow's count", () => {
   assert.deepEqual(f.counted, { rows: 5, total: 7 });
   const cdpIn = pmEdge(MAP_HOLDER, PM.cdp);
   assert.equal(f.edges[cdpIn].rowCount, 2);
-  const m = mergeFillRows(f, [
-    { id: "0x" + "a".repeat(64), edgeIds: [cdpIn] },
-    { id: "0x" + "b".repeat(64), edgeIds: [] },
-    { id: f.rows[0].id, edgeIds: [cdpIn] },
-  ]);
+  const m = mergeFillRows(
+    f,
+    [
+      { id: "0x" + "a".repeat(64), edgeIds: [cdpIn] },
+      { id: "0x" + "b".repeat(64), edgeIds: [] },
+      { id: f.rows[0].id, edgeIds: [cdpIn] },
+    ],
+    pethMapNewEdge(CTX, "12229120"),
+  );
   assert.deepEqual(m.counted, { rows: 7, total: 7 });
   assert.equal(m.edges[cdpIn].rowCount, 3);
   assert.equal(m.edges[pmEdge(PM.eth, PM.zap)].rowCount, 2);
   assert.equal(m.rows.length, 7);
-  // An arrow only the added rows use stays unfilled.
-  assert.equal(
-    mergeFillRows(f, [{ id: "0xc", edgeIds: [pmEdge(MAP_HOLDER, PM.sp)] }]).edges[pmEdge(MAP_HOLDER, PM.sp)],
-    undefined,
+});
+
+test("older rows can make an unused arrow used: merged to the whole ledger", () => {
+  const d = fx("map-38d7");
+  const cdpRow = d.rows.find((r) => r.kind === "cdp_deposit");
+  const deposit = { kind: "sp_deposit", id: "3", market: "usdp" };
+  // The only Stability Pool row is past the first read.
+  const spRow = {
+    ...cdpRow,
+    tx_hash: "0x" + "5".repeat(64),
+    kind: "sp_deposit",
+    place: deposit,
+    places: [deposit],
+    lines: [{ ...cdpRow.lines[0], rule: "sp_deposit", counterparty_role: "usdp_stability_pool", amount_raw: "4" }],
+  };
+  d.total_rows = 6;
+  d.place_counts = [...d.place_counts, { place: deposit, rows: 1 }];
+  const f = buildPethMapFill(d, CTX);
+  const spIn = pmEdge(MAP_HOLDER, PM.sp);
+  assert.equal(f.edges[spIn], undefined);
+  assert.equal(mapUnusedWords(f), "Not used in the newest 5 transactions");
+  const m = mergeFillRows(
+    f,
+    [{ id: spRow.tx_hash, edgeIds: pethMapRowEdges(spRow, CTX) }],
+    pethMapNewEdge(CTX, "12229120"),
   );
+  assert.deepEqual(m.counted, { rows: 6, total: 6 });
+  assert.deepEqual(m.edges[spIn].amounts, []);
+  assert.equal(m.edges[spIn].rowCount, 1);
+  assert.equal(m.edges[spIn].timelineHref, CTX.timelineHref(spIn));
+  assert.match(m.edges[spIn].receipt.summary, /^This address → Stability Pools — /);
+  assert.ok(usedNodes(POLARIS_MAP_LAYOUT, m).has(PM.sp));
+  assert.equal(mapUnusedWords(m), "Not used by this address");
+  assert.equal(m.nodes[PM.sp].rowCount, 1);
+  assert.equal(hotSets(POLARIS_MAP_LAYOUT, m, { type: "node", id: PM.sp }).rows.size, 1);
+  assert.ok(hotSets(POLARIS_MAP_LAYOUT, m, { type: "row", id: spRow.tx_hash }).edges.has(spIn));
 });
 
 test("amounts exist only over a ledger read in full, and a merge never keeps them beside a larger count", () => {
@@ -469,9 +506,13 @@ test("amounts exist only over a ledger read in full, and a merge never keeps the
   const partial = buildPethMapFill(d, CTX);
   assert.ok(Object.values(partial.edges).every((e) => e.amounts.length === 0));
   // Should amounts meet added rows, the merge drops them.
-  const m = mergeFillRows(full, [{ id: "0x" + "d".repeat(64), edgeIds: [pmEdge(MAP_HOLDER, PM.cdp)] }]);
+  const m = mergeFillRows(
+    full,
+    [{ id: "0x" + "d".repeat(64), edgeIds: [pmEdge(MAP_HOLDER, PM.cdp)] }],
+    pethMapNewEdge(CTX, null),
+  );
   assert.ok(Object.values(m.edges).every((e) => e.amounts.length === 0));
   assert.equal(m.edges[pmEdge(MAP_HOLDER, PM.cdp)].rowCount, 3);
   // A merge that adds nothing changes nothing.
-  assert.equal(mergeFillRows(full, []), full);
+  assert.equal(mergeFillRows(full, [], pethMapNewEdge(CTX, null)), full);
 });
