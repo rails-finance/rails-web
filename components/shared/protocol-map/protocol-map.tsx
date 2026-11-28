@@ -238,7 +238,9 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
     sentence = (
       <>
         <span className="font-semibold text-foreground">{title(selection.id)}</span>:{" "}
-        {plural(hot.rows.size, "transaction")} of this address passed through here.
+        {fill.counted.rows < fill.counted.total
+          ? `${hot.rows.size.toLocaleString("en-US")} of the newest ${plural(fill.counted.rows, "transaction")}.`
+          : `${plural(hot.rows.size, "transaction")}.`}
       </>
     );
   } else if (selection?.type === "row") {
@@ -249,7 +251,7 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
     sentence = (
       <>
         <span className="font-semibold text-foreground">{rowLabel?.(selection.id) ?? "This transaction"}</span>
-        {via.length > 0 ? ` used ${via.join(", ")}.` : " is drawn on no arrow of this map."}
+        {via.length > 0 ? `: ${via.join(", ")}.` : ": on no arrow of this map."}
       </>
     );
   }
@@ -394,7 +396,7 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
                       onFilter(x.edge.id);
                     }}
                   >
-                    {f.rowCount}↓
+                    {f.amounts.length > 0 ? `${f.rowCount}↓` : "↓"}
                   </a>
                 </div>
               );

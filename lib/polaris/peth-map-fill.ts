@@ -13,7 +13,7 @@
 // THE ETH ARROWS carry the row's ETH in and ETH out, the figures the card
 // states: they count only zaps and trades into or out of pETH or fpETH. A zap
 // to or from vpETH, USDp, GOLDp or POLAR draws its tokens and no ETH. Morpho
-// Blue moves show their vpETH and are not decoded. The Fee Router's rewards
+// Blue moves show their vpETH and are not decoded. The fee router's rewards
 // back to the address are not read yet (ui-jobs 871), and the box says so.
 
 import type { PethLedgerLine, PethLedgerRow, PethPlace, PolarisPethResponse } from "../sources/api/polaris-peth";
@@ -275,7 +275,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
     cdps.length > 0 ? nowOf(ctx.peth, r.cdp_collateral.raw) : null,
     ...cdps.map((c) => ({
       label: "note" as const,
-      text: `${ctx.marketSymbol[c.market] ?? c.market} #${c.cdp_id}`,
+      text: `${ctx.marketSymbol[c.market] ?? c.market} CDP #${c.cdp_id}`,
       amounts: [amount(ctx.peth, big(c.coll_raw))],
     })),
     cdps.length > 0 ? { label: "note", amounts: [], text: "At each CDP's last touch" } : null,
@@ -298,7 +298,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
     loans.length > 0 ? nowOf(ctx.fpeth, r.loans_fpeth.raw) : null,
     ...loans.map((l) => ({
       label: "note" as const,
-      text: `Loan #${l.loan_id}`,
+      text: `Reserve loan #${l.loan_id}`,
       amounts: [amount(ctx.fpeth, big(l.fpeth_raw))],
     })),
   ]);
@@ -307,7 +307,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
   const share = lps.reduce((s, x) => s + big(x.peth_share_raw), ZERO);
   put(PM.pools, [
     inLine(PM.pools),
-    lps.length > 0 ? { label: "now", text: "share", amounts: [amount(ctx.peth, share)] } : null,
+    lps.length > 0 ? { label: "now", amounts: [amount(ctx.peth, share)] } : null,
     ...(lps.length > 1
       ? lps.map((x) => ({
           label: "note" as const,

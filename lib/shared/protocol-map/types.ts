@@ -5,7 +5,7 @@
 //
 // Ids are namespaced by protocol ("polaris:cdp"); the address's box is the one
 // shared node, `holder`. An edge may join nodes of two protocols, so an edge
-// names its own `protocol`. The layout lists every possible edge; an edge with
+// names its `protocol`. The layout lists every possible edge; an edge with
 // no fill is drawn dashed, and so is a node no filled edge touches.
 //
 // "in" and "now" are valuations side by side. The fill has no field for a

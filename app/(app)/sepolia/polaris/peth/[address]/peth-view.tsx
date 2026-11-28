@@ -137,7 +137,7 @@ function MapFilterNotice({ edgeId, count, onClear }: { edgeId: string; count: nu
       </span>{" "}
       arrow.{" "}
       <button type="button" className={`${INLINE_LINK} cursor-pointer`} onClick={onClear}>
-        Show every transaction
+        Clear filter
       </button>
     </p>
   );

@@ -35,8 +35,8 @@ const nodes: MapNode[] = [
     col: 6,
     span: 1,
     row: 1,
-    title: "Fee Router",
-    blurb: "burns curve fees and rebuys reward pETH for CDP minters and svpETH holders",
+    title: "Fee router",
+    blurb: "burns bonding-curve fees and rebuys reward pETH for CDP minters and svpETH holders",
   },
   {
     id: PM.other,
@@ -45,7 +45,7 @@ const nodes: MapNode[] = [
     span: 2,
     row: 2,
     title: "Other tokens",
-    blurb: "USDp, GOLDp and POLAR bought by zap",
+    blurb: "USDp, GOLDp and POLAR traded through the zap",
   },
   {
     id: PM.zap,
@@ -72,7 +72,7 @@ const nodes: MapNode[] = [
     span: 1,
     row: 2,
     title: "Other addresses",
-    blurb: "wallets and contracts outside Polaris that sent or received pETH",
+    blurb: "wallets and contracts outside Polaris that sent or received pETH, fpETH or vpETH",
   },
   { id: MAP_HOLDER, band: "holder", col: 3, span: 3, row: 3, title: "This address", blurb: "" },
   { id: PM.cdp, band: "mechanism", col: 1, span: 1, row: 4, title: "CDPs", blurb: "lock pETH, mint USDp or GOLDp" },
@@ -101,7 +101,7 @@ const nodes: MapNode[] = [
     span: 1,
     row: 4,
     title: "Splitter",
-    blurb: "pETH into fpETH + vpETH, and back",
+    blurb: "splits pETH into fpETH and vpETH, and merges them back",
   },
   {
     id: PM.pools,
@@ -110,7 +110,7 @@ const nodes: MapNode[] = [
     span: 1,
     row: 4,
     title: "Pools",
-    blurb: "Curve tripool, POLAR/pETH, pETH/WETH",
+    blurb: "Curve pETH/fpETH/vpETH, Uniswap pETH/POLAR and pETH/WETH",
   },
   {
     id: PM.svpeth,
@@ -128,7 +128,7 @@ const nodes: MapNode[] = [
     span: 1,
     row: 4,
     title: "Morpho Blue",
-    blurb: "vpETH market; Rails does not decode it yet",
+    blurb: "vpETH market; only its vpETH moves are shown",
   },
 ];
 

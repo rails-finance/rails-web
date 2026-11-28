@@ -29,8 +29,8 @@ export function pethMapContext(address: string): PethMapContext {
     marketSymbol: Object.fromEntries(POLARIS_MARKETS.map((m) => [m, POLARIS_MARKET_CONFIG[m].stable.symbol])),
     // The map's boxes are narrow: each venue by its short name.
     venueLabel: {
-      venue_curve_tripool: "Curve tripool",
-      venue_univ2_polar_peth: "POLAR/pETH pair",
+      venue_curve_tripool: "Curve pool",
+      venue_univ2_polar_peth: "pETH/POLAR pair",
       venue_univ2_peth_weth: "pETH/WETH pair",
     } satisfies Record<keyof typeof POLARIS_VENUES, string>,
     timelineHref: (edgeId) =>

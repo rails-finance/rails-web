@@ -45,13 +45,15 @@ export function PolarisPethMap({
       </p>
       {ledgerGap != null && (
         <p className="mt-1 text-sm leading-relaxed text-rb-500">
-          The history of this address is not read yet, so the map draws no arrows.
+          {ledgerGap === "too_heavy"
+            ? "This address has too many transactions for one page, so the map draws no arrows."
+            : "The history of this address is still being read, so the map draws no arrows."}
         </p>
       )}
       {ledgerGap == null && rows < total && (
         <p className="mt-1 text-sm leading-relaxed text-rb-500">
           This address has {total.toLocaleString("en-US")} transactions. The arrows count the newest{" "}
-          {rows.toLocaleString("en-US")} and state no amounts; each box gives its count over all of them.
+          {rows.toLocaleString("en-US")} and state no amounts. Each box counts all of them.
         </p>
       )}
       {/* A production build drops this block: NODE_ENV is inlined. */}
@@ -62,8 +64,9 @@ export function PolarisPethMap({
         >
           <p className="font-semibold">Development only: places added by hand</p>
           <p className="mt-0.5">
-            The route does not send each row&rsquo;s place yet (ui-jobs 872). For {address}, the arrows use places added
-            by hand on {handAddedPlaces.length} {handAddedPlaces.length === 1 ? "row" : "rows"}:
+            The route does not send each row&rsquo;s place yet (ui-jobs 872). The list below names the{" "}
+            {handAddedPlaces.length} {handAddedPlaces.length === 1 ? "row" : "rows"} of {address} whose places were
+            added by hand.
           </p>
           <ul className="mt-1 font-mono">
             {handAddedPlaces.map((tx) => (

@@ -107,7 +107,7 @@ test("CDPs and a loan: the zaps, the curve fees, the CDP and loan arrows, and th
   assert.equal(cdp[1].amounts[0].raw, "10925000000000000000");
   assert.deepEqual(
     cdp.slice(2, 4).map((l) => l.text),
-    ["GOLDp #22", "USDp #36"],
+    ["GOLDp CDP #22", "USDp CDP #36"],
   );
   const loan = f.nodes[PM.loan].lines;
   assert.equal(loan.find((l) => l.label === "now").amounts[0].raw, "5000000000000000000");
@@ -251,4 +251,31 @@ test("a selection lights its edges, nodes and rows", () => {
   assert.equal(n.rows.size, 2);
   assert.ok(n.nodes.has(PM.eth) && n.nodes.has(MAP_HOLDER));
   assert.equal(mapExact({ asset: "pETH", raw: "10925000000000000000", decimals: 18 }), "10.925");
+});
+
+test("fpETH and vpETH transfers sum on the Other addresses box", () => {
+  const d = fx("map-c513");
+  const r = d.rows.find((x) => x.kind === "contract_receive");
+  const line = r.lines[0];
+  d.rows = [
+    {
+      ...r,
+      tx_hash: "0x" + "1".repeat(64),
+      kind: "wallet_receive",
+      lines: [
+        { ...line, token: "fpeth", amount_raw: "3" },
+        { ...line, token: "vpeth", amount_raw: "4" },
+      ],
+    },
+    {
+      ...r,
+      tx_hash: "0x" + "2".repeat(64),
+      kind: "wallet_send",
+      lines: [{ ...line, token: "vpeth", direction: "out", amount_raw: "5" }],
+    },
+  ];
+  d.total_rows = 2;
+  const f = buildPethMapFill(d, CTX);
+  assert.deepEqual(sums(f, PM.outside, MAP_HOLDER), { fpETH: "3", vpETH: "4" });
+  assert.deepEqual(sums(f, MAP_HOLDER, PM.outside), { vpETH: "5" });
 });
