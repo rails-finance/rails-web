@@ -17,7 +17,7 @@ import { txTrovesLine, txTrovesTail, type TxTrove } from "@/lib/liquity-v2/tx-tr
 
 const TROVE_PATH = LIQUITY_FORK_CARD_CONFIGS["liquity-v2"].trovePath;
 
-function TroveName({ t, txHash }: { t: TxTrove; txHash: string }) {
+export function TroveName({ t, txHash }: { t: TxTrove; txHash: string }) {
   const id = shortPositionId(t.troveId);
   return (
     <>

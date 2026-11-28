@@ -169,6 +169,19 @@ function delegateProv(clock: RateCooldownClock, chainId: ChainId): Provenance {
   };
 }
 
+/** The words for the row that set a clock, linked to its event page. */
+export function CooldownEventLink({ clock, positionPath }: { clock: RateCooldownClock; positionPath: string }) {
+  return (
+    <a
+      href={`${positionPath}/event/${encodeURIComponent(clock.row.id)}`}
+      className="underline decoration-dotted underline-offset-2"
+      data-rate-cooldown-event={clock.row.id}
+    >
+      {STARTED[clock.start]}
+    </a>
+  );
+}
+
 export function RateCooldownRow({
   state,
   now,
@@ -179,15 +192,7 @@ export function RateCooldownRow({
   positionPath: string;
 }) {
   const chainId = useChainId();
-  const eventLink = (clock: RateCooldownClock) => (
-    <a
-      href={`${positionPath}/event/${encodeURIComponent(clock.row.id)}`}
-      className="underline decoration-dotted underline-offset-2"
-      data-rate-cooldown-event={clock.row.id}
-    >
-      {STARTED[clock.start]}
-    </a>
-  );
+  const eventLink = (clock: RateCooldownClock) => <CooldownEventLink clock={clock} positionPath={positionPath} />;
   const batched = state.batchManager != null;
   const ends = dateTime(state.clock.endsAt);
   const left = cooldownLeft(state.clock.endsAt - now);

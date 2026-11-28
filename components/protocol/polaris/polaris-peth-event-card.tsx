@@ -94,7 +94,7 @@ function pethPlaceLinkOf(
 }
 
 /** The row's place line in T3. Null where the row has none. */
-function PlaceLine({ row }: { row: PethLedgerRow }) {
+export function PlaceLine({ row }: { row: PethLedgerRow }) {
   const to = pethPlaceLinkOf(row);
   if (!to) return null;
   return (

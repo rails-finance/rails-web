@@ -144,7 +144,7 @@ const fmtAbs = (h?: string): string => formatNumber(Math.abs(Number(h)));
 /** A transfer's other side, named as the header names it: the account number,
  *  with the wallet only when it is not the page's own. `counterparty` on a
  *  transfer leg is the other account's owner, which is usually this wallet. */
-function OtherAccount({ ctx, owner }: { ctx: DolomiteContext; owner?: string }) {
+export function OtherAccount({ ctx, owner }: { ctx: DolomiteContext; owner?: string }) {
   if (ctx.counterpartyAccountNumber == null)
     return ctx.counterparty ? (
       <>

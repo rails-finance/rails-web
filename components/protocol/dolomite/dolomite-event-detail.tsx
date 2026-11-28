@@ -340,6 +340,15 @@ function liquidationNotes(
   return out;
 }
 
+/** A transfer's other account, linked to its page. */
+export function OtherAccountLink({ other }: { other: { owner: string; number: string } }) {
+  return (
+    <Link href={`/ethereum/dolomite/${other.owner}/${other.number}`} className="font-medium text-foreground">
+      <DolomiteAccountLabel text={otherAccountName(other.number)} accountNumber={other.number} />
+    </Link>
+  );
+}
+
 /** The card's cells, ledgers, notes and prices. */
 export function useDolomiteCells({
   ctx,
@@ -514,10 +523,7 @@ export function useDolomiteCells({
     <>
       {other && (
         <p className="mt-2 px-5 text-xs text-rb-500" data-dolomite-other-account="">
-          {lead}{" "}
-          <Link href={`/ethereum/dolomite/${other.owner}/${other.number}`} className="font-medium text-foreground">
-            <DolomiteAccountLabel text={otherAccountName(other.number)} accountNumber={other.number} />
-          </Link>
+          {lead} <OtherAccountLink other={other} />
           {sameWallet ? " of this wallet" : ` of ${other.owner.slice(0, 6)}…${other.owner.slice(-4)}`}, inside Dolomite:
           no tokens left the protocol.
         </p>
