@@ -113,12 +113,12 @@ test("Liquity V2: a deposit's Trove in the transaction names the Trove", () => {
 
 test("Liquity V2: the cooldown's words name the event page and keep the verifier's hook", () => {
   const words = {
-    open: ["the Trove opened", "The opening&#x27;s event page"],
-    "open-batch": ["the Trove opened in the batch", "The opening&#x27;s event page"],
-    rate: ["the Trove&#x27;s rate changed", "The rate change&#x27;s event page"],
-    join: ["the Trove joined the batch", "The batch join&#x27;s event page"],
-    leave: ["the Trove left the batch", "The batch leave&#x27;s event page"],
-    "batch-rate": ["the delegate changed the batch&#x27;s rate", "The batch rate change&#x27;s event page"],
+    open: ["the Trove opened", "Opening event"],
+    "open-batch": ["the Trove opened in the batch", "Opening event"],
+    rate: ["the Trove&#x27;s rate changed", "Rate change event"],
+    join: ["the Trove joined the batch", "Batch join event"],
+    leave: ["the Trove left the batch", "Batch leave event"],
+    "batch-rate": ["the delegate changed the batch&#x27;s rate", "Batch rate change event"],
   };
   for (const [start, [value, page]] of Object.entries(words)) {
     const a = linked(after[`cooldown-${start}`], `${value}: ${page}`);

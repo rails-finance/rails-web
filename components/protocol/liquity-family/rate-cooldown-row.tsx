@@ -172,12 +172,12 @@ function delegateProv(clock: RateCooldownClock, chainId: ChainId): Provenance {
 
 /** The event page each start opens, as its tooltip names it. */
 const STARTED_EVENT: Record<CooldownStart, string> = {
-  open: "The opening's event page →",
-  "open-batch": "The opening's event page →",
-  rate: "The rate change's event page →",
-  join: "The batch join's event page →",
-  leave: "The batch leave's event page →",
-  "batch-rate": "The batch rate change's event page →",
+  open: "Opening event →",
+  "open-batch": "Opening event →",
+  rate: "Rate change event →",
+  join: "Batch join event →",
+  leave: "Batch leave event →",
+  "batch-rate": "Batch rate change event →",
 };
 
 /** The words for the row that set a clock, linked to its event page: a
