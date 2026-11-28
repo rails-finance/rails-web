@@ -37,6 +37,7 @@ import {
 } from "@/lib/shared/chains";
 import { KindRing, kindRingInner } from "@/components/shared/token-kind-ring";
 import { getLocalTokenIcon } from "@/lib/shared/local-token-icons";
+import { polarisRingedToken, type PolarisRingedToken } from "@/lib/polaris/token-rings";
 import { isPendlePt } from "@/lib/morpho/pendle-pt";
 import { PT_UNDERLYING_BASE, PT_UNDERLYING_MAINNET } from "@/lib/shared/pt-underlying";
 import { getTokenAddress } from "@/lib/shared/token-addresses";
@@ -120,7 +121,7 @@ export interface TokenChipIconProps {
 export function TokenChipIcon({
   symbol,
   iconOverride,
-  address,
+  address: callerAddress,
   size = 16,
   onClick,
   filterable = true,
@@ -153,7 +154,11 @@ export function TokenChipIcon({
   // failing both, the Ethereum table — the brand mark is the same on every
   // chain, so a Base page drawing "USDC" by symbol alone still finds it. The
   // overrides are Ethereum addresses by construction.
-  const rawLookup = iconOverride ?? symbol;
+  // Polaris's fpETH, vpETH and svpETH have no artwork: each draws pETH's
+  // mark, ringed from 20px (PolarisMark at the foot of this file).
+  const ringed = polarisRingedToken(callerAddress, iconOverride ?? symbol, chainId);
+  const rawLookup = ringed?.base.symbol ?? iconOverride ?? symbol;
+  const address = ringed?.base.address ?? callerAddress;
   // A principal token is a dated claim on another asset, and no CDN
   // hosts a mark for one — every PT address 404s on both tiers. Since every
   // such symbol begins "PT-", the letter glyph made all 149 of them (9,359
@@ -185,7 +190,7 @@ export function TokenChipIcon({
   const isPt = /^PT-/i.test(rawLookup);
   // A Pendle PT (isPendlePt: "PT-<asset>-<DMMMYYYY>") from 20px wears
   // Pendle's PT ring (PtMark below); the mark shrinks to sit inside it.
-  const ring = size >= 20 && isPendlePt(rawLookup);
+  const ring = size >= 20 && (isPendlePt(rawLookup) || !!ringed);
   const markSize = ring ? kindRingInner(size) : size;
   // Resolve as though the caller had asked for the underlying — symbol AND
   // address, so the local-PNG tiers get their chance too. The PT's own address
@@ -247,6 +252,12 @@ export function TokenChipIcon({
         untitled={untitled}
         fallback={fallback}
       />
+    );
+  if (ringed)
+    return (
+      <PolarisMark size={size} ringed={ringed} ring={ring}>
+        {chip}
+      </PolarisMark>
     );
   if (!isPt) return chip;
   return (
@@ -311,6 +322,38 @@ function PtMark({
       >
         PT
       </span>
+    </span>
+  );
+}
+
+/** A Polaris split token's icon: pETH's mark, inside the token's kind ring
+ *  from 20px and bare below it, with a tooltip naming the token at every
+ *  size, since the mark alone would read as pETH. */
+function PolarisMark({
+  size,
+  ringed,
+  ring,
+  children,
+}: {
+  size: number;
+  ringed: PolarisRingedToken;
+  ring: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      className="relative inline-flex shrink-0"
+      style={{ width: size, height: size }}
+      title={ringed.tip}
+      data-polaris-icon={ringed.ring}
+    >
+      {ring ? (
+        <KindRing ring={ringed.ring} size={size}>
+          {children}
+        </KindRing>
+      ) : (
+        children
+      )}
     </span>
   );
 }
