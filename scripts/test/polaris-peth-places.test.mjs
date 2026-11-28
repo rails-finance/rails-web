@@ -111,7 +111,7 @@ test("the T3 line reads verb and place", () => {
   );
 });
 
-test("a spine amount's words follow its own line's direction", () => {
+test("a spine amount's words follow its line's direction", () => {
   const add = row("lp_add", [line("lp_add", "lp_tripool", "in"), line("lp_add", "peth", "out")]);
   assert.equal(pethPlaceWords(add, POOL, NAMES, "in"), "Came from the Curve pETH/fpETH/vpETH pool", "the shares");
   assert.equal(pethPlaceWords(add, POOL, NAMES, "out"), "Went to the Curve pETH/fpETH/vpETH pool", "the tokens sent");

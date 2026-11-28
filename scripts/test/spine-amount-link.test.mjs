@@ -35,7 +35,7 @@ for (const name of ["liquityAdjust", "aaveWithdraw", "touch"]) {
   });
 }
 
-test("an amountLink outside Rails draws the spine as before the prop: the spine links Rails pages only", () => {
+test("an amountLink outside Rails leaves the spine as drawn without one", () => {
   assert.equal(rendered.linkedExternal, expected.liquityAdjust);
 });
 
