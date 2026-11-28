@@ -17,6 +17,7 @@ import { fmtSpine } from "@/lib/shared/spine-format";
 import { INLINE_LINK, INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 import { spineAmountPress } from "@/lib/shared/spine-amount-press";
 import { RevealTip } from "@/components/shared/reveal-tip";
+import { startNavigationProgressOnClick } from "@/components/nav/navigation-progress";
 export { fmtSpine };
 
 // ── Timeline scale ─────────────────────────────────────────────────────
@@ -142,9 +143,10 @@ export function SpineVal({
   );
 }
 
-/** The linked amount in the house tooltip (RevealTip, held open here): on a
- *  screen without hover the first tap opens the link's words with the link in
- *  them, and the second tap follows it (lib/shared/spine-amount-press.ts). */
+/** The linked amount in the house tooltip (RevealTip, held open here): a
+ *  touch or a pen opens the link's words with the link in them first, and a
+ *  second press follows it; a mouse click follows at once, and with no pointer
+ *  event `(hover: none)` decides (lib/shared/spine-amount-press.ts). */
 function SpineAmountLinkView({
   link,
   cls,
@@ -159,16 +161,25 @@ function SpineAmountLinkView({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  // Once a press has opened the tooltip the link says whether it is open;
+  // before that, and with a mouse or a keyboard, it is a plain link.
+  const [discloses, setDiscloses] = useState(false);
   const tipId = useId();
   // The pointer that pressed the link, read at its click; none for a
   // keyboard or a screen reader's activation.
   const pointer = useRef<string | undefined>(undefined);
   const common = {
     title: link.tip,
-    "aria-expanded": open,
+    "aria-expanded": discloses ? open : undefined,
     "aria-describedby": open ? tipId : undefined,
+    // The spine node stands above the rows around it while this is set.
+    "data-tip-open": open ? "" : undefined,
     onPointerDown: (e: React.PointerEvent) => {
       pointer.current = e.pointerType;
+    },
+    // A touch that turns into a scroll leaves no pointer behind.
+    onPointerCancel: () => {
+      pointer.current = undefined;
     },
     // The arrows are visual: the name reads the words alone.
     "aria-label": `${name}: ${link.tip.replace(/\s*[→↗]\s*$/u, "")}`,
@@ -183,6 +194,8 @@ function SpineAmountLinkView({
         keyboard: e.detail === 0,
       });
       if (!press.follow) e.preventDefault();
+      else if (!link.external) startNavigationProgressOnClick(e, link.href);
+      if (press.open) setDiscloses(true);
       setOpen(press.open);
     },
     // "marked" while the border is drawn, "plain" while Display has it off.
@@ -192,7 +205,10 @@ function SpineAmountLinkView({
   const tipLink = {
     className: `font-semibold ${INLINE_LINK}`,
     // The press belongs to the link.
-    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+    onClick: (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!link.external) startNavigationProgressOnClick(e, link.href);
+    },
   };
   const outside = { on: "outside", hoverless: false, keyboard: false } as const;
   return (

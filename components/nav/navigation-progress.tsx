@@ -58,6 +58,17 @@ let startFromOutside: () => void = () => {};
  *  the pathname, so it would hold the bar until STALL_MS (a wallet pill on a
  *  listing already filtered to that wallet). A no-op before the component
  *  mounts, and on the server. */
+/** Start the bar from a link's own onClick, for a link whose handler stops the
+ *  click before `window` (the spine's linked amount, a tooltip's link): a plain
+ *  left click only, as the window listener would take. */
+export function startNavigationProgressOnClick(
+  e: { button: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean },
+  href: string,
+): void {
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  startNavigationProgress(href);
+}
+
 export function startNavigationProgress(href?: string): void {
   if (href != null && typeof window !== "undefined") {
     try {

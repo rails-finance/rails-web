@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { spineAmountPress } from "../../lib/shared/spine-amount-press.ts";
 
-const OPEN_Z = " has-[[data-spine-amount-link][aria-expanded=true]]:z-50!";
+const OPEN_Z = " has-[[data-tip-open]]:z-50!";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const rendered = JSON.parse(
@@ -68,8 +68,9 @@ test("an amountLink wraps the amount alone, and the rest of the spine is unchang
     "the link stands in the house tooltip (RevealTip)",
   );
   assert.doesNotMatch(html, /role="tooltip"/, "the tooltip is closed at rest");
-  assert.match(whole, /aria-expanded="false"/, "the link says its tooltip is closed");
+  assert.doesNotMatch(whole, /aria-expanded/, "before a press opens its tooltip the link is a plain link");
   assert.doesNotMatch(whole, /aria-describedby/, "a closed tooltip describes nothing");
+  assert.doesNotMatch(whole, /data-tip-open/, "the node's raise is off at rest");
   assert.match(
     html,
     /data-spine-node=""[^>]*class="relative z-10 max-sm:z-30 max-sm:pointer-events-none/,
@@ -111,19 +112,53 @@ test("below 640px the number column and the group range stand above a linked nod
   const range = Number(/\.group-range \{\s*z-index: (\d+);/.exec(phone)?.[1]);
   assert.ok(range > node, `.group-range z-index ${range} is above the node's ${node} below 640px`);
   assert.match(css, /\.group-range \{[^}]*pointer-events: none;/, ".group-range passes taps through");
-  const open = Number(/aria-expanded=true\]\]:z-(\d+)!/.exec(read("components/shared/spine-column.tsx"))?.[1]);
+  const open = Number(/has-\[\[data-tip-open\]\]:z-(\d+)!/.exec(read("components/shared/spine-column.tsx"))?.[1]);
   assert.ok(open > num && open > range, `an open tooltip's node, z-${open}, is above .spine-num and .group-range`);
 });
 
-// RevealTip in interactive mode: a click anywhere in the bubble (its padding,
-// its arrow) stops at the bubble, so it never reaches the card row behind it.
-// Read from the source: the repo has no DOM to dispatch a click in.
-test("a click in an interactive RevealTip's bubble stops there", () => {
-  const src = readFileSync(path.join(REPO, "components/shared/reveal-tip.tsx"), "utf8");
+// The click rules around the tooltips, read from the source: the repo has no
+// DOM to dispatch a click in.
+const src = (f) => readFileSync(path.join(REPO, f), "utf8");
+test("a click in an interactive RevealTip's bubble stops there, and on its padding or arrow follows no link around it", () => {
   assert.match(
-    src,
-    /if \(interactive && bubbleRef\.current\?\.contains\(e\.target as Node\)\) \{\s*e\.stopPropagation\(\);\s*return;\s*\}/,
+    src("components/shared/reveal-tip.tsx"),
+    /if \(interactive && bubbleRef\.current\?\.contains\(e\.target as Node\)\) \{\s*const control = \(e\.target as Element\)\.closest\("a\[href\],button"\);\s*if \(!control \|\| !bubbleRef\.current\.contains\(control\)\) e\.preventDefault\(\);\s*e\.stopPropagation\(\);\s*return;\s*\}/,
   );
+});
+test("the links that stop their click start the progress bar themselves", () => {
+  const spine = src("components/shared/activity-timeline.tsx");
+  assert.match(
+    spine,
+    /else if \(!link\.external\) startNavigationProgressOnClick\(e, link\.href\);/,
+    "the spine amount, when its press follows",
+  );
+  assert.match(
+    spine,
+    /onClick: \(e: React\.MouseEvent\) => \{\s*e\.stopPropagation\(\);\s*if \(!link\.external\) startNavigationProgressOnClick\(e, link\.href\);/,
+    "the link in its tooltip",
+  );
+  assert.match(
+    src("components/shared/holder-label.tsx"),
+    /onClick=\{\(e\) => startNavigationProgressOnClick\(e, href\)\}/,
+    "the holder label's Open the vault page",
+  );
+  assert.match(
+    src("components/nav/navigation-progress.tsx"),
+    /if \(e\.button !== 0 \|\| e\.metaKey \|\| e\.ctrlKey \|\| e\.shiftKey \|\| e\.altKey\) return;\s*startNavigationProgress\(href\);/,
+    "a plain left click only",
+  );
+});
+test("a touch that turns into a scroll leaves no pointer behind", () => {
+  assert.match(
+    src("components/shared/activity-timeline.tsx"),
+    /onPointerCancel: \(\) => \{\s*pointer\.current = undefined;/,
+  );
+});
+test("the link says whether its tooltip is open only once a press has opened it", () => {
+  const spine = src("components/shared/activity-timeline.tsx");
+  assert.match(spine, /"aria-expanded": discloses \? open : undefined,/);
+  assert.match(spine, /if \(press\.open\) setDiscloses\(true\);/);
+  assert.match(spine, /"data-tip-open": open \? "" : undefined,/);
 });
 
 // A press on the linked amount (lib/shared/spine-amount-press.ts): a touch or
