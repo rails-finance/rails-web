@@ -251,8 +251,8 @@ function ConfirmationLine({
                 {i > 0 && ", "}
                 <LinkedValue
                   explorer={{ chainId, kind: "tx-logs", value: d.txHash }}
-                  context={`Transaction ${d.txHash.slice(0, 10)}…`}
-                  label={`Transaction ${d.txHash.slice(0, 10)}…`}
+                  context={`Transaction ${d.txHash.slice(0, 6)}…${d.txHash.slice(-4)}`}
+                  label={`Transaction ${d.txHash.slice(0, 6)}…${d.txHash.slice(-4)}`}
                   className="link-external"
                 >
                   {d.txHash.slice(0, 10)}…

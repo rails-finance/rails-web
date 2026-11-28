@@ -53,8 +53,21 @@ for (const [name, explorer, host] of [
   });
 }
 
-test("an explorer link on a chain with no explorer in lib/shared/chains.ts throws", () => {
-  assert.equal(r.unknownChain, "LinkedValue: no explorer for chain 137");
+test("every chain lib/shared/chains.ts names links its explorer", () => {
+  const all = Object.entries(r.everyChain);
+  assert.ok(all.length >= 7);
+  for (const [id, c] of all) {
+    assert.ok(c.host && c.name, `chain ${id} has an explorer`);
+    assert.equal(c.href, `${c.host}/block/1`, `chain ${id}'s link opens its explorer`);
+    assert.equal(c.tip, `View on ${c.name} ↗`);
+  }
+});
+
+test("on a chain with no explorer in lib/shared/chains.ts the value renders plain, warning once", () => {
+  for (const html of r.unknownChain.html) assert.equal(html, '<span class="font-mono">0x5c50…2060</span>');
+  assert.deepEqual(r.unknownChain.warnings, [
+    '[LinkedValue] no explorer for chain 137: "0x5c50…2060" renders unlinked',
+  ]);
 });
 
 test("hover opens and closes the tooltip for a mouse alone", () => {

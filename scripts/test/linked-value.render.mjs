@@ -4,6 +4,7 @@
 import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LinkedValue, linkedValueHref, linkedValueTip } from "@/components/shared/linked-value";
+import { CHAINS } from "@/lib/shared/chains";
 
 const TX = "0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060";
 const CASES = {
@@ -28,11 +29,30 @@ const out = {};
 for (const [k, c] of Object.entries(CASES)) {
   out[k] = { html: renderToStaticMarkup(h(LinkedValue, c, c.label)), tip: linkedValueTip(c), href: linkedValueHref(c) };
 }
-// A chain lib/shared/chains.ts does not name (Polygon) has no explorer.
-try {
-  linkedValueHref({ explorer: { chainId: 137, kind: "tx", value: TX } });
-  out.unknownChain = null;
-} catch (e) {
-  out.unknownChain = e.message;
-}
+// A chain lib/shared/chains.ts does not name (Polygon) renders the value
+// plain, and warns once.
+const warnings = [];
+const warn = console.warn;
+console.warn = (...a) => warnings.push(a.join(" "));
+const polygon = { explorer: { chainId: 137, kind: "tx", value: TX }, label: "0x5c50…2060", className: "font-mono" };
+out.unknownChain = {
+  html: [1, 2].map(() => renderToStaticMarkup(h(LinkedValue, polygon, polygon.label))),
+  warnings,
+};
+console.warn = warn;
+// Every chain the registry names, linked to its block.
+out.everyChain = Object.fromEntries(
+  Object.keys(CHAINS).map((id) => {
+    const d = { explorer: { chainId: Number(id), kind: "block", value: 1 } };
+    return [
+      id,
+      {
+        href: linkedValueHref(d),
+        tip: linkedValueTip(d),
+        host: CHAINS[id].explorerBase,
+        name: CHAINS[id].explorerName,
+      },
+    ];
+  }),
+);
 process.stdout.write(JSON.stringify(out));

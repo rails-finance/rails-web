@@ -6,7 +6,8 @@
 // name as the link ("Trove 123 →"). An explorer link's is the context line
 // ("Went to the Curve pETH/fpETH/vpETH pool"), then the link "View on
 // Etherscan ↗"; the chain, the kind and the value build the href and name the
-// explorer, both from lib/shared/chains.ts, and an unknown chain throws. The timeline
+// explorer, both from lib/shared/chains.ts; on a chain that file does not
+// name the value renders plain, with no link or tooltip. The timeline
 // spine links Rails pages only. The value keeps its look at rest and takes
 // the underline and the focus ring on hover and focus; on a screen without
 // hover it rests on a dotted hairline underline.
@@ -72,27 +73,45 @@ export type LinkedValueProps = Destination & {
   dataAttrs?: Record<`data-${string}`, string | undefined>;
 };
 
-/** The explorer page's chain, which must be one lib/shared/chains.ts names:
- *  `chainMeta` falls back to Ethereum's, and a link would then name one
- *  explorer and open another chain's page on it. */
-function knownChain(chainId: ChainId): ChainId {
-  if (!(chainId in CHAINS)) throw new Error(`LinkedValue: no explorer for chain ${chainId}`);
-  return chainId;
+/** Whether lib/shared/chains.ts names the chain. `chainMeta` falls back to
+ *  Ethereum's, so a link on another chain would name one explorer and open
+ *  that chain's page on it. */
+export function hasExplorer(chainId: ChainId): boolean {
+  return chainId in CHAINS;
 }
 
-/** The tooltip's words for a destination. */
+/** The tooltip's words for a destination whose chain has an explorer. */
 export function linkedValueTip(d: Destination): string {
-  return d.explorer ? `View on ${chainMeta(knownChain(d.explorer.chainId)).explorerName} ↗` : d.tip;
+  return d.explorer ? `View on ${chainMeta(d.explorer.chainId).explorerName} ↗` : d.tip;
 }
 
-/** Where a destination opens. */
+/** Where a destination whose chain has an explorer opens. */
 export function linkedValueHref(d: Destination): string {
   if (!d.explorer) return d.href;
   const { chainId, kind, value } = d.explorer;
-  return explorerUrl(knownChain(chainId), kind, value);
+  return explorerUrl(chainId, kind, value);
 }
 
+/** The chains already warned about, so a page warns once per chain. */
+const warned = new Set<number>();
+
 export function LinkedValue(props: LinkedValueProps) {
+  if (props.explorer && !hasExplorer(props.explorer.chainId)) {
+    const { chainId } = props.explorer;
+    if (process.env.NODE_ENV !== "production" && !warned.has(chainId)) {
+      warned.add(chainId);
+      console.warn(`[LinkedValue] no explorer for chain ${chainId}: "${props.label}" renders unlinked`);
+    }
+    return (
+      <span className={props.className} {...props.dataAttrs}>
+        {props.children}
+      </span>
+    );
+  }
+  return <LinkedValueLink {...props} />;
+}
+
+function LinkedValueLink(props: LinkedValueProps) {
   const { label, children, className, align = "start", dataAttrs } = props;
   const href = linkedValueHref(props);
   const tip = linkedValueTip(props);

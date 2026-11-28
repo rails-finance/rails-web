@@ -97,7 +97,7 @@ for (const c of CHAINS) {
   });
 
   test(`a transaction in prose names it and the explorer: ${c}`, () => {
-    external(linked(after[`tx-${c}`], `Transaction 0x5c504e…2060, View on ${explorer}`), `${host}/tx/${TX}#eventlog`);
+    external(linked(after[`tx-${c}`], `Transaction 0x5c50…2060, View on ${explorer}`), `${host}/tx/${TX}#eventlog`);
   });
 
   test(`the boundary card's block names it and the explorer: ${c}`, () => {
@@ -107,7 +107,7 @@ for (const c of CHAINS) {
   test(`the coverage footer's blocks and dropped transaction name the explorer: ${c}`, () => {
     const html = after[`coverage-${c}`];
     for (const b of ["12,000,000", "11,000,000"]) linked(html, `Block ${b}, View on ${explorer}`);
-    external(linked(html, `Transaction 0x5c504ed4…, View on ${explorer}`), `${host}/tx/${TX}#eventlog`);
+    external(linked(html, `Transaction 0x5c50…2060, View on ${explorer}`), `${host}/tx/${TX}#eventlog`);
   });
 
   test(`a vault row's counterparty names the address and the explorer: ${c}`, () => {
@@ -162,7 +162,7 @@ test("an address with a Rails page names the page", () => {
 test("prose links its address, its transaction and its words, each naming where it goes", () => {
   const html = after.prose;
   linked(html, "Wallet 0x1234…5678");
-  linked(html, "Transaction 0x5c504e…2060, View on Etherscan");
+  linked(html, "Transaction 0x5c50…2060, View on Etherscan");
   const a = linked(html, "the trade: This trade on the wallet&#x27;s CoW page");
   assert.match(a, /data-prose-link=""/);
   assert.match(a, /href="\/wallet\/0x1234\/cow"/);
