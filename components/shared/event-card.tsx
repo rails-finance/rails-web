@@ -1070,10 +1070,11 @@ function EventCardView(props: EventCardProps) {
                 the card in the DOM, so the keyboard reaches the header first.
                 Below 640px it stands above a node with a linked amount
                 (spine-column.tsx, max-sm:z-30), whose ground can reach the
-                row's left edge when its flanks are wide. */}
+                row's left edge when its flanks are wide; it passes taps
+                through, so a tap on that amount opens its link. */}
             {!pageMode && (
               <div
-                className={`spine-num absolute z-20 max-sm:z-40 w-11 justify-center ${inTimeline ? "flex" : "hidden sm:flex"}`}
+                className={`spine-num absolute z-20 max-sm:z-40 max-sm:pointer-events-none w-11 justify-center ${inTimeline ? "flex" : "hidden sm:flex"}`}
                 data-number-column=""
               >
                 {numberSlot ?? numberNode}

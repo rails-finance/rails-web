@@ -319,6 +319,25 @@ export function pethPlaces(d: PolarisPethResponse): PethPlaces {
 /** The row's key on the page: its transaction (one row per transaction). */
 export const pethRowId = (r: Pick<PethLedgerRow, "tx_hash">): string => r.tx_hash.toLowerCase();
 
+/** The event page's read of a row by `tx` (peth-view.tsx), kept with the tx it
+ *  was for, so a read for one pinned event never answers for the next. */
+export type PethPinnedFetch = { tx: string; row: PethLedgerRow | null; read: "loading" | "done" | "failed" };
+
+/** The pinned row's read for the timeline: "loading" (the skeleton) from the
+ *  moment a pinned tx the page has not loaded is set until its read returns,
+ *  "failed" where that read failed, and undefined where the page holds the
+ *  row, the read returned (with or without a row) or the id is not a tx. */
+export function pethPinnedRead(
+  fetch: PethPinnedFetch | null,
+  pinnedTx: string | null,
+  pinnedLoaded: boolean,
+): "loading" | "failed" | undefined {
+  if (!pinnedTx || pinnedLoaded || !/^0x[0-9a-f]{64}$/.test(pinnedTx)) return undefined;
+  const current = fetch?.tx === pinnedTx ? fetch : null;
+  if (current?.row && pethRowId(current.row) === pinnedTx) return undefined;
+  return current?.read === "failed" ? "failed" : current?.read === "done" ? undefined : "loading";
+}
+
 /** A token's lines that moved the address's wallet: a transfer backs each.
  *  The server's `liquidated` line (a CDP's collateral, which never sat in the
  *  wallet) and a MultiSwap-only zap line (no log of its own) are left out, so

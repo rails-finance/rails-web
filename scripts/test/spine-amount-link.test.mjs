@@ -62,18 +62,23 @@ test("an amountLink wraps the amount alone, and the rest of the spine is unchang
 
 // Below 640px a node with a linked amount stands at max-sm:z-30 in the row's
 // stacking context, and a wide node's ground reaches the number column at the
-// row's left edge: the number and a group's range stand above it.
+// row's left edge: the number and a group's range stand above it and pass
+// taps through, so a tap on an amount under them opens its link.
 test("below 640px the number column and the group range stand above a linked node", () => {
   const read = (f) => readFileSync(path.join(REPO, f), "utf8");
   const node = Number(
-    /data-spine-node[\s\S]*?max-sm:z-(\d+) max-sm:pointer-events-none/.exec(
+    /rows\.some\(\(r\) => r\.amountLink\) \? " max-sm:z-(\d+) max-sm:pointer-events-none"/.exec(
       read("components/shared/spine-column.tsx"),
-    )[1],
+    )?.[1],
   );
-  const num = Number(/spine-num absolute z-20 max-sm:z-(\d+)/.exec(read("components/shared/event-card.tsx"))?.[1]);
+  assert.ok(node > 0, "the linked node's phone z-index is read from its class string");
+  const numClass = /className=\{`spine-num ([^$`]*)/.exec(read("components/shared/event-card.tsx"))?.[1] ?? "";
+  const num = Number(/max-sm:z-(\d+)/.exec(numClass)?.[1]);
   assert.ok(num > node, `.spine-num max-sm:z-${num} is above the node's max-sm:z-${node}`);
+  assert.match(numClass, /max-sm:pointer-events-none/, ".spine-num passes taps through below 640px");
   const css = read("app/globals.css");
   const phone = css.slice(css.indexOf("@media (max-width: 639.98px)", css.indexOf(".spine-row {")));
   const range = Number(/\.group-range \{\s*z-index: (\d+);/.exec(phone)?.[1]);
   assert.ok(range > node, `.group-range z-index ${range} is above the node's ${node} below 640px`);
+  assert.match(css, /\.group-range \{[^}]*pointer-events: none;/, ".group-range passes taps through");
 });
