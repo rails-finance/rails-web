@@ -1,13 +1,13 @@
-// The ring round a token icon that names what kind of token the mark stands
-// for. Pendle's PT and YT wear Pendle's PT green or YT blue
-// (`--color-pendle-*`, app/globals.css), the colours the Pendle app gives the
-// two tokens and the ring Aave draws round PT collateral, so a reader coming
-// from either sees the same split. Polaris's fpETH, vpETH and svpETH wear
+// The ring round a token icon, naming the kind of token the mark stands for.
+// Pendle's PT and YT wear Pendle's PT green or YT blue (`--color-pendle-*`,
+// app/globals.css), the colours the Pendle app gives the two tokens and the
+// ring Aave draws round PT collateral, so a reader coming from either sees the
+// same split. Polaris's fpETH, vpETH and svpETH wear
 // pETH's mark inside a ring (ui-jobs 871): fpETH, the floor part, a calm ring
 // in the muted-text grey (rb-500); vpETH, the part above the floor, a brighter
 // ring in purple, the hue of pETH's mark; svpETH, staked vpETH, vpETH's ring
-// with a small lock in the top-right corner, the one corner the spine's badges
-// leave free.
+// with a purple disc top-right (a lock in it from 28px), a corner the spine's
+// badges leave free.
 //
 // The ring sits inside the icon's box, the mark shrunk to fit with a gap of
 // page ground between them, so a ringed node keeps the footprint of a bare one
