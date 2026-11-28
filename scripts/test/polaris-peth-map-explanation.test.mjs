@@ -24,7 +24,9 @@ register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
 const { buildPethMapFill } = await import("../../lib/polaris/peth-map-fill.ts");
 const { pethMapExplanation } = await import("../../lib/polaris/peth-map-explanation.ts");
-const { POLARIS_MAP_LAYOUT, POLARIS_POOL_NAME, PM, pmEdge } = await import("../../lib/polaris/peth-map-layout.ts");
+const { POLARIS_LOAN_NAME, POLARIS_LOAN_ONE, POLARIS_MAP_LAYOUT, POLARIS_POOL_NAME, PM, pmEdge } = await import(
+  "../../lib/polaris/peth-map-layout.ts"
+);
 const { MAP_HOLDER, mapExact, mapPartText, mapSeries, mapUnusedWords, usedNodes } = await import(
   "../../lib/shared/protocol-map/types.ts"
 );
@@ -130,11 +132,44 @@ const JUDGE =
   /\b(safe|safer|risky|riskier|healthy|dangerous|good|bad|cheap|expensive|protect|opportunity|should|recommend|you|your)\b/i;
 const MACHINERY = /\b(fill|route|server|Rails|index|indexed|decoded|row|rows)\b/;
 
+/** Every group of every tab, and one tab's groups. */
+const all = (x) => x.tabs.flatMap((t) => t.groups);
+const tab = (x, key) => x.tabs.find((t) => t.key === key)?.groups ?? [];
+const bulletCount = (groups) => groups.reduce((n, g) => n + g.bullets.length, 0);
+
+/** Z1's pane (§2.1): 8 bullets, 4 groups, 150 words over bullets and headings,
+ *  3 words a heading. */
+function assertPane(groups, label) {
+  assert.ok(bulletCount(groups) <= 8, `${label}: ${bulletCount(groups)} bullets`);
+  assert.ok(groups.length <= 4, `${label}: ${groups.length} groups`);
+  const words = groups.reduce(
+    (n, g) =>
+      n +
+      (g.heading ? g.heading.split(/\s+/).length : 0) +
+      (g.lead ? measure(g.lead).words : 0) +
+      g.bullets.reduce((m, b) => m + measure(b.parts).words, 0),
+    0,
+  );
+  assert.ok(words <= 150, `${label}: ${words} words`);
+  for (const g of groups) if (g.heading) assert.ok(g.heading.split(/\s+/).length <= 3, `heading "${g.heading}"`);
+}
+
 for (const [name, fill] of CASES) {
   const x = pethMapExplanation(fill, XC);
 
+  test(`${name}: each tab's pane keeps Z1's limits`, () => {
+    assert.deepEqual(
+      x.tabs.map((t) => [t.key, t.label]),
+      [
+        ["explanation", "Explanation"],
+        ["parts", "Parts"],
+      ],
+    );
+    for (const t of x.tabs) assertPane(t.groups, `${name} ${t.key}`);
+  });
+
   test(`${name}: every bullet keeps Z1's limits`, () => {
-    for (const g of x.groups) {
+    for (const g of all(x)) {
       assert.ok(g.bullets.length <= 4, `${g.id}: ${g.bullets.length} bullets`);
       if (g.lead) {
         const m = measure(g.lead);
@@ -151,7 +186,7 @@ for (const [name, fill] of CASES) {
   });
 
   test(`${name}: no gain, no judgement, no machinery, and this address the subject`, () => {
-    for (const g of x.groups)
+    for (const g of all(x))
       for (const parts of [g.lead ?? [], ...g.bullets.map((b) => b.parts)]) {
         const t = text(parts);
         assert.doesNotMatch(t, GAIN, t);
@@ -169,7 +204,7 @@ for (const [name, fill] of CASES) {
     for (const e of Object.values(fill.edges)) for (const a of e.amounts) put(a, a.receipt ?? e.receipt);
     for (const n of Object.values(fill.nodes))
       for (const l of n.lines) for (const a of l.amounts) put(a, a.receipt ?? l.receipt);
-    for (const g of x.groups)
+    for (const g of all(x))
       for (const parts of [g.lead ?? [], ...g.bullets.map((b) => b.parts)])
         for (const p of parts) {
           if (typeof p === "object" && "figure" in p) {
@@ -182,14 +217,14 @@ for (const [name, fill] of CASES) {
             const s = (typeof p === "string" ? p : p.link)
               .replace(/#\d+/g, "")
               .replace(fill.counted.rows.toLocaleString("en-US"), "");
-            const skipped = s.match(/^(\d+) more steps$/);
+            const skipped = s.match(/^(\d+) more steps?$/);
             assert.ok(!/\d/.test(skipped ? "" : s), `a number in words: ${s}`);
           }
         }
   });
 
   test(`${name}: the untouched line names the dashed boxes`, () => {
-    const line = x.groups.find((g) => g.id === "unused");
+    const line = tab(x, "parts").find((g) => g.id === "unused");
     if (fill.edgesUnknown) {
       assert.equal(line, undefined);
       return;
@@ -207,24 +242,27 @@ for (const [name, fill] of CASES) {
   });
 
   test(`${name}: the state's groups`, () => {
-    const ids = x.groups.map((g) => g.id);
+    const ids = tab(x, "explanation").map((g) => g.id);
+    const partIds = tab(x, "parts").map((g) => g.id);
     if (fill.edgesUnknown) {
       // Only what sits where now, and the parts that hold it.
       assert.deepEqual(
-        ids.filter((id) => !id.startsWith("now") && !id.startsWith("parts")),
+        ids.filter((id) => !id.startsWith("now")),
         [],
       );
       assert.ok(ids.includes("now"));
-      for (const g of x.groups) for (const b of g.bullets) assert.ok(!b.parts.some((p) => p.when), "no time");
+      assert.deepEqual(partIds, ["parts"]);
+      for (const g of all(x)) for (const b of g.bullets) assert.ok(!b.parts.some((p) => p.when), "no time");
       return;
     }
     assert.equal(ids[0], "did");
-    assert.ok(ids.includes("now") && ids.includes("parts") && ids.includes("unused"));
-    const did = x.groups[0];
+    assert.ok(ids.includes("now"));
+    assert.deepEqual(partIds, ["parts", "unused"]);
+    const did = tab(x, "explanation")[0];
     if (fill.counted.rows < fill.counted.total) {
       assert.equal(text(did.lead), `These steps cover the newest ${fill.counted.rows} transactions.`);
       // The arrows carry no amounts past the first read, so the story states none.
-      for (const g of x.groups.filter((g) => g.id === "did" || g.id === "then"))
+      for (const g of all(x).filter((g) => g.id === "did" || g.id === "then"))
         for (const b of g.bullets) assert.ok(!b.parts.some((p) => p.figure), text(b.parts));
     } else assert.equal(did.lead, undefined);
   });
@@ -232,36 +270,38 @@ for (const [name, fill] of CASES) {
 
 test("0x38d7: the drawer's words", () => {
   const x = pethMapExplanation(full("map-38d7"), XC);
-  const out = x.groups.map((g) => [g.heading ?? null, g.bullets.map((b) => text(b.parts))]);
-  assert.deepEqual(out, [
+  const words = (key) => tab(x, key).map((g) => [g.heading ?? null, g.bullets.map((b) => text(b.parts))]);
+  assert.deepEqual(words("explanation"), [
     [
-      "What this address did",
+      "Its steps",
       [
         "First, from 18 Aug 2026, 11:26 to 11:28, it paid 30 WETH through the zap router for pETH and fpETH.",
         "The bonding curve took 0.173605765590902838 pETH of it in fees.",
       ],
     ],
     [
-      "Then",
+      null,
       [
         "Then, from 11:28 to 11:29, it put 11 pETH into USDp CDP #36 and GOLDp CDP #22.",
-        "Most recently, at 11:30, it put 5 fpETH into reserve loan #28 as collateral.",
+        `Most recently, at 11:30, it put 5 fpETH into ${POLARIS_LOAN_ONE} #28 as collateral.`,
       ],
     ],
     [
       "Now",
       [
-        "Its CDPs held 10.925 pETH at their last touch, and loan #28 holds 5 fpETH.",
+        `Its CDPs held 10.925 pETH at their last touch, and ${POLARIS_LOAN_ONE} #28 holds 5 fpETH.`,
         "It now holds 0.457336014283415572 pETH and 3.778050067873262182 fpETH.",
       ],
     ],
+  ]);
+  assert.deepEqual(words("parts"), [
     [
-      "What each part does",
+      null,
       [
         "Zap router: trades ETH for Polaris tokens in one transaction.",
         "Bonding curve: mints pETH against ETH and burns pETH to release ETH; its fees go to the fee router.",
         "CDPs: lock pETH as collateral to mint USDp or GOLDp.",
-        "Reserve loans: lend the reserve's ETH against fpETH collateral.",
+        `${POLARIS_LOAN_NAME}: lend ETH from the bonding curve reserve against fpETH collateral.`,
       ],
     ],
     [
@@ -272,39 +312,63 @@ test("0x38d7: the drawer's words", () => {
     ],
   ]);
   // Each time links to its event on the timeline: the arrow's first, and its last.
-  const first = x.groups[0].bullets[0].parts.find((p) => p.when).when;
+  const first = tab(x, "explanation")[0].bullets[0].parts.find((p) => p.when).when;
   const f = full("map-38d7").edges[pmEdge(PM.eth, PM.zap)];
   assert.equal(first.from.href, XC.eventHref(f.first.id));
   assert.equal(first.to.href, XC.eventHref(f.last.id));
   // The CDPs' "?" opens Polaris's market modal.
-  assert.equal(x.groups[3].bullets[2].learnMore, "market");
+  assert.equal(tab(x, "parts")[0].bullets[2].learnMore, "market");
 });
 
 test("0xc513: the story's order, the other tokens' bullet and its span", () => {
+  // With Now's three bullets, the story keeps five: the earliest three and the
+  // latest two, and a line to the two between.
   const x = pethMapExplanation(full("map-c513"), XC);
-  const did = x.groups[0].bullets.map((b) => text(b.parts));
-  const then = x.groups[1].bullets.map((b) => text(b.parts));
-  assert.equal(did.length, 4);
+  const g = tab(x, "explanation");
+  assert.deepEqual(
+    g.map((x) => [x.id, x.heading ?? null, x.bullets.length]),
+    [
+      ["did", "Its steps", 3],
+      ["more", null, 0],
+      ["then", null, 2],
+      ["now", "Now", 3],
+    ],
+  );
+  const did = g[0].bullets.map((b) => text(b.parts));
   assert.match(did[0], /^First, from 18 Aug 2026, 04:09 to 04:18, it paid 60 WETH through the zap router/);
   assert.match(did[1], /^The bonding curve took 0\.3637\d+ pETH of it in fees\.$/);
   assert.match(did[2], /^At 04:10, it received 20\.75\d+ pETH from other addresses\.$/);
-  assert.equal(
-    did[3],
-    "From 04:14 to 04:20, it bought vpETH, USDp, GOLDp and POLAR through the zap router; these are not counted in ETH here.",
+  assert.equal(text(g[1].lead), "… and 2 more steps, in the timeline.");
+  // The two skipped: the other tokens' zaps and the svpETH stake.
+  const link = g[1].lead.find((p) => typeof p === "object" && "link" in p);
+  assert.equal(link.href, XC.edgesHref([pmEdge(PM.zap, PM.other), pmEdge(MAP_HOLDER, PM.svpeth)]));
+  assert.deepEqual(
+    g[2].bullets.map((b) => text(b.parts)),
+    [
+      "Then, from 04:30 to 04:33, it put 9.569186061655532494 pETH along with fpETH and vpETH into the pools.",
+      "Most recently, at 04:34, it traded 2.107623962359256268 fpETH through the zap router.",
+    ],
   );
-  assert.deepEqual(then, [
-    "Then, at 04:21, it staked 20 vpETH in the svpETH vault.",
-    "From 04:30 to 04:33, it put 9.569186061655532494 pETH along with fpETH and vpETH into the pools.",
-    "Most recently, at 04:34, it traded 2.107623962359256268 fpETH through the zap router.",
-  ]);
   assert.equal(
-    text(x.groups.find((g) => g.id === "unused").bullets[0].parts),
-    `Not used by this address: CDPs, the ${POLARIS_POOL_NAME}, reserve loans, the Splitter and Morpho Blue.`,
+    text(tab(x, "parts").find((g) => g.id === "unused").bullets[0].parts),
+    `Not used by this address: CDPs, the ${POLARIS_POOL_NAME}, ${POLARIS_LOAN_NAME}, the Splitter and Morpho Blue.`,
   );
 });
 
-test("past eight bullets: the earliest four, a line to the rest in the timeline, the latest four", () => {
-  // A fill with ten steps, one a minute, each on its own arrow.
+test("0xc513 partial: the other tokens' bullet names none and keeps its span", () => {
+  const x = pethMapExplanation(partial("map-c513"), XC);
+  const t = all(x).flatMap((g) => g.bullets.map((b) => text(b.parts)));
+  assert.ok(
+    t.includes(
+      "From 04:14 to 04:20, it bought other tokens through the zap router; these are not counted in ETH here.",
+    ),
+  );
+  assert.equal(text(tab(x, "explanation")[1].lead), "… and 1 more step, in the timeline.");
+});
+
+/** A fill with ten steps, one a minute, each on its own arrow; `held`
+ *  amounts give the address a "now". */
+function tenSteps(held = []) {
   const amt = (asset) => ({ asset, raw: "1000000000000000000", decimals: 18 });
   const arrows = [
     [PM.outside, MAP_HOLDER],
@@ -327,27 +391,54 @@ test("past eight bullets: the earliest four, a line to the rest in the timeline,
     edges[id] = { amounts: [amt("pETH")], rowCount: 1, timelineHref: "", receipt: R(id), first: end, last: end };
     rows.push({ id: end.id, edgeIds: [id], at: end.at });
   });
-  const fill = {
+  return {
     subject: { address: "0x", chain: "sepolia", asOf: { block: null, time: null } },
-    nodes: {},
+    nodes:
+      held.length > 0
+        ? { [MAP_HOLDER]: { lines: [{ label: "now", amounts: held.map(amt), receipt: R("held") }] } }
+        : {},
     edges,
     rows,
     counted: { rows: 10, total: 10 },
   };
-  const x = pethMapExplanation(fill, XC);
+}
+
+test("past eight bullets: the earliest four, a line to the rest in the timeline, the latest four", () => {
+  const x = pethMapExplanation(tenSteps(), XC);
+  const g = tab(x, "explanation");
   assert.deepEqual(
-    x.groups.slice(0, 3).map((g) => [g.id, g.bullets.length]),
+    g.map((x) => [x.id, x.heading ?? null, x.bullets.length]),
     [
-      ["did", 4],
-      ["more", 0],
-      ["then", 4],
+      ["did", "Its steps", 4],
+      ["more", null, 0],
+      ["then", null, 4],
     ],
   );
-  const more = x.groups[1].lead;
+  assertPane(g, "ten steps");
+  const more = g[1].lead;
   assert.equal(text(more), "… and 2 more steps, in the timeline.");
   const link = more.find((p) => typeof p === "object" && "link" in p);
   assert.equal(link.href, XC.edgesHref([pmEdge(PM.sp, MAP_HOLDER), pmEdge(MAP_HOLDER, PM.loan)]));
-  assert.match(text(x.groups[0].bullets[0].parts), /^First, at 18 Aug 2026, 10:00, it received/);
-  assert.match(text(x.groups[2].bullets[0].parts), /^Then, at 10:06, it took 1 pETH out of its reserve loans\./);
-  assert.match(text(x.groups[2].bullets[3].parts), /^Most recently, at 10:09, it put/);
+  assert.match(text(g[0].bullets[0].parts), /^First, at 18 Aug 2026, 10:00, it received/);
+  assert.match(text(g[2].bullets[0].parts), /^Then, at 10:06, it took 1 pETH out of its Floor Loans\./);
+  assert.match(text(g[2].bullets[3].parts), /^Most recently, at 10:09, it put/);
+});
+
+test("with Now in the pane, the story takes what is left of eight bullets", () => {
+  // Four balances: two Now bullets, so six story bullets.
+  const x = pethMapExplanation(tenSteps(["pETH", "fpETH", "vpETH", "svpETH"]), XC);
+  const g = tab(x, "explanation");
+  assert.deepEqual(
+    g.map((x) => [x.id, x.bullets.length]),
+    [
+      ["did", 3],
+      ["more", 0],
+      ["then", 3],
+      ["now", 2],
+    ],
+  );
+  assert.equal(bulletCount(g), 8);
+  assertPane(g, "ten steps and Now");
+  assert.equal(text(g[1].lead), "… and 4 more steps, in the timeline.");
+  assert.match(text(g[2].bullets[2].parts), /^Most recently, at 10:09, /);
 });

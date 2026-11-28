@@ -28,7 +28,7 @@
 import type { PethLedgerLine, PethLedgerRow, PethPlace, PolarisPethResponse } from "../sources/api/polaris-peth";
 import type { MapAmount, MapFill, MapLine, MapReceipt } from "../shared/protocol-map/types";
 import { MAP_HOLDER, spanWith } from "../shared/protocol-map/types";
-import { PM, PM_NODE_OF_PLACE, POLARIS_MAP_LAYOUT, pmEdge } from "./peth-map-layout";
+import { PM, PM_NODE_OF_PLACE, POLARIS_LOAN_ONE, POLARIS_MAP_LAYOUT, pmEdge } from "./peth-map-layout";
 
 const ZERO = BigInt(0);
 const big = (raw: string | null | undefined): bigint => {
@@ -470,7 +470,7 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
         }
       : null,
     ...loans.map((l) => {
-      const text = `Reserve loan #${l.loan_id}`;
+      const text = `${POLARIS_LOAN_ONE} #${l.loan_id}`;
       return {
         label: "note" as const,
         text,

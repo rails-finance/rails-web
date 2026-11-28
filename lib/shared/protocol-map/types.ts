@@ -251,8 +251,8 @@ export function mapEdgesFromParam(raw: string | null, fill: MapFill): string[] {
 }
 
 // ── The explanation drawer (ui-jobs 873.5) ─────────────────────────────────
-// Under the legend, the map's plain-language account of the address: groups
-// of bullets the protocol builds from its fill (Polaris:
+// Under the legend, the map's plain-language account of the address: tabs of
+// grouped bullets the protocol builds from its fill (Polaris:
 // lib/polaris/peth-map-explanation.ts) and the shared map draws. A bullet is
 // text and parts: each figure is a fill amount drawn bold with its receipt,
 // each time a link to its event on the timeline.
@@ -292,8 +292,15 @@ export interface MapExplanationGroup {
   bullets: MapBullet[];
 }
 
-export interface MapExplanation {
+/** One tab of the drawer: its label and its groups. The first tab opens. */
+export interface MapExplanationTab {
+  key: string;
+  label: string;
   groups: MapExplanationGroup[];
+}
+
+export interface MapExplanation {
+  tabs: MapExplanationTab[];
 }
 
 /** A part as plain text, a figure by `figure`. */

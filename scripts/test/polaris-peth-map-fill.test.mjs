@@ -404,7 +404,7 @@ test("the CDP, deposit and loan boxes take the places section's receipts", () =>
   );
   const loan = f.nodes[PM.loan].lines;
   assert.equal(loan.find((l) => l.label === "now").receipt.summary, "loanTotal");
-  assert.equal(loan.find((l) => l.text === "Reserve loan #28").receipt.summary, "loan 28");
+  assert.equal(loan.find((l) => l.text === "Floor Loan #28").receipt.summary, "loan 28");
   const d = fx("map-38d7");
   d.rollup.sp_peth = {
     raw: "3",

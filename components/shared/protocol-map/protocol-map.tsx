@@ -11,12 +11,12 @@
 // Clicking a box, a receipt or a timeline row selects it: the page holds the
 // selection and passes it back, and `hotSets` says what it lights.
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
-import { INFO_PATH } from "@/components/shared/info-disclosure";
+import { CardTabStrip, INFO_PATH } from "@/components/shared/info-disclosure";
 import { EXPLAIN_GROUP_RULE, ExplainBullet, ExplainHeading } from "@/components/shared/explain-groups";
 import {
   hotSets,
@@ -256,7 +256,8 @@ function Part({ p }: { p: MapTextPart }) {
 /** O8: the map's explanation, under the legend. The (i), the words and the
  *  chevron are one toggle, muted at rest and foreground on hover, focus and
  *  while open, as the event card's T3 row; the pane has a hairline above and
- *  no fill or box. Closed by default. */
+ *  no fill or box. Closed by default; open, the protocol's tabs in the opened
+ *  card's tab strip, the first tab open. */
 function MapExplanationDrawer({
   explanation,
   learnMore,
@@ -267,6 +268,11 @@ function MapExplanationDrawer({
   anatomy?: string;
 }) {
   const [open, setOpen] = useState(false);
+  // The tabs as the opened timeline card draws Explanation and Figures
+  // (CardTabStrip); the first opens.
+  const [openTab, setOpenTab] = useState<string | null>(null);
+  const tab = explanation.tabs.find((t) => t.key === openTab) ?? explanation.tabs[0];
+  const domId = `map-explanation-${useId().replace(/:/g, "")}`;
   const tone = open
     ? "text-foreground"
     : "text-rb-500 group-hover/mapx:text-foreground group-focus-visible/mapx:text-foreground";
@@ -306,38 +312,53 @@ function MapExplanationDrawer({
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
-      {open && (
-        <div className="pb-1 pt-3 text-sm" data-map-explanation="" data-anatomy={anatomy}>
-          {explanation.groups.map((g) => (
-            <section
-              key={g.id}
-              className={g.heading ? `mt-3 first:mt-0 ${EXPLAIN_GROUP_RULE}` : "mt-1"}
-              data-map-explanation-group={g.id}
-            >
-              {g.heading && <ExplainHeading>{g.heading}</ExplainHeading>}
-              {g.lead && (
-                <p className="mt-1 text-sm leading-snug text-rb-500">
-                  {g.lead.map((p, i) => (
-                    <Part key={i} p={p} />
-                  ))}
-                </p>
-              )}
-              {g.bullets.length > 0 && (
-                <ul className="mt-1 space-y-1 text-sm leading-snug text-rb-500">
-                  {g.bullets.map((b, i) => (
-                    <ExplainBullet key={i}>
-                      {b.parts.map((p, j) => (
-                        <Part key={j} p={p} />
-                      ))}
-                      {b.learnMore && learnMore && (
-                        <span className="ml-1.5 inline-flex align-middle">{learnMore(b.learnMore)}</span>
-                      )}
-                    </ExplainBullet>
-                  ))}
-                </ul>
-              )}
-            </section>
-          ))}
+      {open && tab && (
+        <div className="pt-2" data-map-explanation="" data-anatomy={anatomy} data-card-tab-open={tab.key}>
+          {explanation.tabs.length > 1 && (
+            <CardTabStrip
+              idBase={domId}
+              tabs={explanation.tabs.map((t) => ({ key: t.key, label: t.label }))}
+              openTab={tab.key}
+              onOpenTabChange={setOpenTab}
+            />
+          )}
+          <div
+            id={`${domId}-panel`}
+            role={explanation.tabs.length > 1 ? "tabpanel" : undefined}
+            aria-labelledby={explanation.tabs.length > 1 ? `${domId}-tab-${tab.key}` : undefined}
+            className="pb-1 pt-3 text-sm"
+          >
+            {tab.groups.map((g) => (
+              <section
+                key={g.id}
+                className={g.heading ? `mt-3 first:mt-0 ${EXPLAIN_GROUP_RULE}` : "mt-1 first:mt-0"}
+                data-map-explanation-group={g.id}
+              >
+                {g.heading && <ExplainHeading>{g.heading}</ExplainHeading>}
+                {g.lead && (
+                  <p className="mt-1 text-sm leading-snug text-rb-500">
+                    {g.lead.map((p, i) => (
+                      <Part key={i} p={p} />
+                    ))}
+                  </p>
+                )}
+                {g.bullets.length > 0 && (
+                  <ul className="mt-1 space-y-1 text-sm leading-snug text-rb-500">
+                    {g.bullets.map((b, i) => (
+                      <ExplainBullet key={i}>
+                        {b.parts.map((p, j) => (
+                          <Part key={j} p={p} />
+                        ))}
+                        {b.learnMore && learnMore && (
+                          <span className="ml-1.5 inline-flex align-middle">{learnMore(b.learnMore)}</span>
+                        )}
+                      </ExplainBullet>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -652,7 +673,7 @@ export function ProtocolMap({
         </div>
       )}
       {/* The selection line stays next to the map; the drawer follows. */}
-      {explanation && explanation.groups.length > 0 && (
+      {explanation && explanation.tabs.length > 0 && (
         <MapExplanationDrawer explanation={explanation} learnMore={learnMore} anatomy={explanationAnatomy} />
       )}
     </div>

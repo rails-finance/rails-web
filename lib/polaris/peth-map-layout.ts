@@ -29,6 +29,15 @@ export const PM = {
  *  of the explorer still says "Stability Pool" until ui-jobs 876. */
 export const POLARIS_POOL_NAME = "Earn Pools";
 
+/** The name of the loans against fpETH, on the map's box and in its
+ *  explanation (Miles, 28 Nov 2026: Polaris's docs say "Floor Loans",
+ *  docs.polaris.finance/architecture/reserve-loans). The loan pages and their
+ *  route keep "reserve loans" until the explorer-wide rename. */
+export const POLARIS_LOAN_NAME = "Floor Loans";
+
+/** One loan: "Floor Loan". */
+export const POLARIS_LOAN_ONE = POLARIS_LOAN_NAME.replace(/s$/, "");
+
 /** The edge between two nodes, by its one spelling. */
 export const pmEdge = (from: string, to: string): string => `${from}->${to}`;
 
@@ -96,7 +105,7 @@ const nodes: MapNode[] = [
     col: 3,
     span: 1,
     row: 4,
-    title: "Reserve loans",
+    title: POLARIS_LOAN_NAME,
     blurb: "borrow reserve ETH against fpETH",
   },
   {

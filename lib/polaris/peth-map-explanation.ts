@@ -5,15 +5,16 @@
 // scripts/test/polaris-peth-map-explanation.test.mjs checks them on both
 // fixtures. Pure, and imports nothing through `@/`.
 //
-// THE STORY ("What this address did", "Then"): one step per filled arrow, in
+// Two tabs. EXPLANATION: the story and Now, eight bullets at most (Z1's pane).
+// THE STORY ("Its steps", then an untitled group): one step per filled arrow, in
 // the order of each arrow's first row, ties in the map's order. Two pairs
 // read as one step: ETH into the zap router with what the router gave back
 // (the zap buy), and the bonding curve's fee after it, which carries no time
 // of its own. Each dated bullet states one time or span and one amount. Past
-// eight bullets the middle steps give way to a line linking the timeline
-// filtered to their arrows. NOW: each box's "now", two to a bullet, then the
-// address's balances. Then each part this address used, in the documented
-// term, and the dashed boxes.
+// the bullets Now leaves, the middle steps give way to a line linking the
+// timeline filtered to their arrows. NOW: each box's "now", two to a bullet,
+// then the address's balances. PARTS: each part this address used, in the
+// documented term, and the dashed boxes.
 //
 // Every figure is a fill amount with the receipt the map shows it with. The
 // zaps to vpETH, USDp, GOLDp or POLAR carry no ETH figure (ui-jobs 865), so
@@ -33,7 +34,7 @@ import type {
   MapTextPart,
 } from "../shared/protocol-map/types";
 import { MAP_HOLDER, mapUnusedWords, usedNodes } from "../shared/protocol-map/types";
-import { PM, POLARIS_MAP_LAYOUT, POLARIS_POOL_NAME, pmEdge } from "./peth-map-layout";
+import { PM, POLARIS_LOAN_NAME, POLARIS_MAP_LAYOUT, POLARIS_POOL_NAME, pmEdge } from "./peth-map-layout";
 
 /** What the drawer links to, from the page. */
 export interface PethMapExplainContext {
@@ -100,7 +101,6 @@ const timeOf = (at: number) => {
 const noteNames = (lines: MapLine[], re: RegExp): string[] =>
   lines.filter((l) => l.label === "note" && l.text != null && re.test(l.text)).map((l) => l.text!);
 
-const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 const upperFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): MapExplanation {
@@ -115,7 +115,8 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
     return i < 0 ? ctx.marketOrder.length : i;
   };
   const cdpNames = noteNames(lines(PM.cdp), /CDP #/).sort((a, b) => marketRank(a) - marketRank(b));
-  const loanNames = noteNames(lines(PM.loan), /#/).map(lowerFirst);
+  // "Floor Loan #28": the docs' term, capitalised mid-sentence too.
+  const loanNames = noteNames(lines(PM.loan), /#/);
   const spMarkets = [...new Set(noteNames(lines(PM.sp), /deposit #/).map((t) => t.split(" ")[0]))].sort(
     (a, b) => ctx.marketOrder.indexOf(a) - ctx.marketOrder.indexOf(b),
   );
@@ -124,14 +125,80 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
   const placeName: Record<string, MapTextPart> = {
     [PM.cdp]: twoOr(cdpNames, "its CDPs"),
     [PM.sp]: spMarkets.length === 1 ? `the ${spMarkets[0]} ${POOL_ONE}` : `the ${POLARIS_POOL_NAME}`,
-    [PM.loan]: twoOr(loanNames, "its reserve loans"),
+    [PM.loan]: twoOr(loanNames, `its ${POLARIS_LOAN_NAME}`),
     [PM.splitter]: "the Splitter",
     [PM.pools]: "the pools",
     [PM.svpeth]: "the svpETH vault",
     [PM.morpho]: "Morpho Blue",
   };
 
-  const groups: MapExplanationGroup[] = [];
+  const story: MapExplanationGroup[] = [];
+  const nowGroups: MapExplanationGroup[] = [];
+  const parts: MapExplanationGroup[] = [];
+
+  // ── Now ──
+  {
+    const now = (id: string): MapLine | undefined => lines(id).find((l) => l.label === "now" && l.amounts.length > 0);
+    const clauses: MapTextPart[][] = [];
+    const nowFig = (l: MapLine): MapTextPart => fig(l.amounts[0], l.receipt);
+    const cdp = now(PM.cdp);
+    if (cdp)
+      clauses.push(
+        cdpNames.length === 1
+          ? ["its CDP held ", nowFig(cdp), " at its last touch"]
+          : ["its CDPs held ", nowFig(cdp), " at their last touch"],
+      );
+    const sp = now(PM.sp);
+    if (sp) {
+      const n = noteNames(lines(PM.sp), /deposit #/).length;
+      clauses.push([`its ${POOL_ONE} ${n === 1 ? "deposit holds" : "deposits hold"} `, nowFig(sp)]);
+    }
+    const loan = now(PM.loan);
+    if (loan)
+      clauses.push(
+        loanNames.length === 1
+          ? [`${loanNames[0]} holds `, nowFig(loan)]
+          : [`its ${POLARIS_LOAN_NAME} hold `, nowFig(loan)],
+      );
+    const pools = now(PM.pools);
+    if (pools) clauses.push(["its pool shares hold ", nowFig(pools)]);
+    const conv = lines(PM.svpeth).find((l) => l.label === "note" && l.text === "Converts to" && l.amounts.length > 0);
+    if (conv) clauses.push(["its svpETH converts to ", nowFig(conv)]);
+
+    const bullets: MapBullet[] = [];
+    for (let i = 0; i < clauses.length; i += 2) {
+      const [a, b] = [clauses[i], clauses[i + 1]];
+      const first = [upperFirst(String(a[0])), ...a.slice(1)];
+      bullets.push({ parts: b ? [...first, ", and ", ...b, "."] : [...first, "."] });
+    }
+    const held = lines(MAP_HOLDER);
+    const heldNow = held.find((l) => l.label === "now");
+    if (heldNow && heldNow.amounts.length > 0) {
+      for (let i = 0; i < heldNow.amounts.length; i += 2) {
+        const [a, b] = heldNow.amounts.slice(i, i + 2);
+        bullets.push({
+          parts: [
+            i === 0 ? "It now holds " : "It also holds ",
+            fig(a, heldNow.receipt),
+            ...(b ? [" and ", fig(b, heldNow.receipt)] : []),
+            ".",
+          ],
+        });
+      }
+    } else if (held.some((l) => l.label === "note")) {
+      bullets.push({ parts: ["What it holds now is not read yet."] });
+    }
+    for (let i = 0; i < bullets.length; i += 4)
+      nowGroups.push({
+        id: i === 0 ? "now" : `now-${i / 4}`,
+        ...(i === 0 ? { heading: "Now" } : {}),
+        bullets: bullets.slice(i, i + 4),
+      });
+  }
+
+  // The Explanation tab keeps Z1's eight bullets: the story has what Now leaves.
+  const nowCount = nowGroups.reduce((n, g) => n + g.bullets.length, 0);
+  const budget = Math.max(0, PANE_BULLETS - nowCount);
 
   // ── The story ──
   if (!unknown) {
@@ -284,7 +351,8 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
     steps.sort((a, b) => (a.span?.first.at ?? Infinity) - (b.span?.first.at ?? Infinity) || a.order - b.order);
 
     // The groups: the steps before the first mechanism, then the rest, four
-    // bullets each; past eight, the earliest four and the latest four.
+    // bullets each. Past the budget, the earliest steps and the latest, and
+    // a line to the ones between.
     const size = (xs: Step[]) => xs.reduce((n, s) => n + 1 + s.more.length, 0);
     const take = (xs: Step[], max: number, fromEnd = false): Step[] => {
       const out: Step[] = [];
@@ -298,9 +366,9 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
     let did: Step[];
     let then: Step[];
     let skipped: Step[] = [];
-    if (size(steps) > 8) {
-      did = take(steps, 4);
-      then = take(steps.slice(did.length), 4, true);
+    if (size(steps) > budget) {
+      did = take(steps, Math.min(4, Math.ceil(budget / 2)));
+      then = take(steps.slice(did.length), Math.min(4, budget - size(did)), true);
       skipped = steps.slice(did.length, steps.length - then.length);
     } else {
       const firstMech = steps.findIndex((s) => s.mechanism);
@@ -309,6 +377,10 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
       while (size(then) > 4) {
         did = [...did, then[0]];
         then = then.slice(1);
+      }
+      while (size(did) > 4 && size([did[did.length - 1], ...then]) <= 4) {
+        then = [did[did.length - 1], ...then];
+        did = did.slice(0, -1);
       }
     }
 
@@ -321,16 +393,16 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
       day = d;
       return { text: d === ref ? timeOf(end.at) : `${d}, ${timeOf(end.at)}`, href: ctx.eventHref(end.id) };
     };
-    const story = [...did, ...then];
-    const lastStep = story[story.length - 1];
+    const told = [...did, ...then];
+    const lastStep = told[told.length - 1];
     const bulletsOf = (xs: Step[], startsThen: boolean): MapBullet[] =>
       xs.flatMap((s, i) => {
         const opener =
-          story.length < 2
+          told.length < 2
             ? ""
             : s === lastStep
               ? "Most recently, "
-              : s === story[0]
+              : s === told[0]
                 ? "First, "
                 : startsThen && i === 0
                   ? "Then, "
@@ -351,10 +423,10 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
         return [{ parts: [...head, ...tail].filter((p) => p !== "") }, ...s.more];
       });
 
-    if (story.length > 0) {
-      groups.push({
+    if (steps.length > 0) {
+      story.push({
         id: "did",
-        heading: "What this address did",
+        heading: "Its steps",
         ...(partial
           ? {
               lead: [
@@ -366,78 +438,21 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
       });
       if (skipped.length > 0) {
         const ids = [...new Set(skipped.flatMap((s) => s.edges).filter((id) => E[id]))];
-        groups.push({
+        story.push({
           id: "more",
           lead: [
             "… and ",
-            { link: `${skipped.length.toLocaleString("en-US")} more steps`, href: ctx.edgesHref(ids) },
+            {
+              link: `${skipped.length.toLocaleString("en-US")} more ${skipped.length === 1 ? "step" : "steps"}`,
+              href: ctx.edgesHref(ids),
+            },
             ", in the timeline.",
           ],
           bullets: [],
         });
       }
-      if (then.length > 0) groups.push({ id: "then", heading: "Then", bullets: bulletsOf(then, true) });
+      if (then.length > 0) story.push({ id: "then", bullets: bulletsOf(then, true) });
     }
-  }
-
-  // ── Now ──
-  {
-    const now = (id: string): MapLine | undefined => lines(id).find((l) => l.label === "now" && l.amounts.length > 0);
-    const clauses: MapTextPart[][] = [];
-    const nowFig = (l: MapLine): MapTextPart => fig(l.amounts[0], l.receipt);
-    const cdp = now(PM.cdp);
-    if (cdp)
-      clauses.push(
-        cdpNames.length === 1
-          ? ["its CDP held ", nowFig(cdp), " at its last touch"]
-          : ["its CDPs held ", nowFig(cdp), " at their last touch"],
-      );
-    const sp = now(PM.sp);
-    if (sp) {
-      const n = noteNames(lines(PM.sp), /deposit #/).length;
-      clauses.push([`its ${POOL_ONE} ${n === 1 ? "deposit holds" : "deposits hold"} `, nowFig(sp)]);
-    }
-    const loan = now(PM.loan);
-    if (loan)
-      clauses.push(
-        loanNames.length === 1
-          ? [`${loanNames[0].replace(/^reserve /, "")} holds `, nowFig(loan)]
-          : ["its reserve loans hold ", nowFig(loan)],
-      );
-    const pools = now(PM.pools);
-    if (pools) clauses.push(["its pool shares hold ", nowFig(pools)]);
-    const conv = lines(PM.svpeth).find((l) => l.label === "note" && l.text === "Converts to" && l.amounts.length > 0);
-    if (conv) clauses.push(["its svpETH converts to ", nowFig(conv)]);
-
-    const bullets: MapBullet[] = [];
-    for (let i = 0; i < clauses.length; i += 2) {
-      const [a, b] = [clauses[i], clauses[i + 1]];
-      const first = [upperFirst(String(a[0])), ...a.slice(1)];
-      bullets.push({ parts: b ? [...first, ", and ", ...b, "."] : [...first, "."] });
-    }
-    const held = lines(MAP_HOLDER);
-    const heldNow = held.find((l) => l.label === "now");
-    if (heldNow && heldNow.amounts.length > 0) {
-      for (let i = 0; i < heldNow.amounts.length; i += 2) {
-        const [a, b] = heldNow.amounts.slice(i, i + 2);
-        bullets.push({
-          parts: [
-            i === 0 ? "It now holds " : "It also holds ",
-            fig(a, heldNow.receipt),
-            ...(b ? [" and ", fig(b, heldNow.receipt)] : []),
-            ".",
-          ],
-        });
-      }
-    } else if (held.some((l) => l.label === "note")) {
-      bullets.push({ parts: ["What it holds now is not read yet."] });
-    }
-    for (let i = 0; i < bullets.length; i += 4)
-      groups.push({
-        id: i === 0 ? "now" : `now-${i / 4}`,
-        ...(i === 0 ? { heading: "Now" } : {}),
-        bullets: bullets.slice(i, i + 4),
-      });
   }
 
   // ── What each part does ──
@@ -450,11 +465,7 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
       ...(PART_MODAL[id] ? { learnMore: PART_MODAL[id] } : {}),
     }));
     for (let i = 0; i < bullets.length; i += 4)
-      groups.push({
-        id: i === 0 ? "parts" : `parts-${i / 4}`,
-        ...(i === 0 ? { heading: "What each part does" } : {}),
-        bullets: bullets.slice(i, i + 4),
-      });
+      parts.push({ id: i === 0 ? "parts" : `parts-${i / 4}`, bullets: bullets.slice(i, i + 4) });
   }
 
   // ── The boxes the map dashes ──
@@ -462,11 +473,19 @@ export function pethMapExplanation(fill: MapFill, ctx: PethMapExplainContext): M
     const used = usedNodes(POLARIS_MAP_LAYOUT, fill);
     const idle = MECHANISMS.filter((id) => !used.has(id)).map((id) => UNUSED_NAME[id]);
     if (idle.length > 0)
-      groups.push({ id: "unused", bullets: [{ parts: [`${mapUnusedWords(fill)}: `, { list: idle }, "."] }] });
+      parts.push({ id: "unused", bullets: [{ parts: [`${mapUnusedWords(fill)}: `, { list: idle }, "."] }] });
   }
 
-  return { groups };
+  return {
+    tabs: [
+      { key: "explanation", label: "Explanation", groups: [...story, ...nowGroups] },
+      { key: "parts", label: "Parts", groups: parts },
+    ].filter((t) => t.groups.length > 0),
+  };
 }
+
+/** Bullets in the Explanation tab at most: zone Z1's per pane (closed). */
+const PANE_BULLETS = 8;
 
 /** The parts the second section explains, in the map's order. */
 const PART_ORDER = [PM.zap, PM.curve, PM.cdp, PM.sp, PM.loan, PM.splitter, PM.pools, PM.svpeth, PM.morpho];
@@ -479,7 +498,7 @@ const PART_WORDS: Record<string, string> = {
   [PM.curve]: "Bonding curve: mints pETH against ETH and burns pETH to release ETH; its fees go to the fee router.",
   [PM.cdp]: "CDPs: lock pETH as collateral to mint USDp or GOLDp.",
   [PM.sp]: `${POLARIS_POOL_NAME}: hold USDp or GOLDp deposits that repay liquidated debt and receive its pETH collateral.`,
-  [PM.loan]: "Reserve loans: lend the reserve's ETH against fpETH collateral.",
+  [PM.loan]: `${POLARIS_LOAN_NAME}: lend ETH from the bonding curve reserve against fpETH collateral.`,
   [PM.splitter]: "Splitter: splits pETH into fpETH and vpETH, and merges them back.",
   [PM.pools]: "Pools: hold pETH paired with other tokens for trading.",
   [PM.svpeth]: "svpETH vault: stakes vpETH and supplies it to Morpho Blue.",
@@ -493,7 +512,7 @@ const PART_MODAL: Record<string, string> = { [PM.cdp]: "market" };
 const UNUSED_NAME: Record<string, string> = {
   [PM.cdp]: "CDPs",
   [PM.sp]: `the ${POLARIS_POOL_NAME}`,
-  [PM.loan]: "reserve loans",
+  [PM.loan]: POLARIS_LOAN_NAME,
   [PM.splitter]: "the Splitter",
   [PM.pools]: "the pools",
   [PM.svpeth]: "the svpETH vault",
