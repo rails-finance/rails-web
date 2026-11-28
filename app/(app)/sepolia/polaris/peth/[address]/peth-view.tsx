@@ -264,7 +264,9 @@ export default function PethView({
   const mapCtx = useMemo(() => pethMapContext(address), [address]);
   const baseFill = useMemo(() => mapFill ?? (data ? buildPethMapFill(data, mapCtx) : null), [mapFill, data, mapCtx]);
   const fill = useMemo(() => {
-    if (!baseFill || older.length === 0) return baseFill;
+    // Rows read later name their edges by the same rule: none while the
+    // server sends no places.
+    if (!baseFill || older.length === 0 || baseFill.edgesUnknown) return baseFill;
     const seen = new Set(baseFill.rows.map((r) => r.id));
     const more = older
       .filter((r) => !seen.has(pethRowId(r)))
@@ -291,7 +293,7 @@ export default function PethView({
   };
   const hot = useMemo(() => (fill ? hotSets(POLARIS_MAP_LAYOUT, fill, selection) : null), [fill, selection]);
   const edgeRows = useMemo(() => {
-    if (!fill || !filterEdge) return null;
+    if (!fill || !filterEdge || fill.edgesUnknown) return null;
     return new Set(fill.rows.filter((r) => r.edgeIds.includes(filterEdge)).map((r) => r.id));
   }, [fill, filterEdge]);
   const rowLabel = (id: string) => {
@@ -473,7 +475,7 @@ export default function PethView({
           boundary={boundary}
           loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
           notice={
-            filterEdge && fill ? (
+            filterEdge && edgeRows ? (
               <MapFilterNotice edgeId={filterEdge} count={shown.length} onClear={() => applyFilter(null)} />
             ) : undefined
           }

@@ -200,12 +200,23 @@ export function pethMapRowEdges(row: PethLedgerRow, ctx: PethMapContext): string
   return [...ids];
 }
 
+/** Whether the server sends each row's place (ui-jobs 872): `place_counts`
+ *  is present, or a row carries a `place` or `places` key. A served row with
+ *  `place: null` is a plain transfer; an answer with neither key on any row
+ *  says nothing about where its rows went. */
+export const pethPlacesServed = (d: Pick<PolarisPethResponse, "place_counts" | "rows">): boolean =>
+  d.place_counts !== undefined || (d.rows ?? []).some((r) => "place" in r || "places" in r);
+
 export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): MapFill {
   const ok = (d.status == null || d.status === "ok") && d.ledger?.complete !== false;
+  const served = pethPlacesServed(d);
+  // Without places served, every row would read as a transfer: sum none.
   const rows = ok ? (d.rows ?? []) : [];
+  const summed = served ? rows : [];
   const sums = new Map<string, { s: Sums; rows: number }>();
   const fillRows: MapFill["rows"] = [];
-  for (const r of rows) {
+  if (!served) for (const r of rows) fillRows.push({ id: r.tx_hash.toLowerCase(), edgeIds: [] });
+  for (const r of summed) {
     const used = new Set<string>();
     for (const f of rowFlows(r, ctx)) {
       if (!EDGES.get(f.edgeId)?.places.includes(f.place)) continue;
@@ -346,5 +357,6 @@ export function buildPethMapFill(d: PolarisPethResponse, ctx: PethMapContext): M
     edges,
     rows: fillRows,
     counted: { rows: rows.length, total },
+    ...(served ? {} : { edgesUnknown: true as const }),
   };
 }

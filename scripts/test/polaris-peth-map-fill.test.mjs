@@ -177,18 +177,6 @@ test("the fill carries no gain, and the browser gets a few dozen figures", () =>
   }
 });
 
-test("without 872's place, only the transfers draw", () => {
-  const d = fx("map-c513");
-  for (const r of d.rows) {
-    delete r.place;
-    delete r.places;
-  }
-  delete d.place_counts;
-  const f = buildPethMapFill(d, CTX);
-  assert.deepEqual(Object.keys(f.edges), [pmEdge(PM.outside, MAP_HOLDER)]);
-  assert.ok(f.nodes[PM.pools].lines.some((l) => l.label === "now"));
-});
-
 test("past the first read, arrows count rows and carry no amount; boxes give the whole ledger's count", () => {
   const d = fx("map-c513");
   d.total_rows = 40000;
@@ -278,4 +266,33 @@ test("fpETH and vpETH transfers sum on the Other addresses box", () => {
   const f = buildPethMapFill(d, CTX);
   assert.deepEqual(sums(f, PM.outside, MAP_HOLDER), { fpETH: "3", vpETH: "4" });
   assert.deepEqual(sums(f, MAP_HOLDER, PM.outside), { vpETH: "5" });
+});
+
+test("places not served: no arrows, no untouched boxes, the boxes' now kept", () => {
+  for (const name of ["map-38d7", "map-c513"]) {
+    const d = fx(name);
+    for (const r of d.rows) {
+      delete r.place;
+      delete r.places;
+    }
+    delete d.place_counts;
+    const f = buildPethMapFill(d, CTX);
+    assert.equal(f.edgesUnknown, true, name);
+    assert.deepEqual(f.edges, {}, name);
+    assert.ok(f.rows.every((r) => r.edgeIds.length === 0));
+    assert.equal(f.rows.length, d.rows.length);
+    assert.ok(f.nodes[MAP_HOLDER].lines[0].label === "now");
+    // Every box reads as known-unknown: none is marked untouched.
+    assert.equal(usedNodes(POLARIS_MAP_LAYOUT, f).size, POLARIS_MAP_LAYOUT.nodes.length);
+    // A contract receipt is not drawn as a transfer.
+    assert.equal(f.edges[pmEdge(PM.outside, MAP_HOLDER)], undefined);
+  }
+});
+
+test("a served row with place null is still a transfer", () => {
+  const d = fx("map-c513");
+  delete d.place_counts;
+  const f = buildPethMapFill(d, CTX);
+  assert.equal(f.edgesUnknown, undefined);
+  assert.deepEqual(sums(f, PM.outside, MAP_HOLDER), { pETH: "20753615371910740758" });
 });

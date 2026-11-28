@@ -208,7 +208,12 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
 
   const used = useMemo(() => usedNodes(layout, fill), [layout, fill]);
   const hot = useMemo(() => hotSets(layout, fill, selection), [layout, fill, selection]);
-  const edges = useMemo(() => (geo ? drawEdges(layout, fill, geo.boxes, geo.w) : []), [layout, fill, geo]);
+  // With the edges unknown, the map draws its boxes alone.
+  const unknown = fill.edgesUnknown === true;
+  const edges = useMemo(
+    () => (geo && !unknown ? drawEdges(layout, fill, geo.boxes, geo.w) : []),
+    [layout, fill, geo, unknown],
+  );
   const title = (id: string) => layout.nodes.find((n) => n.id === id)?.title ?? id;
   const toggle = (s: NonNullable<MapSelection>) =>
     onSelect(selection && selection.type === s.type && selection.id === s.id ? null : s);
@@ -304,14 +309,17 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
           >
             {layout.nodes.map((n) => {
               const isUsed = used.has(n.id);
+              const clickable = isUsed && !unknown;
               const isHot = hot.nodes.has(n.id);
               const holder = n.id === MAP_HOLDER;
               const lines = fill.nodes[n.id]?.lines ?? [];
               const frameCls = holder
                 ? "border-2 border-blue-500/60 dark:border-blue-400/60"
-                : isUsed
-                  ? "border border-blue-500/40 dark:border-blue-400/40"
-                  : "border border-dashed border-rb-300 dark:border-rb-500";
+                : unknown
+                  ? "border border-[var(--card-border)]"
+                  : isUsed
+                    ? "border border-blue-500/40 dark:border-blue-400/40"
+                    : "border border-dashed border-rb-300 dark:border-rb-500";
               const body = (
                 <>
                   <span className={`text-sm ${isUsed ? "font-semibold text-foreground" : "font-medium text-rb-500"}`}>
@@ -332,7 +340,7 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
                 isHot ? "ring-2 ring-[var(--focus-ring)]" : ""
               } ${hot.any && !isHot && isUsed ? "opacity-50" : ""}`;
               const style = { gridColumn: `${n.col} / span ${n.span}`, gridRow: String(n.row) };
-              return isUsed ? (
+              return clickable ? (
                 <button
                   key={n.id}
                   type="button"
@@ -403,20 +411,22 @@ export function ProtocolMap({ layout, fill, selection, onSelect, onFilter, holde
             })}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-rb-500">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-6 border-t-2 border-blue-500/70" aria-hidden="true" />
-          Used by this address
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span
-            className="inline-block w-6 border-t border-dashed border-rb-300 dark:border-rb-500"
-            aria-hidden="true"
-          />
-          Not used by this address
-        </span>
-        <span>Each arrow&rsquo;s number links to the timeline filtered to its transactions.</span>
-      </div>
+      {!unknown && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-rb-500">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-6 border-t-2 border-blue-500/70" aria-hidden="true" />
+            Used by this address
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className="inline-block w-6 border-t border-dashed border-rb-300 dark:border-rb-500"
+              aria-hidden="true"
+            />
+            Not used by this address
+          </span>
+          <span>Each arrow&rsquo;s number links to the timeline filtered to its transactions.</span>
+        </div>
+      )}
       {sentence && (
         <div
           className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-xl border border-blue-500/40 bg-[var(--surface-inset)] px-3 py-2 text-sm text-rb-500"

@@ -41,7 +41,7 @@ export function PolarisPethMap({
       <p className="mt-1 text-sm leading-relaxed text-rb-500">
         The map below draws Polaris with this address&rsquo;s activity on it: where its tokens came from above it, and
         the mechanisms it used below. Each arrow sums what moved along it. Each box gives what went in and what sits
-        there now, each in its token. Click a box, an arrow or a timeline row to trace it.
+        there now, each in its token.{fill.edgesUnknown ? "" : " Click a box, an arrow or a timeline row to trace it."}
       </p>
       {ledgerGap != null && (
         <p className="mt-1 text-sm leading-relaxed text-rb-500">
@@ -50,7 +50,12 @@ export function PolarisPethMap({
             : "The history of this address is still being read, so the map draws no arrows."}
         </p>
       )}
-      {ledgerGap == null && rows < total && (
+      {ledgerGap == null && fill.edgesUnknown && (
+        <p className="mt-1 text-sm leading-relaxed text-rb-500" data-peth-map-unserved="">
+          This server does not send where each transaction went yet, so the map draws no arrows.
+        </p>
+      )}
+      {ledgerGap == null && !fill.edgesUnknown && rows < total && (
         <p className="mt-1 text-sm leading-relaxed text-rb-500">
           This address has {total.toLocaleString("en-US")} transactions. The arrows count the newest{" "}
           {rows.toLocaleString("en-US")} and state no amounts. Each box counts all of them.

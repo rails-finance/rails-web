@@ -82,6 +82,9 @@ export interface MapFill {
   rows: { id: string; edgeIds: string[] }[];
   /** How many rows the fill summed, of how many the address has. */
   counted: { rows: number; total: number };
+  /** The server does not say which edges the rows used: the map draws no
+   *  edges and marks no box untouched. */
+  edgesUnknown?: true;
 }
 
 export type MapSelection = { type: "node" | "edge" | "row"; id: string } | null;
@@ -96,6 +99,7 @@ export interface MapHot {
 /** The nodes a filled edge touches, the holder always among them. */
 export function usedNodes(layout: MapLayout, fill: MapFill): Set<string> {
   const out = new Set<string>([MAP_HOLDER]);
+  if (fill.edgesUnknown) for (const n of layout.nodes) out.add(n.id);
   for (const [id, n] of Object.entries(fill.nodes)) if ((n.rowCount ?? 0) > 0) out.add(id);
   for (const e of layout.edges)
     if (fill.edges[e.id]) {
